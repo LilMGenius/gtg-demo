@@ -18,6 +18,7 @@ export function createBallProbe(camera, scene, ball, radius) {
   const v = new THREE.Vector3();
   const dir = new THREE.Vector3();
   const stats = { frames: 0, visible: 0, offscreen: 0, occluded: 0, behind: 0, streak: 0, longestStreak: 0, last: null, blockers: {} };
+  let run = null;
 
   // 한 프레임의 판정. 투영해서 NDC를 구하고, 카메라에서 공까지 실제로 광선을 쏜다.
   function sample() {
@@ -27,6 +28,7 @@ export function createBallProbe(camera, scene, ball, radius) {
     const onScreen = !behind && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1;
 
     let occluded = false;
+    let lastBlocker = onScreen ? 'offscreen' : 'offscreen';
     if (onScreen) {
       dir.copy(ball.position).sub(camera.position);
       const dist = dir.length();
@@ -40,6 +42,7 @@ export function createBallProbe(camera, scene, ball, radius) {
       if (hit) {
         const k = hit.object.name || hit.object.geometry?.type || 'unknown';
         stats.blockers[k] = (stats.blockers[k] || 0) + 1;
+        lastBlocker = k;
       }
     }
 
@@ -51,8 +54,17 @@ export function createBallProbe(camera, scene, ball, radius) {
     else stats.occluded += 1;
     // 누적 비율은 순간의 가림과 지속적인 사라짐을 같은 숫자로 만든다.
     // 키퍼 뒤로 잠시 지나는 것은 정상이고, 계속 안 보이는 것은 구도 문제다.
-    if (visible) stats.streak = 0;
-    else { stats.streak += 1; stats.longestStreak = Math.max(stats.longestStreak, stats.streak); }
+    if (visible) { stats.streak = 0; run = null; }
+    else {
+      stats.streak += 1;
+      // 숫자만 남기면 어디서 사라졌는지를 몰라 고칠 수가 없다.
+      if (!run) run = { from: [v.x, v.y, v.z], ballFrom: [ball.position.x, ball.position.y, ball.position.z], by: {} };
+      run.to = [v.x, v.y, v.z];
+      run.ballTo = [ball.position.x, ball.position.y, ball.position.z];
+      run.len = stats.streak;
+      if (lastBlocker) run.by[lastBlocker] = (run.by[lastBlocker] || 0) + 1;
+      if (stats.streak > stats.longestStreak) { stats.longestStreak = stats.streak; stats.worstRun = run; }
+    }
     stats.last = { visible, onScreen, occluded, behind, ndc: [v.x, v.y, v.z] };
     return stats.last;
   }
@@ -69,7 +81,7 @@ export function createBallProbe(camera, scene, ball, radius) {
   }
 
   function reset() {
-    stats.frames = 0; stats.visible = 0; stats.offscreen = 0; stats.occluded = 0; stats.behind = 0; stats.streak = 0; stats.longestStreak = 0; stats.last = null; stats.blockers = {};
+    stats.frames = 0; stats.visible = 0; stats.offscreen = 0; stats.occluded = 0; stats.behind = 0; stats.streak = 0; stats.longestStreak = 0; stats.last = null; stats.blockers = {}; stats.worstRun = null; run = null;
   }
 
   return { sample, probeAt, reset, stats };

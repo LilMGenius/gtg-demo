@@ -10,6 +10,8 @@ const flat = (c) => new THREE.MeshLambertMaterial({ color: c });
 const BALL_R = 0.14;
 // 화면 좌우와 판정 좌우를 맞추는 부호. 판정식은 건드리지 않는다.
 const VIEW_X = -1;
+// 키커가 공 바로 뒤에 서면 대기 내내 공을 가린다. 측정값: 23프레임 연속 사라짐.
+const KICKER_OFF = 1.15;
 // 골망은 z = -0.75에 있다. q가 1.09면 공이 딱 그 자리에서 선다.
 const BALL_PAST = 1.09;
 // 판정 단위와 렌더 미터는 같지 않다.
@@ -223,7 +225,8 @@ export function createScene(canvas) {
   let cue = null;
   function play(shot, input, result, onEnd) {
     cue = { shot, input, result, t0: performance.now() / 1000, ended: false, onEnd, steps: 0, struck: false, framed: false };
-    kicker.position.set(VIEW_X * shot.aimX * SX * 0.2, 0, 11.2);
+    kicker.position.set(VIEW_X * shot.aimX * SX * 0.2 + KICKER_OFF, 0, 11.2);
+    kicker.userData.startX = kicker.position.x;
     ball.position.set(0, BALL_R, 11);
     sfx.place();
   }
@@ -238,6 +241,7 @@ export function createScene(canvas) {
       if (t < runup) {
         const p = t / runup;
         kicker.position.z = lerp(11.2, 10.55, ease(p));
+        kicker.position.x = lerp(kicker.userData.startX ?? KICKER_OFF, VIEW_X * shot.aimX * SX * 0.2 + KICKER_OFF * 0.45, ease(p));
         kicker.rotation.z = Math.sin(p * 14) * 0.14;
         // 발이 땅에 닿는 순간에만 소리를 낸다. 균등 간격으로 뿌리면 기계 소리가 된다.
         const beat = Math.floor(p / 0.34) + 1;
@@ -312,7 +316,7 @@ export function createScene(canvas) {
     shadow.position.set(0, 0.02, 11);
     shadow.scale.setScalar(1);
     shadow.material.opacity = 0.42;
-    kicker.position.set(0, 0, 11.2);
+    kicker.position.set(KICKER_OFF, 0, 11.2);
     kicker.rotation.z = 0;
   }
   reset();
