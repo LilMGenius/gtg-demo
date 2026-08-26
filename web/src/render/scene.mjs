@@ -196,6 +196,8 @@ export function createScene(canvas) {
   // 가로가 기준이다. 화면이 그보다 좁으면 수직 화각을 늘려 골대 폭을 지킨다.
   const BASE_ASPECT = 16 / 9;
   const BASE_FOV = 46;
+  // 키퍼가 골라인에 붙으면 카메라에 가까워 발이 프레임 아래로 내려간다.
+  const KEEPER_Z = 0.9;
   function resize() {
     const w = canvas.clientWidth || innerWidth;
     const h = canvas.clientHeight || innerHeight;
@@ -279,7 +281,7 @@ export function createScene(canvas) {
         const dp = Math.min(1, Math.max(0, (t - runup - flight * 0.28) / (flight * 0.7)));
         const span = Math.min(R_HALF_W - 0.5, 1.05 + 0.06 * cueKeeperDiving());
         keeper.position.x = lerp(0, VIEW_X * input.dive * span, ease(dp));
-        keeper.position.z = lerp(0.12, 0.12 + input.advance, ease(Math.min(1, dp * 1.4)));
+        keeper.position.z = lerp(KEEPER_Z, KEEPER_Z + input.advance, ease(Math.min(1, dp * 1.4)));
         keeper.rotation.z = lerp(0, VIEW_X * -input.dive * 1.15, ease(dp));
         // 몸이 누우면 어깨가 지면 아래로 내려간다. 기울인 만큼 들어야 흔을 안 파고 든다.
         const tilt = Math.abs(Math.sin(keeper.rotation.z)) * keeper.userData.girth;
@@ -304,7 +306,7 @@ export function createScene(canvas) {
 
   function reset() {
     cue = null;
-    keeper.position.set(0, 0, 0.12);
+    keeper.position.set(0, 0, KEEPER_Z);
     keeper.rotation.z = 0;
     ball.position.set(0, BALL_R, 11);
     shadow.position.set(0, 0.02, 11);
