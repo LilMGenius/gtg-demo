@@ -3,6 +3,7 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { GOAL_HALF_W, GOAL_H } from '../../../src/chain.mjs';
 import { mountSfx } from '../audio/sfx.mjs';
+import { createBallProbe } from '../diagnostics/ball-probe.mjs';
 
 const flat = (c) => new THREE.MeshLambertMaterial({ color: c });
 const BALL_R = 0.14;
@@ -34,6 +35,7 @@ function buildKeeper(height, weight) {
   gr.position.set(w + 0.22, h * 0.62, 0.06);
 
   g.add(torso, head, legs, gl, gr);
+  for (const m of [torso, head, legs, gl, gr]) m.name = 'keeper';
   g.userData.gloves = [gl, gr];
   return g;
 }
@@ -46,6 +48,7 @@ function buildKicker() {
   head.position.y = 1.62;
   const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 0.52, 3, 8), flat(0xf0f0ee));
   legs.position.y = 0.4;
+  for (const m of [torso, head, legs]) m.name = 'kicker';
   g.add(torso, head, legs);
   return g;
 }
@@ -74,11 +77,13 @@ export function createScene(canvas) {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), flat(0x9c7a4a));
   ground.rotation.x = -Math.PI / 2;
   ground.position.z = 24;
+  ground.name = 'ground';
   scene.add(ground);
 
   const box = new THREE.Mesh(new THREE.PlaneGeometry(16.5, 16.5), flat(0xb08e58));
   box.rotation.x = -Math.PI / 2;
   box.position.set(0, 0.01, 8.2);
+  box.name = 'box';
   scene.add(box);
 
   // 골대. 판정식이 쓰는 폭과 높이를 그대로 쓴다. 그림과 숫자가 어긋나면 화면이 거짓말을 한다.
@@ -87,11 +92,13 @@ export function createScene(canvas) {
   for (const x of [-GOAL_HALF_W, GOAL_HALF_W]) {
     const p = new THREE.Mesh(post, white);
     p.position.set(x, GOAL_H / 2, 0);
+    p.name = 'post';
     scene.add(p);
   }
   const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, GOAL_HALF_W * 2, 8), white);
   bar.rotation.z = Math.PI / 2;
   bar.position.set(0, GOAL_H, 0);
+  bar.name = 'bar';
   scene.add(bar);
 
   const net = new THREE.Mesh(
@@ -130,6 +137,7 @@ export function createScene(canvas) {
   scene.add(skyline);
 
   const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.14, 1), flat(0xfdfdf6));
+  ball.userData.probeIgnore = true;
   scene.add(ball);
 
   // 공 그림자. 공이 어디쯤인지 바닥이 알려주면 궤적을 놓치지 않는다.
@@ -138,6 +146,7 @@ export function createScene(canvas) {
     new THREE.MeshBasicMaterial({ color: 0x1c1508, transparent: true, opacity: 0.42 })
   );
   shadow.rotation.x = -Math.PI / 2;
+  shadow.userData.probeIgnore = true;
   scene.add(shadow);
 
   const kicker = buildKicker();
@@ -170,6 +179,9 @@ export function createScene(canvas) {
   }
   addEventListener('resize', resize);
   resize();
+
+  // 공이 화면에 있는지는 재야 알 수 있다. 보이게 만들었다는 말은 증거가 아니다.
+  const ballProbe = createBallProbe(camera, scene, ball, BALL_R);
 
   // 한 구의 연출. 시작 시각과 확정된 결과만 받는다.
   let cue = null;
@@ -243,6 +255,7 @@ export function createScene(canvas) {
         }
       }
     }
+    if (cue) ballProbe.sample();
     renderer.render(scene, camera);
   }
   let divingStat = 5;
@@ -263,5 +276,5 @@ export function createScene(canvas) {
   }
   reset();
 
-  return { play, reset, setKeeper, sfx, set diving(v) { divingStat = v; } };
+  return { play, reset, setKeeper, sfx, ballProbe, set diving(v) { divingStat = v; } };
 }
