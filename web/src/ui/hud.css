@@ -60,6 +60,14 @@ body.playing #hud{opacity:1}
 #out.on{background:#e0563f;color:#fff;border-color:#ff8b78;
   box-shadow:0 0 0 5px #e0563f2e, 0 6px 20px #e0563f55}
 
+/* 자동. 손가락만 대신한다. */
+#auto{position:absolute;right:var(--pad-r);bottom:calc(94px + env(safe-area-inset-bottom));
+  pointer-events:auto;width:66px;height:66px;border-radius:50%;
+  border:1px solid var(--edge);background:var(--panel);backdrop-filter:blur(7px);
+  color:var(--dim);font-size:15px;font-weight:800;letter-spacing:.02em}
+#auto.on{background:#4fd08a;color:#0d110c;border-color:#8ef0bb;
+  box-shadow:0 0 0 5px #4fd08a2e, 0 6px 20px #4fd08a55}
+
 /* 성장 선택. 가로라 세 장을 나란히 놓을 수 있다. */
 #offer{position:absolute;inset:0;pointer-events:auto;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;

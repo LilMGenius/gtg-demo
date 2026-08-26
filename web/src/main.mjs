@@ -4,6 +4,7 @@ import { CAUSE_LABEL } from '../../src/ledger.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
+import { load, save } from './state/save.mjs';
 
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
@@ -16,7 +17,8 @@ mountBgm();
 // 재현되지 않는 캐프처는 증거가 아니다. ?seed= 가 있으면 그 씨드로 고정한다.
 const seedParam = new URLSearchParams(location.search).get('seed');
 const rng = makeRng(seedParam === null ? ((Date.now() ^ 0x9e3779b9) >>> 0) : (Number(seedParam) >>> 0));
-const state = { keeper: newKeeper(), shots: [], i: 0, results: [], phase: 'idle' };
+const saved = load();
+const state = { keeper: saved?.keeper ?? newKeeper(), shots: [], i: 0, results: [], phase: 'idle', auto: Boolean(saved?.auto) };
 
 // 손가락 셋. 방향과 타이밍과 나갈지 여부.
 // 여기서 나온 실패는 손가락 셋으로 귀속하고 스탯 원장에 섞지 않는다.
@@ -62,7 +64,9 @@ function nextShot() {
   say(shot.kicker.name + ' 준비합니다.', null);
   // 창이 닫히면 손가락 대신 자동 입력이 친다. 늦은 만큼은 스탯이 아니라 손가락 탓이다.
   clearTimeout(timer);
-  timer = setTimeout(() => { if (state.phase === 'wait') commit(null); }, shot.flight * 1000 + 900);
+  // 자동은 손가락만 대신한다. 공은 같은 시간을 날고 대기시간은 그대로다.
+  const wait = state.auto ? Math.max(0, pressAt - performance.now()) : shot.flight * 1000 + 900;
+  timer = setTimeout(() => { if (state.phase === 'wait') commit(null); }, wait);
 }
 
 function commit(dive) {
@@ -115,6 +119,7 @@ function endSet() {
     b.onclick = () => {
       state.keeper[b.dataset.k] += 1;
       state.keeper.level += 1;
+      save(state.keeper, state.auto);
       box.hidden = true;
       stage.setKeeper(state.keeper);
       nextSet();
@@ -125,6 +130,14 @@ function endSet() {
 for (const b of document.querySelectorAll('.zone')) {
   b.onpointerdown = () => commit(Number(b.dataset.dive));
 }
+const autoBtn = el('auto');
+autoBtn.classList.toggle('on', state.auto);
+autoBtn.onpointerdown = () => {
+  state.auto = !state.auto;
+  autoBtn.classList.toggle('on', state.auto);
+  save(state.keeper, state.auto);
+};
+
 el('out').onpointerdown = () => {
   advance = advance > 0 ? 0 : 0.9;
   el('out').classList.toggle('on', advance > 0);
