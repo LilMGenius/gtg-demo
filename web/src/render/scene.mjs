@@ -168,6 +168,33 @@ export function createScene(canvas) {
   box.name = 'box';
   scene.add(box);
 
+  // 라인. 흙바닥만 있으면 거리가 안 읽힌다. 공이 어디쯤 왔는지는 선이 알려준다.
+  const lineMat = new THREE.MeshBasicMaterial({ color: 0xf2f0e4, transparent: true, opacity: 0.7 });
+  const stripe = (w, d, x, z) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), lineMat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(x, 0.02, z);
+    m.userData.probeIgnore = true;
+    scene.add(m);
+  };
+  const BOX_W = 16.5;
+  const BOX_D = 16.5;
+  const GA_W = 9.16;
+  const GA_D = 5.5;
+  stripe(40, 0.12, 0, 0);
+  stripe(0.12, BOX_D, -BOX_W / 2, BOX_D / 2);
+  stripe(0.12, BOX_D, BOX_W / 2, BOX_D / 2);
+  stripe(BOX_W, 0.12, 0, BOX_D);
+  stripe(0.12, GA_D, -GA_W / 2, GA_D / 2);
+  stripe(0.12, GA_D, GA_W / 2, GA_D / 2);
+  stripe(GA_W, 0.12, 0, GA_D);
+  // 페널티 스팟. 키커가 공을 놓는 자리다.
+  const spot = new THREE.Mesh(new THREE.CircleGeometry(0.16, 12), lineMat);
+  spot.rotation.x = -Math.PI / 2;
+  spot.position.set(0, 0.02, 11);
+  spot.userData.probeIgnore = true;
+  scene.add(spot);
+
   // 골대. 판정식이 쓰는 폭과 높이를 그대로 쓴다. 그림과 숫자가 어긋나면 화면이 거짓말을 한다.
   const post = new THREE.CylinderGeometry(0.06, 0.06, R_H, 8);
   const white = flat(0xf4f6f2);
