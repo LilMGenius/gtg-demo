@@ -1,5 +1,5 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
-import { makeRng, buildSet, resolve, growthOffer, newKeeper, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain } from '../../src/chain.mjs';
+import { makeRng, buildSet, resolve, growthOffer, newKeeper, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain } from '../../src/chain.mjs';
 import { CAUSE_LABEL } from '../../src/ledger.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
@@ -21,6 +21,8 @@ const saved = load();
 const state = { keeper: Object.assign(newKeeper(), saved?.keeper || null), shots: [], i: 0, results: [], phase: 'idle', auto: Boolean(saved?.auto), picks: 0 };
 // 비운 시간은 훈련 선택권으로만 바뀌고, 그 선택은 손으로 한다.
 state.picks = saved ? offlineGain(saved.at, Date.now()) : 0;
+// 아웃문그램 팔로워. 의사소통과 악동이 여기서 값을 낸다.
+state.fans = Number(saved?.fans) || 0;
 window.__picks = () => state.picks;
 
 // 손가락 셋. 방향과 타이밍과 나갈지 여부.
@@ -41,6 +43,7 @@ function pips() {
     return '<i class=\"' + (r === undefined ? '' : r ? 'gone' : 'save') + '\"></i>';
   }).join('');
   el('lv').textContent = 'Lv ' + state.keeper.level;
+  el('fans').innerHTML = '아웃문그램 <b>' + state.fans.toLocaleString() + '</b>';
 }
 
 function setPad(on) {
@@ -99,6 +102,9 @@ function rollCaptions(result) {
     const e = lines.shift();
     if (!e) {
       state.skip = null;
+      // 팔로워는 구마다 오른다. 먹혀도 오르고, 막으면 더 오른다.
+      const gain = followerGain(state.keeper, result);
+      state.fans += gain;
       pips();
       state.i += 1;
       restart(result);
@@ -131,6 +137,7 @@ function countdown(sec, label, then) {
 }
 
 function restart(result) {
+  save(state.keeper, state.auto, state.fans);
   const hand = ballInHand(result);
   countdown(restartDelay(state.keeper, result), hand ? '손으로 던져준다' : '골킥을 차준다', nextShot);
 }
@@ -155,12 +162,12 @@ function showOffer() {
       // 프로의식은 히든이다. 숫자는 안 보이고 가끔 두 칸이 오른다.
       state.keeper[b.dataset.k] += growthGain(state.keeper, rng);
       state.keeper.level += 1;
-      save(state.keeper, state.auto);
+      save(state.keeper, state.auto, state.fans);
       box.hidden = true;
       stage.setKeeper(state.keeper);
       if (state.picks > 0) {
         state.picks -= 1;
-        save(state.keeper, state.auto);
+        save(state.keeper, state.auto, state.fans);
         showOffer();
         return;
       }
@@ -180,7 +187,7 @@ autoBtn.classList.toggle('on', state.auto);
 autoBtn.onpointerdown = () => {
   state.auto = !state.auto;
   autoBtn.classList.toggle('on', state.auto);
-  save(state.keeper, state.auto);
+  save(state.keeper, state.auto, state.fans);
 };
 
 el('out').onpointerdown = () => {

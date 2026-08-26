@@ -14,9 +14,9 @@ export function load() {
   }
 }
 
-export function save(keeper, auto) {
+export function save(keeper, auto, fans) {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ keeper, auto, at: Date.now() }));
+    localStorage.setItem(KEY, JSON.stringify({ keeper, auto, fans, at: Date.now() }));
   } catch {
     // 사파리 프라이빗 모드는 쓰기를 막는다. 저장이 안 되는 것과 게임이 죽는 것은 다른 일이다.
   }
