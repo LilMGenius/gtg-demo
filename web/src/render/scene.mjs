@@ -245,6 +245,24 @@ export function createScene(canvas) {
   }
   scene.add(skyline);
 
+  // 행인. 펜스 너머를 지나간다. 아무도 없는 운동장은 연습장이지 경기장이 아니다.
+  // 집중력 스탯이 여기에 걸린다. 지금은 걷기만 한다.
+  const passers = [];
+  const shirt = [0xd8556a, 0x4a72c4, 0xe0a23c, 0x7a4fb0, 0x3fa37a];
+  for (let i = 0; i < 5; i += 1) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.62, 3, 6), flat(shirt[i]));
+    body.position.y = 0.86;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), flat(0xe0b48c));
+    head.position.y = 1.38;
+    g.add(body, head);
+    for (const m of [body, head]) m.userData.probeIgnore = true;
+    g.position.set(-24 + i * 9.5, 0, 32.5 + (i % 3) * 1.4);
+    g.userData.speed = 1.4 + (i % 4) * 0.5;
+    scene.add(g);
+    passers.push(g);
+  }
+
   const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.14, 1), flat(0xfdfdf6));
   ball.userData.probeIgnore = true;
   scene.add(ball);
@@ -387,6 +405,12 @@ export function createScene(canvas) {
       }
     }
     keeperShadow.position.set(keeper.position.x, 0.03, keeper.position.z);
+    // 행인은 판정과 무관하게 계속 걷는다. 멈춘 배경은 그림이고 움직이는 배경은 장소다.
+    for (const p of passers) {
+      p.position.x += p.userData.speed * 0.016;
+      if (p.position.x > 26) p.position.x = -26;
+      p.rotation.z = Math.sin(performance.now() * 0.006 * p.userData.speed) * 0.06;
+    }
     keeperShadow.scale.setScalar(1 + Math.abs(Math.sin(keeper.rotation.z)) * 0.8);
     kickerShadow.position.set(kicker.position.x, 0.03, kicker.position.z);
     if (cue) { ballProbe.sample(); stageProbe.sample(); }
