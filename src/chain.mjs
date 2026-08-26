@@ -13,11 +13,14 @@ export const GOAL_H = 1.9;
 const SHOULDER = 0.90;
 
 // 한 칸이 여유에 주는 몫. 둘의 비가 실점 원인 순위를 정하므로 함께 읽는다.
-// 측정으로 고른 값이다. 0.0225면 다이빙이, 0.024면 오프더볼이 전 구간을 먹는다.
-const K_LAT = 0.023;
-// 스윕용 임시 노브. 값이 굳으면 인라인하고 지운다.
-export const TUNE = { horiz0: 0.80, wFront: 0.003, wMove: 1.2, hLow: 2.5, kLat: 0.025, kDive: 0.027, wBrace: 0.45 };
-const K_DIVE = 0.024;
+// 측정으로 고른 쌍이다. 둘 중 하나만 움직이면 한 칸이 전 구간 1위를 독점한다.
+const K_LAT = 0.025;   // 오프더볼이 서 있는 자리에 주는 몫
+const K_DIVE = 0.027;  // 다이빙이 수평 반경에 주는 몫
+const HORIZ0 = 0.80;   // 서서 옆으로 뻗었을 때의 고정 반경
+const W_FRONT = 0.003; // 정면 실루엣. 무거울수록 몸에 맞는 폭이 넓다
+const W_MOVE = 1.2;    // 무게가 기동에 더하는 지연 ms/kg
+const H_LOW = 2.5;     // 큰 키가 낮은 공에 몸을 접는 데 드는 지연 ms/cm
+const W_BRACE = 0.45;  // 정면 강슛을 버티는 질량
 
 export function makeRng(seed) {
   let s = seed >>> 0 || 1;
@@ -127,7 +130,7 @@ export function buildSet(rng, level = 5) {
 // 0단 배치. 오프더볼이 소유한다.
 function placement(keeper, shot) {
   return {
-    lateral: (10 - keeper.offball) * TUNE.kLat,
+    lateral: (10 - keeper.offball) * K_LAT,
     depth: 0.12,
     markerAt: shot.flight * 0.72
   };
@@ -142,7 +145,7 @@ function contactMargin(keeper, shot, input, over) {
   const flight = clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
 
   const offball = s("offball");
-  const lateral = (10 - offball) * TUNE.kLat;
+  const lateral = (10 - offball) * K_LAT;
   const depth = 0.12;
   const markerAt = flight * 0.72;
 
@@ -154,9 +157,9 @@ function contactMargin(keeper, shot, input, over) {
   const SCALE_MS = 200;
   // 무게는 기동을 늦춘다. 정면 공은 서 있는 자리로 오므로 기동이 없고, 그래서 이 항도 없다.
   let moveDelay = 104 - 7 * s("agility");
-  if (shot.course !== "정면") moveDelay += (keeper.weight - 84) * TUNE.wMove;
+  if (shot.course !== "정면") moveDelay += (keeper.weight - 84) * W_MOVE;
   // 큰 키는 낮은 공까지 몸을 접어 내리는 데 시간이 더 든다.
-  if (shot.course === "하단") moveDelay += (keeper.height - 188) * TUNE.hLow;
+  if (shot.course === "하단") moveDelay += (keeper.height - 188) * H_LOW;
 
   const reactBudget = (flight - markerAt) * 1000;
   const slack = windowMs + reactBudget - moveDelay - Math.abs(input.errMs);
@@ -164,7 +167,7 @@ function contactMargin(keeper, shot, input, over) {
   const timing = clamp(slack / SCALE_MS, -1.2, 1.35);
 
   // 도달 반경. 높은 공은 수직으로, 낮은 공은 수평으로 판정한다.
-  const horiz = TUNE.horiz0 + TUNE.kDive * s("diving");
+  const horiz = HORIZ0 + K_DIVE * s("diving");
   const vert = 0.40 + 0.06 * LOCKED.aerial + 0.05 * LOCKED.jump + (keeper.height - 188) * 0.004;
 
   const closing = clamp(1 - forward * 0.30 * (1 + LOCKED.oneOnOne * 0.04), 0.35, 1);
@@ -178,7 +181,7 @@ function contactMargin(keeper, shot, input, over) {
     margin = horiz * quality - gap;
   }
   // 정면 슛의 일부는 서 있기만 해도 몸에 맞는다. 무거울수록 넓다.
-  if (shot.course === "정면") margin += 0.10 + (keeper.weight - 84) * TUNE.wFront;
+  if (shot.course === "정면") margin += 0.10 + (keeper.weight - 84) * W_FRONT;
   return margin;
 }
 
@@ -290,7 +293,7 @@ export function resolve(input) {
   // 공이 손에 닿은 뒤 한 번에 갈린다. 이 단계 역시 롤 하나다.
   state.stage = 2;
   // 정면 강슛은 몸으로 받는다. 질량이 버티는 자리는 여기다. 옆으로 날아간 몸에는 버틸 질량이 없다.
-  const brace = shot.course === "정면" ? (keeper.weight - 84) * TUNE.wBrace : 0;
+  const brace = shot.course === "정면" ? (keeper.weight - 84) * W_BRACE : 0;
   const carryP = shot.strong ? Math.max(0, 40 - keeper.strength * 4.4 - brace) : 0;
   const gloveP = keeper.handling <= 4 ? (5 - keeper.handling) * 7 : 0;
   const spillP = Math.max(0, 100 - (34 + keeper.handling * 6 + LOCKED.punching * -4));
