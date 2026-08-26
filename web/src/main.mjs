@@ -26,6 +26,7 @@ state.fans = Number(saved?.fans) || 0;
 window.__picks = () => state.picks;
 // 사고 연출은 확률로만 나오므로 계측기가 불러낼 수 있어야 한다. 판정은 안 바뀐다.
 window.__act = (kind) => stage.act(kind);
+// 불러오기는 판이 시작되기 전에 끝난다. 첨 판을 기다려 그리면 그 사이에 숫자가 없다.
 
 // 손가락 셋. 방향과 타이밍과 나갈지 여부.
 // 여기서 나온 실패는 손가락 셋으로 귀속하고 스탯 원장에 섞지 않는다.
@@ -203,6 +204,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'ArrowUp' || e.key === ' ') commit(0);
 });
 
+pips();
 mountTitle(() => {
   stage.setKeeper(state.keeper);
   // 돌아오자마자 밀린 훈련부터 쓴다. 그 다음에 공이 날아온다.
