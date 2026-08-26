@@ -1,0 +1,75 @@
+/* 타이틀. 16:9가 기준 화면이다. 글자 수는 적게, 덩치는 크게. */
+#title{position:fixed;inset:0;z-index:20;
+  display:flex;align-items:center;
+  padding-left:calc(clamp(28px,6vw,96px) + env(safe-area-inset-left));
+  padding-right:calc(clamp(28px,6vw,96px) + env(safe-area-inset-right));
+  background:
+    radial-gradient(85% 120% at 16% 52%, #0000 4%, #0b0f0ac2 62%, #0b0f0aee 100%),
+    linear-gradient(100deg,#0b0f0acc,#0b0f0a4d 58%,#0b0f0aa6);
+  font-family:'Black Han Sans','Pretendard','Malgun Gothic',sans-serif}
+#title[hidden]{display:none}
+
+#mark{transform:rotate(-2.2deg);max-width:min(660px,64vw)}
+#kicker{display:inline-block;background:var(--bad);color:#fff;
+  font-size:clamp(11px,1.5vw,18px);letter-spacing:.09em;
+  padding:5px 13px 6px;border-radius:5px;transform:rotate(1.4deg);
+  box-shadow:4px 4px 0 #0009}
+#word{margin-top:clamp(8px,1.2vw,16px);line-height:.85;
+  font-size:clamp(52px,10.4vw,150px);color:#ffd83d;font-weight:400;
+  -webkit-text-stroke:clamp(3px,.62vw,8px) #12160e;paint-order:stroke fill;
+  text-shadow:clamp(5px,.9vw,12px) clamp(6px,1.05vw,14px) 0 #12160e}
+#word span{display:block}
+#word span:last-child{margin-left:clamp(22px,5.4vw,78px);color:#8ff0a6}
+#tag{margin-top:clamp(14px,1.7vw,24px);color:#dfe6da;opacity:.8;
+  font-family:'Pretendard','Malgun Gothic',sans-serif;font-weight:700;
+  font-size:clamp(12px,1.45vw,19px)}
+
+#go{margin-top:clamp(20px,3vw,40px);display:block;
+  padding:clamp(13px,1.55vw,20px) clamp(38px,5.2vw,74px);
+  border:0;border-radius:999px;background:var(--good);color:#0d1a12;
+  font-family:inherit;font-weight:400;font-size:clamp(21px,2.7vw,36px);letter-spacing:.03em;
+  box-shadow:0 7px 0 #1f7a4d, 0 12px 30px #000a;
+  animation:bob 1.15s ease-in-out infinite}
+#go:active{transform:translateY(6px);box-shadow:0 1px 0 #1f7a4d}
+@keyframes bob{50%{transform:translateY(-5px)}}
+@media (prefers-reduced-motion:reduce){#go{animation:none}}
+
+/* 조작법. 아래에 늘어놓지 않고 우측 위에서 펼친다. */
+#help{position:absolute;top:calc(14px + env(safe-area-inset-top));
+  right:calc(16px + env(safe-area-inset-right));
+  display:flex;flex-direction:column;align-items:flex-end;gap:10px;z-index:2}
+#helpBtn{display:flex;align-items:center;gap:8px;
+  padding:9px 15px;border-radius:999px;border:1px solid #ffffff2e;
+  background:var(--panel);backdrop-filter:blur(7px);color:var(--ink);
+  font-family:'Pretendard','Malgun Gothic',sans-serif;font-weight:800;font-size:14px}
+#helpBtn svg{width:17px;height:17px}
+#helpBtn[aria-expanded="true"]{background:#ffd83d;color:#12160e;border-color:#ffd83d}
+#helpPanel{width:min(330px,72vw);padding:16px;border-radius:16px;
+  border:1px solid var(--edge);background:#0f140ef7;backdrop-filter:blur(10px);
+  box-shadow:0 18px 44px #000a;
+  font-family:'Pretendard','Malgun Gothic',sans-serif;
+  transform-origin:top right;animation:pop .16s ease-out}
+#helpPanel[hidden]{display:none}
+@keyframes pop{from{opacity:0;transform:scale(.9) translateY(-6px)}}
+#helpPanel ul{list-style:none;display:flex;flex-direction:column;gap:14px}
+#helpPanel li{display:flex;align-items:center;gap:13px}
+#helpPanel li>svg{flex:0 0 auto;width:40px;height:40px}
+#helpPanel b{display:block;font-size:14px;font-weight:800}
+#helpPanel small{font-size:12px;color:var(--dim);line-height:1.45}
+#helpPanel .keys{margin-top:14px;padding-top:12px;border-top:1px solid #ffffff1a;
+  font-size:11.5px;color:#7e8878;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+#helpPanel kbd{font:inherit;font-size:11px;padding:2px 6px;border-radius:5px;
+  background:#20281d;border:1px solid var(--edge);color:#c3ccbc}
+
+/* 세로로 들면 골대 좌우가 잘린다. 그때는 게임을 보여주지 않는다. */
+#rotate{position:fixed;inset:0;z-index:60;display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  background:#0b0f0a;text-align:center;
+  font-family:'Pretendard','Malgun Gothic',sans-serif}
+#rotate svg{width:74px;height:74px;animation:tilt 1.8s ease-in-out infinite}
+#rotate p{font-size:16px;font-weight:800;color:var(--ink)}
+#rotate small{font-size:12.5px;color:var(--dim)}
+@keyframes tilt{0%,45%{transform:rotate(0)}70%,100%{transform:rotate(-90deg)}}
+@media (max-aspect-ratio:1/1){
+  #rotate{display:flex}
+}

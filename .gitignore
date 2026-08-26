@@ -28,3 +28,6 @@ sim/out/
 
 # encoded audio. tools/encode-bgm.ps1 rebuilds these from assets/audio
 web/assets/audio/
+
+# npm tarballs. vendor/ already holds the extracted files
+*.tgz

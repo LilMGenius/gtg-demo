@@ -1,0 +1,77 @@
+/* HUD. 가로 화면 전제. 골대가 좌우로 긴 물건이라 세로로는 판정이 안 보인다. */
+:root{
+  --ink:#f2f4f0; --dim:#9aa495; --bad:#e0563f; --good:#4fd08a;
+  --panel:#141a13d9; --edge:#ffffff26;
+  --pad-l:calc(16px + env(safe-area-inset-left));
+  --pad-r:calc(16px + env(safe-area-inset-right));
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:#0d110c;overflow:hidden;
+  font-family:'Pretendard','Malgun Gothic',system-ui,sans-serif;color:var(--ink);
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+button{font-family:inherit;cursor:pointer}
+#stage{position:fixed;inset:0;width:100%;height:100%;display:block}
+
+#hud{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .3s}
+body.playing #hud{opacity:1}
+
+/* 상단 좌측. 레벨과 다섯 구의 결과만 남긴다. */
+#top{position:absolute;top:calc(12px + env(safe-area-inset-top));left:var(--pad-l);
+  display:flex;align-items:center;gap:12px;
+  padding:7px 14px;border-radius:999px;
+  background:var(--panel);border:1px solid var(--edge);backdrop-filter:blur(7px)}
+#lv{font-weight:800;font-size:15px;letter-spacing:.02em}
+#pips{display:flex;gap:6px}
+#pips i{width:9px;height:9px;border-radius:50%;background:#ffffff26;display:block;
+  transition:background .18s}
+#pips i.save{background:var(--good);box-shadow:0 0 9px #4fd08a88}
+#pips i.gone{background:var(--bad);box-shadow:0 0 9px #e0563f88}
+
+/* 자막. 화면 하단 가운데. 탭 칸 위에 얹히되 입력은 통과시킨다. */
+#caption{position:absolute;left:50%;transform:translateX(-50%);
+  bottom:calc(20px + env(safe-area-inset-bottom));
+  width:min(680px,82vw);text-align:center;pointer-events:none;
+  font-size:clamp(15px,2.1vw,21px);line-height:1.4;font-weight:700;
+  text-shadow:0 2px 12px #000d, 0 0 26px #000a;
+  display:flex;flex-direction:column;align-items:center;gap:7px;min-height:3.6em;
+  justify-content:flex-end}
+#caption b{color:var(--bad);font-size:12px;font-weight:800;letter-spacing:.06em;
+  padding:3px 9px;border-radius:999px;background:#e0563f24;border:1px solid #e0563f55}
+
+/* 세 칸. 가로 화면 전체를 좌·중·우로 나눈 투명 탭 영역이다.
+   버튼을 아래에 늘어놓으면 손가락이 골대를 가린다. */
+#pad{position:absolute;inset:0;display:flex;pointer-events:auto}
+.zone{flex:1;border:0;background:transparent;position:relative;
+  display:flex;align-items:flex-end;justify-content:center;
+  padding-bottom:calc(74px + env(safe-area-inset-bottom))}
+.zone+.zone::before{content:'';position:absolute;left:0;top:18%;bottom:18%;
+  width:1px;background:linear-gradient(#fff0,#ffffff1c,#fff0)}
+.zone svg{width:clamp(26px,3.2vw,38px);height:clamp(26px,3.2vw,38px);
+  color:#ffffff4d;transition:color .12s,transform .12s;filter:drop-shadow(0 2px 6px #000a)}
+.zone:active svg{color:#ffd83d;transform:scale(1.22)}
+.zone:disabled svg{color:#ffffff1f}
+.zone:disabled{cursor:default}
+
+/* 나가기. 각을 좁히는 선택이라 세 칸과 따로 논다. */
+#out{position:absolute;right:var(--pad-r);bottom:calc(20px + env(safe-area-inset-bottom));
+  pointer-events:auto;width:66px;height:66px;border-radius:50%;
+  border:1px solid var(--edge);background:var(--panel);backdrop-filter:blur(7px);
+  color:var(--dim);font-size:15px;font-weight:800;letter-spacing:.02em}
+#out.on{background:#e0563f;color:#fff;border-color:#ff8b78;
+  box-shadow:0 0 0 5px #e0563f2e, 0 6px 20px #e0563f55}
+
+/* 성장 선택. 가로라 세 장을 나란히 놓을 수 있다. */
+#offer{position:absolute;inset:0;pointer-events:auto;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  background:#080b07d9;backdrop-filter:blur(4px)}
+#offer[hidden]{display:none}
+#offer h4{font-size:clamp(17px,2.4vw,24px);font-weight:800;letter-spacing:.01em}
+#offer .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;
+  padding:0 var(--pad-l)}
+#offer button{min-width:150px;padding:18px 22px;border-radius:15px;
+  border:1px solid var(--edge);background:#1b2318;color:var(--ink);
+  font-size:16px;font-weight:800;text-align:left;line-height:1.5;
+  transition:transform .12s,border-color .12s}
+#offer button em{display:block;font-style:normal;font-size:13px;font-weight:700;
+  color:var(--good);margin-top:3px}
+#offer button:hover{border-color:#ffd83d;transform:translateY(-3px)}
