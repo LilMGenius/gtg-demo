@@ -1,0 +1,145 @@
+// 무대. 흙 운동장 하나와 그 너머를 채우는 것들이다.
+import * as THREE from '../../../vendor/three.module.min.js';
+import { flat, R_HALF_W, R_H } from '../units.mjs';
+
+// 사각 그물 한 장. wireframe 평면은 삼각형 대각선이 남아 그물이 아니라 격자무늬로 읽힌다.
+export function meshPanel(w, h, cell, color, opacity) {
+  const pts = [];
+  const nx = Math.max(1, Math.round(w / cell));
+  const ny = Math.max(1, Math.round(h / cell));
+  for (let i = 0; i <= nx; i += 1) {
+    const x = -w / 2 + (w * i) / nx;
+    pts.push(x, -h / 2, 0, x, h / 2, 0);
+  }
+  for (let j = 0; j <= ny; j += 1) {
+    const y = -h / 2 + (h * j) / ny;
+    pts.push(-w / 2, y, 0, w / 2, y, 0);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  const m = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+  m.userData.probeIgnore = true;
+  return m;
+}
+
+export function buildPitch(scene) {
+  // 흙바닥. 잔디가 아니다. 동네 운동장이 이 게임의 무대다.
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), flat(0x9c7a4a));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.z = 24;
+  ground.name = 'ground';
+  scene.add(ground);
+
+  const box = new THREE.Mesh(new THREE.PlaneGeometry(16.5, 16.5), flat(0xb08e58));
+  box.rotation.x = -Math.PI / 2;
+  box.position.set(0, 0.01, 8.2);
+  box.name = 'box';
+  scene.add(box);
+
+  // 라인. 흙바닥만 있으면 거리가 안 읽힌다. 공이 어디쯤 왔는지는 선이 알려준다.
+  const lineMat = new THREE.MeshBasicMaterial({ color: 0xf2f0e4, transparent: true, opacity: 0.7 });
+  const stripe = (w, d, x, z) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), lineMat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(x, 0.02, z);
+    m.userData.probeIgnore = true;
+    scene.add(m);
+  };
+  const BOX_W = 16.5;
+  const BOX_D = 16.5;
+  const GA_W = 9.16;
+  const GA_D = 5.5;
+  stripe(40, 0.12, 0, 0);
+  stripe(0.12, BOX_D, -BOX_W / 2, BOX_D / 2);
+  stripe(0.12, BOX_D, BOX_W / 2, BOX_D / 2);
+  stripe(BOX_W, 0.12, 0, BOX_D);
+  stripe(0.12, GA_D, -GA_W / 2, GA_D / 2);
+  stripe(0.12, GA_D, GA_W / 2, GA_D / 2);
+  stripe(GA_W, 0.12, 0, GA_D);
+  // 페널티 스팟. 키커가 공을 놓는 자리다.
+  const spot = new THREE.Mesh(new THREE.CircleGeometry(0.16, 12), lineMat);
+  spot.rotation.x = -Math.PI / 2;
+  spot.position.set(0, 0.02, 11);
+  spot.userData.probeIgnore = true;
+  scene.add(spot);
+
+  // 골대. 판정식이 쓰는 폭과 높이를 그대로 쓴다. 그림과 숫자가 어긋나면 화면이 거짓말을 한다.
+  const post = new THREE.CylinderGeometry(0.06, 0.06, R_H, 8);
+  const white = flat(0xf4f6f2);
+  for (const x of [-R_HALF_W, R_HALF_W]) {
+    const p = new THREE.Mesh(post, white);
+    p.position.set(x, R_H / 2, 0);
+    p.name = 'post';
+    scene.add(p);
+  }
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, R_HALF_W * 2, 8), white);
+  bar.rotation.z = Math.PI / 2;
+  bar.position.set(0, R_H, 0);
+  bar.name = 'bar';
+  scene.add(bar);
+
+  // 골망. 뒷면 한 장이 아니라 상자다. 평면 하나면 골대에 깊이가 없다.
+  const NET_D = 1.5;
+  const NET_C = 0xe6ede0;
+  const back = meshPanel(R_HALF_W * 2, R_H, 0.24, NET_C, 0.34);
+  back.position.set(0, R_H / 2, -NET_D);
+  scene.add(back);
+  for (const sgn of [-1, 1]) {
+    const side = meshPanel(NET_D, R_H, 0.24, NET_C, 0.28);
+    side.rotation.y = Math.PI / 2;
+    side.position.set(sgn * R_HALF_W, R_H / 2, -NET_D / 2);
+    scene.add(side);
+  }
+  const roof = meshPanel(R_HALF_W * 2, NET_D, 0.24, NET_C, 0.24);
+  roof.rotation.x = -Math.PI / 2;
+  roof.position.set(0, R_H, -NET_D / 2);
+  scene.add(roof);
+
+  // 하늘. 안쪽을 보는 반구 하나면 검은 벽이 사라진다.
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(90, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: 0x86aecb, side: THREE.BackSide, fog: false })
+  );
+  scene.add(dome);
+
+  // 펜스. 동네 운동장을 두르는 초록 그물이다.
+  const fence = meshPanel(58, 3.4, 0.55, 0x3f6b4a, 0.5);
+  fence.position.set(0, 1.7, 30);
+  scene.add(fence);
+
+  // 건물 실루엣. 지평선 위가 비지 않게만 세운다. 디테일은 없다.
+  const skyline = new THREE.Group();
+  const blockMat = flat(0x5b6f7d);
+  for (let i = 0; i < 14; i += 1) {
+    const w = 3.4 + ((i * 37) % 5);
+    const h = 5 + ((i * 53) % 11);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 3), blockMat);
+    b.position.set(-30 + i * 4.6 + ((i * 17) % 3), h / 2, 38 + ((i * 29) % 7));
+    skyline.add(b);
+  }
+  scene.add(skyline);
+
+  return { ground, box, bar };
+}
+
+// 행인. 펜스 너머를 지나간다. 아무도 없는 운동장은 연습장이지 경기장이 아니다.
+// 집중력 스탯이 여기에 걸린다. 지금은 걷기만 한다.
+export function buildPassers(scene) {
+  const passers = [];
+  const shirt = [0xd8556a, 0x4a72c4, 0xe0a23c, 0x7a4fb0, 0x3fa37a];
+  for (let i = 0; i < 5; i += 1) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.86, 3, 6), flat(shirt[i]));
+    body.position.y = 0.65;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), flat(0xe0b48c));
+    head.position.y = 1.44;
+    g.add(body, head);
+    for (const m of [body, head]) m.userData.probeIgnore = true;
+    g.position.set(-24 + i * 9.5, 0, 32.5 + (i % 3) * 1.4);
+    g.userData.speed = 1.4 + (i % 4) * 0.5;
+    g.userData.homeZ = g.position.z;
+    scene.add(g);
+    passers.push(g);
+  }
+  return passers;
+}
