@@ -24,6 +24,8 @@ state.picks = saved ? offlineGain(saved.at, Date.now()) : 0;
 // 아웃문그램 팔로워. 의사소통과 악동이 여기서 값을 낸다.
 state.fans = Number(saved?.fans) || 0;
 window.__picks = () => state.picks;
+// 사고 연출은 확률로만 나오므로 계측기가 불러낼 수 있어야 한다. 판정은 안 바뀐다.
+window.__act = (kind) => stage.act(kind);
 
 // 손가락 셋. 방향과 타이밍과 나갈지 여부.
 // 여기서 나온 실패는 손가락 셋으로 귀속하고 스탯 원장에 섞지 않는다.

@@ -534,6 +534,25 @@ export function createScene(canvas) {
           // 올라가기 전에 먼저 포스트 밖으로 빼낸다.
           ball.position.set(lerp(tail.from.x, 2.45, Math.min(1, e * 2.4)), lerp(tail.from.y, REST_Y, Math.min(1, e * 1.6)) + Math.sin(e * Math.PI) * 1.5, lerp(tail.from.z, -1.2, Math.min(1, e * 3.2)));
           break;
+        case 'talked': {
+          // 입을 열었고 몸이 따라갔다. 공은 그대로 빈 골대로 들어간다.
+          const head2 = keeper.userData.head;
+          head2.rotation.y = lerp(0, 2.6, Math.min(1, e * 2));
+          for (const pu of head2.userData.eyes) {
+            pu.material = heartMat;
+            pu.scale.set(2.1, 2.1, 0.5);
+          }
+          const walk = Math.min(1, e * 1.5);
+          keeper.position.x = lerp(tail.kx, -2.4, walk);
+          keeper.position.z = lerp(KEEPER_Z, 5.4, walk);
+          keeper.rotation.z = Math.sin(e * 12) * 0.09;
+          if (passers[0]) {
+            passers[0].position.set(lerp(-14, -3.6, walk), 0, lerp(18, 6.0, walk));
+            passers[0].rotation.z = Math.sin(e * 9) * 0.18;
+          }
+          ball.position.set(lerp(tail.from.x, 0, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
+          break;
+        }
         case 'distracted': {
           // 카메라가 아니라 고개가 돌아간다. 머리가 돌아가 있는 동안 공은 그대로 지나간다.
           const head = keeper.userData.head;
@@ -577,6 +596,7 @@ export function createScene(canvas) {
     cue = null;
     tail = null;
     if (loose) { keeper.add(loose); loose = null; }
+    for (const p of passers) p.rotation.z = 0;
     keeper.userData.gloves.forEach((g, i) => { g.position.copy(keeper.userData.gloveHome[i]); g.rotation.set(0, 0, 0); });
     const head = keeper.userData.head;
     head.rotation.y = 0;
