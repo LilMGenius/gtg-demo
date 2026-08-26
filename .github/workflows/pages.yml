@@ -19,11 +19,6 @@ jobs:
     environment: github-pages
     steps:
       - uses: actions/checkout@v4
-      # The encoded audio is not tracked. The runner rebuilds it from the source file.
-      - run: |
-          mkdir -p web/assets/audio
-          ffmpeg -hide_banner -loglevel error -y -i assets/audio/bgm.mp3 -vn -ac 2 -ar 48000 -c:a libopus -b:a 48k web/assets/audio/bgm.ogg
-          ffmpeg -hide_banner -loglevel error -y -i assets/audio/bgm.mp3 -vn -ac 2 -ar 44100 -c:a aac -b:a 48k -movflags +faststart web/assets/audio/bgm.m4a
       # The engine lives outside web/, so the site root is the repo root.
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
