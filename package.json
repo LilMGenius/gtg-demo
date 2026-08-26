@@ -1,0 +1,27 @@
+{
+  "name": "gtg-demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "3D goalkeeper idle RPG. Three.js, no engine, no server.",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LilMGenius/gtg-demo.git"
+  },
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "gate:ui": "node tools/ui-gate.mjs",
+    "gate:save": "node tools/save-gate.mjs",
+    "gate:shot": "node tools/shot-gate.mjs",
+    "gate:sfx": "node tools/sfx-gate.mjs",
+    "gate:perf": "node tools/perf-gate.mjs",
+    "test": "node --test test/contract.test.mjs"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "^4.4.2",
+    "@gltf-transform/extensions": "^4.4.2",
+    "@gltf-transform/functions": "^4.4.2",
+    "meshoptimizer": "^1.2.0",
+    "three": "^0.185.1"
+  }
+}

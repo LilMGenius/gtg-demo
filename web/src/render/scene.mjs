@@ -332,6 +332,13 @@ export function createScene(canvas) {
   let divingStat = 5;
   const cueKeeperDiving = () => divingStat;
 
+  // 렌더러가 실제로 무엇을 그렸는지. 선언이 아니라 카운터다.
+  window.__renderInfo = () => ({
+    calls: renderer.info.render.calls,
+    triangles: renderer.info.render.triangles,
+    programs: renderer.info.programs ? renderer.info.programs.length : 0
+  });
+
   renderer.setAnimationLoop(frame);
 
   function reset() {
