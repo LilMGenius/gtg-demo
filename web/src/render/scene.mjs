@@ -4,6 +4,7 @@ import * as THREE from '../../vendor/three.module.min.js';
 import { GOAL_HALF_W, GOAL_H } from '../../../src/chain.mjs';
 import { mountSfx } from '../audio/sfx.mjs';
 import { createBallProbe } from '../diagnostics/ball-probe.mjs';
+import { createStageProbe, goalFraming } from '../diagnostics/stage-probe.mjs';
 
 const flat = (c) => new THREE.MeshLambertMaterial({ color: c });
 const BALL_R = 0.14;
@@ -11,7 +12,20 @@ const BALL_R = 0.14;
 const VIEW_X = -1;
 // 골망은 z = -0.75에 있다. q가 1.09면 공이 딱 그 자리에서 선다.
 const BALL_PAST = 1.09;
+// 판정 단위와 렌더 미터는 같지 않다.
+// 판정의 골대는 4.4 x 1.9이고 사람은 1.9이라 키퍼 머리가 크로스바에 닿는다.
+// 실제 골대는 7.32 x 2.44다. 그 비율로 그려야 사람이 골대 안에 들어간다.
+// 판정식은 건들지 않는다. 여기서 단위만 바꾼다.
+const R_HALF_W = 3.66;
+const R_H = 2.44;
+const SX = R_HALF_W / GOAL_HALF_W;
+const SY = R_H / GOAL_H;
 const lerp = (a, b, t) => a + (b - a) * t;
+// 캐프슐은 중심 기준이라 반경만큼 더 내려간다. 눈대중으로 놓으면 발이 흔 속에 묻힌다.
+const standOnGround = (g) => {
+  const b = new THREE.Box3().setFromObject(g);
+  for (const c of g.children) c.position.y -= b.min.y;
+};
 const ease = (t) => t * t * (3 - 2 * t);
 
 // 골키퍼. 원시 도형뿐이다. 관절은 없고 몸통이 통째로 기울어진다.
@@ -36,7 +50,9 @@ function buildKeeper(height, weight) {
 
   g.add(torso, head, legs, gl, gr);
   for (const m of [torso, head, legs, gl, gr]) m.name = 'keeper';
+  standOnGround(g);
   g.userData.gloves = [gl, gr];
+  g.userData.girth = w;
   return g;
 }
 
@@ -50,6 +66,7 @@ function buildKicker() {
   legs.position.y = 0.4;
   for (const m of [torso, head, legs]) m.name = 'kicker';
   g.add(torso, head, legs);
+  standOnGround(g);
   return g;
 }
 
@@ -64,9 +81,10 @@ export function createScene(canvas) {
 
   // 가로 화면 전제. 골대는 좌우로 긴 물건이라 세로로는 판정이 안 보인다.
   // 카메라는 골대 뒤 위쪽. 골대 폭 전체와 키커까지 한 화면에 넣는다.
+  // 망원으로 당긴다. 화각을 넓히면 골대가 화면 중앙의 작은 사각형으로 줄고 나머지는 하늘이 된다.
   const camera = new THREE.PerspectiveCamera(46, 16 / 9, 0.1, 200);
-  camera.position.set(0, 3.4, -7.4);
-  camera.lookAt(0, 1.5, 5.5);
+  camera.position.set(0, 3.3, -5.1);
+  camera.lookAt(0, 1.4, 4.5);
 
   scene.add(new THREE.AmbientLight(0xd8e6dc, 2.4));
   const sun = new THREE.DirectionalLight(0xfff6e0, 2.6);
@@ -87,25 +105,25 @@ export function createScene(canvas) {
   scene.add(box);
 
   // 골대. 판정식이 쓰는 폭과 높이를 그대로 쓴다. 그림과 숫자가 어긋나면 화면이 거짓말을 한다.
-  const post = new THREE.CylinderGeometry(0.06, 0.06, GOAL_H, 8);
+  const post = new THREE.CylinderGeometry(0.06, 0.06, R_H, 8);
   const white = flat(0xf4f6f2);
-  for (const x of [-GOAL_HALF_W, GOAL_HALF_W]) {
+  for (const x of [-R_HALF_W, R_HALF_W]) {
     const p = new THREE.Mesh(post, white);
-    p.position.set(x, GOAL_H / 2, 0);
+    p.position.set(x, R_H / 2, 0);
     p.name = 'post';
     scene.add(p);
   }
-  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, GOAL_HALF_W * 2, 8), white);
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, R_HALF_W * 2, 8), white);
   bar.rotation.z = Math.PI / 2;
-  bar.position.set(0, GOAL_H, 0);
+  bar.position.set(0, R_H, 0);
   bar.name = 'bar';
   scene.add(bar);
 
   const net = new THREE.Mesh(
-    new THREE.PlaneGeometry(GOAL_HALF_W * 2, GOAL_H, 9, 7),
+    new THREE.PlaneGeometry(R_HALF_W * 2, R_H, 11, 7),
     new THREE.MeshBasicMaterial({ color: 0xdfe6da, wireframe: true, transparent: true, opacity: 0.28 })
   );
-  net.position.set(0, GOAL_H / 2, -0.75);
+  net.position.set(0, R_H / 2, -0.75);
   scene.add(net);
 
   // 하늘. 안쪽을 보는 반구 하나면 검은 벽이 사라진다.
@@ -149,6 +167,20 @@ export function createScene(canvas) {
   shadow.userData.probeIgnore = true;
   scene.add(shadow);
 
+  // 배우 그림자. 공에만 그림자가 있으면 사람은 떠 보인다. 수치상 접지여도 화면은 그렇게 안 읽힌다.
+  const blob = (r) => {
+    const m = new THREE.Mesh(
+      new THREE.CircleGeometry(r, 14),
+      new THREE.MeshBasicMaterial({ color: 0x1c1508, transparent: true, opacity: 0.3 })
+    );
+    m.rotation.x = -Math.PI / 2;
+    m.userData.probeIgnore = true;
+    scene.add(m);
+    return m;
+  };
+  const keeperShadow = blob(0.42);
+  const kickerShadow = blob(0.3);
+
   const kicker = buildKicker();
   scene.add(kicker);
 
@@ -182,12 +214,14 @@ export function createScene(canvas) {
 
   // 공이 화면에 있는지는 재야 알 수 있다. 보이게 만들었다는 말은 증거가 아니다.
   const ballProbe = createBallProbe(camera, scene, ball, BALL_R);
+  const stageProbe = createStageProbe(camera, { kicker: () => kicker, keeper: () => keeper });
+  const goalFrame = () => goalFraming(camera, R_HALF_W, R_H);
 
   // 한 구의 연출. 시작 시각과 확정된 결과만 받는다.
   let cue = null;
   function play(shot, input, result, onEnd) {
     cue = { shot, input, result, t0: performance.now() / 1000, ended: false, onEnd, steps: 0, struck: false, framed: false };
-    kicker.position.set(VIEW_X * shot.aimX * 0.2, 0, 11.2);
+    kicker.position.set(VIEW_X * shot.aimX * SX * 0.2, 0, 11.2);
     ball.position.set(0, BALL_R, 11);
     sfx.place();
   }
@@ -222,9 +256,9 @@ export function createScene(canvas) {
         // 카메라가 골대 뒤에 있으니 그 뒤로 더 보내면 공이 렌즈를 뚫고 사라진다.
         const past = result.conceded ? BALL_PAST : 1.0;
         const q = Math.min(p * past, past);
-        ball.position.x = lerp(0, VIEW_X * shot.aimX, Math.min(q, 1));
+        ball.position.x = lerp(0, VIEW_X * shot.aimX * SX, Math.min(q, 1));
         ball.position.z = lerp(11, 0.1, q);
-        ball.position.y = lerp(BALL_R, shot.aimY, Math.min(q, 1)) + Math.sin(Math.min(p, 1) * Math.PI) * 0.3;
+        ball.position.y = lerp(BALL_R, shot.aimY * SY, Math.min(q, 1)) + Math.sin(Math.min(p, 1) * Math.PI) * 0.3;
         ball.rotation.x -= 0.4;
         ball.rotation.y -= 0.22;
         // 골포스트와 크로스바를 스치는 코스만 금속음이 난다.
@@ -243,11 +277,13 @@ export function createScene(canvas) {
         // 키퍼는 판정된 방향으로 몸을 던진다. 늦게 출발하면 늦게 보인다.
         // 뻗는 거리는 골포스트 안쪽까지다. 화면 밖으로 나가면 결과가 안 보인다.
         const dp = Math.min(1, Math.max(0, (t - runup - flight * 0.28) / (flight * 0.7)));
-        const span = Math.min(GOAL_HALF_W - 0.4, 1.05 + 0.06 * cueKeeperDiving());
+        const span = Math.min(R_HALF_W - 0.5, 1.05 + 0.06 * cueKeeperDiving());
         keeper.position.x = lerp(0, VIEW_X * input.dive * span, ease(dp));
-        keeper.position.z = lerp(0.35, 0.35 + input.advance, ease(Math.min(1, dp * 1.4)));
+        keeper.position.z = lerp(0.12, 0.12 + input.advance, ease(Math.min(1, dp * 1.4)));
         keeper.rotation.z = lerp(0, VIEW_X * -input.dive * 1.15, ease(dp));
-        keeper.position.y = Math.sin(ease(dp) * Math.PI) * (input.dive === 0 ? 0.05 : 0.42);
+        // 몸이 누우면 어깨가 지면 아래로 내려간다. 기울인 만큼 들어야 흔을 안 파고 든다.
+        const tilt = Math.abs(Math.sin(keeper.rotation.z)) * keeper.userData.girth;
+        keeper.position.y = Math.sin(ease(dp) * Math.PI) * (input.dive === 0 ? 0.05 : 0.42) + tilt;
 
         if (p >= 1 && !cue.ended && t - runup > flight + 0.9) {
           cue.ended = true;
@@ -255,7 +291,10 @@ export function createScene(canvas) {
         }
       }
     }
-    if (cue) ballProbe.sample();
+    keeperShadow.position.set(keeper.position.x, 0.03, keeper.position.z);
+    keeperShadow.scale.setScalar(1 + Math.abs(Math.sin(keeper.rotation.z)) * 0.8);
+    kickerShadow.position.set(kicker.position.x, 0.03, kicker.position.z);
+    if (cue) { ballProbe.sample(); stageProbe.sample(); }
     renderer.render(scene, camera);
   }
   let divingStat = 5;
@@ -265,7 +304,7 @@ export function createScene(canvas) {
 
   function reset() {
     cue = null;
-    keeper.position.set(0, 0, 0.35);
+    keeper.position.set(0, 0, 0.12);
     keeper.rotation.z = 0;
     ball.position.set(0, BALL_R, 11);
     shadow.position.set(0, 0.02, 11);
@@ -276,5 +315,5 @@ export function createScene(canvas) {
   }
   reset();
 
-  return { play, reset, setKeeper, sfx, ballProbe, set diving(v) { divingStat = v; } };
+  return { play, reset, setKeeper, sfx, ballProbe, stageProbe, goalFrame, set diving(v) { divingStat = v; } };
 }

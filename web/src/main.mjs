@@ -9,6 +9,8 @@ const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
 // 계측 훅. 플레이테스트가 이 값을 읽고, 값이 없으면 게이트를 죽인다.
 window.__ballProbe = stage.ballProbe;
+window.__stageProbe = stage.stageProbe;
+window.__goalFrame = stage.goalFrame;
 mountBgm();
 
 const rng = makeRng((Date.now() ^ 0x9e3779b9) >>> 0);
