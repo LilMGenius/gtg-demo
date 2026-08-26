@@ -19,10 +19,10 @@ const K_DIVE = 0.027;  // 다이빙이 수평 반경에 주는 몫
 const HORIZ0 = 0.80;   // 서서 옆으로 뻗었을 때의 고정 반경
 const W_FRONT = 0.003; // 정면 실루엣. 무거울수록 몸에 맞는 폭이 넓다
 const W_MOVE = 1.2;    // 무게가 기동에 더하는 지연 ms/kg
-const H_LOW = 2.5;     // 큰 키가 낮은 공에 몸을 접는 데 드는 지연 ms/cm
+const H_LOW = 3.6;     // 큰 키가 낮은 공에 몸을 접는 데 드는 지연 ms/cm
 const W_BRACE = 0.45;  // 정면 강슛을 버티는 질량
 const WIN0 = 70;
-const STREAK_K = 1.6;
+const STREAK_K = 6.0;
 
 export function makeRng(seed) {
   let s = seed >>> 0 || 1;
@@ -189,7 +189,7 @@ function contactMargin(keeper, shot, input, over) {
   if (shot.strong) windowMs -= (10 - s("composure")) * 10;
   const SCALE_MS = 200;
   // 무게는 기동을 늦춘다. 정면 공은 서 있는 자리로 오므로 기동이 없고, 그래서 이 항도 없다.
-  let moveDelay = 104 - 7 * s("agility");
+  let moveDelay = 104 - 12 * s("agility");
   if (shot.course !== "정면") moveDelay += (keeper.weight - 84) * W_MOVE;
   // 큰 키는 낮은 공까지 몸을 접어 내리는 데 시간이 더 든다.
   if (shot.course === "하단") moveDelay += (keeper.height - 188) * H_LOW;
@@ -288,7 +288,8 @@ export function resolve(input) {
     // 연속 실점은 상태로 남는다. 다음 구의 판정 창을 회복탄력성이 방어한다.
     keeper.streak = conceded ? (keeper.streak || 0) + 1 : 0;
     events.push({ t: "result", line: conceded ? "실점" : "세이브", cause: cause || null });
-    return { events, conceded, cause: conceded ? cause : null, stage: state.stage, rolls: state.rolls };
+    // 유명한 키커를 막으면 더 오르고, 유명한 키커에게 먹히면 덜 오른다. STATS 4절의 M 경로다.
+    return { events, conceded, cause: conceded ? cause : null, stage: state.stage, rolls: state.rolls, fame: shot.kicker.fame };
   };
 
   const place = placement(keeper, shot);
@@ -296,14 +297,14 @@ export function resolve(input) {
   // 0단 배치. 나가서 생긴 사고와 안 와도 될 공에 누운 사고는 같은 판단에서 나온다.
   // 한 단계는 롤 하나를 쓴다. 두 사고는 같은 난수를 구간으로 나눠 가른다.
   const centerish = shot.course === "정면" || shot.chip;
-  const overP = shot.chip && place.depth + inp.advance > 1.0 ? 48 + shot.kicker.flair * 4 : 0;
+  const overP = shot.chip ? Math.max(0, (clamp(keeper.offball, 1, 10) - 3) * 7 + shot.kicker.flair * 4 + (place.depth + inp.advance > 1.0 ? 30 : 0)) : 0;
   const diveP = centerish && inp.dive !== 0 ? Math.max(0, keeper.diving * 4.2 - keeper.judgement * 3.4) : 0;
   // 한눈팔기. 행인이 지나가는 구에서만 열리고 집중력이 소유한다.
   // 같은 단계의 사고는 롤 하나를 구간으로 나눠 가른다. 새 롤을 뒤면 한 구가 일곱 번 굴러간다.
   const gazeP = shot.gaze ? Math.max(0, (10 - keeper.focus) * 2.6) : 0;
   // 말 걸기. 의사소통이 여는 사고다. 눈으로 따라가는 것과 입을 여는 것은 다른 사건이다.
   // 팔로워를 버는 칸이 같은 자리에서 골을 먹인다. 이 칸이 양날인 이유가 그것이다.
-  const talkP = shot.gaze ? Math.max(0, keeper.communication * keeper.mischief * 0.08) : 0;
+  const talkP = shot.gaze ? Math.max(0, keeper.communication * keeper.mischief * 0.55) : 0;
   if (overP > 0 || diveP > 0 || gazeP > 0 || talkP > 0) {
     const d = draw();
     if (d < overP) {
@@ -372,7 +373,7 @@ export function resolve(input) {
 
     // 3단 리바운드. 착지에 실패했으면 두 번째 창이 아예 없다.
     state.stage = 3;
-    const landing = Math.max(0, (10 - keeper.balance) * 4 + keeper.diving * 2);
+    const landing = Math.max(0, (10 - keeper.balance) * 14 + keeper.diving * 2);
     const downed = inp.dive !== 0 && roll(landing);
     // 무거우면 일어나는 데 시간이 더 든다.
     const reboundWindow = (18 + keeper.reflex * 4.5) * (1 - (keeper.weight - 84) * 0.006);
@@ -398,7 +399,7 @@ export function resolve(input) {
   // 4단 악동. 돌진이 잠긴 v0.2에서는 시행이 구마다 하나로 고정이다.
   // 돌진은 분모만 늘리는 칸이므로, 잠긴 동안 분모를 다른 칸에서 빌려 오면 두 칸이 한 칸이 된다.
   state.stage = 4;
-  if (!roll(keeper.mischief * 3.2 * (1 + LOCKED.charge * 0.2))) {
+  if (!roll(keeper.mischief * 4.6 * (1 + LOCKED.charge * 0.2))) {
     say("save", "잡고 끝냈습니다. 세이브입니다.", null);
     return done(false, null);
   }
@@ -427,11 +428,23 @@ export function ballInHand(result) {
 // 재시작 템포. 판 수가 시간당 수익과 성장을 정하므로 이 식이 회전율을 소유한다.
 // 공이 손에 있으면 스로잉이, 그물이나 필드에 있으면 골킥이 임자다.
 export function restartDelay(keeper, result) {
-  if (ballInHand(result)) return Math.max(1.6, 4.0 - 0.20 * keeper.throwing - 0.06 * LOCKED.pass);
-  return Math.max(2.4, 6.5 - 0.26 * keeper.goalKick - 0.09 * LOCKED.firstTouch);
+  const rise = result.events.some((e) => e.t === "downed") ? (10 - clamp(keeper.balance, 1, 10)) * 0.25 : 0;
+  // 먹힌 뒤 고개를 드는 시간. 회복탄력성이 짧게 만든다.
+  const shake = result.conceded ? (10 - clamp(keeper.resilience, 1, 10)) * 0.22 : 0;
+  if (ballInHand(result)) return Math.max(1.6, 4.0 - 0.20 * keeper.throwing - 0.06 * LOCKED.pass) + rise + shake;
+  return Math.max(2.4, 6.5 - 0.26 * keeper.goalKick - 0.09 * LOCKED.firstTouch) + rise + shake;
 }
 
 // 판 사이 대기는 회복이다. 스태미너와 호흡력은 잠겨 있어 지금은 상수로 선다.
+export function followerGain(keeper, result) {
+  const saved = !result.conceded;
+  const flair = result.events.some((e) => e.t === "beat" || e.t === "charge" || e.t === "talked");
+  const base = saved ? 40 : 8;
+  const talk = 6 * clamp(keeper.communication, 1, 10) + 3 * clamp(keeper.mischief, 1, 10);
+  const fame = clamp(result.fame || 1, 1, 10) * (saved ? 9 : 2);
+  return Math.round((base + talk + fame) * (flair ? 2.2 : 1));
+}
+
 export function setBreak() {
   return Math.max(3.0, 8.0 - 0.20 * LOCKED.stamina - 0.15 * LOCKED.breathing);
 }

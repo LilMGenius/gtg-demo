@@ -1,7 +1,7 @@
 // 성장 트립와이어. 성장 선택지 어느 것을 골라도 다음 판 화면에서 달라지는 것이 있는가.
 // 같은 씨드로 같은 구를 두 번 돌린다. 한 번은 그대로, 한 번은 칸 하나를 +1 해서.
 // 화면에 나오는 것은 자막 순서와 재시작 대기 초다. 둘 중 하나라도 바뀌면 그 구는 다르게 보인다.
-import { makeRng, buildSet, resolve, restartDelay, keeperAtLevel, rollForm } from "../src/chain.mjs";
+import { makeRng, buildSet, resolve, restartDelay, followerGain, keeperAtLevel, rollForm } from "../src/chain.mjs";
 import { GROWABLE, CAUSE_LABEL } from "../src/ledger.mjs";
 
 const SETS = Number(process.argv[2] ?? 3000);
@@ -17,7 +17,7 @@ function playSet(keeper, shots, seed) {
   const out = [];
   for (const shot of shots) {
     const r = resolve({ keeper: k, shot, rng });
-    out.push(r.events.map((e) => e.t).join(">") + "|" + restartDelay(k, r).toFixed(1));
+    out.push(r.events.map((e) => e.t).join(">") + "|" + restartDelay(k, r).toFixed(1) + "|" + followerGain(k, r));
   }
   return out;
 }
