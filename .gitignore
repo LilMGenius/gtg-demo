@@ -19,8 +19,9 @@ build/
 .env.*
 !.env.example
 
-# scratch. named *.local.* and deleted the moment its one use is over
+# scratch. named *.local.* or *.local/ and deleted the moment its one use is over
 *.local.*
+*.local/
 
 # run results. regenerating these costs nothing
 sim/out/

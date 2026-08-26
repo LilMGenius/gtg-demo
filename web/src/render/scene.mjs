@@ -4,12 +4,12 @@ import * as THREE from '../../vendor/three.module.min.js';
 import { GOAL_HALF_W, GOAL_H } from '../../../src/chain.mjs';
 import { mountSfx } from '../audio/sfx.mjs';
 import { createBallProbe } from '../diagnostics/ball-probe.mjs';
-import { createStageProbe, goalFraming } from '../diagnostics/stage-probe.mjs';
+import { createStageProbe, goalFraming, footY } from '../diagnostics/stage-probe.mjs';
 import {
   flat, BALL_R, VIEW_X, KICKER_OFF, BALL_PAST, REST_Z, REST_Y,
   R_HALF_W, R_H, SX, SY, lerp, ease
 } from './units.mjs';
-import { pupilMat, buildKeeper, buildKicker } from './objects/actors.mjs';
+import { pupilMat, buildKeeper, buildKicker, POSES, lerpPose, setPose } from './objects/actors.mjs';
 import { buildPitch, buildPassers } from './objects/pitch.mjs';
 
 export function createScene(canvas) {
@@ -106,6 +106,15 @@ export function createScene(canvas) {
   const goalFrame = () => goalFraming(camera, R_HALF_W, R_H);
 
   // 한 구의 연출. 시작 시각과 확정된 결과만 받는다.
+  // 포즈는 상태다. 목표 포즈로 매 프레임 조금씩 끌고 간다.
+  // 순간 전환은 사람이 아니라 슬라이드로 읽힌다.
+  const poseNow = { keeper: POSES.idle, kicker: POSES.windup };
+  const actor = { keeper: null, kicker: null };
+  function drive(key, target, rate) {
+    poseNow[key] = lerpPose(poseNow[key], target, rate);
+    setPose(actor[key], poseNow[key], performance.now() / 1000);
+  }
+
   let cue = null;
   // 체인의 반전은 자막이 아니라 화면에서 일어나야 한다.
   // 여기서 결과를 바꾸지 않는다. 이미 확정된 사건 이름 하나를 받아 그것만 연기한다.
@@ -140,12 +149,24 @@ export function createScene(canvas) {
   }
 
   function frame() {
+    actor.keeper = keeper;
+    actor.kicker = kicker;
+    // 이번 프레임에 무엇을 연기할지. 결과는 이미 확정됐고 여기서는 각도만 고른다.
+    let kp = POSES.idle;
+    let kk = POSES.windup;
+    // 발밑 높이는 상수로 못 낸다. 관절이 돌면 몸의 최저점이 매 프레임 바뀐다.
+    // 원하는 높이를 여기 적고, 실제 접지는 프레임 끝에서 실측해서 맞춘다.
+    let hover = 0;
     if (cue) {
       const t = performance.now() / 1000 - cue.t0;
       const { shot, input, result } = cue;
       const runup = 0.55;
       const flight = shot.flight;
 
+      const diveSide = Math.sign(VIEW_X * input.dive);
+      const divePose = diveSide > 0 ? POSES.diveR : POSES.diveL;
+      kp = t < runup ? POSES.brace : (input.dive === 0 ? POSES.brace : divePose);
+      kk = t < runup ? POSES.windup : POSES.strike;
       if (t < runup) {
         const p = t / runup;
         kicker.position.z = lerp(11.2, 10.55, ease(p));
@@ -194,10 +215,9 @@ export function createScene(canvas) {
         const span = Math.min(R_HALF_W - 0.5, 1.05 + 0.06 * cueKeeperDiving());
         keeper.position.x = lerp(0, VIEW_X * input.dive * span, ease(dp));
         keeper.position.z = lerp(KEEPER_Z, KEEPER_Z + input.advance, ease(Math.min(1, dp * 1.4)));
-        keeper.rotation.z = lerp(0, VIEW_X * -input.dive * 1.15, ease(dp));
-        // 몸이 누우면 어깨가 지면 아래로 내려간다. 기울인 만큼 들어야 흔을 안 파고 든다.
-        const tilt = Math.abs(Math.sin(keeper.rotation.z)) * keeper.userData.girth;
-        keeper.position.y = Math.sin(ease(dp) * Math.PI) * (input.dive === 0 ? 0.05 : 0.42) + tilt;
+        // 관절이 뻗는 방향을 이미 보여주므로 몸통 회전은 거들기만 한다.
+        keeper.rotation.z = lerp(0, VIEW_X * -input.dive * 0.86, ease(dp));
+        hover = Math.sin(ease(dp) * Math.PI) * (input.dive === 0 ? 0.05 : 0.40);
 
         if (p >= 1 && !cue.ended && t - runup > flight + 0.9) {
           cue.ended = true;
@@ -209,19 +229,29 @@ export function createScene(canvas) {
       const u = Math.min(1, (performance.now() / 1000 - tail.t0) / 0.8);
       const e = ease(u);
       const gx = keeper.position.x + Math.sign(tail.kx || 1) * 0.1;
+      const side = Math.sign(tail.kx || 1) > 0 ? POSES.diveR : POSES.diveL;
+      // 꼬리 연출의 포즈. 사건마다 몸이 다르게 망가져야 사건이 구분된다.
+      const TAIL_POSE = {
+        catch: POSES.clutch, save: POSES.clutch, carriedIn: POSES.faceplant,
+        gloveGone: side, spill: side, downed: POSES.faceplant,
+        rebound: side, reboundMiss: side, charge: POSES.dribble, beat: POSES.dribble,
+        lost: POSES.faceplant, skied: POSES.brace,
+        talked: POSES.swoon, distracted: POSES.swoon, openGoalScored: POSES.faceplant
+      };
+      kp = TAIL_POSE[tail.kind] ?? kp;
+      if (tail.kind === 'beat' || tail.kind === 'lost') kk = POSES.dribble;
       switch (tail.kind) {
         case 'catch':
         case 'save':
           // 잡았으면 공이 장갑에 붙는다. 몸은 일어선다.
           ball.position.set(gx, lerp(tail.from.y, 0.95, e), lerp(tail.from.z, KEEPER_Z + 0.25, e));
           keeper.rotation.z = lerp(keeper.rotation.z, 0, 0.08);
-          keeper.position.y = lerp(keeper.position.y, 0, 0.08);
           break;
         case 'carriedIn':
           // 막았는데 같이 넘어간다. 공과 몸이 한 덩어리로 골망까지 간다.
           keeper.position.z = lerp(KEEPER_Z, -0.35, e);
           keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.35, 0.08);
-          keeper.position.y = keeper.userData.girth;
+          hover = 0.06;
           ball.position.set(keeper.position.x, 0.55, keeper.position.z - 0.2);
           break;
         case 'gloveGone': {
@@ -241,7 +271,7 @@ export function createScene(canvas) {
           break;
         case 'downed':
           keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.5, 0.06);
-          keeper.position.y = keeper.userData.girth;
+          hover = 0.04;
           break;
         case 'rebound':
           ball.position.set(lerp(tail.from.x, 0.6, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
@@ -252,14 +282,13 @@ export function createScene(canvas) {
           break;
         case 'charge':
           // 잡고 나서 드리블하러 나간다. 공이 발 앞에서 튄다.
-          keeper.rotation.z = lerp(keeper.rotation.z, 0, 0.12);
-          keeper.position.y = 0;
+          keeper.rotation.z = lerp(keeper.rotation.z, 0, 0.34);
           keeper.position.z = lerp(KEEPER_Z, 6.5, e);
           ball.position.set(keeper.position.x, 0.14 + Math.abs(Math.sin(u * 12)) * 0.28, keeper.position.z + 0.7);
           break;
         case 'beat':
           keeper.position.z = lerp(6.5, 13, e);
-          keeper.rotation.z = Math.sin(u * 16) * 0.12;
+          keeper.rotation.z = lerp(keeper.rotation.z, Math.sin(u * 16) * 0.12, 0.34);
           ball.position.set(keeper.position.x, 0.14, keeper.position.z + 0.7);
           kicker.rotation.z = lerp(0, 1.3, e);
           break;
@@ -316,6 +345,12 @@ export function createScene(canvas) {
       shadow.scale.setScalar(1 + lift2 * 0.55);
       shadow.material.opacity = Math.max(0.06, 0.42 - lift2 * 0.14);
     }
+    // 잡히는 속도는 사건마다 다르다. 자빠짐은 빠르고 회복은 느리다.
+    drive('keeper', kp, kp === POSES.faceplant ? 0.22 : (kp === POSES.dribble ? 0.26 : 0.12));
+    drive('kicker', kk, kk === POSES.strike ? 0.30 : 0.10);
+    // 접지는 선언이 아니라 측정이다. 몸의 실제 최저점을 재서 원하는 높이에 맞춘다.
+    keeper.position.y += hover - footY(keeper);
+    kicker.position.y += -footY(kicker);
     keeperShadow.position.set(keeper.position.x, 0.03, keeper.position.z);
     // 행인은 판정과 무관하게 계속 걷는다. 멈춘 배경은 그림이고 움직이는 배경은 장소다.
     for (const [i, p] of passers.entries()) {
@@ -344,7 +379,11 @@ export function createScene(canvas) {
   function reset() {
     cue = null;
     tail = null;
-    if (loose) { keeper.add(loose); loose = null; }
+    if (loose) {
+      const gi = keeper.userData.gloves.indexOf(loose);
+      keeper.userData.gloveParent[gi].add(loose);
+      loose = null;
+    }
     for (const p of passers) p.rotation.z = 0;
     keeper.userData.gloves.forEach((g, i) => { g.position.copy(keeper.userData.gloveHome[i]); g.rotation.set(0, 0, 0); });
     const head = keeper.userData.head;
@@ -358,6 +397,10 @@ export function createScene(canvas) {
     shadow.material.opacity = 0.42;
     kicker.position.set(KICKER_OFF, 0, 11.2);
     kicker.rotation.z = 0;
+    poseNow.keeper = POSES.idle;
+    poseNow.kicker = POSES.windup;
+    setPose(keeper, POSES.idle, 0);
+    setPose(kicker, POSES.windup, 0);
   }
   reset();
 
