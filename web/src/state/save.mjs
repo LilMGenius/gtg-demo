@@ -22,6 +22,18 @@ export function save(keeper, auto) {
   }
 }
 
+// 자리를 비운 시간은 훈련 기회로만 쌓인다. 경기를 대신 뛰어주지는 않는다.
+// 시계를 되돌린 사람과 몇 달 만에 돌아온 사람은 같은 상한을 받는다.
+export const OFFLINE_MS = 20 * 60 * 1000;
+export const OFFLINE_CAP = 12;
+
+export function offlineGain(at, now) {
+  if (!Number.isFinite(at) || !Number.isFinite(now)) return 0;
+  const away = now - at;
+  if (!(away > 0)) return 0;
+  return Math.min(OFFLINE_CAP, Math.floor(away / OFFLINE_MS));
+}
+
 export function wipe() {
   try { localStorage.removeItem(KEY); } catch { /* 위와 같다 */ }
 }

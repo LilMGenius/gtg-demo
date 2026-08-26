@@ -4,7 +4,7 @@ import { CAUSE_LABEL } from '../../src/ledger.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
-import { load, save } from './state/save.mjs';
+import { load, save, offlineGain } from './state/save.mjs';
 
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
@@ -18,7 +18,10 @@ mountBgm();
 const seedParam = new URLSearchParams(location.search).get('seed');
 const rng = makeRng(seedParam === null ? ((Date.now() ^ 0x9e3779b9) >>> 0) : (Number(seedParam) >>> 0));
 const saved = load();
-const state = { keeper: saved?.keeper ?? newKeeper(), shots: [], i: 0, results: [], phase: 'idle', auto: Boolean(saved?.auto) };
+const state = { keeper: saved?.keeper ?? newKeeper(), shots: [], i: 0, results: [], phase: 'idle', auto: Boolean(saved?.auto), picks: 0 };
+// 비운 시간은 훈련 선택권으로만 바뀌고, 그 선택은 손으로 한다.
+state.picks = saved ? offlineGain(saved.at, Date.now()) : 0;
+window.__picks = () => state.picks;
 
 // 손가락 셋. 방향과 타이밍과 나갈지 여부.
 // 여기서 나온 실패는 손가락 셋으로 귀속하고 스탯 원장에 섞지 않는다.
@@ -106,13 +109,18 @@ function rollCaptions(result) {
 }
 
 function endSet() {
-  state.phase = 'offer';
   const conceded = state.results.filter(Boolean).length;
   say('다섯 구 중 ' + (5 - conceded) + '개 막았습니다.', null);
+  showOffer();
+}
+
+function showOffer() {
+  state.phase = 'offer';
   const offer = growthOffer(rng, state.keeper);
   const box = el('offer');
   box.hidden = false;
-  box.innerHTML = '<h4>어디를 올릴까</h4><div class=\"row\">' + offer.map((k) =>
+  const head = state.picks > 0 ? '자리 비운 사이 훈련 ' + state.picks + '회 남음' : '어디를 올릴까';
+  box.innerHTML = '<h4>' + head + '</h4><div class=\"row\">' + offer.map((k) =>
     '<button data-k=\"' + k + '\">' + CAUSE_LABEL[k] + '<em>' + state.keeper[k] + ' → ' + (state.keeper[k] + 1) + '</em></button>'
   ).join('') + '</div>';
   for (const b of box.querySelectorAll('button')) {
@@ -122,6 +130,12 @@ function endSet() {
       save(state.keeper, state.auto);
       box.hidden = true;
       stage.setKeeper(state.keeper);
+      if (state.picks > 0) {
+        state.picks -= 1;
+        save(state.keeper, state.auto);
+        showOffer();
+        return;
+      }
       nextSet();
     };
   }
@@ -150,5 +164,11 @@ addEventListener('keydown', (e) => {
 
 mountTitle(() => {
   stage.setKeeper(state.keeper);
+  // 돌아오자마자 밀린 훈련부터 쓴다. 그 다음에 공이 날아온다.
+  if (state.picks > 0) {
+    state.picks -= 1;
+    showOffer();
+    return;
+  }
   nextSet();
 });
