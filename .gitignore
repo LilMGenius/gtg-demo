@@ -25,3 +25,6 @@ build/
 # run results. regenerating these costs nothing
 sim/out/
 *.log
+
+# encoded audio. tools/encode-bgm.ps1 rebuilds these from assets/audio
+web/assets/audio/
