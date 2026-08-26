@@ -241,7 +241,10 @@ export function createScene(canvas) {
     const HIT = { save: 0.13, catch: 0.13, gloveGone: 0.16, carriedIn: 0.14, spill: 0.10, downed: 0.12 };
     // 손이 닿은 사건은 그 자리에서 흙이 뜨고 흰 선이 터진다. 공이 그냥 지나간 사건에는 아무것도 없다.
     const BURST = { save: 1.0, catch: 0.8, gloveGone: 1.15, carriedIn: 1.1, spill: 0.85, downed: 1.0 };
-    if (BURST[kind]) impact.burst(ball.position, BURST[kind]);
+    // 사건 이름을 모르면 화면만 보고는 무슨 일이 난 건지 모른다. 한 단어로 적어준다.
+    // 문장을 넣으면 자막과 같은 것이 두 개가 되어 둘 다 안 읽힌다.
+    const WORD = { save: '털!', catch: '찰칵', gloveGone: '어?', carriedIn: '아아', spill: '퍽', downed: '으악' };
+    if (BURST[kind]) impact.burst(ball.position, BURST[kind], WORD[kind] || '');
     // 웃겨야 하는 사건에만 렌즈를 기울인다. 선방까지 기울이면 매 구 화면이 비뚤어져 기울기가 안 읽힌다.
     const TILT = { gloveGone: 0.13, carriedIn: -0.14, downed: 0.15, talked: -0.11, distracted: 0.1, beat: -0.12, lost: 0.12 };
     if (TILT[kind]) tilt(TILT[kind], 0.9);
@@ -508,7 +511,7 @@ export function createScene(canvas) {
         netT = 0;
         netX = ball.position.x;
         netY = ball.position.y - R_H / 2;
-        impact.burst(ball.position, 0.9);
+        impact.burst(ball.position, 0.9, '꾹');
         shake(0.03, 0.22);
       }
       shadow.position.set(ball.position.x, 0.02, ball.position.z);
