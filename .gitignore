@@ -1,0 +1,27 @@
+# OS and editor noise
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.BIN/
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# dependencies and build output
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# local environment
+.env
+.env.*
+!.env.example
+
+# scratch. named *.local.* and deleted the moment its one use is over
+*.local.*
+
+# run results. regenerating these costs nothing
+sim/out/
+*.log
