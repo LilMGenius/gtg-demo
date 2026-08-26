@@ -3,6 +3,7 @@
 // 어깨와 고관절을 끝단 피벗으로 세우고, 각도를 데이터로 둔다. 과장은 여기서 나온다.
 import * as THREE from '../../../vendor/three.module.min.js';
 import { flat, standOnGround } from '../units.mjs';
+import { jitterMesh, addOutline } from '../handmade.mjs';
 
 // 동공은 연출이 바꿔 끼우므로 재질을 밖에서 소유한다.
 export const pupilMat = new THREE.MeshBasicMaterial({ color: 0x18140f });
@@ -164,11 +165,15 @@ export function addFace(head, r, dir, skin) {
 
 // 피벗이 끝단인 마디. 원점에서 아래로 뻗는다.
 // 캡슐을 중앙 피벗으로 두면 어깨를 돌렸을 때 팔이 몸통을 관통한다.
-function seg(radius, len, color, tag) {
+// 사지에는 외곽선을 안 건다. 팔 여덟 개가 각자 복제본을 달면 드로우콜이 두 배가 되고,
+// 가늘어서 어차피 선만 남는다. 실루엣을 만드는 건 몸통과 머리다.
+function seg(radius, len, color, tag, salt) {
   const geo = new THREE.CapsuleGeometry(radius, len, 3, 6);
   geo.translate(0, -len / 2, 0);
   const m = new THREE.Mesh(geo, flat(color));
   m.name = tag;
+  // 사지는 얇다. 0.035를 그대로 주면 팔이 끊어진 것처럼 잘록해진다.
+  jitterMesh(m, 0.012, salt);
   return m;
 }
 
@@ -190,12 +195,17 @@ function buildBody(o) {
   torsoGeo.translate(0, o.torsoLen / 2, 0);
   const torso = new THREE.Mesh(torsoGeo, flat(o.shirt));
   torso.name = tag;
+  jitterMesh(torso, 0.022, 3);
+  addOutline(torso, 0.05);
   spine.add(torso);
 
   const neck = joint(spine, 0, o.torsoLen + o.torsoR * 0.35, 0);
   const head = new THREE.Mesh(new THREE.SphereGeometry(o.headR, 10, 8), flat(o.skin));
   head.name = tag;
   head.position.y = o.headR * 0.92;
+  // 머리는 작다. 몸통과 같은 진폭을 주면 두개골이 찌그러진 것으로 읽힌다.
+  jitterMesh(head, 0.008, 11);
+  addOutline(head, 0.045);
   addFace(head, o.headR, o.faceDir, o.skin);
   neck.add(head);
 
@@ -206,10 +216,10 @@ function buildBody(o) {
   for (const side of [-1, 1]) {
     const k = side < 0 ? 'L' : 'R';
     const sh = joint(spine, side * o.shoulderX, o.torsoLen * 0.92, 0);
-    const upper = seg(o.armR, o.upperLen, o.shirt, tag);
+    const upper = seg(o.armR, o.upperLen, o.shirt, tag, side < 0 ? 21 : 22);
     sh.add(upper);
     const el = joint(sh, 0, -o.upperLen, 0);
-    const fore = seg(o.armR * 0.92, o.foreLen, o.skin, tag);
+    const fore = seg(o.armR * 0.92, o.foreLen, o.skin, tag, side < 0 ? 23 : 24);
     el.add(fore);
     joints['sh' + k] = sh;
     joints['el' + k] = el;
@@ -217,16 +227,19 @@ function buildBody(o) {
     if (o.gloveSize) {
       const gv = new THREE.Mesh(new THREE.BoxGeometry(o.gloveSize, o.gloveSize, o.gloveSize * 0.45), flat(0xf2d64b));
       gv.name = tag;
+      // 장갑은 화면에서 가장 자주 보는 물건이다. 직육면체 그대로면 여기서 티가 제일 크게 난다.
+      jitterMesh(gv, 0.02, side < 0 ? 31 : 32);
+      addOutline(gv, 0.028);
       gv.position.set(0, -o.foreLen - o.gloveSize * 0.2, 0);
       el.add(gv);
       gloves.push(gv);
       gloveParent.push(el);
     }
     const hp = joint(hip, side * o.hipX, 0, 0);
-    const thigh = seg(o.legR, o.thighLen, o.shorts, tag);
+    const thigh = seg(o.legR, o.thighLen, o.shorts, tag, side < 0 ? 41 : 42);
     hp.add(thigh);
     const kn = joint(hp, 0, -o.thighLen, 0);
-    const shin = seg(o.legR * 0.82, o.shinLen, o.socks, tag);
+    const shin = seg(o.legR * 0.82, o.shinLen, o.socks, tag, side < 0 ? 43 : 44);
     kn.add(shin);
     joints['hip' + k] = hp;
     joints['kn' + k] = kn;

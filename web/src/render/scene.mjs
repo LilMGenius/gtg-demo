@@ -11,6 +11,7 @@ import {
 } from './units.mjs';
 import { pupilMat, buildKeeper, buildKicker, POSES, lerpPose, setPose } from './objects/actors.mjs';
 import { buildPitch, buildPassers } from './objects/pitch.mjs';
+import { jitterMesh, addOutline } from './handmade.mjs';
 
 export function createScene(canvas) {
   const sfx = mountSfx();
@@ -39,6 +40,9 @@ export function createScene(canvas) {
   const passers = buildPassers(scene);
 
   const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.14, 1), flat(0xfdfdf6));
+  // 흰 공이 밝은 하늘 앞을 지나면 사라진다. 외곽선 하나가 그걸 끝낸다.
+  jitterMesh(ball, 0.006, 5);
+  addOutline(ball, 0.012);
   ball.userData.probeIgnore = true;
   scene.add(ball);
 

@@ -30,3 +30,4 @@ sim/out/
 
 # npm tarballs. vendor/ already holds the extracted files
 *.tgz
+cmsg.txt

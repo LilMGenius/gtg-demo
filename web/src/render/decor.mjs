@@ -3,28 +3,32 @@
 // 에셋 하나가 404여도 게임은 돌아야 한다.
 import { GLTFLoader } from '../../vendor/loaders/GLTFLoader.js';
 import { flat } from './units.mjs';
+import { jitterMesh } from './handmade.mjs';
 
 const loader = new GLTFLoader();
 
 // 구울 때는 MeshStandardMaterial이었다. exporter가 Lambert를 안 받기 때문이다.
 // 화면에 설 때는 Lambert로 돌린다. 재질 소유권은 units.mjs의 flat()에 있다.
-function relight(root) {
+// 구운 것에도 손을 댄다. 코드가 세운 것만 삐뚤고 GLB만 반듯하면 한 화면에 두 화풍이 선다.
+function relight(root, jitter) {
+  let salt = 200;
   root.traverse((o) => {
     if (!o.isMesh) return;
     const src = o.material;
     o.material = flat(src && src.color ? src.color.getHex() : 0xffffff);
+    if (jitter) { jitterMesh(o, jitter, salt); salt += 1; }
     // 장식은 판정에 안 쓰인다. 프로브가 이걸 세면 가림 판정이 거짓말을 한다.
     o.userData.probeIgnore = true;
   });
 }
 
-export function loadDecor(scene, name, fallback) {
+export function loadDecor(scene, name, fallback, jitter = 0) {
   loader.load(
     'assets/models/' + name + '.glb',
     (gltf) => {
       const root = gltf.scene;
       root.name = name;
-      relight(root);
+      relight(root, jitter);
       if (fallback && fallback.parent) fallback.parent.remove(fallback);
       scene.add(root);
     },
