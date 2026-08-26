@@ -2,7 +2,7 @@
 import { makeRng, buildSet, resolve, growthOffer, newKeeper, autoInput } from '../../src/chain.mjs';
 import { CAUSE_LABEL } from '../../src/ledger.mjs';
 import { createScene } from './render/scene.mjs';
-import { mountBgm } from './bgm.mjs';
+import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 
 const el = (id) => document.getElementById(id);
@@ -13,7 +13,9 @@ window.__stageProbe = stage.stageProbe;
 window.__goalFrame = stage.goalFrame;
 mountBgm();
 
-const rng = makeRng((Date.now() ^ 0x9e3779b9) >>> 0);
+// 재현되지 않는 캐프처는 증거가 아니다. ?seed= 가 있으면 그 씨드로 고정한다.
+const seedParam = new URLSearchParams(location.search).get('seed');
+const rng = makeRng(seedParam === null ? ((Date.now() ^ 0x9e3779b9) >>> 0) : (Number(seedParam) >>> 0));
 const state = { keeper: newKeeper(), shots: [], i: 0, results: [], phase: 'idle' };
 
 // 손가락 셋. 방향과 타이밍과 나갈지 여부.
