@@ -30,6 +30,26 @@ const standOnGround = (g) => {
 };
 const ease = (t) => t * t * (3 - 2 * t);
 
+// 사각 그물 한 장. wireframe 평면은 삼각형 대각선이 남아 그물이 아니라 격자무늬로 읽힌다.
+function meshPanel(w, h, cell, color, opacity) {
+  const pts = [];
+  const nx = Math.max(1, Math.round(w / cell));
+  const ny = Math.max(1, Math.round(h / cell));
+  for (let i = 0; i <= nx; i += 1) {
+    const x = -w / 2 + (w * i) / nx;
+    pts.push(x, -h / 2, 0, x, h / 2, 0);
+  }
+  for (let j = 0; j <= ny; j += 1) {
+    const y = -h / 2 + (h * j) / ny;
+    pts.push(-w / 2, y, 0, w / 2, y, 0);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  const m = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+  m.userData.probeIgnore = true;
+  return m;
+}
+
 // 얼굴. 흰자 위에 검은 동공을 얹는다. 눈이 없으면 사람이 아니라 캡슐이다.
 // dir은 얼굴이 보는 쪽이다. 키퍼는 키커를 보고, 키커는 렌즈 쪽을 본다.
 function addFace(head, r, dir, skin) {
@@ -210,12 +230,22 @@ export function createScene(canvas) {
   bar.name = 'bar';
   scene.add(bar);
 
-  const net = new THREE.Mesh(
-    new THREE.PlaneGeometry(R_HALF_W * 2, R_H, 11, 7),
-    new THREE.MeshBasicMaterial({ color: 0xdfe6da, wireframe: true, transparent: true, opacity: 0.28 })
-  );
-  net.position.set(0, R_H / 2, -0.75);
-  scene.add(net);
+  // 골망. 뒷면 한 장이 아니라 상자다. 평면 하나면 골대에 깊이가 없다.
+  const NET_D = 1.5;
+  const NET_C = 0xe6ede0;
+  const back = meshPanel(R_HALF_W * 2, R_H, 0.24, NET_C, 0.34);
+  back.position.set(0, R_H / 2, -NET_D);
+  scene.add(back);
+  for (const sgn of [-1, 1]) {
+    const side = meshPanel(NET_D, R_H, 0.24, NET_C, 0.28);
+    side.rotation.y = Math.PI / 2;
+    side.position.set(sgn * R_HALF_W, R_H / 2, -NET_D / 2);
+    scene.add(side);
+  }
+  const roof = meshPanel(R_HALF_W * 2, NET_D, 0.24, NET_C, 0.24);
+  roof.rotation.x = -Math.PI / 2;
+  roof.position.set(0, R_H, -NET_D / 2);
+  scene.add(roof);
 
   // 하늘. 안쪽을 보는 반구 하나면 검은 벽이 사라진다.
   const dome = new THREE.Mesh(
@@ -225,12 +255,8 @@ export function createScene(canvas) {
   scene.add(dome);
 
   // 펜스. 동네 운동장을 두르는 초록 그물이다.
-  const fence = new THREE.Mesh(
-    new THREE.PlaneGeometry(58, 3.4, 30, 3),
-    new THREE.MeshBasicMaterial({ color: 0x3f6b4a, wireframe: true, transparent: true, opacity: 0.55 })
-  );
+  const fence = meshPanel(58, 3.4, 0.55, 0x3f6b4a, 0.5);
   fence.position.set(0, 1.7, 30);
-  fence.rotation.y = Math.PI;
   scene.add(fence);
 
   // 건물 실루엣. 지평선 위가 비지 않게만 세운다. 디테일은 없다.
