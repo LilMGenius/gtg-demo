@@ -1,5 +1,5 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
-import { makeRng, buildSet, resolve, growthOffer, newKeeper, autoInput, rollForm } from '../../src/chain.mjs';
+import { makeRng, buildSet, resolve, growthOffer, newKeeper, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain } from '../../src/chain.mjs';
 import { CAUSE_LABEL } from '../../src/ledger.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
@@ -99,7 +99,7 @@ function rollCaptions(result) {
     if (!e) {
       pips();
       state.i += 1;
-      setTimeout(nextShot, 700);
+      restart(result);
       return;
     }
     say(e.line, e.cause);
@@ -113,10 +113,27 @@ function rollCaptions(result) {
   step();
 }
 
+// 공을 다시 세우는 시간. 스로잉과 골킱이 이 초를 줄이고, 줄어드는 것이 화면에 보여야 선택이 선택이 된다.
+function countdown(sec, label, then) {
+  const until = performance.now() + sec * 1000;
+  const tick = () => {
+    const left = (until - performance.now()) / 1000;
+    if (left <= 0) { el('caption').textContent = ''; then(); return; }
+    el('caption').innerHTML = label + ' <b>' + left.toFixed(1) + 's</b>';
+    timer = setTimeout(tick, 100);
+  };
+  tick();
+}
+
+function restart(result) {
+  const hand = ballInHand(result);
+  countdown(restartDelay(state.keeper, result), hand ? '손으로 던져준다' : '골킥을 차준다', nextShot);
+}
+
 function endSet() {
   const conceded = state.results.filter(Boolean).length;
   say('다섯 구 중 ' + (5 - conceded) + '개 막았습니다.', null);
-  showOffer();
+  setTimeout(() => countdown(setBreak(), '숨 고르는 중', showOffer), 900);
 }
 
 function showOffer() {
@@ -130,7 +147,8 @@ function showOffer() {
   ).join('') + '</div>';
   for (const b of box.querySelectorAll('button')) {
     b.onclick = () => {
-      state.keeper[b.dataset.k] += 1;
+      // 프로의식은 히든이다. 숫자는 안 보이고 가끔 두 칸이 오른다.
+      state.keeper[b.dataset.k] += growthGain(state.keeper, rng);
       state.keeper.level += 1;
       save(state.keeper, state.auto);
       box.hidden = true;
