@@ -32,8 +32,39 @@ export function createScene(canvas) {
   camera.position.set(0, 3.3, -5.1);
   camera.lookAt(0, 1.4, 4.5);
 
+  // 화면을 한 번 작게 그린 다음 늘린다. 플래시 게임의 뭉개짐은 실력 부족이 아니라 그 시대의 해상도다.
+  // 풀해상도로 깨끗하게 그린 로우폴리는 에셋스토어 템플릿으로 읽힌다. 여기서 그 지문을 지운다.
+  // 세로 288은 골키퍼 얼굴이 뭉개져 사라졌고 540은 원본과 구분이 안 갔다. 384가 계단이 보이면서 형태가 남는 높이다.
+  const RT_H = 384;
+  const rt = new THREE.WebGLRenderTarget(683, RT_H, {
+    // 선형 보간으로 늘리면 뿌옇기만 하고 픽셀이 안 보인다. 계단이 보여야 저해상도로 읽힌다.
+    minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter
+  });
+  const postScene = new THREE.Scene();
+  const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  // 색을 몇 단으로 끊는다. 그라데이션이 남아 있으면 3D 렌더링이고, 끊기면 그림이다.
+  // 10단은 원본과 같았고 4단은 얼굴과 유니폼이 한 색이 됐다.
+  const postMat = new THREE.ShaderMaterial({
+    uniforms: { tDiffuse: { value: rt.texture }, steps: { value: 7.0 } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: [
+      'uniform sampler2D tDiffuse; uniform float steps; varying vec2 vUv;',
+      'void main(){',
+      '  vec3 c = texture2D(tDiffuse, vUv).rgb;',
+      // floor만 쓰면 화면 전체가 어두워진다. 반 칸 올려 원래 밝기를 지킨다.
+      '  c = (floor(c * steps) + 0.5) / steps;',
+      '  gl_FragColor = vec4(c, 1.0);',
+      '}'
+    ].join(String.fromCharCode(10)),
+    depthTest: false, depthWrite: false
+  });
+  postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), postMat));
+
   // 세계의 시계. performance.now()를 직접 읽으면 시간을 늦출 자리가 없다.
+
   // 히트스톱은 프레임을 건너뛰는 것이 아니라 시간의 배율을 낮추는 것이다.
+  let sceneCalls = 0;
+  let sceneTris = 0;
   let vnow = 0;
   let realLast = performance.now() / 1000;
   let stopLeft = 0;
@@ -158,6 +189,8 @@ export function createScene(canvas) {
       camera.fov = (Math.atan(halfH) * 360) / Math.PI;
     }
     camera.updateProjectionMatrix();
+    // 저해상도 버퍼도 화면 비율을 따라간다. 고정 폭이면 화면이 넓어질 때 가로로 늘어난다.
+    rt.setSize(Math.max(2, Math.round(RT_H * (w / Math.max(1, h)))), RT_H);
   }
   addEventListener('resize', resize);
   resize();
@@ -554,15 +587,23 @@ export function createScene(canvas) {
     }
     impact.update(dt, camera);
     if (cue) { ballProbe.sample(); stageProbe.sample(); }
+    renderer.setRenderTarget(rt);
     renderer.render(scene, camera);
+    // 두 번째 render 호출이 카운터를 0으로 되돌린다. 세계를 그린 값은 여기서 걷어야 한다.
+    // 안 걷으면 예산 게이트가 전체 화면 사각형 한 장만 보고 통과시킨다.
+    sceneCalls = renderer.info.render.calls;
+    sceneTris = renderer.info.render.triangles;
+    renderer.setRenderTarget(null);
+    renderer.render(postScene, postCam);
   }
   let divingStat = 5;
   const cueKeeperDiving = () => divingStat;
 
   // 렌더러가 실제로 무엇을 그렸는지. 선언이 아니라 카운터다.
+  // 포스트 패스 한 장이 아니라 세계 패스를 보고한다. 예산은 세계가 쓴다.
   window.__renderInfo = () => ({
-    calls: renderer.info.render.calls,
-    triangles: renderer.info.render.triangles,
+    calls: sceneCalls + 1,
+    triangles: sceneTris + 2,
     programs: renderer.info.programs ? renderer.info.programs.length : 0
   });
 
