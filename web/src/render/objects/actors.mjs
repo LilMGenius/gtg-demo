@@ -49,11 +49,17 @@ export function buildKeeper(height, weight) {
   const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 10, 8), flat(0xe8c39a));
   head.position.y = h * 0.93;
   addFace(head, headR, 1, 0xe8c39a);
-  const legs = new THREE.Mesh(new THREE.CapsuleGeometry(w * 0.72, h * 0.3, 3, 8), flat(0x14202c));
-  legs.position.y = h * 0.22;
+  // 다리 둘. 하나짜리 캡슐은 사람이 아니라 화분이다.
+  const legGeo = new THREE.CapsuleGeometry(w * 0.34, h * 0.3, 3, 8);
+  const legs = [];
+  for (const s of [-1, 1]) {
+    const leg = new THREE.Mesh(legGeo, flat(0x14202c));
+    leg.position.set(s * w * 0.38, h * 0.22, 0);
+    legs.push(leg);
+  }
 
   // 팔. 어깨에서 장갑까지 이어주는 막대다. 없으면 장갑이 허공에 떠 있다.
-  const armGeo = new THREE.CapsuleGeometry(h * 0.032, w * 0.9 + 0.16, 3, 6);
+  const armGeo = new THREE.CapsuleGeometry(h * 0.052, w * 0.9 + 0.1, 3, 6);
   const arms = [];
   for (const s of [-1, 1]) {
     const arm = new THREE.Mesh(armGeo, flat(0x2f8f5b));
@@ -70,8 +76,8 @@ export function buildKeeper(height, weight) {
   gl.position.set(-w - 0.22, h * 0.62, 0.06);
   gr.position.set(w + 0.22, h * 0.62, 0.06);
 
-  g.add(torso, head, legs, gl, gr);
-  for (const m of [torso, head, legs, gl, gr]) m.name = 'keeper';
+  g.add(torso, head, gl, gr, ...legs);
+  for (const m of [torso, head, gl, gr, ...legs]) m.name = 'keeper';
   standOnGround(g);
   g.userData.gloves = [gl, gr];
   g.userData.gloveHome = [gl.position.clone(), gr.position.clone()];
@@ -89,8 +95,13 @@ export function buildKicker() {
   head.position.y = 1.62;
   // 키커는 골대를 향해 달린다. 카메라는 골대 뒤에 있으니 얼굴이 렌즈를 마주 본다.
   addFace(head, 0.14, -1, 0xd8a877);
-  const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 0.52, 3, 8), flat(0xf0f0ee));
-  legs.position.y = 0.4;
+  const legGeo = new THREE.CapsuleGeometry(0.09, 0.52, 3, 8);
+  const legs = [];
+  for (const s of [-1, 1]) {
+    const leg = new THREE.Mesh(legGeo, flat(0x243043));
+    leg.position.set(s * 0.11, 0.4, 0);
+    legs.push(leg);
+  }
   const armGeo = new THREE.CapsuleGeometry(0.055, 0.42, 3, 6);
   const arms = [];
   for (const s of [-1, 1]) {
@@ -101,8 +112,8 @@ export function buildKicker() {
     g.add(arm);
     arms.push(arm);
   }
-  for (const m of [torso, head, legs]) m.name = 'kicker';
-  g.add(torso, head, legs);
+  for (const m of [torso, head, ...legs]) m.name = 'kicker';
+  g.add(torso, head, ...legs);
   standOnGround(g);
   g.userData.arms = arms;
   g.userData.head = head;
