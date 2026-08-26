@@ -2,7 +2,8 @@
 // 몸통 하나를 통째로 기울이면 T포즈를 회전시킨 것으로만 읽힌다.
 // 어깨와 고관절을 끝단 피벗으로 세우고, 각도를 데이터로 둔다. 과장은 여기서 나온다.
 import * as THREE from '../../../vendor/three.module.min.js';
-import { flat, standOnGround } from '../units.mjs';
+import { flat, flatMap, standOnGround } from '../units.mjs';
+import { clothTex } from '../texture.mjs';
 import { jitterMesh, addOutline } from '../handmade.mjs';
 
 // 동공은 연출이 바꿔 끼우므로 재질을 밖에서 소유한다.
@@ -193,7 +194,8 @@ function buildBody(o) {
 
   const torsoGeo = new THREE.CapsuleGeometry(o.torsoR, o.torsoLen, 3, 8);
   torsoGeo.translate(0, o.torsoLen / 2, 0);
-  const torso = new THREE.Mesh(torsoGeo, flat(o.shirt));
+  // 유니폼 한 장이 단색이면 사람이 아니라 색 견본이다. 구겨진 명암이 옷을 옷으로 만든다.
+  const torso = new THREE.Mesh(torsoGeo, flatMap(o.shirt, clothTex()));
   torso.name = tag;
   jitterMesh(torso, 0.022, 3);
   addOutline(torso, 0.05);
@@ -225,7 +227,7 @@ function buildBody(o) {
     joints['el' + k] = el;
     arms.push(sh);
     if (o.gloveSize) {
-      const gv = new THREE.Mesh(new THREE.BoxGeometry(o.gloveSize, o.gloveSize, o.gloveSize * 0.45), flat(0xf2d64b));
+      const gv = new THREE.Mesh(new THREE.BoxGeometry(o.gloveSize, o.gloveSize, o.gloveSize * 0.45), flatMap(0xf2d64b, clothTex()));
       gv.name = tag;
       // 장갑은 화면에서 가장 자주 보는 물건이다. 직육면체 그대로면 여기서 티가 제일 크게 난다.
       jitterMesh(gv, 0.02, side < 0 ? 31 : 32);

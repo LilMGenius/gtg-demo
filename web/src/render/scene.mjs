@@ -12,7 +12,7 @@ import {
 import { pupilMat, buildKeeper, buildKicker, POSES, lerpPose, setPose } from './objects/actors.mjs';
 import { buildPitch, buildPassers } from './objects/pitch.mjs';
 import { createImpact } from './objects/impact.mjs';
-import { jitterMesh, addOutline } from './handmade.mjs';
+import { jitterMesh, addOutline, blobGeo } from './handmade.mjs';
 
 export function createScene(canvas) {
   const sfx = mountSfx();
@@ -45,14 +45,28 @@ export function createScene(canvas) {
   // 색을 몇 단으로 끊는다. 그라데이션이 남아 있으면 3D 렌더링이고, 끊기면 그림이다.
   // 10단은 원본과 같았고 4단은 얼굴과 유니폼이 한 색이 됐다.
   const postMat = new THREE.ShaderMaterial({
-    uniforms: { tDiffuse: { value: rt.texture }, steps: { value: 7.0 } },
+    uniforms: { tDiffuse: { value: rt.texture }, steps: { value: 7.0 }, texel: { value: new THREE.Vector2(1 / 683, 1 / RT_H) } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
     fragmentShader: [
-      'uniform sampler2D tDiffuse; uniform float steps; varying vec2 vUv;',
+      'uniform sampler2D tDiffuse; uniform float steps; uniform vec2 texel; varying vec2 vUv;',
       'void main(){',
-      '  vec3 c = texture2D(tDiffuse, vUv).rgb;',
+      // 색채널을 한 텍셀씩 어긋내 뽑는다. 싼 렌즈는 가장자리에서 색이 갈린다.
+      // 화면 전체에 균일하게 주면 인쇄 불량으로 보인다. 중심에서 멀수록 커져야 렌즈로 읽힌다.
+      '  vec2 off = (vUv - 0.5) * texel * 0.7;',
+      '  vec3 c;',
+      '  c.r = texture2D(tDiffuse, vUv + off).r;',
+      '  c.g = texture2D(tDiffuse, vUv).g;',
+      '  c.b = texture2D(tDiffuse, vUv - off).b;',
+      // 색을 끊기 전에 잡음을 섞는다. 끊고 나서 섞으면 계단 위에 모래를 뿌린 것으로 보인다.
+      '  float n = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);',
+      '  c += (n - 0.5) / steps * 0.9;',
       // floor만 쓰면 화면 전체가 어두워진다. 반 칸 올려 원래 밝기를 지킨다.
       '  c = (floor(c * steps) + 0.5) / steps;',
+      // 주사선. 한 줄 걸러 살짝 어둡게. 0.02는 안 보였고 0.11은 낮 경기가 밤이 됐다.
+      '  c *= 1.0 - step(0.5, fract(gl_FragCoord.y * 0.5)) * 0.055;',
+      // 비네트. 가장자리만 살짝. 0.5는 경기장 절반이 그늘로 들어갔다.
+      '  vec2 d = vUv - 0.5;',
+      '  c *= 1.0 - dot(d, d) * 0.22;',
       '  gl_FragColor = vec4(c, 1.0);',
       '}'
     ].join(String.fromCharCode(10)),
@@ -106,7 +120,7 @@ export function createScene(canvas) {
 
   // 공 그림자. 공이 어디쯤인지 바닥이 알려주면 궤적을 놓치지 않는다.
   const shadow = new THREE.Mesh(
-    new THREE.CircleGeometry(0.16, 12),
+    blobGeo(0.16, 0x4411a3),
     new THREE.MeshBasicMaterial({ color: 0x1c1508, transparent: true, opacity: 0.42 })
   );
   shadow.rotation.x = -Math.PI / 2;
@@ -114,11 +128,22 @@ export function createScene(canvas) {
   scene.add(shadow);
 
   // 배우 그림자. 공에만 그림자가 있으면 사람은 떠 보인다. 수치상 접지여도 화면은 그렇게 안 읽힌다.
+  // 그늘 한 장은 균일하다. 실제로는 몸에 가까운 쪽이 더 짙고 가장자리로 갈수록 옅다.
+  // 원판 두 장을 어긋나게 겹치면 그 농도 차이가 생긴다.
+  let blobSeed = 0x1f0b77;
   const blob = (r) => {
+    blobSeed += 0x9e37;
     const m = new THREE.Mesh(
-      new THREE.CircleGeometry(r, 14),
-      new THREE.MeshBasicMaterial({ color: 0x1c1508, transparent: true, opacity: 0.3 })
+      blobGeo(r, blobSeed),
+      new THREE.MeshBasicMaterial({ color: 0x1c1508, transparent: true, opacity: 0.22 })
     );
+    const core = new THREE.Mesh(
+      blobGeo(r * 0.56, blobSeed + 0x31),
+      new THREE.MeshBasicMaterial({ color: 0x1c1508, transparent: true, opacity: 0.24 })
+    );
+    // 정확히 겹치면 두 장인 줄 모른다. 반지름의 5분의 1만 밀어 발밑을 짙게 만든다.
+    core.position.set(r * 0.18, -r * 0.14, 0.001);
+    m.add(core);
     m.rotation.x = -Math.PI / 2;
     m.userData.probeIgnore = true;
     scene.add(m);
@@ -194,6 +219,8 @@ export function createScene(canvas) {
     camera.updateProjectionMatrix();
     // 저해상도 버퍼도 화면 비율을 따라간다. 고정 폭이면 화면이 넓어질 때 가로로 늘어난다.
     rt.setSize(Math.max(2, Math.round(RT_H * (w / Math.max(1, h)))), RT_H);
+    // 색수차 폭은 텍셀 단위다. 여기서 안 갱신하면 창을 넓힐수록 색이 벌어진다.
+    postMat.uniforms.texel.value.set(1 / rt.width, 1 / rt.height);
   }
   addEventListener('resize', resize);
   resize();

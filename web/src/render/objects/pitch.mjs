@@ -1,6 +1,7 @@
 // 무대. 흙 운동장 하나와 그 너머를 채우는 것들이다.
 import * as THREE from '../../../vendor/three.module.min.js';
-import { flat, R_HALF_W, R_H } from '../units.mjs';
+import { flat, flatMap, R_HALF_W, R_H } from '../units.mjs';
+import { dirtTex, scuffTex, clothTex, chippedTex, windowTex } from '../texture.mjs';
 import { loadDecor } from '../decor.mjs';
 import { jitterMesh, seeded, addOutline } from '../handmade.mjs';
 
@@ -56,13 +57,15 @@ export function meshPanel(w, h, cell, color, opacity, sag = 0) {
 
 export function buildPitch(scene) {
   // 흙바닥. 잔디가 아니다. 동네 운동장이 이 게임의 무대다.
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), flat(0x9c7a4a));
+  // 단색 흙은 카펫으로 읽힌다. 얼룩과 발자국과 잔모래가 있어야 밟은 땅이 된다.
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), flatMap(0x9c7a4a, dirtTex()));
   ground.rotation.x = -Math.PI / 2;
   ground.position.z = 24;
   ground.name = 'ground';
   scene.add(ground);
 
-  const box = new THREE.Mesh(new THREE.PlaneGeometry(16.5, 16.5), flat(0xb08e58));
+  // 박스 안은 더 밟힌다. 같은 잡티를 다른 배율로 물려야 한 장이 두 땅으로 읽힌다.
+  const box = new THREE.Mesh(new THREE.PlaneGeometry(16.5, 16.5), flatMap(0xb08e58, scuffTex()));
   box.rotation.x = -Math.PI / 2;
   box.position.set(0, 0.01, 8.2);
   box.name = 'box';
@@ -101,7 +104,8 @@ export function buildPitch(scene) {
 
   // 골대. 판정식이 쓰는 폭과 높이를 그대로 쓴다. 그림과 숫자가 어긋나면 화면이 거짓말을 한다.
   const post = new THREE.CylinderGeometry(0.06, 0.06, R_H, 8);
-  const white = flat(0xf4f6f2);
+  // 새로 칠한 골대는 규격 경기장의 물건이다. 아래에서 녹이 올라와야 동네 골대다.
+  const white = flatMap(0xf4f6f2, chippedTex());
   for (const [pi, x] of [-R_HALF_W, R_HALF_W].entries()) {
     const p = new THREE.Mesh(post, white);
     p.position.set(x, R_H / 2, 0);
@@ -155,7 +159,8 @@ export function buildPitch(scene) {
   // 로드가 실패하면 이게 남는다. 에셋 하나로 화면이 비지는 않는다.
   // 등간격으로 세우면 도시가 아니라 막대그래프다. 간격과 각도를 손으로 놓은 것처럼 어긋낸다.
   const skyline = new THREE.Group();
-  const blockMat = flat(0x5b6f7d);
+  // 순수한 검정 실루엣은 오려붙인 종이다. 창문 몇 칸이 켜지면 사람이 사는 도시가 된다.
+  const blockMat = new THREE.MeshLambertMaterial({ color: 0x5b6f7d, emissive: 0xffffff, emissiveMap: windowTex() });
   const rnd = seeded(0x5c17e0);
   let cursor = -32;
   for (let i = 0; i < 14; i += 1) {
@@ -173,7 +178,7 @@ export function buildPitch(scene) {
   }
   scene.add(skyline);
   // 라인은 흔들지 않는다. 바닥 선이 물결치면 거리를 못 읽는다. 건물만 흔든다.
-  loadDecor(scene, 'skyline', skyline, 0.18);
+  loadDecor(scene, 'skyline', skyline, 0.18, (c) => new THREE.MeshLambertMaterial({ color: c, emissive: 0xffffff, emissiveMap: windowTex() }));
 
   return { ground, box, bar, net: back, netZ: -NET_D };
 }
@@ -191,7 +196,7 @@ export function buildPassers(scene) {
     const g = new THREE.Group();
     const tall = 0.85 + rnd() * 0.35;
     const wide = 0.85 + rnd() * 0.35;
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22 * wide, 0.62 * tall, 3, 6), flat(shirt[i]));
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22 * wide, 0.62 * tall, 3, 6), flatMap(shirt[i], clothTex()));
     body.position.y = 0.86 * tall;
     const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.15 * wide, 0.46 * tall, 3, 6), flat(0x30384a));
     legs.position.y = 0.38 * tall;

@@ -17,6 +17,27 @@ function hashNoise(x, y, z, salt) {
 
 // 정점을 흔든다. 0.01은 렌더 오차로 읽혀 아무 일도 안 일어난 것 같았다.
 // 0.09는 상자가 녹은 것으로 읽혔다. 0.035에서 손으로 그은 선이 된다.
+// 우그러진 원판. 각도마다 반지름이 다르다.
+// 완벽한 원은 소프트웨어가 찍은 도장이다. 그늘은 몸 모양을 따라 찌그러진다.
+export function blobGeo(r, seed) {
+  const N = 16;
+  const pos = [0, 0, 0];
+  const idx = [];
+  let s = seed >>> 0;
+  const rnd = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967295; };
+  for (let i = 0; i <= N; i += 1) {
+    const a = (i / N) * Math.PI * 2;
+    // 0.06은 원과 구분이 안 갔고 0.4는 별 모양이 됐다.
+    const rr = r * (1 + (rnd() - 0.5) * 0.34);
+    pos.push(Math.cos(a) * rr, Math.sin(a) * rr, 0);
+  }
+  for (let i = 1; i <= N; i += 1) idx.push(0, i, i + 1);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  return g;
+}
+
 export function jitterMesh(mesh, amp = 0.035, salt = 1) {
   if (!mesh.isMesh || mesh.userData.jittered) return mesh;
   const geo = mesh.geometry.clone();
