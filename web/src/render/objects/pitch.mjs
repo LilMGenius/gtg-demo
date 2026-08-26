@@ -33,9 +33,24 @@ export function meshPanel(w, h, cell, color, opacity, sag = 0) {
     }
   }
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  const attr = new THREE.Float32BufferAttribute(pts, 3);
+  geo.setAttribute('position', attr);
   const m = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
   m.userData.probeIgnore = true;
+  // 공이 그물에 박히면 그물이 밀린다. 밀리지 않으면 공이 그림 앞을 지나간 것으로 읽힌다.
+  // 원본 좌표를 따로 들고 있어야 밀었다 돌아온다. 매 프레임 누적하면 그물이 영영 늘어난다.
+  const base = Float32Array.from(pts);
+  // 반경 0.35는 실이 한 가닥만 튀어 구멍이 뚫린 것으로 읽혔다. 1.1은 그물 전체가 평행이동했다.
+  m.userData.punch = (px, py, amp, radius = 0.62) => {
+    const a = attr.array;
+    const r2 = radius * radius;
+    for (let i = 0; i < a.length; i += 3) {
+      const dx = base[i] - px;
+      const dy = base[i + 1] - py;
+      a[i + 2] = base[i + 2] + amp * Math.exp(-(dx * dx + dy * dy) / r2);
+    }
+    attr.needsUpdate = true;
+  };
   return m;
 }
 
@@ -107,16 +122,18 @@ export function buildPitch(scene) {
   // 골망. 뒷면 한 장이 아니라 상자다. 평면 하나면 골대에 깊이가 없다.
   const NET_D = 1.5;
   const NET_C = 0xe6ede0;
-  const back = meshPanel(R_HALF_W * 2, R_H, 0.24, NET_C, 0.34, 0.22);
+  // 카메라가 골대 뒤에 있어 그물은 화면에서 가장 앞에 온다. 그래서 처음엔 겨우 보일 만큼만 켰다.
+  // 그 결과 골이 들어가도 무엇에 박혔는지 안 보였다. 0.34는 화면에서 안 읽혔고 0.8은 화면 전체가 방충망이 됐다.
+  const back = meshPanel(R_HALF_W * 2, R_H, 0.24, NET_C, 0.56, 0.22);
   back.position.set(0, R_H / 2, -NET_D);
   scene.add(back);
   for (const sgn of [-1, 1]) {
-    const side = meshPanel(NET_D, R_H, 0.24, NET_C, 0.28, 0.06);
+    const side = meshPanel(NET_D, R_H, 0.24, NET_C, 0.44, 0.06);
     side.rotation.y = Math.PI / 2;
     side.position.set(sgn * R_HALF_W, R_H / 2, -NET_D / 2);
     scene.add(side);
   }
-  const roof = meshPanel(R_HALF_W * 2, NET_D, 0.24, NET_C, 0.24, 0.10);
+  const roof = meshPanel(R_HALF_W * 2, NET_D, 0.24, NET_C, 0.4, 0.10);
   roof.rotation.x = -Math.PI / 2;
   roof.position.set(0, R_H, -NET_D / 2);
   scene.add(roof);
@@ -158,7 +175,7 @@ export function buildPitch(scene) {
   // 라인은 흔들지 않는다. 바닥 선이 물결치면 거리를 못 읽는다. 건물만 흔든다.
   loadDecor(scene, 'skyline', skyline, 0.18);
 
-  return { ground, box, bar };
+  return { ground, box, bar, net: back, netZ: -NET_D };
 }
 
 // 행인. 펜스 너머를 지나간다. 아무도 없는 운동장은 연습장이지 경기장이 아니다.

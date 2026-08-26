@@ -11,6 +11,7 @@ import {
 } from './units.mjs';
 import { pupilMat, buildKeeper, buildKicker, POSES, lerpPose, setPose } from './objects/actors.mjs';
 import { buildPitch, buildPassers } from './objects/pitch.mjs';
+import { createImpact } from './objects/impact.mjs';
 import { jitterMesh, addOutline } from './handmade.mjs';
 
 export function createScene(canvas) {
@@ -44,8 +45,9 @@ export function createScene(canvas) {
   sun.position.set(-5, 9, 7);
   scene.add(sun);
 
-  buildPitch(scene);
+  const pitch = buildPitch(scene);
   const passers = buildPassers(scene);
+  const impact = createImpact(scene);
 
   const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.14, 1), flat(0xfdfdf6));
   // 흰 공이 밝은 하늘 앞을 지나면 사라진다. 외곽선 하나가 그걸 끝낸다.
@@ -115,6 +117,23 @@ export function createScene(canvas) {
   let shakeAmp = 0;
   let shakeLeft = 0;
   let shakeSpan = 1;
+  // 더치 앵글. 카메라 위치를 옮기면 골대 프레이밍 측정이 통째로 흔들린다.
+  // 렌즈만 기울이면 프레임 안의 것들은 그대로 있고 화면만 비뚤어진다. 게이트가 재는 축을 안 건드린다.
+  // 0.04는 모니터가 삐뚤어진 줄 알았고 0.28은 골대 모서리가 프레임을 나갔다.
+  let dutch = 0;
+  let dutchLeft = 0;
+  let dutchSpan = 1;
+  function tilt(rad, dur) {
+    if (Math.abs(rad) <= Math.abs(dutch)) return;
+    dutch = rad;
+    dutchLeft = dur;
+    dutchSpan = dur;
+  }
+  // 골망 출렁임. 감쇠 진동 한 번. 한 번만 밀면 그물이 밀린 채로 굳는다.
+  let netAmp = 0;
+  let netT = 0;
+  let netX = 0;
+  let netY = 0;
   function shake(amp, dur) {
     // 겹쳐 오면 큰 쪽이 이긴다. 더하면 실점 한 번에 화면이 뒤집힌다.
     shakeAmp = Math.max(shakeAmp, amp);
@@ -187,6 +206,12 @@ export function createScene(canvas) {
     // 사건마다 무게가 다르다. 선방과 실점이 같은 톤으로 지나가면 둘 다 아무 일도 아니게 된다.
     // 히트스톱은 손이 닿은 순간에만 준다. 공이 그냥 지나간 사건에 걸면 정지가 이유 없이 읽힌다.
     const HIT = { save: 0.13, catch: 0.13, gloveGone: 0.16, carriedIn: 0.14, spill: 0.10, downed: 0.12 };
+    // 손이 닿은 사건은 그 자리에서 흙이 뜨고 흰 선이 터진다. 공이 그냥 지나간 사건에는 아무것도 없다.
+    const BURST = { save: 1.0, catch: 0.8, gloveGone: 1.15, carriedIn: 1.1, spill: 0.85, downed: 1.0 };
+    if (BURST[kind]) impact.burst(ball.position, BURST[kind]);
+    // 웃겨야 하는 사건에만 렌즈를 기울인다. 선방까지 기울이면 매 구 화면이 비뚤어져 기울기가 안 읽힌다.
+    const TILT = { gloveGone: 0.13, carriedIn: -0.14, downed: 0.15, talked: -0.11, distracted: 0.1, beat: -0.12, lost: 0.12 };
+    if (TILT[kind]) tilt(TILT[kind], 0.9);
     // 흔들림은 실점이 가장 크다. 골이 들어간 것이 화면에서 제일 큰 사건이어야 한다.
     const SHK = {
       save: [0.045, 0.34], catch: [0.032, 0.28], gloveGone: [0.055, 0.42],
@@ -318,6 +343,12 @@ export function createScene(canvas) {
     if (tail) {
       const u = Math.min(1, (vnow - tail.t0) / 0.8);
       const e = ease(u);
+      // 공이 붙는 자리는 선언이 아니라 장갑의 실제 월드 좌표다.
+      // 키퍼 좌표에 상수를 더하면 몸이 기울어 있을 때 공이 장갑 옆 허공에 뜬다.
+      const gloveWorld = (sgn) => {
+        const gl = keeper.userData.gloves[sgn > 0 ? 1 : 0];
+        return gl ? gl.getWorldPosition(new THREE.Vector3()) : keeper.position.clone();
+      };
       const gx = keeper.position.x + Math.sign(tail.kx || 1) * 0.1;
       const side = Math.sign(tail.kx || 1) > 0 ? POSES.diveR : POSES.diveL;
       // 꼬리 연출의 포즈. 사건마다 몸이 다르게 망가져야 사건이 구분된다.
@@ -334,7 +365,11 @@ export function createScene(canvas) {
         case 'catch':
         case 'save':
           // 잡았으면 공이 장갑에 붙는다. 몸은 일어선다.
-          ball.position.set(gx, lerp(tail.from.y, 0.95, e), lerp(tail.from.z, KEEPER_Z + 0.25, e));
+          // 손이 어디 있든 공은 거기 있어야 한다. 그래야 잡았다는 말이 화면에서 사실이 된다.
+          {
+            const gw = gloveWorld(Math.sign(tail.kx || 1));
+            ball.position.set(lerp(tail.from.x, gw.x, e), lerp(tail.from.y, gw.y, e), lerp(tail.from.z, gw.z, e));
+          }
           keeper.rotation.z = lerp(keeper.rotation.z, 0, 0.08);
           break;
         case 'carriedIn':
@@ -350,8 +385,11 @@ export function createScene(canvas) {
           ball.position.y = lerp(tail.from.y, REST_Y, e);
           ball.position.z = lerp(tail.from.z, REST_Z, e);
           if (loose) {
-            loose.position.set(ball.position.x + 0.3, ball.position.y + 0.2, ball.position.z + 0.25);
+            // 장갑은 공에 딸려 간다. 0.3만큼 띄웠더니 장갑과 공이 따로 날아가는 것으로 읽혔다.
+            // 공에 닿을 만큼 붙이고 회전만 따로 준다.
+            loose.position.set(ball.position.x + 0.12, ball.position.y + 0.09, ball.position.z + 0.1);
             loose.rotation.z += 0.4;
+            loose.rotation.x += 0.26;
           }
           break;
         }
@@ -430,6 +468,16 @@ export function createScene(canvas) {
         default:
           break;
       }
+      // 공이 그물에 닿는 순간. 판정이 아니라 좌표 하나를 읽는 것뿐이다.
+      if (!tail.netDone && ball.position.z <= pitch.netZ + 0.5 && CONCEDE.has(tail.kind)) {
+        tail.netDone = true;
+        netAmp = 0.4;
+        netT = 0;
+        netX = ball.position.x;
+        netY = ball.position.y - R_H / 2;
+        impact.burst(ball.position, 0.9);
+        shake(0.03, 0.22);
+      }
       shadow.position.set(ball.position.x, 0.02, ball.position.z);
       const lift2 = Math.max(0, ball.position.y - BALL_R);
       shadow.scale.setScalar(1 + lift2 * 0.55);
@@ -488,6 +536,23 @@ export function createScene(canvas) {
       if (shakeLeft <= 0) shakeAmp = 0;
     }
     camera.lookAt(CAM_LOOK);
+    if (dutchLeft > 0) {
+      dutchLeft -= dt;
+      // 기울었다가 제자리로 돌아온다. 끝까지 기운 채로 두면 다음 구가 비뚤어진 채 시작한다.
+      const k = dutch * Math.max(0, dutchLeft / dutchSpan);
+      camera.rotateZ(k);
+      if (dutchLeft <= 0) dutch = 0;
+    }
+    if (netAmp > 0.002) {
+      netT += dt;
+      netAmp *= Math.exp(-dt * 5.2);
+      // 밀렸다가 되튄다. 진동수가 낮으면 천이 아니라 젤리다.
+      pitch.net.userData.punch(netX, netY, -netAmp * Math.cos(netT * 19));
+    } else if (netAmp !== 0) {
+      netAmp = 0;
+      pitch.net.userData.punch(0, 0, 0);
+    }
+    impact.update(dt, camera);
     if (cue) { ballProbe.sample(); stageProbe.sample(); }
     renderer.render(scene, camera);
   }
@@ -526,6 +591,9 @@ export function createScene(canvas) {
     stopLeft = 0;
     shakeLeft = 0;
     shakeAmp = 0;
+    dutchLeft = 0;
+    dutch = 0;
+    if (netAmp !== 0) { netAmp = 0; pitch.net.userData.punch(0, 0, 0); }
     shadow.position.set(0, 0.02, 11);
     shadow.scale.setScalar(1);
     shadow.material.opacity = 0.42;
