@@ -14,6 +14,9 @@ const VIEW_X = -1;
 const KICKER_OFF = 1.15;
 // 골망은 z = -0.75에 있다. q가 1.09면 공이 딱 그 자리에서 선다.
 const BALL_PAST = 1.09;
+// 골망 안에서 공이 멈추는 자리. 더 깊이 보내면 카메라가 가까워 공이 프레임 아래로 내려간다.
+const REST_Z = -0.7;
+const REST_Y = 0.95;
 // 판정 단위와 렌더 미터는 같지 않다.
 // 판정의 골대는 4.4 x 1.9이고 사람은 1.9이라 키퍼 머리가 크로스바에 닿는다.
 // 실제 골대는 7.32 x 2.44다. 그 비율로 그려야 사람이 골대 안에 들어간다.
@@ -50,11 +53,14 @@ function meshPanel(w, h, cell, color, opacity) {
   return m;
 }
 
+// 동공은 연출이 바꿔 끼우므로 재질을 밖에서 소유한다.
+const pupilMat = new THREE.MeshBasicMaterial({ color: 0x18140f });
+
 // 얼굴. 흰자 위에 검은 동공을 얹는다. 눈이 없으면 사람이 아니라 캡슐이다.
 // dir은 얼굴이 보는 쪽이다. 키퍼는 키커를 보고, 키커는 렌즈 쪽을 본다.
 function addFace(head, r, dir, skin) {
   const whiteMat = new THREE.MeshBasicMaterial({ color: 0xfbfbf5 });
-  const darkMat = new THREE.MeshBasicMaterial({ color: 0x18140f });
+  const darkMat = pupilMat;
   const eyes = [];
   for (const s of [-1, 1]) {
     const eye = new THREE.Mesh(new THREE.SphereGeometry(r * 0.34, 10, 8), whiteMat);
@@ -120,6 +126,7 @@ function buildKeeper(height, weight) {
   for (const m of [torso, head, legs, gl, gr]) m.name = 'keeper';
   standOnGround(g);
   g.userData.gloves = [gl, gr];
+  g.userData.gloveHome = [gl.position.clone(), gr.position.clone()];
   g.userData.arms = arms;
   g.userData.head = head;
   g.userData.girth = w;
@@ -285,6 +292,7 @@ export function createScene(canvas) {
     for (const m of [body, head]) m.userData.probeIgnore = true;
     g.position.set(-24 + i * 9.5, 0, 32.5 + (i % 3) * 1.4);
     g.userData.speed = 1.4 + (i % 4) * 0.5;
+    g.userData.homeZ = g.position.z;
     scene.add(g);
     passers.push(g);
   }
@@ -359,14 +367,26 @@ export function createScene(canvas) {
   // 체인의 반전은 자막이 아니라 화면에서 일어나야 한다.
   // 여기서 결과를 바꾸지 않는다. 이미 확정된 사건 이름 하나를 받아 그것만 연기한다.
   let tail = null;
+  // 떨어져 나간 장갑. 키퍼 그룹에 달린 채로 카메라 쪽으로 날아가면 키퍼가 프레임을 나간 것으로 측정된다.
+  let loose = null;
+  const heartMat = new THREE.MeshBasicMaterial({ color: 0xff3f6d });
   function act(kind) {
+    if (kind === 'gloveGone') {
+      const gl = keeper.userData.gloves[keeper.position.x > 0 ? 1 : 0];
+      scene.attach(gl);
+      loose = gl;
+    }
     tail = { kind, t0: performance.now() / 1000, from: ball.position.clone(), kx: keeper.position.x };
   }
   function play(shot, input, result, onEnd) {
+    tail = null;
     cue = { shot, input, result, t0: performance.now() / 1000, ended: false, onEnd, steps: 0, struck: false, framed: false };
     kicker.position.set(VIEW_X * shot.aimX * SX * 0.2 + KICKER_OFF, 0, 11.2);
     kicker.userData.startX = kicker.position.x;
     ball.position.set(0, BALL_R, 11);
+    // 눈에 띄는 행인은 매 구 있지 않다. 그 구에만 앞줄로 걸어온다.
+    for (const p of passers) p.position.z = p.userData.homeZ;
+    if (shot.gaze) { passers[0].position.set(-14, 0, 18); }
     sfx.place();
   }
 
@@ -450,17 +470,20 @@ export function createScene(canvas) {
           break;
         case 'carriedIn':
           // 막았는데 같이 넘어간다. 공과 몸이 한 덩어리로 골망까지 간다.
-          keeper.position.z = lerp(KEEPER_Z, -1.1, e);
-          keeper.rotation.z += 0.05;
-          ball.position.set(keeper.position.x, 0.5, keeper.position.z - 0.2);
+          keeper.position.z = lerp(KEEPER_Z, -0.35, e);
+          keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.35, 0.08);
+          keeper.position.y = keeper.userData.girth;
+          ball.position.set(keeper.position.x, 0.55, keeper.position.z - 0.2);
           break;
         case 'gloveGone': {
           // 장갑이 공에 딸려 간다. 손이 하나 없는 채로 남는다.
-          const gl = keeper.userData.gloves[tail.kx > 0 ? 1 : 0];
-          ball.position.set(lerp(tail.from.x, tail.from.x * 1.1, e), lerp(tail.from.y, 0.6, e), lerp(tail.from.z, -1.2, e));
-          gl.getWorldPosition(new THREE.Vector3());
-          gl.position.z = lerp(0.06, -2.4, e);
-          gl.rotation.z += 0.4;
+          ball.position.x = lerp(tail.from.x, tail.from.x * 1.1, e);
+          ball.position.y = lerp(tail.from.y, REST_Y, e);
+          ball.position.z = lerp(tail.from.z, REST_Z, e);
+          if (loose) {
+            loose.position.set(ball.position.x + 0.3, ball.position.y + 0.2, ball.position.z + 0.25);
+            loose.rotation.z += 0.4;
+          }
           break;
         }
         case 'spill':
@@ -472,7 +495,7 @@ export function createScene(canvas) {
           keeper.position.y = keeper.userData.girth;
           break;
         case 'rebound':
-          ball.position.set(lerp(tail.from.x, 0.6, e), 0.6, lerp(tail.from.z, -1.1, e));
+          ball.position.set(lerp(tail.from.x, 0.6, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
           break;
         case 'reboundMiss':
           ball.position.set(lerp(tail.from.x, -6.5, e), 0.5, lerp(tail.from.z, -1, e));
@@ -499,8 +522,19 @@ export function createScene(canvas) {
           // 올라갔다가 다시 내려온다. 프레임을 나가면 하늘로 넘겼다는 결과가 안 보인다.
           ball.position.set(lerp(tail.from.x, 1.6, e), 0.14 + Math.sin(e * Math.PI) * 3.4, lerp(tail.from.z, 6.5, e));
           break;
+        case 'distracted': {
+          // 카메라가 아니라 고개가 돌아간다. 머리가 돌아가 있는 동안 공은 그대로 지나간다.
+          const head = keeper.userData.head;
+          head.rotation.y = lerp(0, -1.15, e);
+          for (const pu of head.userData.eyes) {
+            pu.material = heartMat;
+            pu.scale.set(1.9, 1.9, 0.5);
+          }
+          ball.position.set(lerp(tail.from.x, tail.from.x * 1.3, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
+          break;
+        }
         case 'openGoalScored':
-          ball.position.set(lerp(tail.from.x, 0, e), 0.14, lerp(tail.from.z, -1.2, e));
+          ball.position.set(lerp(tail.from.x, 0, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
           break;
         default:
           break;
@@ -530,7 +564,11 @@ export function createScene(canvas) {
   function reset() {
     cue = null;
     tail = null;
-    for (const g of keeper.userData.gloves) { g.position.z = 0.06; g.rotation.z = 0; }
+    if (loose) { keeper.add(loose); loose = null; }
+    keeper.userData.gloves.forEach((g, i) => { g.position.copy(keeper.userData.gloveHome[i]); g.rotation.set(0, 0, 0); });
+    const head = keeper.userData.head;
+    head.rotation.y = 0;
+    for (const pu of head.userData.eyes) { pu.material = pupilMat; pu.scale.set(1, 1.1, 0.5); }
     keeper.position.set(0, 0, KEEPER_Z);
     keeper.rotation.z = 0;
     ball.position.set(0, BALL_R, 11);

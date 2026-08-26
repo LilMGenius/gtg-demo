@@ -76,6 +76,7 @@ export function createStageProbe(camera, actors) {
       w.maxFootY = Math.max(w.maxFootY, y);
       w.minInside = Math.min(w.minInside, f.inside);
       w.maxAbsX = Math.max(w.maxAbsX, f.maxAbsX);
+      if (f.maxAbsY > w.maxAbsY) w.peak = { maxAbsY: +f.maxAbsY.toFixed(3), maxAbsX: +f.maxAbsX.toFixed(3), inside: f.inside, footY: +y.toFixed(2), pos: [+g.position.x.toFixed(2), +g.position.y.toFixed(2), +g.position.z.toFixed(2)], rz: +g.rotation.z.toFixed(2), tail: (typeof window !== 'undefined' ? window.__tailKind : null) };
       w.maxAbsY = Math.max(w.maxAbsY, f.maxAbsY);
       const a = actorFrac(g, camera);
       w.maxWidthFrac = Math.max(w.maxWidthFrac || 0, a.widthFrac);

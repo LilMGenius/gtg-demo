@@ -36,7 +36,7 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const pct = (rng, p) => rng() * 100 < p;
 
 export function newKeeper() {
-  return keeperAt({ diving: 3, handling: 3, reflex: 4, offball: 3, judgement: 3, agility: 3, balance: 3, strength: 3, mischief: 4 }, 188, 84);
+  return keeperAt({ diving: 3, handling: 3, reflex: 4, offball: 3, judgement: 3, agility: 3, balance: 3, strength: 3, mischief: 4, focus: 3 }, 188, 84);
 }
 
 function keeperAt(stats, height, weight) {
@@ -113,11 +113,14 @@ export function buildSet(rng, level = 5) {
       aimY = 0.3 + rng() * 1.55;
       forced = false;
     }
+    // 눈에 띄는 행인이 지나가는 구. 행인은 늘 걷고 있지만 고개가 돌아갈 만한 건 가끔이다.
+    // 여기서 매 구 굴려야 같은 맵을 돌아도 언제 걸릴지 모른다.
+    const gaze = pct(rng, 30);
     const chip = pct(rng, 6 + k.flair * 1.6);
     // 칩은 세게 차는 공이 아니다. 둘이 같이 서면 몸싸움 롤과 칩 롤이 한 구에 겹쳐 상한을 넘긴다.
     const strong = chip ? false : pct(rng, 20 + k.power * 6);
     shots.push({
-      index: i, kicker: k, aimX, aimY, forced, strong, chip,
+      index: i, kicker: k, aimX, aimY, forced, strong, chip, gaze,
       side: aimX < -0.55 ? -1 : aimX > 0.55 ? 1 : 0,
       course: courseOf(aimX, aimY),
       // 슛파워가 시간을 줄인다. 판정 창을 직접 압박하는 항이다.
@@ -257,7 +260,10 @@ export function resolve(input) {
   const centerish = shot.course === "정면" || shot.chip;
   const overP = shot.chip && place.depth + inp.advance > 1.0 ? 48 + shot.kicker.flair * 4 : 0;
   const diveP = centerish && inp.dive !== 0 ? Math.max(0, keeper.diving * 4.2 - keeper.judgement * 3.4) : 0;
-  if (overP > 0 || diveP > 0) {
+  // 한눈팔기. 행인이 지나가는 구에서만 열리고 집중력이 소유한다.
+  // 같은 단계의 사고는 롤 하나를 구간으로 나눠 가른다. 새 롤을 뒤면 한 구가 일곱 번 굴러간다.
+  const gazeP = shot.gaze ? Math.max(0, (10 - keeper.focus) * 2.6) : 0;
+  if (overP > 0 || diveP > 0 || gazeP > 0) {
     const d = draw();
     if (d < overP) {
       say("emptyGoal", "나간 사이 넘겨버렸습니다. 골대가 비어 있었습니다.", "greed");
@@ -266,6 +272,11 @@ export function resolve(input) {
     if (d < overP + diveP * (100 - overP) / 100) {
       say("dived", "안 와도 될 공에 먼저 누웠습니다.", "judgement");
       return done(true, "judgement");
+    }
+    const before = overP + diveP * (100 - overP) / 100;
+    if (d < before + gazeP * (100 - before) / 100) {
+      say("distracted", "지나가던 행인을 봤습니다. 눈에 하트가 떴습니다.", "focus");
+      return done(true, "focus");
     }
   }
 
