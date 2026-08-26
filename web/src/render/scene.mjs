@@ -54,8 +54,8 @@ export function createScene(canvas) {
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x2b3a4a);
-  scene.fog = new THREE.Fog(0x3d4a52, 26, 76);
+  scene.background = new THREE.Color(0x86aecb);
+  scene.fog = new THREE.Fog(0x9dbdd4, 34, 96);
 
   // 가로 화면 전제. 골대는 좌우로 긴 물건이라 세로로는 판정이 안 보인다.
   // 카메라는 골대 뒤 위쪽. 골대 폭 전체와 키커까지 한 화면에 넣는다.
@@ -63,18 +63,18 @@ export function createScene(canvas) {
   camera.position.set(0, 3.4, -7.4);
   camera.lookAt(0, 1.5, 5.5);
 
-  scene.add(new THREE.AmbientLight(0xbcd0c0, 1.5));
-  const sun = new THREE.DirectionalLight(0xfff2d0, 1.5);
+  scene.add(new THREE.AmbientLight(0xd8e6dc, 2.4));
+  const sun = new THREE.DirectionalLight(0xfff6e0, 2.6);
   sun.position.set(-5, 9, 7);
   scene.add(sun);
 
   // 흙바닥. 잔디가 아니다. 동네 운동장이 이 게임의 무대다.
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), flat(0x6b5433));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), flat(0x9c7a4a));
   ground.rotation.x = -Math.PI / 2;
   ground.position.z = 24;
   scene.add(ground);
 
-  const box = new THREE.Mesh(new THREE.PlaneGeometry(16.5, 16.5), flat(0x7a6440));
+  const box = new THREE.Mesh(new THREE.PlaneGeometry(16.5, 16.5), flat(0xb08e58));
   box.rotation.x = -Math.PI / 2;
   box.position.set(0, 0.01, 8.2);
   scene.add(box);
@@ -102,14 +102,14 @@ export function createScene(canvas) {
   // 하늘. 안쪽을 보는 반구 하나면 검은 벽이 사라진다.
   const dome = new THREE.Mesh(
     new THREE.SphereGeometry(90, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color: 0x5f7f9c, side: THREE.BackSide, fog: false })
+    new THREE.MeshBasicMaterial({ color: 0x86aecb, side: THREE.BackSide, fog: false })
   );
   scene.add(dome);
 
   // 펜스. 동네 운동장을 두르는 초록 그물이다.
   const fence = new THREE.Mesh(
     new THREE.PlaneGeometry(58, 3.4, 30, 3),
-    new THREE.MeshBasicMaterial({ color: 0x2c4a34, wireframe: true, transparent: true, opacity: 0.55 })
+    new THREE.MeshBasicMaterial({ color: 0x3f6b4a, wireframe: true, transparent: true, opacity: 0.55 })
   );
   fence.position.set(0, 1.7, 30);
   fence.rotation.y = Math.PI;
@@ -117,7 +117,7 @@ export function createScene(canvas) {
 
   // 건물 실루엣. 지평선 위가 비지 않게만 세운다. 디테일은 없다.
   const skyline = new THREE.Group();
-  const blockMat = flat(0x33404a);
+  const blockMat = flat(0x5b6f7d);
   for (let i = 0; i < 14; i += 1) {
     const w = 3.4 + ((i * 37) % 5);
     const h = 5 + ((i * 53) % 11);

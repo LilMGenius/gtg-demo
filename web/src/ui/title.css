@@ -4,8 +4,8 @@
   padding-left:calc(clamp(28px,6vw,96px) + env(safe-area-inset-left));
   padding-right:calc(clamp(28px,6vw,96px) + env(safe-area-inset-right));
   background:
-    radial-gradient(85% 120% at 16% 52%, #0000 4%, #0b0f0ac2 62%, #0b0f0aee 100%),
-    linear-gradient(100deg,#0b0f0acc,#0b0f0a4d 58%,#0b0f0aa6);
+    radial-gradient(62% 96% at 14% 54%, #0b0f0acc 0%, #0b0f0a4d 46%, #0000 76%),
+    linear-gradient(180deg,#0b0f0a00 62%,#0b0f0a55);
   font-family:'Black Han Sans','Pretendard','Malgun Gothic',sans-serif}
 #title[hidden]{display:none}
 
