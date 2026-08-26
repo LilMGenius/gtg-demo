@@ -24,14 +24,19 @@
   font-family:'Pretendard','Malgun Gothic',sans-serif;font-weight:700;
   font-size:clamp(12px,1.45vw,19px)}
 
-#go{margin-top:clamp(20px,3vw,40px);display:block;
-  padding:clamp(13px,1.55vw,20px) clamp(38px,5.2vw,74px);
-  border:0;border-radius:999px;background:var(--good);color:#0d1a12;
-  font-family:inherit;font-weight:400;font-size:clamp(21px,2.7vw,36px);letter-spacing:.03em;
-  box-shadow:0 7px 0 #1f7a4d, 0 12px 30px #000a;
+/* 시작 버튼. 알약 + 아래 그림자는 앱 위젯의 언어라 타이틀 글자와 화풍이 갈렸다.
+   글자와 같은 것을 쓴다. 검정 스트로크, 오프셋 그림자, 기울기. */
+#go{margin-top:clamp(20px,3vw,40px);display:block;position:relative;
+  padding:clamp(11px,1.4vw,18px) clamp(34px,4.8vw,68px) clamp(14px,1.7vw,22px);
+  border:clamp(4px,.55vw,7px) solid #12160e;border-radius:14px;
+  background:var(--good);color:#12160e;
+  font-family:inherit;font-weight:400;font-size:clamp(26px,3.3vw,44px);letter-spacing:.04em;
+  transform:rotate(-2.6deg);
+  box-shadow:clamp(6px,.8vw,11px) clamp(7px,.95vw,13px) 0 #12160e;
   animation:bob 1.15s ease-in-out infinite}
-#go:active{transform:translateY(6px);box-shadow:0 1px 0 #1f7a4d}
-@keyframes bob{50%{transform:translateY(-5px)}}
+#go:active{transform:rotate(-2.6deg) translate(5px,6px);box-shadow:1px 1px 0 #12160e;
+  animation:none}
+@keyframes bob{50%{transform:rotate(-2.6deg) translateY(-6px)}}
 @media (prefers-reduced-motion:reduce){#go{animation:none}}
 
 /* 조작법. 아래에 늘어놓지 않고 우측 위에서 펼친다. */
@@ -39,14 +44,16 @@
   right:calc(16px + env(safe-area-inset-right));
   display:flex;flex-direction:column;align-items:flex-end;gap:10px;z-index:2}
 #helpBtn{display:flex;align-items:center;gap:8px;
-  padding:9px 15px;border-radius:999px;border:1px solid #ffffff2e;
-  background:var(--panel);backdrop-filter:blur(7px);color:var(--ink);
-  font-family:'Pretendard','Malgun Gothic',sans-serif;font-weight:800;font-size:14px}
-#helpBtn svg{width:17px;height:17px}
-#helpBtn[aria-expanded="true"]{background:#ffd83d;color:#12160e;border-color:#ffd83d}
-#helpPanel{width:min(330px,72vw);padding:16px;border-radius:16px;
-  border:1px solid var(--edge);background:#0f140ef7;backdrop-filter:blur(10px);
-  box-shadow:0 18px 44px #000a;
+  padding:7px 15px 9px;border-radius:11px;border:3px solid #12160e;
+  background:var(--panel);color:var(--ink);transform:rotate(1.8deg);
+  box-shadow:4px 5px 0 #12160e;
+  font-family:inherit;font-weight:400;font-size:17px;letter-spacing:.02em}
+#helpBtn svg{width:18px;height:18px;stroke-width:3}
+#helpBtn:active{transform:rotate(1.8deg) translate(3px,4px);box-shadow:1px 1px 0 #12160e}
+#helpBtn[aria-expanded="true"]{background:#ffd83d;color:#12160e}
+#helpPanel{width:min(330px,72vw);padding:16px;border-radius:14px;
+  border:3px solid #12160e;background:#161c14;
+  box-shadow:6px 7px 0 #12160e;
   font-family:'Pretendard','Malgun Gothic',sans-serif;
   transform-origin:top right;animation:pop .16s ease-out}
 #helpPanel[hidden]{display:none}
@@ -54,12 +61,12 @@
 #helpPanel ul{list-style:none;display:flex;flex-direction:column;gap:14px}
 #helpPanel li{display:flex;align-items:center;gap:13px}
 #helpPanel li>svg{flex:0 0 auto;width:40px;height:40px}
-#helpPanel b{display:block;font-size:14px;font-weight:800}
+#helpPanel b{display:block;font-family:inherit;font-size:15px;font-weight:800}
 #helpPanel small{font-size:12px;color:var(--dim);line-height:1.45}
 #helpPanel .keys{margin-top:14px;padding-top:12px;border-top:1px solid #ffffff1a;
   font-size:11.5px;color:#7e8878;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-#helpPanel kbd{font:inherit;font-size:11px;padding:2px 6px;border-radius:5px;
-  background:#20281d;border:1px solid var(--edge);color:#c3ccbc}
+#helpPanel kbd{font:inherit;font-size:11px;padding:1px 6px 2px;border-radius:5px;
+  background:#20281d;border:2px solid #12160e;box-shadow:2px 2px 0 #12160e;color:#c3ccbc}
 
 /* 세로로 들면 골대 좌우가 잘린다. 그때는 게임을 보여주지 않는다. */
 #rotate{position:fixed;inset:0;z-index:60;display:none;
@@ -67,7 +74,8 @@
   background:#0b0f0a;text-align:center;
   font-family:'Pretendard','Malgun Gothic',sans-serif}
 #rotate svg{width:74px;height:74px;animation:tilt 1.8s ease-in-out infinite}
-#rotate p{font-size:16px;font-weight:800;color:var(--ink)}
+#rotate p{font-family:'Black Han Sans','Pretendard',sans-serif;font-size:21px;
+  font-weight:400;color:#ffd83d;-webkit-text-stroke:4px #12160e;paint-order:stroke fill}
 #rotate small{font-size:12.5px;color:var(--dim)}
 @keyframes tilt{0%,45%{transform:rotate(0)}70%,100%{transform:rotate(-90deg)}}
 @media (max-aspect-ratio:1/1){
