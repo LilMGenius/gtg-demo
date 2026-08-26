@@ -21,6 +21,7 @@ body.playing #hud{opacity:1}
   padding:7px 14px;border-radius:999px;
   background:var(--panel);border:1px solid var(--edge);backdrop-filter:blur(7px)}
 #lv{font-weight:800;font-size:15px;letter-spacing:.02em}
+#form{font-size:12px;font-weight:800;opacity:.72;letter-spacing:.02em}
 #pips{display:flex;gap:6px}
 #pips i{width:9px;height:9px;border-radius:50%;background:#ffffff26;display:block;
   transition:background .18s}

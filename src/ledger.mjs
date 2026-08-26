@@ -3,8 +3,8 @@
 
 export const STAT_CAUSES = [
   "diving", "handling", "reflex", "offball", "judgement",
-  "agility", "balance", "strength", "mischief", "focus",
-  "kickerFinishing", "kickerPower"
+  "agility", "balance", "strength", "mischief", "focus", "composure",
+  "kickerFinishing", "kickerPower", "kickerCurve"
 ];
 
 export const INPUT_CAUSES = ["direction", "timing", "greed"];
@@ -23,8 +23,10 @@ export const CAUSE_LABEL = {
   strength: "맷집",
   mischief: "악동",
   focus: "집중력",
+  composure: "침착성",
   kickerFinishing: "키커 골결정력",
   kickerPower: "키커 슛파워",
+  kickerCurve: "키커 슛커브",
   direction: "방향",
   timing: "타이밍",
   greed: "욕심"
@@ -33,7 +35,7 @@ export const CAUSE_LABEL = {
 // 성장하는 칸. 체격 둘은 여기 없다. 올릴 수 없으므로 스탯이 아니다.
 export const GROWABLE = [
   "diving", "handling", "reflex", "offball",
-  "judgement", "agility", "balance", "strength", "mischief", "focus"
+  "judgement", "agility", "balance", "strength", "mischief", "focus", "composure"
 ];
 
 // v0.5부터 열리는 칸. 잠긴 동안 판정식에서 이 값이 상수로 선다.
@@ -44,7 +46,6 @@ export const LOCKED = {
   sweeping: 4,    // 수비범위
   pace: 4,        // 스피드
   oneOnOne: 4,    // 일대일마크
-  composure: 4,   // 침착성
   punching: 0,    // 펀칭. 코너킥에서 열린다
   charge: 0,      // 돌진. 페널티에는 뛰쳐나갈 자리가 없다
   dribbling: 4,   // 드리블

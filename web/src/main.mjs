@@ -1,5 +1,5 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
-import { makeRng, buildSet, resolve, growthOffer, newKeeper, autoInput } from '../../src/chain.mjs';
+import { makeRng, buildSet, resolve, growthOffer, newKeeper, autoInput, rollForm } from '../../src/chain.mjs';
 import { CAUSE_LABEL } from '../../src/ledger.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
@@ -18,7 +18,7 @@ mountBgm();
 const seedParam = new URLSearchParams(location.search).get('seed');
 const rng = makeRng(seedParam === null ? ((Date.now() ^ 0x9e3779b9) >>> 0) : (Number(seedParam) >>> 0));
 const saved = load();
-const state = { keeper: saved?.keeper ?? newKeeper(), shots: [], i: 0, results: [], phase: 'idle', auto: Boolean(saved?.auto), picks: 0 };
+const state = { keeper: Object.assign(newKeeper(), saved?.keeper || null), shots: [], i: 0, results: [], phase: 'idle', auto: Boolean(saved?.auto), picks: 0 };
 // 비운 시간은 훈련 선택권으로만 바뀌고, 그 선택은 손으로 한다.
 state.picks = saved ? offlineGain(saved.at, Date.now()) : 0;
 window.__picks = () => state.picks;
@@ -48,6 +48,9 @@ function setPad(on) {
 }
 
 function nextSet() {
+  // 기복은 판당 한 번 굴러서 그 판 내내 같은 값으로 선다.
+  const form = rollForm(state.keeper, rng);
+  el('form').textContent = form > 0.4 ? '컴디션 좋음' : form < -0.4 ? '컴디션 난조' : '';
   state.shots = buildSet(rng, state.keeper.level);
   state.i = 0;
   state.results = [];

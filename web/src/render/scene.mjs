@@ -174,6 +174,8 @@ export function createScene(canvas) {
   // 카메라는 골대 뒤 위쪽. 골대 폭 전체와 키커까지 한 화면에 넣는다.
   // 망원으로 당긴다. 화각을 넓히면 골대가 화면 중앙의 작은 사각형으로 줄고 나머지는 하늘이 된다.
   const camera = new THREE.PerspectiveCamera(46, 16 / 9, 0.1, 200);
+  // 카메라가 크로스바와 같은 높이에 서면 상단으로 오는 공이 비행 내내 바에 가려 안 보인다.
+  // 바 아래로 내려서 공과 바를 화면에서 분리한다.
   camera.position.set(0, 3.3, -5.1);
   camera.lookAt(0, 1.4, 4.5);
 
@@ -384,6 +386,12 @@ export function createScene(canvas) {
     kicker.position.set(VIEW_X * shot.aimX * SX * 0.2 + KICKER_OFF, 0, 11.2);
     kicker.userData.startX = kicker.position.x;
     ball.position.set(0, BALL_R, 11);
+    // 카메라는 골대 뒤 위에 있고 크로스바는 골대 전체 폭을 가로지르는 봉이다.
+    // 그래서 바에 가린 공은 옆으로 밀어도 그대로 가려 있다. 떨어지는 것은 높이뿐이다.
+    // 상단 코스는 비행 선이 시선과 거의 나란해져 바 뒤를 계속 따라간다.
+    // 포물선을 키워 시선을 가로지르게 만든다.
+    cue.arc = 0.3 + (shot.aimY > 1.0 ? 0.85 : 0);
+
     // 눈에 띄는 행인은 매 구 있지 않다. 그 구에만 앞줄로 걸어온다.
     for (const p of passers) p.position.z = p.userData.homeZ;
     if (shot.gaze) { passers[0].position.set(-14, 0, 18); }
@@ -423,7 +431,7 @@ export function createScene(canvas) {
         const q = Math.min(p * past, past);
         ball.position.x = lerp(0, VIEW_X * shot.aimX * SX, Math.min(q, 1));
         ball.position.z = lerp(11, 0.1, q);
-        ball.position.y = lerp(BALL_R, shot.aimY * SY, Math.min(q, 1)) + Math.sin(Math.min(p, 1) * Math.PI) * 0.3;
+        ball.position.y = lerp(BALL_R, shot.aimY * SY, Math.min(q, 1)) + Math.sin(Math.min(p, 1) * Math.PI) * cue.arc;
         ball.rotation.x -= 0.4;
         ball.rotation.y -= 0.22;
         // 골포스트와 크로스바를 스치는 코스만 금속음이 난다.
@@ -498,7 +506,8 @@ export function createScene(canvas) {
           ball.position.set(lerp(tail.from.x, 0.6, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
           break;
         case 'reboundMiss':
-          ball.position.set(lerp(tail.from.x, -6.5, e), 0.5, lerp(tail.from.z, -1, e));
+          // 튀어나간 공이 골대 옆으로 흘러난다. 프레임 밖으로 보내면 어디로 갔는지 안 보인다.
+          ball.position.set(lerp(tail.from.x, tail.kx >= 0 ? 2.9 : -2.9, e), 0.14 + Math.abs(Math.sin(u * 8)) * 0.45 * (1 - u), lerp(tail.from.z, 3.2, e));
           break;
         case 'charge':
           // 잡고 나서 드리블하러 나간다. 공이 발 앞에서 튄다.
@@ -520,7 +529,10 @@ export function createScene(canvas) {
           break;
         case 'skied':
           // 올라갔다가 다시 내려온다. 프레임을 나가면 하늘로 넘겼다는 결과가 안 보인다.
-          ball.position.set(lerp(tail.from.x, 1.6, e), 0.14 + Math.sin(e * Math.PI) * 3.4, lerp(tail.from.z, 6.5, e));
+          // 바 위로 넘어 골대 옆으로 떨어진다.
+          // 카메라가 골대 뒤에서 내려다보므로 그대로 올리면 크로스바가 공을 가린다.
+          // 올라가기 전에 먼저 포스트 밖으로 빼낸다.
+          ball.position.set(lerp(tail.from.x, 2.45, Math.min(1, e * 2.4)), lerp(tail.from.y, REST_Y, Math.min(1, e * 1.6)) + Math.sin(e * Math.PI) * 1.5, lerp(tail.from.z, -1.2, Math.min(1, e * 3.2)));
           break;
         case 'distracted': {
           // 카메라가 아니라 고개가 돌아간다. 머리가 돌아가 있는 동안 공은 그대로 지나간다.

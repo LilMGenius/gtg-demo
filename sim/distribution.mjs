@@ -2,7 +2,7 @@
 // C2: 모든 실점 원인이 v0.2 원장 안에 있는가.
 // C3: 레벨 3, 5, 7, 10 네 구간에서 한 원인이 전 구간 1위를 독점하지 않는가.
 
-import { resolve, makeRng, buildSet, keeperAtLevel } from "../src/chain.mjs";
+import { resolve, makeRng, buildSet, keeperAtLevel, rollForm } from "../src/chain.mjs";
 import { LEDGER, CAUSE_LABEL } from "../src/ledger.mjs";
 
 const args = process.argv.slice(2);
@@ -29,6 +29,7 @@ for (const level of LEVELS) {
     seed += 1;
     const rng = makeRng(seed);
     const keeper = keeperAtLevel(level, rng);
+    rollForm(keeper, rng);
     for (const shot of buildSet(rng, level)) {
       if (levelBalls >= perLevel) break;
       const r = resolve({ keeper, shot, rng });

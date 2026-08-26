@@ -36,11 +36,20 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const pct = (rng, p) => rng() * 100 < p;
 
 export function newKeeper() {
-  return keeperAt({ diving: 3, handling: 3, reflex: 4, offball: 3, judgement: 3, agility: 3, balance: 3, strength: 3, mischief: 4, focus: 3 }, 188, 84);
+  return keeperAt({ diving: 3, handling: 3, reflex: 4, offball: 3, judgement: 3, agility: 3, balance: 3, strength: 3, mischief: 4, focus: 3, composure: 3 }, 188, 84, 5);
 }
 
-function keeperAt(stats, height, weight) {
-  return Object.assign({ height, weight, level: 1 }, stats);
+function keeperAt(stats, height, weight, consistency) {
+  // 기복은 히든이다. 숫자로 안 뜼고 그날의 손끝으로만 드러난다.
+  return Object.assign({ height, weight, level: 1, consistency, form: 0 }, stats);
+}
+
+// 기복. 한 판이 시작할 때 한 번 굴러 그 판의 실효 칸을 흔든다.
+// 구마다 흔들면 같은 판 안에서 사람이 손을 고칠 수가 없다.
+export function rollForm(keeper, rng) {
+  const swing = (10 - (keeper.consistency || 5)) * 0.22;
+  keeper.form = Math.round((rng() * 2 - 1) * swing * 10) / 10;
+  return keeper.form;
 }
 
 // 레벨은 성장 포인트의 총량만 정한다. 어디에 붙는지는 성장 선택지가 정하므로 여기서는 무작위 배분이다.
@@ -70,7 +79,7 @@ export function keeperAtLevel(level, rng) {
 
   const height = 178 + Math.floor(rng() * 21);
   const weight = 74 + Math.floor(rng() * 21);
-  const keeper = keeperAt(stats, height, weight);
+  const keeper = keeperAt(stats, height, weight, 2 + Math.floor(rng() * 8));
   keeper.level = level;
   return keeper;
 }
@@ -116,11 +125,14 @@ export function buildSet(rng, level = 5) {
     // 눈에 띄는 행인이 지나가는 구. 행인은 늘 걷고 있지만 고개가 돌아갈 만한 건 가끔이다.
     // 여기서 매 구 굴려야 같은 맵을 돌아도 언제 걸릴지 모른다.
     const gaze = pct(rng, 30);
+    // 휘어들어오는 공. 마커가 서준 자리에서 끝에 빗나간다.
+    // 배치를 맞춘 키퍼를 저격하는 항이므로 키커 칸이 소유한다.
+    const bend = pct(rng, 8 + k.curve * 3.4) ? 0.02 + k.curve * 0.028 : 0;
     const chip = pct(rng, 6 + k.flair * 1.6);
     // 칩은 세게 차는 공이 아니다. 둘이 같이 서면 몸싸움 롤과 칩 롤이 한 구에 겹쳐 상한을 넘긴다.
     const strong = chip ? false : pct(rng, 20 + k.power * 6);
     shots.push({
-      index: i, kicker: k, aimX, aimY, forced, strong, chip, gaze,
+      index: i, kicker: k, aimX, aimY, forced, strong, chip, gaze, bend,
       side: aimX < -0.55 ? -1 : aimX > 0.55 ? 1 : 0,
       course: courseOf(aimX, aimY),
       // 슛파워가 시간을 줄인다. 판정 창을 직접 압박하는 항이다.
@@ -142,9 +154,12 @@ function placement(keeper, shot) {
 // 1단 접촉의 여유. 양수면 닿는다.
 // 각 항의 주인은 STATS 15절이 정한다. 여기서 계수를 발명하지 않는다.
 function contactMargin(keeper, shot, input, over) {
-  const s = (k) => (over && k in over ? over[k] : keeper[k]);
+  const form = keeper.form || 0;
+  const s = (k) => clamp((over && k in over ? over[k] : keeper[k]) + form, 1, 10);
   const k = shot.kicker;
   const power = over && "kickerPower" in over ? over.kickerPower : k.power;
+  // 프로브는 한 칸만 움직인다. 커브를 절반으로 줄이면 한 칸이 아니라 다섯 칸을 준 것이 된다.
+  const bend = Math.max(0, (shot.bend || 0) - (over && "bendSub" in over ? over.bendSub : 0));
   const flight = clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
 
   const offball = s("offball");
@@ -156,7 +171,9 @@ function contactMargin(keeper, shot, input, over) {
   const forward = depth + advance;
 
   // 판정 창과 기동. 반응속도가 인지이고 민첩성이 기동이다.
-  const windowMs = 70 + 13 * s("reflex") + 5 * LOCKED.composure;
+  let windowMs = 70 + 13 * s("reflex") + 4 * s("composure");
+  // 강슈은 창을 좁힌다. 침착성이 그 좁혀짐을 막는다.
+  if (shot.strong) windowMs -= (10 - s("composure")) * 10;
   const SCALE_MS = 200;
   // 무게는 기동을 늦춘다. 정면 공은 서 있는 자리로 오므로 기동이 없고, 그래서 이 항도 없다.
   let moveDelay = 104 - 7 * s("agility");
@@ -178,9 +195,9 @@ function contactMargin(keeper, shot, input, over) {
 
   let margin;
   if (shot.course === "상단") {
-    margin = vert * quality - (shot.aimY - SHOULDER) * closing;
+    margin = vert * quality - (shot.aimY - SHOULDER + bend * 0.6) * closing;
   } else {
-    const gap = (Math.abs(shot.aimX) + lateral) * closing;
+    const gap = (Math.abs(shot.aimX) + lateral + bend) * closing;
     margin = horiz * quality - gap;
   }
   // 정면 슛의 일부는 서 있기만 해도 몸에 맞는다. 무거울수록 넓다.
@@ -198,12 +215,16 @@ function attributeContact(keeper, shot, input) {
     ? [["reflex", { reflex: keeper.reflex + 1 }],
        ["agility", { agility: keeper.agility + 1 }],
        ["offball", { offball: keeper.offball + 1 }],
-       ["kickerPower", { kickerPower: shot.kicker.power - 1 }]]
+       ["composure", { composure: keeper.composure + 1 }],
+       ["kickerPower", { kickerPower: shot.kicker.power - 1 }],
+       ["kickerCurve", { bendSub: 0.028 }]]
     : [["diving", { diving: keeper.diving + 1 }],
        ["reflex", { reflex: keeper.reflex + 1 }],
        ["agility", { agility: keeper.agility + 1 }],
        ["offball", { offball: keeper.offball + 1 }],
-       ["kickerPower", { kickerPower: shot.kicker.power - 1 }]];
+       ["composure", { composure: keeper.composure + 1 }],
+       ["kickerPower", { kickerPower: shot.kicker.power - 1 }],
+       ["kickerCurve", { bendSub: 0.028 }]];
   let best = probes[0][0];
   let bestGain = -Infinity;
   for (const [cause, over] of probes) {
@@ -293,7 +314,9 @@ export function resolve(input) {
       reflex: "반응이 한 박자 늦었습니다.",
       agility: "몸이 늦게 출발했습니다.",
       offball: "서 있던 자리가 틀렸습니다.",
-      kickerPower: "손 쓸 시간을 안 줬습니다."
+      composure: "강슈에 서둘렀습니다.",
+      kickerPower: "손 쓸 시간을 안 줬습니다.",
+      kickerCurve: "끝에 휘어졌습니다. 손이 간 자리가 아니었습니다."
     };
     say("miss", lines[cause], cause);
     return done(true, cause);
