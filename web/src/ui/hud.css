@@ -27,13 +27,13 @@ body.playing #hud{opacity:1}
 #pips i.save{background:var(--good);box-shadow:0 0 9px #4fd08a88}
 #pips i.gone{background:var(--bad);box-shadow:0 0 9px #e0563f88}
 
-/* 자막. 화면 하단 가운데. 탭 칸 위에 얹히되 입력은 통과시킨다. */
+/* 자막은 크로스바 위 하늘에 산다. 공과 같은 높이에 두면 판정을 글자가 덮는다. */
 #caption{position:absolute;left:50%;transform:translateX(-50%);
-  bottom:calc(128px + env(safe-area-inset-bottom));
-  width:min(680px,82vw);text-align:center;pointer-events:none;
+  top:calc(13px + env(safe-area-inset-top));
+  width:min(660px,calc(100vw - 2*(var(--pad-r) + 172px)));text-align:center;pointer-events:none;
   font-size:clamp(15px,2.1vw,21px);line-height:1.4;font-weight:700;
-  text-shadow:0 2px 12px #000d, 0 0 26px #000a;
-  display:flex;flex-direction:column;align-items:center;gap:7px;min-height:3.6em;
+  text-shadow:0 2px 10px #000e, 0 0 24px #000c, 0 1px 3px #000;
+  display:flex;flex-direction:column-reverse;align-items:center;gap:7px;min-height:3.6em;
   justify-content:flex-end}
 #caption b{color:var(--bad);font-size:12px;font-weight:800;letter-spacing:.06em;
   padding:3px 9px;border-radius:999px;background:#e0563f24;border:1px solid #e0563f55}
