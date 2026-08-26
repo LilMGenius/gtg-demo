@@ -1,6 +1,7 @@
 // 무대. 흙 운동장 하나와 그 너머를 채우는 것들이다.
 import * as THREE from '../../../vendor/three.module.min.js';
 import { flat, R_HALF_W, R_H } from '../units.mjs';
+import { loadDecor } from '../decor.mjs';
 
 // 사각 그물 한 장. wireframe 평면은 삼각형 대각선이 남아 그물이 아니라 격자무늬로 읽힌다.
 export function meshPanel(w, h, cell, color, opacity) {
@@ -38,12 +39,14 @@ export function buildPitch(scene) {
 
   // 라인. 흙바닥만 있으면 거리가 안 읽힌다. 공이 어디쯤 왔는지는 선이 알려준다.
   const lineMat = new THREE.MeshBasicMaterial({ color: 0xf2f0e4, transparent: true, opacity: 0.7 });
+  const marks = new THREE.Group();
+  marks.name = 'markings';
   const stripe = (w, d, x, z) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), lineMat);
     m.rotation.x = -Math.PI / 2;
     m.position.set(x, 0.02, z);
     m.userData.probeIgnore = true;
-    scene.add(m);
+    marks.add(m);
   };
   const BOX_W = 16.5;
   const BOX_D = 16.5;
@@ -61,7 +64,9 @@ export function buildPitch(scene) {
   spot.rotation.x = -Math.PI / 2;
   spot.position.set(0, 0.02, 11);
   spot.userData.probeIgnore = true;
-  scene.add(spot);
+  marks.add(spot);
+  scene.add(marks);
+  loadDecor(scene, 'markings', marks);
 
   // 골대. 판정식이 쓰는 폭과 높이를 그대로 쓴다. 그림과 숫자가 어긋나면 화면이 거짓말을 한다.
   const post = new THREE.CylinderGeometry(0.06, 0.06, R_H, 8);
@@ -108,6 +113,8 @@ export function buildPitch(scene) {
   scene.add(fence);
 
   // 건물 실루엣. 지평선 위가 비지 않게만 세운다. 디테일은 없다.
+  // 구운 GLB가 오면 이걸 치우고 그 자리에 선다. 14개 드로우콜이 1개가 된다.
+  // 로드가 실패하면 이게 남는다. 에셋 하나로 화면이 비지는 않는다.
   const skyline = new THREE.Group();
   const blockMat = flat(0x5b6f7d);
   for (let i = 0; i < 14; i += 1) {
@@ -115,9 +122,11 @@ export function buildPitch(scene) {
     const h = 5 + ((i * 53) % 11);
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 3), blockMat);
     b.position.set(-30 + i * 4.6 + ((i * 17) % 3), h / 2, 38 + ((i * 29) % 7));
+    b.userData.probeIgnore = true;
     skyline.add(b);
   }
   scene.add(skyline);
+  loadDecor(scene, 'skyline', skyline);
 
   return { ground, box, bar };
 }
