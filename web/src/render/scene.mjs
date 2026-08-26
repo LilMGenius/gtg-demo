@@ -31,6 +31,14 @@ export function createScene(canvas) {
   camera.position.set(0, 3.3, -5.1);
   camera.lookAt(0, 1.4, 4.5);
 
+  // 세계의 시계. performance.now()를 직접 읽으면 시간을 늦출 자리가 없다.
+  // 히트스톱은 프레임을 건너뛰는 것이 아니라 시간의 배율을 낮추는 것이다.
+  let vnow = 0;
+  let realLast = performance.now() / 1000;
+  let stopLeft = 0;
+  // 0.30은 슬로모션으로 읽혔고 0.02는 프레임이 멈춘 것으로 읽혔다. 0.08이 걸리는 느낌이다.
+  const HIT_SCALE = 0.08;
+
   scene.add(new THREE.AmbientLight(0xd8e6dc, 2.4));
   const sun = new THREE.DirectionalLight(0xfff6e0, 2.6);
   sun.position.set(-5, 9, 7);
@@ -45,6 +53,23 @@ export function createScene(canvas) {
   addOutline(ball, 0.012);
   ball.userData.probeIgnore = true;
   scene.add(ball);
+
+  // 잔상. 공 한 개만 그리면 빠른 공과 느린 공이 같은 그림이 된다.
+  // 공이 카메라를 향해 오므로 지나온 자리는 화면에서 공 뒤에 그대로 숨는다.
+  // 그래서 원근 축소를 거리비로 되돌리고 거기서 더 키운다. 꼬리가 아니라 공을 감싸는 링으로 남는다.
+  // 지오메트리와 재질은 한 벌만 쓴다. 잔상이 프로그램을 하나 더 만들면 드로우콜 예산이 먼저 죽는다.
+  const GHOSTS = 8;
+  const ghostGeo = new THREE.IcosahedronGeometry(BALL_R, 0);
+  const ghostMat = new THREE.MeshBasicMaterial({ color: 0xfdfdf6, transparent: true, opacity: 0.2, depthWrite: false });
+  const ghosts = [];
+  for (let i = 0; i < GHOSTS; i++) {
+    const g = new THREE.Mesh(ghostGeo, ghostMat);
+    g.visible = false;
+    g.userData.probeIgnore = true;
+    scene.add(g);
+    ghosts.push(g);
+  }
+  const trail = [];
 
   // 공 그림자. 공이 어디쯤인지 바닥이 알려주면 궤적을 놓치지 않는다.
   const shadow = new THREE.Mesh(
@@ -83,6 +108,20 @@ export function createScene(canvas) {
     scene.add(keeper);
   }
 
+  // 화면 흔들림. 카메라 본체를 흔들면 골대 프레이밍과 키퍼 접지 측정이 같이 흔들린다.
+  // 그래서 진폭은 게이트가 견디는 크기에서 시작한다. 0.09는 골대가 프레임을 나갔고 0.004는 아무 일도 안 일어났다.
+  const CAM_BASE = new THREE.Vector3(0, 3.3, -5.1);
+  const CAM_LOOK = new THREE.Vector3(0, 1.4, 4.5);
+  let shakeAmp = 0;
+  let shakeLeft = 0;
+  let shakeSpan = 1;
+  function shake(amp, dur) {
+    // 겹쳐 오면 큰 쪽이 이긴다. 더하면 실점 한 번에 화면이 뒤집힌다.
+    shakeAmp = Math.max(shakeAmp, amp);
+    shakeLeft = Math.max(shakeLeft, dur);
+    shakeSpan = Math.max(shakeLeft, 0.001);
+  }
+
   // 가로가 기준이다. 화면이 그보다 좁으면 수직 화각을 늘려 골대 폭을 지킨다.
   const BASE_ASPECT = 16 / 9;
   const BASE_FOV = 46;
@@ -116,7 +155,7 @@ export function createScene(canvas) {
   const actor = { keeper: null, kicker: null };
   function drive(key, target, rate) {
     poseNow[key] = lerpPose(poseNow[key], target, rate);
-    setPose(actor[key], poseNow[key], performance.now() / 1000);
+    setPose(actor[key], poseNow[key], vnow);
   }
 
   let cue = null;
@@ -126,17 +165,47 @@ export function createScene(canvas) {
   // 떨어져 나간 장갑. 키퍼 그룹에 달린 채로 카메라 쪽으로 날아가면 키퍼가 프레임을 나간 것으로 측정된다.
   let loose = null;
   const heartMat = new THREE.MeshBasicMaterial({ color: 0xff3f6d });
+  // 공이 들어간 사건들. 자막이 아니라 화면이 먼저 알려야 한다.
+  const CONCEDE = new Set(['carriedIn', 'gloveGone', 'downed', 'openGoalScored', 'talked', 'distracted']);
+  // 흰 플래시 한 장 다음 색이 빠진다. 캔버스 필터로 걸면 GPU 한 패스가 더 붙고 프로그램 수가 는다.
+  // DOM 한 겹이 더 싸고, 프레이밍 측정에도 손을 안 댄다.
+  const flashEl = document.getElementById('flash');
+  function flash() {
+    if (!flashEl) return;
+    flashEl.classList.remove('hit');
+    // 리플로우를 한 번 강제하지 않으면 연속 실점에서 두 번째가 안 보인다.
+    void flashEl.offsetWidth;
+    flashEl.classList.add('hit');
+  }
   function act(kind) {
     if (kind === 'gloveGone') {
       const gl = keeper.userData.gloves[keeper.position.x > 0 ? 1 : 0];
       scene.attach(gl);
       loose = gl;
     }
-    tail = { kind, t0: performance.now() / 1000, from: ball.position.clone(), kx: keeper.position.x };
+    tail = { kind, t0: vnow, from: ball.position.clone(), kx: keeper.position.x };
+    // 사건마다 무게가 다르다. 선방과 실점이 같은 톤으로 지나가면 둘 다 아무 일도 아니게 된다.
+    // 히트스톱은 손이 닿은 순간에만 준다. 공이 그냥 지나간 사건에 걸면 정지가 이유 없이 읽힌다.
+    const HIT = { save: 0.13, catch: 0.13, gloveGone: 0.16, carriedIn: 0.14, spill: 0.10, downed: 0.12 };
+    // 흔들림은 실점이 가장 크다. 골이 들어간 것이 화면에서 제일 큰 사건이어야 한다.
+    const SHK = {
+      save: [0.045, 0.34], catch: [0.032, 0.28], gloveGone: [0.055, 0.42],
+      carriedIn: [0.062, 0.5], downed: [0.058, 0.44], spill: [0.03, 0.26],
+      openGoalScored: [0.062, 0.5], talked: [0.02, 0.3], distracted: [0.02, 0.3],
+      beat: [0.05, 0.4], lost: [0.05, 0.4]
+    };
+    if (HIT[kind]) stopLeft = HIT[kind];
+    const s = SHK[kind];
+    if (s) shake(s[0], s[1]);
+    // 실점은 화면이 한 번 하얗게 튄 다음 색이 빠진다. 결과를 글자로만 알리면 글자를 안 읽는다.
+    if (CONCEDE.has(kind)) flash();
   }
   function play(shot, input, result, onEnd) {
     tail = null;
-    cue = { shot, input, result, t0: performance.now() / 1000, ended: false, onEnd, steps: 0, struck: false, framed: false };
+    cue = { shot, input, result, t0: vnow, ended: false, onEnd, steps: 0, struck: false, framed: false };
+    trail.length = 0;
+    for (const g of ghosts) g.visible = false;
+    ball.scale.set(1, 1, 1);
     kicker.position.set(VIEW_X * shot.aimX * SX * 0.2 + KICKER_OFF, 0, 11.2);
     kicker.userData.startX = kicker.position.x;
     ball.position.set(0, BALL_R, 11);
@@ -153,6 +222,17 @@ export function createScene(canvas) {
   }
 
   function frame() {
+    // 실시간과 세계시간을 나눈다. 히트스톱은 세계시간만 늦춘다.
+    // 렌더 루프까지 멈추면 브라우저가 프레임을 놓친 것과 구분되지 않는다.
+    const real = performance.now() / 1000;
+    // 탭이 백그라운드로 갔다 오면 dt가 몇 초로 들어와 연출이 한 프레임에 끝난다.
+    let dt = Math.min(0.05, Math.max(0, real - realLast));
+    realLast = real;
+    if (stopLeft > 0) {
+      stopLeft -= dt;
+      dt *= HIT_SCALE;
+    }
+    vnow += dt;
     actor.keeper = keeper;
     actor.kicker = kicker;
     // 이번 프레임에 무엇을 연기할지. 결과는 이미 확정됐고 여기서는 각도만 고른다.
@@ -162,7 +242,7 @@ export function createScene(canvas) {
     // 원하는 높이를 여기 적고, 실제 접지는 프레임 끝에서 실측해서 맞춘다.
     let hover = 0;
     if (cue) {
-      const t = performance.now() / 1000 - cue.t0;
+      const t = vnow - cue.t0;
       const { shot, input, result } = cue;
       const runup = 0.55;
       const flight = shot.flight;
@@ -200,6 +280,12 @@ export function createScene(canvas) {
         ball.position.y = lerp(BALL_R, shot.aimY * SY, Math.min(q, 1)) + Math.sin(Math.min(p, 1) * Math.PI) * cue.arc;
         ball.rotation.x -= 0.4;
         ball.rotation.y -= 0.22;
+        // 진행축 스트레치는 여기서 안 쓴다. 공은 카메라를 향해 오므로 진행축이 시선축과 거의 나란하고,
+        // 그 방향으로 늘려봐야 화면에는 크기 변화로만 나타난다. 속도는 잔상이 대신 말한다.
+        // 대신 발에 맞은 직후에만 짜부라진다. 이건 시선축과 무관해서 화면에 그대로 보인다.
+        // 0.5초는 공이 계속 찌그러진 채로 날았다. 0.13초가 맞은 순간으로만 읽힌다.
+        const sq = Math.max(0, 1 - (t - runup) / 0.13);
+        ball.scale.set(1 + sq * 0.5, 1 - sq * 0.34, 1 + sq * 0.5);
         // 골포스트와 크로스바를 스치는 코스만 금속음이 난다.
         // 판정은 이미 끝났고 여기서 읽는 것은 확정된 조준점의 기하뿐이다.
         if (!cue.framed && q >= 0.97) {
@@ -230,7 +316,7 @@ export function createScene(canvas) {
       }
     }
     if (tail) {
-      const u = Math.min(1, (performance.now() / 1000 - tail.t0) / 0.8);
+      const u = Math.min(1, (vnow - tail.t0) / 0.8);
       const e = ease(u);
       const gx = keeper.position.x + Math.sign(tail.kx || 1) * 0.1;
       const side = Math.sign(tail.kx || 1) > 0 ? POSES.diveR : POSES.diveL;
@@ -365,6 +451,43 @@ export function createScene(canvas) {
     }
     keeperShadow.scale.setScalar(1 + Math.abs(Math.sin(keeper.rotation.z)) * 0.8);
     kickerShadow.position.set(kicker.position.x, 0.03, kicker.position.z);
+    // 잔상은 지나온 자리를 따라간다. 매 프레임 전부 옮기면 공이 여덟 개인 것으로 읽힌다.
+    // 간격을 두 프레임으로 벌려 꼬리가 길어지게 한다.
+    if (cue && !tail) {
+      trail.unshift(ball.position.clone());
+      if (trail.length > GHOSTS * 2) trail.length = GHOSTS * 2;
+      for (let i = 0; i < GHOSTS; i++) {
+        const p = trail[i * 2 + 2];
+        const g = ghosts[i];
+        g.visible = Boolean(p);
+        if (p) {
+          g.position.copy(p);
+          // 화면상 크기 = 실제 크기 / 카메라 거리. 거리비를 곱하면 뒤 잔상도 공과 같은 크기로 보인다.
+          const dg = g.position.distanceTo(CAM_BASE);
+          const db = Math.max(0.01, ball.position.distanceTo(CAM_BASE));
+          // 1.02는 링이 공 안에 먹혔고 1.5는 비눗방울이 됐다. 0.13씩 벌어지는 것이 속도선으로 읽힌다.
+          g.scale.setScalar((dg / db) * (1 + i * 0.13));
+        }
+      }
+      // 재질이 한 벌이라 투명도는 한 번만 정한다. 개별로 주려면 재질이 여덟 벌 필요하고 그건 예산 밖이다.
+      ghostMat.opacity = 0.2;
+    } else if (ghosts[0].visible) {
+      for (const g of ghosts) g.visible = false;
+    }
+
+    // 흔들림을 먼저 얹고 그 카메라로 잰다. 흔들리기 전 카메라로 재면 게이트는 흔들림을 못 본다.
+    // 측정 프레임만 빼는 것은 우회다. 게이트가 견딜 때까지 진폭을 줄이는 쪽이 맞다.
+    camera.position.copy(CAM_BASE);
+    if (shakeLeft > 0) {
+      shakeLeft -= dt;
+      // 감쇠 없이 흔들면 끝날 때 뚝 끊긴다. 남은 시간에 비례해 잦아든다.
+      const k = shakeAmp * Math.max(0, shakeLeft / shakeSpan);
+      // 사인 두 개를 정수비로 겹치면 규칙적인 원운동이 되고 카메라가 도는 것으로 읽힌다.
+      camera.position.x += Math.sin(vnow * 61) * k;
+      camera.position.y += Math.sin(vnow * 47 + 1.7) * k * 0.8;
+      if (shakeLeft <= 0) shakeAmp = 0;
+    }
+    camera.lookAt(CAM_LOOK);
     if (cue) { ballProbe.sample(); stageProbe.sample(); }
     renderer.render(scene, camera);
   }
@@ -396,6 +519,13 @@ export function createScene(canvas) {
     keeper.position.set(0, 0, KEEPER_Z);
     keeper.rotation.z = 0;
     ball.position.set(0, BALL_R, 11);
+    ball.scale.set(1, 1, 1);
+    ball.rotation.set(0, 0, 0);
+    trail.length = 0;
+    for (const g of ghosts) g.visible = false;
+    stopLeft = 0;
+    shakeLeft = 0;
+    shakeAmp = 0;
     shadow.position.set(0, 0.02, 11);
     shadow.scale.setScalar(1);
     shadow.material.opacity = 0.42;

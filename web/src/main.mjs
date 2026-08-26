@@ -35,9 +35,9 @@ let advance = 0;
 let timer = 0;
 
 function say(line, cause) {
-  el('caption').innerHTML = cause
-    ? '<b>' + (CAUSE_LABEL[cause] || cause) + '</b>' + line
-    : line;
+  // 매 줄이 새 요소여야 등장 애니메이션이 다시 돈다. 같은 노드에 글자만 갈면 조용히 바뀐다.
+  el('caption').innerHTML = (cause ? '<b>' + (CAUSE_LABEL[cause] || cause) + '</b>' : '')
+    + '<span>' + line + '</span>';
 }
 
 function pips() {
