@@ -1,0 +1,130 @@
+import { chromium } from "playwright";
+
+// UI 게이트. 화면을 픽셀로 재는 칸이다. 기능 게이트는 프레임을 안 센다.
+// 대조군 둘이 붙어 있다. 세로 회전 안내와 조작법 패널 초기 접힘.
+// 둘이 기대대로 나오지 않으면 이 게이트가 무엇을 보고 있는지 모르는 것이다.
+const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
+const URL = "http://127.0.0.1:10310/web/index.html?seed=" + (process.argv[2] || 7);
+const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 80000);
+t.unref();
+
+const fails = [];
+const notes = [];
+function check(name, ok, detail) {
+  (ok ? notes : fails).push(name + " " + detail);
+}
+
+let b;
+try {
+  b = await chromium.launch({ executablePath: EXE });
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  const p = await ctx.newPage();
+  const errs = [];
+  p.on("pageerror", (e) => errs.push(String(e)));
+  p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+
+  await p.goto(URL, { waitUntil: "load" });
+  await p.waitForTimeout(1200);
+
+  // 대조군 1. 조작법 패널은 처음에 접혀 있어야 한다.
+  const panelClosed = await p.evaluate(() => document.getElementById("helpPanel").hidden);
+  check("control:helpPanel-initially-folded", panelClosed === true, String(panelClosed));
+
+  // 대조군 2. 가로에서는 회전 안내가 안 보이고 세로에서는 보여야 한다.
+  const rotLand = await p.evaluate(() => getComputedStyle(document.getElementById("rotate")).display);
+  await p.setViewportSize({ width: 720, height: 1280 });
+  await p.waitForTimeout(400);
+  const rotPort = await p.evaluate(() => getComputedStyle(document.getElementById("rotate")).display);
+  await p.setViewportSize({ width: 1280, height: 720 });
+  await p.waitForTimeout(400);
+  check("control:rotate-notice-only-in-portrait", rotLand === "none" && rotPort !== "none", rotLand + "/" + rotPort);
+
+  await p.click("#go", { force: true });
+  await p.waitForTimeout(1400);
+
+  // 지속 크롬. HUD 요소가 덮는 화면 비율.
+  const chrome = await p.evaluate(() => {
+    const W = innerWidth, H = innerHeight;
+    let area = 0;
+    for (const id of ["top", "out", "auto", "caption"]) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      area += Math.max(0, r.width) * Math.max(0, r.height);
+    }
+    return area / (W * H);
+  });
+  check("chrome:persistent-under-25pct", chrome <= 0.25, (chrome * 100).toFixed(1) + "%");
+
+  // 화면 중앙. 판정이 일어나는 자리를 UI가 덮으면 안 된다.
+  const center = await p.evaluate(() => {
+    const W = innerWidth, H = innerHeight;
+    const box = { x0: W * 0.3, x1: W * 0.7, y0: H * 0.3, y1: H * 0.7 };
+    let area = 0;
+    for (const id of ["top", "out", "auto", "caption"]) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      const w = Math.max(0, Math.min(r.right, box.x1) - Math.max(r.left, box.x0));
+      const h = Math.max(0, Math.min(r.bottom, box.y1) - Math.max(r.top, box.y0));
+      area += w * h;
+    }
+    return area / ((box.x1 - box.x0) * (box.y1 - box.y0));
+  });
+  check("chrome:center-band-under-2pct", center <= 0.02, (center * 100).toFixed(2) + "%");
+
+  // 겹침. 좁은 가로에서 HUD 요소끼리 부딪히면 안 된다.
+  await p.setViewportSize({ width: 740, height: 360 });
+  await p.waitForTimeout(500);
+  const overlaps = await p.evaluate(() => {
+    const ids = ["top", "out", "auto", "caption"];
+    const rs = ids.map((id) => [id, document.getElementById(id).getBoundingClientRect()]);
+    const hit = [];
+    for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) {
+      const [ai, a] = rs[i], [bj, c] = rs[j];
+      if (a.width === 0 || c.width === 0) continue;
+      const w = Math.min(a.right, c.right) - Math.max(a.left, c.left);
+      const h = Math.min(a.bottom, c.bottom) - Math.max(a.top, c.top);
+      if (w > 2 && h > 2) hit.push(ai + "x" + bj);
+    }
+    return hit;
+  });
+  check("layout:no-overlap-at-740x360", overlaps.length === 0, overlaps.join(",") || "none");
+  await p.setViewportSize({ width: 1280, height: 720 });
+  await p.waitForTimeout(400);
+
+  // 성장 카드. 세 장이 한 줄로 뷰포트 안에 들어와야 한다.
+  await p.evaluate(() => {
+    const o = document.getElementById("offer");
+    if (o.hidden) {
+      o.hidden = false;
+      o.innerHTML = '<h4>\uc131\uc7a5</h4><div class="row">' +
+        '<button>\ub2e4\uc774\ube59<em>+1</em></button>' +
+        '<button>\ud578\ub4e4\ub9c1<em>+1</em></button>' +
+        '<button>\uce68\ucc29\uc131<em>+1</em></button></div>';
+    }
+  });
+  await p.waitForTimeout(300);
+  const cards = await p.evaluate(() => {
+    const bs = [...document.querySelectorAll("#offer button")];
+    const tops = new Set(bs.map((b) => Math.round(b.getBoundingClientRect().top)));
+    const inside = bs.every((b) => {
+      const r = b.getBoundingClientRect();
+      return r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
+    });
+    return { n: bs.length, rows: tops.size, inside };
+  });
+  check("offer:three-cards-one-row-in-viewport",
+    cards.n === 3 && cards.rows === 1 && cards.inside,
+    JSON.stringify(cards));
+
+  check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
+
+  console.log(notes.map((s) => "  ok   " + s).join("\n"));
+  if (fails.length) console.log(fails.map((s) => "  FAIL " + s).join("\n"));
+  console.log(fails.length ? "ui FAIL " + fails.length : "ui PASS");
+  if (fails.length) process.exitCode = 1;
+} finally {
+  clearTimeout(t);
+  if (b) await b.close();
+}
