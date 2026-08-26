@@ -198,12 +198,26 @@ export function buildPassers(scene) {
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), flat(0xe0b48c));
     head.position.y = 1.36 * tall;
     const parts = [body, legs, head];
+    // 실루엓 세 종. 색만 다른 다섯은 멀리서 한 사람이 다섯 번 지나가는 것으로 읽힐다.
+    // 머리 윗마리만 바꿔도 멀리서 구분된다. 몸통 비율을 건드리면 모두 땅만해진다.
     if (i === 0) {
       // 긴 머리 한 덩이. 이 하나로 멀리서도 다른 사람으로 읽힌다.
       // 반경 0.17은 머리(0.15)보다 커서 얼굴을 통째로 삼켰다. 뒤통수 쪽으로 물린다.
       const hair = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.34, 3, 6), flat(0x2b1d14));
       hair.position.set(0, 1.28 * tall, -0.09);
       parts.push(hair);
+    } else if (i % 2 === 1) {
+      // 학생. 등에 가방 한 덩어리. 실루엓이 뒤로 불룩해져 머리 없이도 구분된다.
+      const bag = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.2), flat(0x2f4f43));
+      bag.position.set(0, 0.92 * tall, -0.24);
+      parts.push(bag);
+    } else {
+      // 아저씨. 챙 달린 모자. 챙을 안 달면 머리에 그릇을 엎은 것으로 보인다.
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.09, 8), flat(0x8d3f3f));
+      cap.position.y = 1.47 * tall;
+      const brim = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 0.18), flat(0x8d3f3f));
+      brim.position.set(0, 1.44 * tall, 0.16);
+      parts.push(cap, brim);
     }
     for (const [pi, m] of parts.entries()) { jitterMesh(m, 0.02, 70 + i * 5 + pi); m.userData.probeIgnore = true; }
     addOutline(body, 0.03);

@@ -206,6 +206,7 @@ addEventListener('keydown', (e) => {
 
 pips();
 mountTitle(() => {
+  stage.leaveTitle();
   stage.setKeeper(state.keeper);
   // 돌아오자마자 밀린 훈련부터 쓴다. 그 다음에 공이 날아온다.
   if (state.picks > 0) {

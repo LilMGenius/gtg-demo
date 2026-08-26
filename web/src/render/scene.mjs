@@ -151,6 +151,9 @@ export function createScene(canvas) {
   // 더치 앵글. 카메라 위치를 옮기면 골대 프레이밍 측정이 통째로 흔들린다.
   // 렌즈만 기울이면 프레임 안의 것들은 그대로 있고 화면만 비뚤어진다. 게이트가 재는 축을 안 건드린다.
   // 0.04는 모니터가 삐뚤어진 줄 알았고 0.28은 골대 모서리가 프레임을 나갔다.
+  // 타이틀은 인게임 카메라를 안 쓴다. 같은 각도면 시작 버튼을 눌러도 화면이 그대로라 게임이 안 도는 것으로 보인다.
+  // CAM_BASE 고정 규칙은 게이트가 재는 인게임에만 걸린다. 타이틀은 그 밖이다.
+  let titleMode = true;
   let dutch = 0;
   let dutchLeft = 0;
   let dutchSpan = 1;
@@ -236,6 +239,8 @@ export function createScene(canvas) {
       loose = gl;
     }
     tail = { kind, t0: vnow, from: ball.position.clone(), kx: keeper.position.x };
+    // 사건이 난 뒤에는 연출이 행인을 몰고 간다. 걸어오던 보간을 끄지 않으면 둘이 서로 당긴다.
+    if (passers[0]) passers[0].userData.gaze = 0;
     // 사건마다 무게가 다르다. 선방과 실점이 같은 톤으로 지나가면 둘 다 아무 일도 아니게 된다.
     // 히트스톱은 손이 닿은 순간에만 준다. 공이 그냥 지나간 사건에 걸면 정지가 이유 없이 읽힌다.
     const HIT = { save: 0.13, catch: 0.13, gloveGone: 0.16, carriedIn: 0.14, spill: 0.10, downed: 0.12 };
@@ -277,8 +282,10 @@ export function createScene(canvas) {
     cue.arc = 0.3 + (shot.aimY > 1.0 ? 0.85 : 0);
 
     // 눈에 띄는 행인은 매 구 있지 않다. 그 구에만 앞줄로 걸어온다.
-    for (const p of passers) p.position.z = p.userData.homeZ;
-    if (shot.gaze) { passers[0].position.set(-14, 0, 18); }
+    for (const p of passers) { p.position.z = p.userData.homeZ; p.userData.gaze = 0; }
+    // 눈에 띄는 행인은 매 구 있지 않다. 그 구에만 앞줄로 걸어온다.
+    // 좌표를 바로 박으면 순간이동이다. 펜스 쪽에서 걸어서 들어와야 키퍼가 본 것이 된다.
+    if (shot.gaze) { passers[0].position.set(-17, 0, 29); passers[0].userData.gaze = 0.001; }
     sfx.place();
   }
 
@@ -481,7 +488,7 @@ export function createScene(canvas) {
           keeper.position.z = lerp(KEEPER_Z, 4.2, walk);
           keeper.rotation.z = Math.sin(e * 12) * 0.09;
           if (passers[0]) {
-            passers[0].position.set(lerp(-14, -3.6, walk), 0, lerp(18, 4.6, walk));
+            passers[0].position.set(lerp(-11.5, -3.6, walk), 0, lerp(18, 4.6, walk));
             passers[0].rotation.z = Math.sin(e * 9) * 0.18;
           }
           ball.position.set(lerp(tail.from.x, 0, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
@@ -529,6 +536,14 @@ export function createScene(canvas) {
     // 행인은 판정과 무관하게 계속 걷는다. 멈춘 배경은 그림이고 움직이는 배경은 장소다.
     for (const [i, p] of passers.entries()) {
       passerShadows[i].position.set(p.position.x, 0.03, p.position.z);
+      if (p.userData.gaze) {
+        // 1.6초. 0.6초는 달려들어오는 것으로 보였고 3초는 슈팅이 끝나도 펜스 밖이었다.
+        p.userData.gaze = Math.min(1, p.userData.gaze + dt / 1.6);
+        const w = ease(p.userData.gaze);
+        p.position.set(lerp(-17, -11.5, w), 0, lerp(29, 18, w));
+        p.rotation.z = Math.sin(vnow * 9) * 0.13;
+        continue;
+      }
       p.position.x += p.userData.speed * 0.016;
       if (p.position.x > 26) p.position.x = -26;
       p.rotation.z = Math.sin(performance.now() * 0.006 * p.userData.speed) * 0.06;
@@ -572,6 +587,13 @@ export function createScene(canvas) {
       if (shakeLeft <= 0) shakeAmp = 0;
     }
     camera.lookAt(CAM_LOOK);
+    if (titleMode) {
+      // 골대 옆 낮은 곳에서 천천히 돌린다. 정면 고정 샷은 스크린샷이지 타이틀이 아니다.
+      // 반경 9.5에 높이 2.0. 반경 5는 골대를 벗어나고 15는 선수가 점으로 작아졌다.
+      const a = vnow * 0.16 + 0.5;
+      camera.position.set(Math.sin(a) * 9.5, 2.0 + Math.sin(vnow * 0.4) * 0.35, 4.5 - Math.cos(a) * 9.5);
+      camera.lookAt(0, 1.5, 5.5);
+    }
     if (dutchLeft > 0) {
       dutchLeft -= dt;
       // 기울었다가 제자리로 돌아온다. 끝까지 기운 채로 두면 다음 구가 비뚤어진 채 시작한다.
@@ -650,5 +672,7 @@ export function createScene(canvas) {
   }
   reset();
 
-  return { play, act, reset, setKeeper, sfx, ballProbe, stageProbe, goalFrame, set diving(v) { divingStat = v; } };
+  return { play, act, reset, setKeeper, sfx, ballProbe, stageProbe, goalFrame,
+    leaveTitle() { titleMode = false; },
+    set diving(v) { divingStat = v; } };
 }
