@@ -100,6 +100,8 @@ function rollCaptions(result) {
       return;
     }
     say(e.line, e.cause);
+    // 자막이 말한 사건을 화면도 같이 연기한다. 결과는 이미 확정됐고 여기서 바뀌지 않는다.
+    if (e.t !== 'result') stage.act(e.t);
     // 체인이 드리블로 갔을 때만 공을 튕기는 소리가 붙는다. 자막과 소리가 같은 사건을 가리킨다.
     if (e.t === 'charge' || e.t === 'beat') stage.sfx.dribble();
     if (e.t === 'spill' || e.t === 'rebound') stage.sfx.kick(0.5);

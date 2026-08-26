@@ -356,6 +356,12 @@ export function createScene(canvas) {
 
   // 한 구의 연출. 시작 시각과 확정된 결과만 받는다.
   let cue = null;
+  // 체인의 반전은 자막이 아니라 화면에서 일어나야 한다.
+  // 여기서 결과를 바꾸지 않는다. 이미 확정된 사건 이름 하나를 받아 그것만 연기한다.
+  let tail = null;
+  function act(kind) {
+    tail = { kind, t0: performance.now() / 1000, from: ball.position.clone(), kx: keeper.position.x };
+  }
   function play(shot, input, result, onEnd) {
     cue = { shot, input, result, t0: performance.now() / 1000, ended: false, onEnd, steps: 0, struck: false, framed: false };
     kicker.position.set(VIEW_X * shot.aimX * SX * 0.2 + KICKER_OFF, 0, 11.2);
@@ -430,6 +436,80 @@ export function createScene(canvas) {
         }
       }
     }
+    if (tail) {
+      const u = Math.min(1, (performance.now() / 1000 - tail.t0) / 0.8);
+      const e = ease(u);
+      const gx = keeper.position.x + Math.sign(tail.kx || 1) * 0.1;
+      switch (tail.kind) {
+        case 'catch':
+        case 'save':
+          // 잡았으면 공이 장갑에 붙는다. 몸은 일어선다.
+          ball.position.set(gx, lerp(tail.from.y, 0.95, e), lerp(tail.from.z, KEEPER_Z + 0.25, e));
+          keeper.rotation.z = lerp(keeper.rotation.z, 0, 0.08);
+          keeper.position.y = lerp(keeper.position.y, 0, 0.08);
+          break;
+        case 'carriedIn':
+          // 막았는데 같이 넘어간다. 공과 몸이 한 덩어리로 골망까지 간다.
+          keeper.position.z = lerp(KEEPER_Z, -1.1, e);
+          keeper.rotation.z += 0.05;
+          ball.position.set(keeper.position.x, 0.5, keeper.position.z - 0.2);
+          break;
+        case 'gloveGone': {
+          // 장갑이 공에 딸려 간다. 손이 하나 없는 채로 남는다.
+          const gl = keeper.userData.gloves[tail.kx > 0 ? 1 : 0];
+          ball.position.set(lerp(tail.from.x, tail.from.x * 1.1, e), lerp(tail.from.y, 0.6, e), lerp(tail.from.z, -1.2, e));
+          gl.getWorldPosition(new THREE.Vector3());
+          gl.position.z = lerp(0.06, -2.4, e);
+          gl.rotation.z += 0.4;
+          break;
+        }
+        case 'spill':
+          // 흘렸다. 공이 옆으로 튀어나가 아직 살아 있다.
+          ball.position.set(lerp(tail.from.x, tail.from.x + (tail.kx >= 0 ? 1.5 : -1.5), e), 0.14 + Math.abs(Math.sin(u * 9)) * 0.5 * (1 - u), lerp(tail.from.z, 3.2, e));
+          break;
+        case 'downed':
+          keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.5, 0.06);
+          keeper.position.y = keeper.userData.girth;
+          break;
+        case 'rebound':
+          ball.position.set(lerp(tail.from.x, 0.6, e), 0.6, lerp(tail.from.z, -1.1, e));
+          break;
+        case 'reboundMiss':
+          ball.position.set(lerp(tail.from.x, -6.5, e), 0.5, lerp(tail.from.z, -1, e));
+          break;
+        case 'charge':
+          // 잡고 나서 드리블하러 나간다. 공이 발 앞에서 튄다.
+          keeper.rotation.z = lerp(keeper.rotation.z, 0, 0.12);
+          keeper.position.y = 0;
+          keeper.position.z = lerp(KEEPER_Z, 6.5, e);
+          ball.position.set(keeper.position.x, 0.14 + Math.abs(Math.sin(u * 12)) * 0.28, keeper.position.z + 0.7);
+          break;
+        case 'beat':
+          keeper.position.z = lerp(6.5, 13, e);
+          keeper.rotation.z = Math.sin(u * 16) * 0.12;
+          ball.position.set(keeper.position.x, 0.14, keeper.position.z + 0.7);
+          kicker.rotation.z = lerp(0, 1.3, e);
+          break;
+        case 'lost':
+          // 뺏겼다. 키퍼는 저기 나가 있고 골대가 비어 있다.
+          ball.position.set(lerp(tail.from.x, kicker.position.x, e), 0.14, lerp(tail.from.z, kicker.position.z + 0.5, e));
+          keeper.rotation.z = lerp(keeper.rotation.z, 1.2, 0.06);
+          break;
+        case 'skied':
+          // 올라갔다가 다시 내려온다. 프레임을 나가면 하늘로 넘겼다는 결과가 안 보인다.
+          ball.position.set(lerp(tail.from.x, 1.6, e), 0.14 + Math.sin(e * Math.PI) * 3.4, lerp(tail.from.z, 6.5, e));
+          break;
+        case 'openGoalScored':
+          ball.position.set(lerp(tail.from.x, 0, e), 0.14, lerp(tail.from.z, -1.2, e));
+          break;
+        default:
+          break;
+      }
+      shadow.position.set(ball.position.x, 0.02, ball.position.z);
+      const lift2 = Math.max(0, ball.position.y - BALL_R);
+      shadow.scale.setScalar(1 + lift2 * 0.55);
+      shadow.material.opacity = Math.max(0.06, 0.42 - lift2 * 0.14);
+    }
     keeperShadow.position.set(keeper.position.x, 0.03, keeper.position.z);
     // 행인은 판정과 무관하게 계속 걷는다. 멈춘 배경은 그림이고 움직이는 배경은 장소다.
     for (const p of passers) {
@@ -449,6 +529,8 @@ export function createScene(canvas) {
 
   function reset() {
     cue = null;
+    tail = null;
+    for (const g of keeper.userData.gloves) { g.position.z = 0.06; g.rotation.z = 0; }
     keeper.position.set(0, 0, KEEPER_Z);
     keeper.rotation.z = 0;
     ball.position.set(0, BALL_R, 11);
@@ -460,5 +542,5 @@ export function createScene(canvas) {
   }
   reset();
 
-  return { play, reset, setKeeper, sfx, ballProbe, stageProbe, goalFrame, set diving(v) { divingStat = v; } };
+  return { play, act, reset, setKeeper, sfx, ballProbe, stageProbe, goalFrame, set diving(v) { divingStat = v; } };
 }
