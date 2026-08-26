@@ -42,19 +42,21 @@ export function buildKeeper(height, weight) {
   const g = new THREE.Group();
   const h = height / 100;
   const w = 0.30 + (weight - 84) * 0.0035;
-  const headR = h * 0.075;
+  const headR = h * 0.082;
 
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(w, h * 0.42, 3, 8), flat(0x2f8f5b));
-  torso.position.y = h * 0.55;
+  // 몸통 캡슐 반지름이 곧 어깨 너비다. w를 그대로 쓰면 지름이 몸길이만큼 나와서
+  // 머리가 캡슐 위쪽 뚜껑에 통째로 삼켜진다. 갸름하게 세우고 머리를 그 위로 올린다.
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(w * 0.62, h * 0.40, 3, 8), flat(0x2f8f5b));
+  torso.position.y = h * 0.62;
   const head = new THREE.Mesh(new THREE.SphereGeometry(headR, 10, 8), flat(0xe8c39a));
-  head.position.y = h * 0.93;
+  head.position.y = h * 0.98;
   addFace(head, headR, 1, 0xe8c39a);
   // 다리 둘. 하나짜리 캡슐은 사람이 아니라 화분이다.
-  const legGeo = new THREE.CapsuleGeometry(w * 0.34, h * 0.3, 3, 8);
+  const legGeo = new THREE.CapsuleGeometry(w * 0.26, h * 0.34, 3, 8);
   const legs = [];
   for (const s of [-1, 1]) {
     const leg = new THREE.Mesh(legGeo, flat(0x14202c));
-    leg.position.set(s * w * 0.38, h * 0.22, 0);
+    leg.position.set(s * w * 0.34, h * 0.215, 0);
     legs.push(leg);
   }
 
@@ -63,8 +65,8 @@ export function buildKeeper(height, weight) {
   const arms = [];
   for (const s of [-1, 1]) {
     const arm = new THREE.Mesh(armGeo, flat(0x2f8f5b));
-    arm.position.set(s * (w * 0.62 + 0.12), h * 0.62, 0.04);
-    arm.rotation.z = Math.PI / 2;
+    arm.position.set(s * (w * 0.60 + 0.11), h * 0.71, 0.04);
+    arm.rotation.z = s * (Math.PI / 2 - 0.22);
     arm.name = 'keeper';
     g.add(arm);
     arms.push(arm);
@@ -73,8 +75,8 @@ export function buildKeeper(height, weight) {
   const glove = new THREE.BoxGeometry(h * 0.11, h * 0.11, h * 0.05);
   const gl = new THREE.Mesh(glove, flat(0xf2d64b));
   const gr = new THREE.Mesh(glove, flat(0xf2d64b));
-  gl.position.set(-w - 0.22, h * 0.62, 0.06);
-  gr.position.set(w + 0.22, h * 0.62, 0.06);
+  gl.position.set(-w - 0.21, h * 0.60, 0.06);
+  gr.position.set(w + 0.21, h * 0.60, 0.06);
 
   g.add(torso, head, gl, gr, ...legs);
   for (const m of [torso, head, gl, gr, ...legs]) m.name = 'keeper';
@@ -89,24 +91,24 @@ export function buildKeeper(height, weight) {
 
 export function buildKicker() {
   const g = new THREE.Group();
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.72, 3, 8), flat(0xc9483a));
-  torso.position.y = 1.02;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), flat(0xd8a877));
-  head.position.y = 1.62;
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.62, 3, 8), flat(0xc9483a));
+  torso.position.y = 1.12;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.145, 10, 8), flat(0xd8a877));
+  head.position.y = 1.72;
   // 키커는 골대를 향해 달린다. 카메라는 골대 뒤에 있으니 얼굴이 렌즈를 마주 본다.
-  addFace(head, 0.14, -1, 0xd8a877);
-  const legGeo = new THREE.CapsuleGeometry(0.09, 0.52, 3, 8);
+  addFace(head, 0.145, -1, 0xd8a877);
+  const legGeo = new THREE.CapsuleGeometry(0.075, 0.60, 3, 8);
   const legs = [];
   for (const s of [-1, 1]) {
     const leg = new THREE.Mesh(legGeo, flat(0x243043));
-    leg.position.set(s * 0.11, 0.4, 0);
+    leg.position.set(s * 0.10, 0.40, 0);
     legs.push(leg);
   }
-  const armGeo = new THREE.CapsuleGeometry(0.055, 0.42, 3, 6);
+  const armGeo = new THREE.CapsuleGeometry(0.05, 0.40, 3, 6);
   const arms = [];
   for (const s of [-1, 1]) {
     const arm = new THREE.Mesh(armGeo, flat(0xc9483a));
-    arm.position.set(s * 0.3, 1.06, 0);
+    arm.position.set(s * 0.25, 1.20, 0);
     arm.rotation.z = s * 0.35;
     arm.name = 'kicker';
     g.add(arm);
