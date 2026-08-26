@@ -29,7 +29,7 @@ body.playing #hud{opacity:1}
 
 /* 자막. 화면 하단 가운데. 탭 칸 위에 얹히되 입력은 통과시킨다. */
 #caption{position:absolute;left:50%;transform:translateX(-50%);
-  bottom:calc(20px + env(safe-area-inset-bottom));
+  bottom:calc(128px + env(safe-area-inset-bottom));
   width:min(680px,82vw);text-align:center;pointer-events:none;
   font-size:clamp(15px,2.1vw,21px);line-height:1.4;font-weight:700;
   text-shadow:0 2px 12px #000d, 0 0 26px #000a;
