@@ -21,6 +21,8 @@ const W_FRONT = 0.003; // 정면 실루엣. 무거울수록 몸에 맞는 폭이
 const W_MOVE = 1.2;    // 무게가 기동에 더하는 지연 ms/kg
 const H_LOW = 2.5;     // 큰 키가 낮은 공에 몸을 접는 데 드는 지연 ms/cm
 const W_BRACE = 0.45;  // 정면 강슛을 버티는 질량
+const WIN0 = 70;
+const STREAK_K = 1.6;
 
 export function makeRng(seed) {
   let s = seed >>> 0 || 1;
@@ -36,17 +38,19 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const pct = (rng, p) => rng() * 100 < p;
 
 export function newKeeper() {
-  return keeperAt({ diving: 3, handling: 3, reflex: 4, offball: 3, judgement: 3, agility: 3, balance: 3, strength: 3, mischief: 4, focus: 3, composure: 3 }, 188, 84, 5);
+  return keeperAt({ diving: 3, handling: 3, reflex: 4, offball: 3, judgement: 3, agility: 3, balance: 3, strength: 3, mischief: 4, focus: 3, composure: 3, resilience: 3, goalKick: 3, throwing: 3, communication: 3 }, 188, 84, 5, 5);
 }
 
-function keeperAt(stats, height, weight, consistency) {
-  // 기복은 히든이다. 숫자로 안 뜼고 그날의 손끝으로만 드러난다.
-  return Object.assign({ height, weight, level: 1, consistency, form: 0 }, stats);
+function keeperAt(stats, height, weight, consistency, professionalism) {
+  // 기복은 히든이다. 숫자로 안 뜨고 그날의 손끝으로만 드러난다.
+  return Object.assign({ height, weight, level: 1, consistency, professionalism, form: 0, streak: 0 }, stats);
 }
 
 // 기복. 한 판이 시작할 때 한 번 굴러 그 판의 실효 칸을 흔든다.
 // 구마다 흔들면 같은 판 안에서 사람이 손을 고칠 수가 없다.
 export function rollForm(keeper, rng) {
+  // 연속 실점은 판을 넘어가지 않는다. 판이 바뀌면 어제 먹힌 것은 끝난 일이다.
+  keeper.streak = 0;
   const swing = (10 - (keeper.consistency || 5)) * 0.22;
   keeper.form = Math.round((rng() * 2 - 1) * swing * 10) / 10;
   return keeper.form;
@@ -79,7 +83,7 @@ export function keeperAtLevel(level, rng) {
 
   const height = 178 + Math.floor(rng() * 21);
   const weight = 74 + Math.floor(rng() * 21);
-  const keeper = keeperAt(stats, height, weight, 2 + Math.floor(rng() * 8));
+  const keeper = keeperAt(stats, height, weight, 2 + Math.floor(rng() * 8), 2 + Math.floor(rng() * 8));
   keeper.level = level;
   return keeper;
 }
@@ -143,9 +147,15 @@ export function buildSet(rng, level = 5) {
 }
 
 // 0단 배치. 오프더볼이 소유한다.
+// 서 있는 자리가 밀린 거리. 앞에서 한 칸이 크고 뒤에서 작다.
+function lateralGap(offball) {
+  const d = 10 - clamp(offball, 1, 10);
+  return Math.sqrt(d) * K_LAT * 2.6;
+}
+
 function placement(keeper, shot) {
   return {
-    lateral: (10 - keeper.offball) * K_LAT,
+    lateral: lateralGap(keeper.offball),
     depth: 0.12,
     markerAt: shot.flight * 0.72
   };
@@ -163,7 +173,7 @@ function contactMargin(keeper, shot, input, over) {
   const flight = clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
 
   const offball = s("offball");
-  const lateral = (10 - offball) * K_LAT;
+  const lateral = lateralGap(offball);
   const depth = 0.12;
   const markerAt = flight * 0.72;
 
@@ -171,8 +181,11 @@ function contactMargin(keeper, shot, input, over) {
   const forward = depth + advance;
 
   // 판정 창과 기동. 반응속도가 인지이고 민첩성이 기동이다.
-  let windowMs = 70 + 13 * s("reflex") + 4 * s("composure");
-  // 강슈은 창을 좁힌다. 침착성이 그 좁혀짐을 막는다.
+  let windowMs = WIN0 + 13 * s("reflex") + 4 * s("composure");
+  // 연속 실점은 다음 구를 좁힌다. 회복탄력성이 그 좁혀짐을 먹는다.
+  const streak = Math.min(keeper.streak || 0, 3);
+  if (streak > 0) windowMs -= streak * (10 - s("resilience")) * STREAK_K;
+  // 강슛은 창을 좁힌다. 침착성이 그 좁혀짐을 막는다.
   if (shot.strong) windowMs -= (10 - s("composure")) * 10;
   const SCALE_MS = 200;
   // 무게는 기동을 늦춘다. 정면 공은 서 있는 자리로 오므로 기동이 없고, 그래서 이 항도 없다.
@@ -216,6 +229,7 @@ function attributeContact(keeper, shot, input) {
        ["agility", { agility: keeper.agility + 1 }],
        ["offball", { offball: keeper.offball + 1 }],
        ["composure", { composure: keeper.composure + 1 }],
+       ["resilience", { resilience: keeper.resilience + 1 }],
        ["kickerPower", { kickerPower: shot.kicker.power - 1 }],
        ["kickerCurve", { bendSub: 0.028 }]]
     : [["diving", { diving: keeper.diving + 1 }],
@@ -223,6 +237,7 @@ function attributeContact(keeper, shot, input) {
        ["agility", { agility: keeper.agility + 1 }],
        ["offball", { offball: keeper.offball + 1 }],
        ["composure", { composure: keeper.composure + 1 }],
+       ["resilience", { resilience: keeper.resilience + 1 }],
        ["kickerPower", { kickerPower: shot.kicker.power - 1 }],
        ["kickerCurve", { bendSub: 0.028 }]];
   let best = probes[0][0];
@@ -270,6 +285,8 @@ export function resolve(input) {
   // 한 단계는 롤 하나를 쓴다. 같은 단계의 두 사고는 같은 난수를 구간으로 나눠 가른다.
   const draw = () => { state.rolls++; return rng() * 100; };
   const done = (conceded, cause) => {
+    // 연속 실점은 상태로 남는다. 다음 구의 판정 창을 회복탄력성이 방어한다.
+    keeper.streak = conceded ? (keeper.streak || 0) + 1 : 0;
     events.push({ t: "result", line: conceded ? "실점" : "세이브", cause: cause || null });
     return { events, conceded, cause: conceded ? cause : null, stage: state.stage, rolls: state.rolls };
   };
@@ -284,7 +301,10 @@ export function resolve(input) {
   // 한눈팔기. 행인이 지나가는 구에서만 열리고 집중력이 소유한다.
   // 같은 단계의 사고는 롤 하나를 구간으로 나눠 가른다. 새 롤을 뒤면 한 구가 일곱 번 굴러간다.
   const gazeP = shot.gaze ? Math.max(0, (10 - keeper.focus) * 2.6) : 0;
-  if (overP > 0 || diveP > 0 || gazeP > 0) {
+  // 말 걸기. 의사소통이 여는 사고다. 눈으로 따라가는 것과 입을 여는 것은 다른 사건이다.
+  // 팔로워를 버는 칸이 같은 자리에서 골을 먹인다. 이 칸이 양날인 이유가 그것이다.
+  const talkP = shot.gaze ? Math.max(0, keeper.communication * keeper.mischief * 0.08) : 0;
+  if (overP > 0 || diveP > 0 || gazeP > 0 || talkP > 0) {
     const d = draw();
     if (d < overP) {
       say("emptyGoal", "나간 사이 넘겨버렸습니다. 골대가 비어 있었습니다.", "greed");
@@ -298,6 +318,11 @@ export function resolve(input) {
     if (d < before + gazeP * (100 - before) / 100) {
       say("distracted", "지나가던 행인을 봤습니다. 눈에 하트가 떴습니다.", "focus");
       return done(true, "focus");
+    }
+    const beforeTalk = before + gazeP * (100 - before) / 100;
+    if (d < beforeTalk + talkP * (100 - beforeTalk) / 100) {
+      say("talked", "행인에게 말을 걸었습니다. 번호는 받았고 골은 먹혔습니다.", "communication");
+      return done(true, "communication");
     }
   }
 
@@ -315,6 +340,7 @@ export function resolve(input) {
       agility: "몸이 늦게 출발했습니다.",
       offball: "서 있던 자리가 틀렸습니다.",
       composure: "강슈에 서둘렀습니다.",
+      resilience: "앞 구를 먹힌 것이 아직 안 풀렸습니다.",
       kickerPower: "손 쓸 시간을 안 줬습니다.",
       kickerCurve: "끝에 휘어졌습니다. 손이 간 자리가 아니었습니다."
     };
@@ -394,6 +420,27 @@ export function resolve(input) {
 }
 
 // 성장. 매번 다른 셋이 뜬다. 다섯을 다 보여주면 최적해가 하나로 굳는다.
+export function ballInHand(result) {
+  return result.events.some((e) => e.t === "catch" || e.t === "save" || e.t === "beat");
+}
+
+// 재시작 템포. 판 수가 시간당 수익과 성장을 정하므로 이 식이 회전율을 소유한다.
+// 공이 손에 있으면 스로잉이, 그물이나 필드에 있으면 골킥이 임자다.
+export function restartDelay(keeper, result) {
+  if (ballInHand(result)) return Math.max(1.6, 4.0 - 0.20 * keeper.throwing - 0.06 * LOCKED.pass);
+  return Math.max(2.4, 6.5 - 0.26 * keeper.goalKick - 0.09 * LOCKED.firstTouch);
+}
+
+// 판 사이 대기는 회복이다. 스태미너와 호흡력은 잠겨 있어 지금은 상수로 선다.
+export function setBreak() {
+  return Math.max(3.0, 8.0 - 0.20 * LOCKED.stamina - 0.15 * LOCKED.breathing);
+}
+
+// 프로의식. 같은 판을 돌아도 더 오른다. 히든이므로 화면은 오른 숫자만 보여준다.
+export function growthGain(keeper, rng) {
+  return pct(rng, (keeper.professionalism || 5) * 3.4) ? 2 : 1;
+}
+
 export function growthOffer(rng, keeper) {
   const pool = GROWABLE.filter((k) => keeper[k] < 10);
   const out = [];

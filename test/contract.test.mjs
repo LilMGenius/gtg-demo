@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolve, makeRng, newKeeper, buildSet } from "../src/chain.mjs";
+import { resolve, makeRng, newKeeper, buildSet, rollForm } from "../src/chain.mjs";
 import { LEDGER } from "../src/ledger.mjs";
 
 // C1. 한 구는 단계 넷에서 끊기고 롤은 여섯까지 굴러간다.
@@ -8,6 +8,7 @@ import { LEDGER } from "../src/ledger.mjs";
 
 function play(seed, keeper, opts) {
   const rng = makeRng(seed);
+  rollForm(keeper, rng);
   const shots = buildSet(rng, keeper.level || 5);
   const out = [];
   for (const shot of shots) {
