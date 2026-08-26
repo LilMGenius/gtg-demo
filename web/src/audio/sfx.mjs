@@ -36,6 +36,48 @@ function noiseAt(ac, noise, t0, dur) {
   return s;
 }
 
+// 겹친 층이 더해지면서 1을 넘었다. 측정된 피크가 1.73이었고 그건 디지털 클리핑이다.
+// 잘라내는 대신 곡선으로 눕힌다. 0.66까지는 3차, 그 위는 tanh.
+// 몸과 접촉을 둘 다 크게 쓰면서 한계를 안 넘는 유일한 방법이다.
+function softClipCurve(n = 2048) {
+  const c = new Float32Array(n);
+  for (let i = 0; i < n; i += 1) {
+    const x = (i / (n - 1)) * 2 - 1;
+    const a = Math.abs(x);
+    const y = a <= 0.66 ? a - (a * a * a) / 3 : Math.tanh(a);
+    c[i] = Math.sign(x) * y;
+  }
+  return c;
+}
+
+function clipper(ac, out) {
+  const w = ac.createWaveShaper();
+  w.curve = softClipCurve();
+  w.oversample = '2x';
+  const g = ac.createGain();
+  g.gain.value = 1.15;
+  w.connect(g).connect(out);
+  return w;
+}
+
+// 접촉의 순간. 짧고 높다.
+// 몸만 있으면 북이고, 이 몇 밀리초가 붙어야 무언가에 맞은 소리가 된다.
+// 측정이 잡아냈다. 어택 창의 고역 비중이 2%까지 내려가 있었고 그건 퍽 소리다.
+function snap(ac, out, noise, t0, peak, freq, dur) {
+  const s = noiseAt(ac, noise, t0, dur);
+  const hp = ac.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = freq;
+  const tilt = ac.createBiquadFilter();
+  tilt.type = 'peaking';
+  tilt.frequency.value = freq * 1.7;
+  tilt.Q.value = 0.8;
+  tilt.gain.value = 7;
+  const g = ac.createGain();
+  env(g, peak, dur, t0);
+  s.connect(hp).connect(tilt).connect(g).connect(out);
+}
+
 // 공을 차는 소리. 먹먹한 쪽은 가죽이 눌리는 저역이고, 발등이 닿는 순간은 고역이다.
 // 고역만 키우면 풍선 터지는 소리가 되고, 저역만 남기면 북이 된다.
 function kick(ac, out, noise, t0, power = 0.6) {
@@ -46,7 +88,7 @@ function kick(ac, out, noise, t0, power = 0.6) {
   body.frequency.setValueAtTime(150 + p * 40, t0);
   body.frequency.exponentialRampToValueAtTime(52, t0 + 0.13);
   const bg = ac.createGain();
-  env(bg, 0.4 + p * 0.16, 0.17, t0);
+  env(bg, 0.20 + p * 0.30, 0.17, t0);
   body.connect(bg).connect(out);
   body.start(t0);
   body.stop(t0 + 0.3);
@@ -58,8 +100,10 @@ function kick(ac, out, noise, t0, power = 0.6) {
   lp.frequency.exponentialRampToValueAtTime(320, t0 + 0.08);
   lp.Q.value = 0.7;
   const sg = ac.createGain();
-  env(sg, 0.62 + p * 0.34, 0.09, t0);
+  env(sg, 0.24 + p * 0.40, 0.09, t0);
   skin.connect(lp).connect(sg).connect(out);
+
+  snap(ac, out, noise, t0, 0.30 + p * 0.42, 2400, 0.016);
 }
 
 // 골대 맞는 소리. 알루미늄 관의 배음은 정수배가 아니다.
@@ -99,7 +143,7 @@ function dribble(ac, out, noise, t0) {
   o.frequency.setValueAtTime(190, t0);
   o.frequency.exponentialRampToValueAtTime(88, t0 + 0.09);
   const g = ac.createGain();
-  env(g, 0.3, 0.12, t0);
+  env(g, 0.24, 0.12, t0);
   const lp = ac.createBiquadFilter();
   lp.type = 'lowpass';
   lp.frequency.value = 760;
@@ -115,6 +159,8 @@ function dribble(ac, out, noise, t0) {
   const tg = ac.createGain();
   env(tg, 0.34, 0.03, t0);
   tap.connect(bp).connect(tg).connect(out);
+
+  snap(ac, out, noise, t0, 0.34, 2600, 0.012);
 }
 
 // 공을 땅에 놓는 소리. 흙 위에 얹는 것이라 울림이 없다.
@@ -127,7 +173,7 @@ function place(ac, out, noise, t0) {
   bp.frequency.exponentialRampToValueAtTime(560, t0 + 0.1);
   bp.Q.value = 0.9;
   const dg = ac.createGain();
-  env(dg, 0.3, 0.11, t0);
+  env(dg, 0.26, 0.11, t0);
   dirt.connect(bp).connect(dg).connect(out);
 
   const thud = ac.createOscillator();
@@ -138,6 +184,8 @@ function place(ac, out, noise, t0) {
   thud.connect(tg).connect(out);
   thud.start(t0);
   thud.stop(t0 + 0.15);
+
+  snap(ac, out, noise, t0, 0.22, 3000, 0.009);
 }
 
 // 발소리. 뒤꿈치와 앞꿈치가 십수 밀리초 간격으로 두 번 닿는다.
@@ -161,6 +209,7 @@ function step(ac, out, noise, t0, hard = false) {
 // 이름 하나로 그래프를 세운다. 실시간과 오프라인이 같은 함수를 탄다.
 // 검사한 소리와 들리는 소리가 다르면 검사가 아무 말도 안 한 것이 된다.
 export function buildSfx(name, ac, out, noise, t0, arg) {
+  out = clipper(ac, out);
   if (name === 'kick') return kick(ac, out, noise, t0, arg ?? 0.6);
   if (name === 'post') return post(ac, out, noise, t0);
   if (name === 'dribble') return dribble(ac, out, noise, t0);

@@ -1,0 +1,149 @@
+// 소리를 귀 없이 재는 계측기. sfx.mjs의 그래프 함수를 OfflineAudioContext로 렌더해서
+// 파형 자체를 잰다. 선언값이 아니라 나온 소리를 잰다.
+//
+// 창을 둘로 나눈다. 접촉은 십수 밀리초 안에 끝나고 몸은 그 뒤로 남는다.
+// 한 창으로만 재면 긴 저역이 짧은 고역을 항상 이기고, 접촉이 없어도 통과한다.
+
+export const SR = 48000;
+
+export async function renderSfx(mod, name, arg, seconds) {
+  const ac = new OfflineAudioContext(1, Math.floor(SR * seconds), SR);
+  const g = ac.createGain();
+  g.gain.value = 1;
+  g.connect(ac.destination);
+  const noise = mod.makeNoise(ac, 1.2);
+  mod.buildSfx(name, ac, g, noise, 0, arg);
+  return (await ac.startRendering()).getChannelData(0);
+}
+
+export async function renderRaw(fn, seconds) {
+  const ac = new OfflineAudioContext(1, Math.floor(SR * seconds), SR);
+  const g = ac.createGain();
+  g.gain.value = 1;
+  g.connect(ac.destination);
+  const noise = (() => {
+    const n = Math.floor(SR * 1.2);
+    const buf = ac.createBuffer(1, n, SR);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i += 1) d[i] = Math.random() * 2 - 1;
+    return buf;
+  })();
+  fn(ac, g, noise);
+  return (await ac.startRendering()).getChannelData(0);
+}
+
+function rmsEnvelope(d, hopMs) {
+  const hop = Math.max(1, Math.floor((SR * hopMs) / 1000));
+  const e = [];
+  for (let i = 0; i + hop <= d.length; i += hop) {
+    let s = 0;
+    for (let j = 0; j < hop; j += 1) s += d[i + j] * d[i + j];
+    e.push(Math.sqrt(s / hop));
+  }
+  return e;
+}
+
+// 접촉을 몇 번 하는지. hop 1ms라야 뒤꿈치와 앞꿈치가 갈라진다.
+// 4ms로 재면 두 겹과 한 겹이 같은 값을 내고, 그 지표는 아무 말도 안 한 것이 된다.
+export function contacts(d) {
+  const e = rmsEnvelope(d, 1);
+  const pk = Math.max(...e);
+  if (pk <= 0) return 0;
+  let n = 0;
+  let armed = true;
+  for (let i = 0; i < e.length; i += 1) {
+    if (armed && e[i] > pk * 0.45) { n += 1; armed = false; }
+    if (!armed && e[i] < pk * 0.2) armed = true;
+  }
+  return n;
+}
+
+export function peakOf(d) {
+  let m = 0;
+  for (let i = 0; i < d.length; i += 1) m = Math.max(m, Math.abs(d[i]));
+  return m;
+}
+
+// 피크의 5% 아래로 내려가 다시 안 올라오는 지점. 울림의 길이다.
+export function tailMs(d) {
+  const e = rmsEnvelope(d, 4);
+  const pk = Math.max(...e);
+  let last = 0;
+  for (let i = 0; i < e.length; i += 1) if (e[i] > pk * 0.05) last = i;
+  return last * 4;
+}
+
+function goertzel(d, f, from, len) {
+  const w = (2 * Math.PI * f) / SR;
+  const c = 2 * Math.cos(w);
+  let s1 = 0;
+  let s2 = 0;
+  const end = Math.min(d.length, from + len);
+  for (let i = from; i < end; i += 1) {
+    const s0 = d[i] + c * s1 - s2;
+    s2 = s1;
+    s1 = s0;
+  }
+  return Math.sqrt(Math.abs(s1 * s1 + s2 * s2 - c * s1 * s2)) / (end - from);
+}
+
+export function spectrum(d, fromMs, lenMs) {
+  const from = Math.floor((SR * fromMs) / 1000);
+  const len = Math.floor((SR * lenMs) / 1000);
+  const bins = [];
+  for (let f = 60; f < 12000; f *= 1.04) bins.push({ f: Math.round(f), a: goertzel(d, f, from, len) });
+  return bins;
+}
+
+// 저역이 몸, 고역이 접촉. 비율만 본다. 절대값은 게인이 바뀌면 따라 움직인다.
+export function bands(d, fromMs, lenMs) {
+  const s = spectrum(d, fromMs, lenMs);
+  let lo = 0;
+  let mid = 0;
+  let hi = 0;
+  let tot = 0;
+  for (const x of s) {
+    tot += x.a;
+    if (x.f < 400) lo += x.a;
+    else if (x.f < 1800) mid += x.a;
+    else hi += x.a;
+  }
+  if (tot <= 0) return { lo: 0, mid: 0, hi: 0 };
+  return { lo: lo / tot, mid: mid / tot, hi: hi / tot };
+}
+
+export function topPeaks(d, fromMs, lenMs, k) {
+  const s = spectrum(d, fromMs, lenMs).slice();
+  s.sort((a, x) => x.a - a.a);
+  const picked = [];
+  for (const x of s) {
+    if (picked.every((y) => Math.abs(y.f - x.f) / x.f > 0.2)) picked.push(x);
+    if (picked.length >= k) break;
+  }
+  return picked.map((x) => x.f).sort((a, x) => a - x);
+}
+
+// 상위 모드가 최저 모드의 정수배에 얼마나 가까운지. 0에 가까우면 종이다.
+// 알루미늄 관은 1 : 2.76 : 5.40 근처라 어느 정수와도 멀다.
+export function harmonicity(peaks) {
+  if (peaks.length < 2) return 1;
+  const f0 = peaks[0];
+  let worst = 1;
+  for (let i = 1; i < peaks.length; i += 1) {
+    const r = peaks[i] / f0;
+    const d = Math.abs(r - Math.round(r)) / Math.max(1, Math.round(r));
+    worst = Math.min(worst, d);
+  }
+  return worst;
+}
+
+export function measure(d) {
+  return {
+    peak: Number(peakOf(d).toFixed(4)),
+    tailMs: tailMs(d),
+    contacts: contacts(d),
+    attack: bands(d, 0, 12),
+    body: bands(d, 0, 140),
+    peaks: topPeaks(d, 20, 300, 3)
+  };
+}
