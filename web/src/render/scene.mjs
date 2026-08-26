@@ -286,10 +286,10 @@ export function createScene(canvas) {
   const shirt = [0xd8556a, 0x4a72c4, 0xe0a23c, 0x7a4fb0, 0x3fa37a];
   for (let i = 0; i < 5; i += 1) {
     const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.62, 3, 6), flat(shirt[i]));
-    body.position.y = 0.86;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), flat(0xe0b48c));
-    head.position.y = 1.38;
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.86, 3, 6), flat(shirt[i]));
+    body.position.y = 0.65;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), flat(0xe0b48c));
+    head.position.y = 1.44;
     g.add(body, head);
     for (const m of [body, head]) m.userData.probeIgnore = true;
     g.position.set(-24 + i * 9.5, 0, 32.5 + (i % 3) * 1.4);
@@ -325,6 +325,8 @@ export function createScene(canvas) {
   };
   const keeperShadow = blob(0.42);
   const kickerShadow = blob(0.3);
+  // 행인도 그림자가 있어야 땅을 딘는다. 말걸기 연출은 행인을 앞줄로 데려오므로 더 눈에 띄다.
+  const passerShadows = passers.map(() => blob(0.24));
 
   const kicker = buildKicker();
   scene.add(kicker);
@@ -544,10 +546,10 @@ export function createScene(canvas) {
           }
           const walk = Math.min(1, e * 1.5);
           keeper.position.x = lerp(tail.kx, -2.4, walk);
-          keeper.position.z = lerp(KEEPER_Z, 5.4, walk);
+          keeper.position.z = lerp(KEEPER_Z, 4.2, walk);
           keeper.rotation.z = Math.sin(e * 12) * 0.09;
           if (passers[0]) {
-            passers[0].position.set(lerp(-14, -3.6, walk), 0, lerp(18, 6.0, walk));
+            passers[0].position.set(lerp(-14, -3.6, walk), 0, lerp(18, 4.6, walk));
             passers[0].rotation.z = Math.sin(e * 9) * 0.18;
           }
           ball.position.set(lerp(tail.from.x, 0, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
@@ -577,7 +579,8 @@ export function createScene(canvas) {
     }
     keeperShadow.position.set(keeper.position.x, 0.03, keeper.position.z);
     // 행인은 판정과 무관하게 계속 걷는다. 멈춘 배경은 그림이고 움직이는 배경은 장소다.
-    for (const p of passers) {
+    for (const [i, p] of passers.entries()) {
+      passerShadows[i].position.set(p.position.x, 0.03, p.position.z);
       p.position.x += p.userData.speed * 0.016;
       if (p.position.x > 26) p.position.x = -26;
       p.rotation.z = Math.sin(performance.now() * 0.006 * p.userData.speed) * 0.06;

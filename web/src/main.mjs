@@ -56,7 +56,7 @@ function setPad(on) {
 function nextSet() {
   // 기복은 판당 한 번 굴러서 그 판 내내 같은 값으로 선다.
   const form = rollForm(state.keeper, rng);
-  el('form').textContent = form > 0.4 ? '컴디션 좋음' : form < -0.4 ? '컴디션 난조' : '';
+  el('form').textContent = form > 0.4 ? '컨디션 좋음' : form < -0.4 ? '컨디션 난조' : '';
   state.shots = buildSet(rng, state.keeper.level);
   state.i = 0;
   state.results = [];
