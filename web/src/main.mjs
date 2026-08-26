@@ -94,9 +94,11 @@ function commit(dive) {
 // 자막은 체인 순서대로 한 줄씩 나온다. 반전이 반전을 덮으려면 한꺼번에 오면 안 된다.
 function rollCaptions(result) {
   const lines = result.events.slice();
+  state.phase = 'caption';
   const step = () => {
     const e = lines.shift();
     if (!e) {
+      state.skip = null;
       pips();
       state.i += 1;
       restart(result);
@@ -108,7 +110,10 @@ function rollCaptions(result) {
     // 체인이 드리블로 갔을 때만 공을 튕기는 소리가 붙는다. 자막과 소리가 같은 사건을 가리킨다.
     if (e.t === 'charge' || e.t === 'beat') stage.sfx.dribble();
     if (e.t === 'spill' || e.t === 'rebound') stage.sfx.kick(0.5);
-    setTimeout(step, e.t === 'result' ? 900 : 850);
+    clearTimeout(timer);
+    timer = setTimeout(step, e.t === 'result' ? 900 : 850);
+    // 자막을 밀어놓는 것은 손가락이다. 스택으로 살 수 있는 것은 공이 다시 놀이는 시간뿐이다.
+    state.skip = () => { clearTimeout(timer); step(); };
   };
   step();
 }
@@ -165,7 +170,10 @@ function showOffer() {
 }
 
 for (const b of document.querySelectorAll('.zone')) {
-  b.onpointerdown = () => commit(Number(b.dataset.dive));
+  b.onpointerdown = () => {
+    if (state.phase === 'caption') return state.skip && state.skip();
+    commit(Number(b.dataset.dive));
+  };
 }
 const autoBtn = el('auto');
 autoBtn.classList.toggle('on', state.auto);
@@ -180,6 +188,7 @@ el('out').onpointerdown = () => {
   el('out').classList.toggle('on', advance > 0);
 };
 addEventListener('keydown', (e) => {
+  if (state.phase === 'caption' && state.skip) return state.skip();
   if (e.key === 'ArrowLeft') commit(-1);
   if (e.key === 'ArrowRight') commit(1);
   if (e.key === 'ArrowUp' || e.key === ' ') commit(0);
