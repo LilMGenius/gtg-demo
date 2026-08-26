@@ -1,0 +1,220 @@
+// 효과음. 샘플 없이 Web Audio로 합성한다.
+// 파일을 안 쓰는 이유는 용량이 아니라 권리다. 우리가 만든 소리만 빌드에 들어간다.
+//
+// 현실감의 기준은 하나다. 한 소리는 몸(저역)과 접촉(고역 트랜지언트)을 같이 가져야 한다.
+// 둘 중 하나만 있으면 삐 소리이거나 퍽 소리이지 사물이 부딪힌 소리가 아니다.
+//
+// 그래프를 만드는 함수는 전부 (ac, out, t0)를 받는다. 실시간 컨텍스트를 안 잡으므로
+// OfflineAudioContext로 그대로 렌더해서 파형을 잴 수 있다. 귀 없이 소리를 검사하는 유일한 경로다.
+
+export const SFX_NAMES = ['kick', 'post', 'dribble', 'place', 'step'];
+
+// 노이즈 소스는 색을 안 정한다. 흙이냐 가죽이냐 금속이냐는 체인의 필터가 정한다.
+// 어두운 소스를 쓰면 그 뒤의 밴드패스가 통과시킬 게 남지 않는다. 측정으로 확인했다.
+export function makeNoise(ac, seconds = 1.2) {
+  const n = Math.floor(ac.sampleRate * seconds);
+  const buf = ac.createBuffer(1, n, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i += 1) d[i] = Math.random() * 2 - 1;
+  return buf;
+}
+
+// 즉시 시작, 지수 감쇠. 트랜지언트의 기본형이다.
+function env(g, peak, decay, t0) {
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(peak, t0 + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + decay);
+}
+
+function noiseAt(ac, noise, t0, dur) {
+  const s = ac.createBufferSource();
+  s.buffer = noise;
+  s.loop = true;
+  s.playbackRate.value = 0.85 + Math.random() * 0.3;
+  s.start(t0);
+  s.stop(t0 + dur + 0.05);
+  return s;
+}
+
+// 공을 차는 소리. 먹먹한 쪽은 가죽이 눌리는 저역이고, 발등이 닿는 순간은 고역이다.
+// 고역만 키우면 풍선 터지는 소리가 되고, 저역만 남기면 북이 된다.
+function kick(ac, out, noise, t0, power = 0.6) {
+  const p = Math.min(1, Math.max(0, power));
+
+  const body = ac.createOscillator();
+  body.type = 'sine';
+  body.frequency.setValueAtTime(150 + p * 40, t0);
+  body.frequency.exponentialRampToValueAtTime(52, t0 + 0.13);
+  const bg = ac.createGain();
+  env(bg, 0.4 + p * 0.16, 0.17, t0);
+  body.connect(bg).connect(out);
+  body.start(t0);
+  body.stop(t0 + 0.3);
+
+  const skin = noiseAt(ac, noise, t0, 0.09);
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(1100 + p * 900, t0);
+  lp.frequency.exponentialRampToValueAtTime(320, t0 + 0.08);
+  lp.Q.value = 0.7;
+  const sg = ac.createGain();
+  env(sg, 0.62 + p * 0.34, 0.09, t0);
+  skin.connect(lp).connect(sg).connect(out);
+}
+
+// 골대 맞는 소리. 알루미늄 관의 배음은 정수배가 아니다.
+// 정수배로 쌓으면 종소리가 되고 축구장이 아니라 교회가 된다.
+// 관의 굽힘 모드는 1 : 2.76 : 5.40 : 8.93 근처에 선다. 눈대중으로 고른 값은
+// 정수배로 미끄러지고 그러면 종소리가 된다. 측정 게이트가 그걸 잡아냈다.
+const POST_MODES = [712, 1965, 3845, 6358];
+function post(ac, out, noise, t0) {
+  const detune = 0.97 + Math.random() * 0.06;
+
+  POST_MODES.forEach((f, i) => {
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = f * detune;
+    const g = ac.createGain();
+    // 위 모드일수록 빨리 죽는다. 금속이 울리다 마는 소리가 여기서 나온다.
+    env(g, 0.3 / (i + 1.2), 0.9 - i * 0.16, t0);
+    o.connect(g).connect(out);
+    o.start(t0);
+    o.stop(t0 + 1.0);
+  });
+
+  // 맞는 순간의 마찰. 이 5ms가 없으면 울림만 남고 접촉이 안 들린다.
+  const scr = noiseAt(ac, noise, t0, 0.02);
+  const hp = ac.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 2600;
+  const g = ac.createGain();
+  env(g, 0.22, 0.02, t0);
+  scr.connect(hp).connect(g).connect(out);
+}
+
+// 드리블. 차는 소리와 같은 재질이라 형태는 같고 크기만 다르다.
+function dribble(ac, out, noise, t0) {
+  const o = ac.createOscillator();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(190, t0);
+  o.frequency.exponentialRampToValueAtTime(88, t0 + 0.09);
+  const g = ac.createGain();
+  env(g, 0.3, 0.12, t0);
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 760;
+  o.connect(lp).connect(g).connect(out);
+  o.start(t0);
+  o.stop(t0 + 0.25);
+
+  const tap = noiseAt(ac, noise, t0, 0.03);
+  const bp = ac.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = 1800;
+  bp.Q.value = 1.0;
+  const tg = ac.createGain();
+  env(tg, 0.34, 0.03, t0);
+  tap.connect(bp).connect(tg).connect(out);
+}
+
+// 공을 땅에 놓는 소리. 흙 위에 얹는 것이라 울림이 없다.
+// 마른 마찰 한 겹과 아주 짧은 저역 하나. 그 이상 넣으면 공이 아니라 상자가 된다.
+function place(ac, out, noise, t0) {
+  const dirt = noiseAt(ac, noise, t0, 0.11);
+  const bp = ac.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.setValueAtTime(1400, t0);
+  bp.frequency.exponentialRampToValueAtTime(560, t0 + 0.1);
+  bp.Q.value = 0.9;
+  const dg = ac.createGain();
+  env(dg, 0.3, 0.11, t0);
+  dirt.connect(bp).connect(dg).connect(out);
+
+  const thud = ac.createOscillator();
+  thud.type = 'sine';
+  thud.frequency.value = 96;
+  const tg = ac.createGain();
+  env(tg, 0.18, 0.07, t0);
+  thud.connect(tg).connect(out);
+  thud.start(t0);
+  thud.stop(t0 + 0.15);
+}
+
+// 발소리. 뒤꿈치와 앞꿈치가 십수 밀리초 간격으로 두 번 닿는다.
+// 한 겹이면 망치질이고 두 겹이라야 사람 발이다.
+function step(ac, out, noise, t0, hard = false) {
+  const layer = (at, peak, freq) => {
+    const s = noiseAt(ac, noise, at, 0.06);
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = freq;
+    bp.Q.value = 1.1;
+    const g = ac.createGain();
+    env(g, peak, 0.055, at);
+    s.connect(bp).connect(g).connect(out);
+  };
+  const loud = hard ? 0.34 : 0.2;
+  layer(t0, loud, 900 + Math.random() * 260);
+  layer(t0 + 0.012 + Math.random() * 0.006, loud * 0.7, 1400 + Math.random() * 260);
+}
+
+// 이름 하나로 그래프를 세운다. 실시간과 오프라인이 같은 함수를 탄다.
+// 검사한 소리와 들리는 소리가 다르면 검사가 아무 말도 안 한 것이 된다.
+export function buildSfx(name, ac, out, noise, t0, arg) {
+  if (name === 'kick') return kick(ac, out, noise, t0, arg ?? 0.6);
+  if (name === 'post') return post(ac, out, noise, t0);
+  if (name === 'dribble') return dribble(ac, out, noise, t0);
+  if (name === 'place') return place(ac, out, noise, t0);
+  if (name === 'step') return step(ac, out, noise, t0, arg ?? false);
+  throw new Error('unknown sfx ' + name);
+}
+
+const KEY = 'gtg.sfx.volume';
+
+export function mountSfx() {
+  let ctx = null;
+  let master = null;
+  let noise = null;
+
+  function ensure() {
+    if (ctx) return ctx;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    ctx = new AC();
+    master = ctx.createGain();
+    const saved = Number(localStorage.getItem(KEY));
+    master.gain.value = Number.isFinite(saved) && saved >= 0 && saved <= 1 ? saved : 0.7;
+    master.connect(ctx.destination);
+    noise = makeNoise(ctx);
+    return ctx;
+  }
+
+  const fire = (name, arg) => {
+    const ac = ensure();
+    if (!ac) return;
+    buildSfx(name, ac, master, noise, ac.currentTime, arg);
+  };
+
+  // 브라우저는 첫 입력 전에 오디오를 안 열어준다. 그래서 입력에 붙여 깨운다.
+  const wake = () => {
+    const ac = ensure();
+    if (ac && ac.state === 'suspended') ac.resume();
+  };
+  for (const ev of ['pointerdown', 'keydown', 'touchstart']) {
+    document.addEventListener(ev, wake, { passive: true });
+  }
+
+  return {
+    kick: (power) => fire('kick', power),
+    post: () => fire('post'),
+    dribble: () => fire('dribble'),
+    place: () => fire('place'),
+    step: (hard) => fire('step', hard),
+    get volume() { return master ? master.gain.value : 0; },
+    set volume(v) {
+      const x = Math.min(1, Math.max(0, v));
+      if (ensure()) master.gain.value = x;
+      localStorage.setItem(KEY, String(x));
+    }
+  };
+}

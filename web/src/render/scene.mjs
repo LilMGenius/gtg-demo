@@ -2,6 +2,7 @@
 // 롤은 이미 굴렀고 여기서는 확정된 결과를 연기할 뿐이다.
 import * as THREE from '../../vendor/three.module.min.js';
 import { GOAL_HALF_W, GOAL_H } from '../../../src/chain.mjs';
+import { mountSfx } from '../audio/sfx.mjs';
 
 const flat = (c) => new THREE.MeshLambertMaterial({ color: c });
 const BALL_R = 0.14;
@@ -50,6 +51,7 @@ function buildKicker() {
 }
 
 export function createScene(canvas) {
+  const sfx = mountSfx();
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 
@@ -172,9 +174,10 @@ export function createScene(canvas) {
   // 한 구의 연출. 시작 시각과 확정된 결과만 받는다.
   let cue = null;
   function play(shot, input, result, onEnd) {
-    cue = { shot, input, result, t0: performance.now() / 1000, ended: false, onEnd };
+    cue = { shot, input, result, t0: performance.now() / 1000, ended: false, onEnd, steps: 0, struck: false, framed: false };
     kicker.position.set(VIEW_X * shot.aimX * 0.2, 0, 11.2);
     ball.position.set(0, BALL_R, 11);
+    sfx.place();
   }
 
   function frame() {
@@ -188,7 +191,19 @@ export function createScene(canvas) {
         const p = t / runup;
         kicker.position.z = lerp(11.2, 10.55, ease(p));
         kicker.rotation.z = Math.sin(p * 14) * 0.14;
+        // 발이 땅에 닿는 순간에만 소리를 낸다. 균등 간격으로 뿌리면 기계 소리가 된다.
+        const beat = Math.floor(p / 0.34) + 1;
+        if (beat > cue.steps && beat <= 2) {
+          cue.steps = beat;
+          sfx.step(false);
+        }
       } else {
+        if (!cue.struck) {
+          cue.struck = true;
+          sfx.step(true);
+          // 슛파워가 임팩트의 세기다. 화면이 쓰는 값과 소리가 쓰는 값이 같아야 한 사건으로 들린다.
+          sfx.kick(shot.strong ? 0.95 : 0.4 + shot.kicker.power * 0.06);
+        }
         kicker.rotation.z *= 0.86;
         const p = Math.min(1, (t - runup) / flight);
         // 공은 골라인에서 멈추지 않는다. 실점이면 골망까지 가고 거기서 선다.
@@ -200,6 +215,14 @@ export function createScene(canvas) {
         ball.position.y = lerp(BALL_R, shot.aimY, Math.min(q, 1)) + Math.sin(Math.min(p, 1) * Math.PI) * 0.3;
         ball.rotation.x -= 0.4;
         ball.rotation.y -= 0.22;
+        // 골포스트와 크로스바를 스치는 코스만 금속음이 난다.
+        // 판정은 이미 끝났고 여기서 읽는 것은 확정된 조준점의 기하뿐이다.
+        if (!cue.framed && q >= 0.97) {
+          cue.framed = true;
+          const nearPost = Math.abs(GOAL_HALF_W - Math.abs(shot.aimX)) < 0.16;
+          const nearBar = Math.abs(GOAL_H - shot.aimY) < 0.16;
+          if (nearPost || nearBar) sfx.post();
+        }
         shadow.position.set(ball.position.x, 0.02, ball.position.z);
         const lift = Math.max(0, ball.position.y - BALL_R);
         shadow.scale.setScalar(1 + lift * 0.55);
@@ -240,5 +263,5 @@ export function createScene(canvas) {
   }
   reset();
 
-  return { play, reset, setKeeper, set diving(v) { divingStat = v; } };
+  return { play, reset, setKeeper, sfx, set diving(v) { divingStat = v; } };
 }
