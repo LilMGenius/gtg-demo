@@ -267,7 +267,7 @@ export function mountSfx() {
     dribble: () => fire('dribble'),
     place: () => fire('place'),
     step: (hard) => fire('step', hard),
-    get volume() { return master ? master.gain.value : 0; },
+    get volume() { return master ? master.gain.value : readVolume(KEY, 0.7); },
     set volume(v) {
       const x = Math.min(1, Math.max(0, v));
       if (ensure()) master.gain.value = x;

@@ -108,6 +108,17 @@ body.playing #hud{opacity:1}
 #out.on{background:#e0563f;color:#fff;box-shadow:var(--lift) var(--lift) 0 var(--edge)}
 
 /* 자동. 손가락만 대신한다. */
+/* 소리. 끌 수 없는 소리는 소리가 아니라 사고다. 자동/나가기 위로 같은 줄에 얹는다. */
+#mute{position:absolute;right:var(--pad-r);bottom:calc(168px + env(safe-area-inset-bottom));
+  pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
+  border:var(--line) solid var(--edge);background:var(--panel);color:var(--ink);
+  transform:rotate(var(--tilt));box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel)}
+#mute svg{width:24px;height:24px}
+#mute .slash{opacity:0}
+#mute:active{transform:rotate(var(--tilt)) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
+#mute[aria-pressed="true"]{color:var(--bad)}
+#mute[aria-pressed="true"] .wave{opacity:0}
+#mute[aria-pressed="true"] .slash{opacity:1}
 #auto{position:absolute;right:var(--pad-r);bottom:calc(94px + env(safe-area-inset-bottom));
   pointer-events:auto;width:66px;height:66px;white-space:nowrap;
   border:var(--line) solid var(--edge);background:var(--panel);

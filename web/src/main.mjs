@@ -13,7 +13,7 @@ window.__ballProbe = stage.ballProbe;
 window.__stageProbe = stage.stageProbe;
 window.__goalFrame = stage.goalFrame;
 window.__ballPos = stage.ballPos;
-mountBgm();
+const bgm = mountBgm();
 
 // 재현되지 않는 캐프처는 증거가 아니다. ?seed= 가 있으면 그 씨드로 고정한다.
 const seedParam = new URLSearchParams(location.search).get('seed');
@@ -192,6 +192,29 @@ autoBtn.onpointerdown = () => {
   state.auto = !state.auto;
   autoBtn.classList.toggle('on', state.auto);
   save(state.keeper, state.auto, state.fans);
+};
+
+// 소리. 끌 수 없는 소리는 소리가 아니라 사고다.
+// 음량을 0으로 써버리면 다시 켜는 것이 아니라 음량을 잃는 것이다. 직전 값을 들고 있는다.
+const MUTE_KEY = 'gtg.muted';
+const muteBtn = el('mute');
+let held = { bgm: bgm.volume, sfx: stage.sfx.volume };
+function setMuted(on, apply = true) {
+  if (on) held = { bgm: bgm.volume || held.bgm, sfx: stage.sfx.volume || held.sfx };
+  if (apply) {
+    bgm.volume = on ? 0 : held.bgm;
+    // 음량 대입은 AudioContext를 열게 한다. 켜진 상태로 시작할 때는 손 대지 않는다.
+    if (on || stage.sfx.volume === 0) stage.sfx.volume = on ? 0 : held.sfx;
+  }
+  muteBtn.setAttribute('aria-pressed', String(on));
+  muteBtn.setAttribute('aria-label', on ? '소리 켜기' : '소리 끄기');
+  localStorage.setItem(MUTE_KEY, on ? '1' : '0');
+}
+const muted0 = localStorage.getItem(MUTE_KEY) === '1';
+setMuted(muted0, muted0);
+muteBtn.onpointerdown = (e) => {
+  e.stopPropagation();
+  setMuted(muteBtn.getAttribute('aria-pressed') !== 'true');
 };
 
 el('out').onpointerdown = () => {
