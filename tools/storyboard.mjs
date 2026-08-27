@@ -94,8 +94,12 @@ try {
   await awaitOffer(24000);
   mark('grow');
   await wait(9000);
-  await holdOffer(700);
-  await wait(2000);
+
+  // 성장 오버레이는 모달이다. 열려 있는 동안은 판이 안 굴러간다.
+  // 닫고 사건을 보여주면 그 사이에 다음 판이 끝나면서 모달이 또 열려 장면을 자른다.
+  // 열어둔 채 화면에서만 숨긴다. 판은 멈춰 있고 연출만 돌아간다.
+  await p.evaluate(() => { document.getElementById('offer').style.visibility = 'hidden'; });
+  await wait(600);
 
   // 4장. 병맛 사건. 한 장면씩 불러서 충분히 보여준다.
   const SHOW = ['gloveGone', 'carriedIn', 'downed', 'talked', 'charge', 'beat'];
@@ -104,6 +108,11 @@ try {
     mark(kind);
     await wait(5200);
   }
+
+  await p.evaluate(() => { document.getElementById('offer').style.visibility = ''; });
+  await wait(900);
+  await holdOffer(700);
+  await wait(2000);
 
   // 5장. 두 번째 판. 키운 뒤의 화면을 한 번 더 보여준다.
   mark('play2');
