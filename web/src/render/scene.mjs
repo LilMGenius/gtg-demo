@@ -611,17 +611,23 @@ export function createScene(canvas) {
           // 흘렸다. 공이 옆으로 튀어나가 아직 살아 있다.
           ball.position.set(lerp(tail.from.x, tail.from.x + (tail.kx >= 0 ? 1.5 : -1.5), e), 0.14 + Math.abs(Math.sin(u * 9)) * 0.5 * (1 - u), lerp(tail.from.z, 3.2, e));
           break;
-        case 'downed':
+        case 'downed': {
           keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.5, 0.06);
           hover = 0.04;
-          // 실점인데 공을 안 움직였다. 자막은 골이라고 하는데 공은 골대 옆 땅에 멈춰 있었다.
-          // 깔린 몸 위를 넘어 굴러가야 깔려서 들어갔다는 것이 한 사건으로 읽힌다.
+          // 공이 몸과 상관없는 자리로 혼자 굴러갔다. 자막은 깔렸다는데 공은 반대편 허공을 지나갔다.
+          // 경로의 중간 지점을 쓰러진 몸에 묶는다. 몸 위를 타고 넘어가야 한 사건으로 읽힌다.
+          const bx = keeper.position.x;
+          const bz = keeper.position.z;
+          const over = ease(Math.min(1, u / 0.45));
+          const past = ease(Math.max(0, (u - 0.45) / 0.55));
+          const crossed = u > 0.45;
           ball.position.set(
-            lerp(tail.from.x, tail.kx * 0.5, e),
-            lerp(tail.from.y, REST_Y, e) - Math.sin(u * Math.PI) * 0.22,
-            lerp(tail.from.z, REST_Z, e)
+            crossed ? lerp(bx, bx * 0.35, past) : lerp(tail.from.x, bx, over),
+            (crossed ? lerp(0.44, REST_Y, past) : lerp(tail.from.y, 0.44, over)) + Math.sin(Math.min(1, u / 0.9) * Math.PI) * 0.15,
+            crossed ? lerp(bz, REST_Z, past) : lerp(tail.from.z, bz, over)
           );
           break;
+        }
         case 'rebound':
           ball.position.set(lerp(tail.from.x, 0.6, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
           break;
