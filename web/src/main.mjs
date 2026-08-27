@@ -12,6 +12,7 @@ const stage = createScene(el('stage'));
 window.__ballProbe = stage.ballProbe;
 window.__stageProbe = stage.stageProbe;
 window.__goalFrame = stage.goalFrame;
+window.__ballPos = stage.ballPos;
 mountBgm();
 
 // 재현되지 않는 캐프처는 증거가 아니다. ?seed= 가 있으면 그 씨드로 고정한다.

@@ -121,7 +121,9 @@ export function createScene(canvas) {
   // 지오메트리와 재질은 한 벌만 쓴다. 잔상이 프로그램을 하나 더 만들면 드로우콜 예산이 먼저 죽는다.
   const GHOSTS = 8;
   const ghostGeo = new THREE.IcosahedronGeometry(BALL_R, 0);
-  const ghostMat = new THREE.MeshBasicMaterial({ color: 0xfdfdf6, transparent: true, opacity: 0.2, depthWrite: false });
+  // 흰 잔상은 흰 공 뒤에서도 흙 배경 위에서도 안 보였다. 정지 화면에서 공이 서 있는지 날아오는지 안 읽혔다.
+  // 만화가 속도를 그리는 색은 흰색이 아니다. 노란 링이라야 갈색 흙 위에서 남는다.
+  const ghostMat = new THREE.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0.2, depthWrite: false });
   const ghosts = [];
   for (let i = 0; i < GHOSTS; i++) {
     const g = new THREE.Mesh(ghostGeo, ghostMat);
@@ -680,7 +682,10 @@ export function createScene(canvas) {
         }
       }
       // 재질이 한 벌이라 투명도는 한 번만 정한다. 개별로 주려면 재질이 여덟 벌 필요하고 그건 예산 밖이다.
-      ghostMat.opacity = 0.2;
+      // 0.2는 흙 위에서 사라졌다. 그렇다고 상수로 올리면 굴러오는 공에도 속도선이 붙어 늘 빠른 것으로 읽힌다.
+      // 이번 프레임에 공이 간 거리로 정한다. 느리면 링이 없고 빠르면 진해진다.
+      const step = trail.length > 1 ? trail[0].distanceTo(trail[1]) : 0;
+      ghostMat.opacity = Math.min(0.62, Math.max(0, (step - 0.04) * 4.2));
     } else if (ghosts[0].visible) {
       for (const g of ghosts) g.visible = false;
     }
@@ -789,6 +794,7 @@ export function createScene(canvas) {
   reset();
 
   return { play, act, reset, setKeeper, sfx, ballProbe, stageProbe, goalFrame,
+    ballPos: () => ({ x: ball.position.x, y: ball.position.y, z: ball.position.z }),
     leaveTitle() { titleMode = false; },
     set diving(v) { divingStat = v; } };
 }
