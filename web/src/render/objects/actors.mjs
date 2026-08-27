@@ -298,6 +298,15 @@ function buildBody(o) {
     const kn = joint(hp, 0, -o.thighLen, 0);
     const shin = seg(o.legR * 0.82, o.shinLen, o.socks, tag, side < 0 ? 43 : 44);
     kn.add(shin);
+    // 축구화가 없으면 다리가 잘린 막대로 끝난다. 발은 실루엣에서 가장 아래에 있고 제일 먼저 보인다.
+    if (o.bootLen) {
+      const boot = new THREE.Mesh(new THREE.BoxGeometry(o.legR * 1.5, o.legR * 0.9, o.bootLen), flat(0x14100c));
+      boot.name = tag;
+      jitterMesh(boot, 0.016, side < 0 ? 51 : 52);
+      // 발끝은 얼굴이 보는 쪽으로 나간다. 뒤꿈치는 발목 밑에 남긴다.
+      boot.position.set(0, -o.shinLen - o.legR * 0.36, o.faceDir * (o.bootLen * 0.28));
+      kn.add(boot);
+    }
     joints['hip' + k] = hp;
     joints['kn' + k] = kn;
   }
@@ -330,8 +339,10 @@ export function buildKeeper(height, weight) {
     upperLen: h * 0.17, foreLen: h * 0.16,
     hipX: w * 0.34, legR: w * 0.24,
     thighLen: h * 0.21, shinLen: h * 0.20,
-    gloveSize: h * 0.115,
-    shirt: 0x2f8f5b, skin: 0xe8c39a, shorts: 0x14202c, socks: 0x1b2c3c,
+    gloveSize: h * 0.115, bootLen: h * 0.14,
+    // 반바지·양말·축구화가 전부 검정에 가까워 하반신이 기둥 하나로 뭉쳤다.
+    // 상의 초록과 같은 계열의 양말을 신겨 키트로 묶고, 반바지는 무릎 위치를 알려줄 정도로만 밝힌다.
+    shirt: 0x2f8f5b, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: 0x2f8f5b,
     phase: 0.7, rest: POSES.ready
   });
   g.userData.girth = w;
@@ -348,7 +359,7 @@ export function buildKicker() {
     upperLen: 0.30, foreLen: 0.28,
     hipX: 0.10, legR: 0.085,
     thighLen: 0.40, shinLen: 0.38,
-    gloveSize: 0,
+    gloveSize: 0, bootLen: 0.24,
     // 카메라가 골대 뒤에 있어 크로스바가 키커의 다리를 가로로 자른다.
     // 흰 양말은 흰 바에, 남색 반바지는 어두운 그물 띠에 먹혀 잘린 조각이 다리로 안 읽힌다.
     // 배경 어느 띠에도 없는 색을 쓴다.
