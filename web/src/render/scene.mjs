@@ -566,7 +566,9 @@ export function createScene(canvas) {
           keeper.rotation.z = lerp(keeper.rotation.z, 0, 0.34);
           keeper.position.z = lerp(KEEPER_Z, 6.5, e);
           // 0.7은 캡슐 반경 안이라 공이 정강이를 뚫고 지나갔다. 발 앞으로 한 걸음 더 내보낸다.
-          ball.position.set(keeper.position.x, 0.14 + Math.abs(Math.sin(u * 12)) * 0.28, keeper.position.z + 1.05);
+          // 카메라가 등 뒤에 있어서 정면으로 내보낸 공은 다리에 겹쳐 파묻힌 것으로 보였다.
+          // 드리블은 어차피 발 옆으로 밀고 간다. 한 걸음 옆으로 빼면 다리와 안 겹친다.
+          ball.position.set(keeper.position.x + 0.95, 0.14 + Math.abs(Math.sin(u * 12)) * 0.28, keeper.position.z + 0.85);
           break;
         case 'beat':
           keeper.position.z = lerp(6.5, 13, e);
