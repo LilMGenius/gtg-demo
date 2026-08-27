@@ -29,10 +29,16 @@
 #go{margin-top:clamp(20px,3vw,40px);display:block;position:relative;
   padding:clamp(11px,1.4vw,18px) clamp(34px,4.8vw,68px) clamp(14px,1.7vw,22px);
   border:clamp(4px,.55vw,7px) solid #12160e;
-  background:var(--good);color:#12160e;
+  color:#12160e;
   font-family:inherit;font-weight:400;font-size:clamp(26px,3.3vw,44px);letter-spacing:.04em;
   transform:rotate(-2.6deg);
-  box-shadow:clamp(6px,.8vw,11px) clamp(7px,.95vw,13px) 0 #12160e;
+  /* 단색 면은 평평한 앱 버튼이다. 위가 밝고 아래가 어두워야 눌리는 물건으로 읽힌다.
+     같은 화면의 조작법 버튼이 이미 이 언어를 쓰는데 시작 버튼만 혼자 평면이었다. */
+  background:linear-gradient(180deg,#b6ffce 0%,var(--good) 38%,#3ec97a 100%);
+  box-shadow:clamp(6px,.8vw,11px) clamp(7px,.95vw,13px) 0 #12160e,
+             inset 3px 3px 0 #ffffff66, inset -3px -4px 0 #00000030;
+  /* 로고는 검정 오프셋 그림자를 지고 있는데 버튼 글자만 맨몸이라 화풍이 갈렸다. */
+  text-shadow:3px 4px 0 #12160e33;
   animation:bob 1.15s ease-in-out infinite}
 #go:active{transform:rotate(-2.6deg) translate(5px,6px);box-shadow:1px 1px 0 #12160e;
   animation:none}
