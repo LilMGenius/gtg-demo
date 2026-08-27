@@ -139,15 +139,17 @@ export function chippedTex() {
   });
 }
 
-// 건물 창문. 밤이 아니라 저녁이라 몇 칸만 켜져 있다. 전부 켜면 격자무늬 벽지가 된다.
+// 건물 창문. 대낮이다. 창은 켜지는 게 아니라 벽보다 어두운 유리로 파인다.
+// 흙바닥도 하늘도 행인도 낮인데 건물만 야경이면 배경이 뒤에 세운 딴 그림으로 읽힌다.
 // 한 장을 열네 동에 돌려 쓰니 도시가 아니라 같은 스티커를 열네 번 붙인 것으로 읽혔다.
-// 변종은 씨앗만 바꾸는 게 아니다. 층 간격과 점등률이 같으면 씨앗이 달라도 같은 리듬이 남는다.
+// 변종은 씨앗만 바꾸는 게 아니다. 층 간격과 밀도가 같으면 씨앗이 달라도 같은 리듬이 남는다.
+// 흰 바탕에 어두운 칸. 재질 색과 곱해지므로 벽색은 살고 창만 파인다.
 const WIN_KIND = [
-  { seed: 0x39f0c2, stepY: 13, stepX: 14, lit: 0.20 },
-  { seed: 0x7ac41d, stepY: 11, stepX: 16, lit: 0.30 },
-  { seed: 0x1de935, stepY: 16, stepX: 12, lit: 0.13 },
-  { seed: 0xc25a70, stepY: 12, stepX: 18, lit: 0.26 },
-  { seed: 0x40b8e1, stepY: 15, stepX: 13, lit: 0.08 }
+  { seed: 0x39f0c2, stepY: 15, stepX: 17, skip: 0.26 },
+  { seed: 0x7ac41d, stepY: 13, stepX: 20, skip: 0.34 },
+  { seed: 0x1de935, stepY: 18, stepX: 15, skip: 0.20 },
+  { seed: 0xc25a70, stepY: 14, stepX: 22, skip: 0.38 },
+  { seed: 0x40b8e1, stepY: 17, stepX: 16, skip: 0.29 }
 ];
 
 export function windowTex(variant = 0) {
@@ -156,20 +158,21 @@ export function windowTex(variant = 0) {
     const S = 64;
     const cv = canvas(S);
     const c = cv.getContext('2d');
-    c.fillStyle = '#000000';
+    c.fillStyle = '#ffffff';
     c.fillRect(0, 0, S, S);
     const r = rng(k.seed);
     // 창을 잘게 찍으면 저해상도로 줄어드는 화면에서 한 픽셀도 안 남는다.
-    // 크게 찍고 대신 켜진 칸을 줄인다. 저녁이라 몇 집만 불이 들어와 있다.
+    // 크게 찍고 대신 몇 칸을 비운다. 창이 한 칸도 안 빠지면 격자무늬 벽지다.
     for (let y = 5; y < S - 6; y += k.stepY) {
       for (let x = 5; x < S - 6; x += k.stepX) {
-        if (r() > k.lit) continue;
+        if (r() < k.skip) continue;
         // 자로 잰 격자는 창문이 아니라 엑셀 시트다. 층마다 한두 칸씩 어긋나게 찍는다.
         const ox = Math.round((r() - 0.5) * 4);
         const oy = Math.round((r() - 0.5) * 3);
-        // 색을 섞으니 창문이 아니라 만국기가 됐다. 색수차가 작은 사각형을 세 색으로 갈라놓기 때문이다.
-        // 저녁 불빛은 한 가지 색이다. 밝기만 흔든다.
-        c.fillStyle = r() > 0.5 ? '#e8b45c' : '#c4903f';
+        // 낮의 창은 밝기만 다르다. 전부 같은 농도로 파면 구멍 뚫린 판때기가 된다.
+        // 커튼 친 집이 몇 있어야 사람이 사는 건물로 읽힌다.
+        const v = r();
+        c.fillStyle = v > 0.82 ? '#b9c2c8' : (v > 0.45 ? '#4d5d69' : '#3a4954');
         c.fillRect(x + ox, y + oy, 5 + Math.round(r() * 2), 6 + Math.round(r() * 2));
       }
     }
