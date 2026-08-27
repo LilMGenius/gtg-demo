@@ -237,6 +237,12 @@ function buildBody(o) {
   for (const side of [-1, 1]) {
     const k = side < 0 ? 'L' : 'R';
     const sh = joint(spine, side * o.shoulderX, o.torsoLen * 0.92, 0);
+    // 어깨에 살이 없으면 팔이 몸통 옆에 떠 있는 별개 물체로 읽힌다.
+    // 팔을 어느 각도로 돌려도 피벗에 있는 이 구가 몸통과 팔 사이를 메운다.
+    const delt = new THREE.Mesh(new THREE.SphereGeometry(o.armR * 1.45, 8, 6), flat(o.shirt));
+    delt.name = tag;
+    jitterMesh(delt, 0.015, side < 0 ? 25 : 26);
+    sh.add(delt);
     const upper = seg(o.armR, o.upperLen, o.shirt, tag, side < 0 ? 21 : 22);
     sh.add(upper);
     const el = joint(sh, 0, -o.upperLen, 0);
@@ -300,7 +306,7 @@ export function buildKeeper(height, weight) {
     hipY: h * 0.47,
     torsoR: w * 0.55, torsoLen: h * 0.27,
     headR: h * 0.082, faceDir: 1,
-    shoulderX: w * 0.62, armR: h * 0.048,
+    shoulderX: w * 0.56, armR: h * 0.048,
     upperLen: h * 0.17, foreLen: h * 0.16,
     hipX: w * 0.34, legR: w * 0.24,
     thighLen: h * 0.21, shinLen: h * 0.20,
@@ -318,7 +324,7 @@ export function buildKicker() {
     hipY: 0.88,
     torsoR: 0.16, torsoLen: 0.48,
     headR: 0.145, faceDir: -1,
-    shoulderX: 0.19, armR: 0.05,
+    shoulderX: 0.17, armR: 0.05,
     upperLen: 0.30, foreLen: 0.28,
     hipX: 0.10, legR: 0.085,
     thighLen: 0.40, shinLen: 0.38,
