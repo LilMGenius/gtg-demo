@@ -335,7 +335,13 @@ export function createScene(canvas) {
     // 사건 이름을 모르면 화면만 보고는 무슨 일이 난 건지 모른다. 한 단어로 적어준다.
     // 문장을 넣으면 자막과 같은 것이 두 개가 되어 둘 다 안 읽힌다.
     const WORD = { save: '털!', catch: '찰칵', gloveGone: '어?', carriedIn: '아아', spill: '퍽', downed: '으악' };
-    if (BURST[kind]) impact.burst(ball.position, BURST[kind], WORD[kind] || '');
+    // 사건이 선언되는 순간 공은 아직 킥 지점 근처에 있다. 거기서 터뜨리면 글자가 키커 머리 위에 뜬다.
+    // 손이 닿은 사건은 닿은 자리, 즉 장갑에서 터진다. 나머지는 골라인 앞 키퍼 자리다.
+    if (BURST[kind]) {
+      const gi = keeper.userData.gloves[keeper.position.x >= 0 ? 1 : 0];
+      const at = gi ? gi.getWorldPosition(new THREE.Vector3()) : keeper.position.clone().setY(1.2);
+      impact.burst(at, BURST[kind], WORD[kind] || '');
+    }
     // 웃겨야 하는 사건에만 렌즈를 기울인다. 선방까지 기울이면 매 구 화면이 비뚤어져 기울기가 안 읽힌다.
     const TILT = { gloveGone: 0.13, carriedIn: -0.14, downed: 0.15, talked: -0.11, distracted: 0.1, beat: -0.12, lost: 0.12 };
     if (TILT[kind]) tilt(TILT[kind], 0.9);
