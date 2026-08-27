@@ -6,6 +6,35 @@ import { loadDecor } from '../decor.mjs';
 import { jitterMesh, seeded, addOutline } from '../handmade.mjs';
 import { addFace } from './actors.mjs';
 
+// 지오메트리 여러 개를 한 장으로 붙인다. 메시를 더 만들면 그만큼 드로우콜이 늘고,
+// 행인 다섯에게 팔을 달면 예산을 넘긴다. 모양은 늘리되 부를 것은 그대로 둔다.
+function mergeGeos(list) {
+  let n = 0;
+  let ni = 0;
+  for (const g of list) { n += g.attributes.position.count; ni += g.index.count; }
+  const pos = new Float32Array(n * 3);
+  const nor = new Float32Array(n * 3);
+  const uv = new Float32Array(n * 2);
+  const idx = new Uint16Array(ni);
+  let vo = 0;
+  let io2 = 0;
+  for (const g of list) {
+    pos.set(g.attributes.position.array, vo * 3);
+    nor.set(g.attributes.normal.array, vo * 3);
+    uv.set(g.attributes.uv.array, vo * 2);
+    const src = g.index.array;
+    for (let i = 0; i < src.length; i += 1) idx[io2 + i] = src[i] + vo;
+    io2 += src.length;
+    vo += g.attributes.position.count;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  out.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  out.setIndex(new THREE.BufferAttribute(idx, 1));
+  return out;
+}
+
 // 사각 그물 한 장. wireframe 평면은 삼각형 대각선이 남아 그물이 아니라 격자무늬로 읽힌다.
 // 팽팽한 격자는 그물이 아니라 방충망이다. 가운데를 배가 부르게 늘어뜨려야 천으로 읽힌다.
 // sag는 선을 조각내야 휜다. 세로선 한 줄을 두 점으로 그으면 직선밖에 안 나온다.
@@ -289,7 +318,24 @@ export function buildPassers(scene) {
     const g = new THREE.Group();
     const tall = 0.85 + rnd() * 0.35;
     const wide = 0.85 + rnd() * 0.35;
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22 * wide, 0.62 * tall, 3, 6), flatMap(shirt[i], clothTex()));
+    // 머리만 사람이고 아래는 페인트 통이었다. 팔이 없으면 서 있는 것인지 꽂혀 있는 것인지가 안 갈린다.
+    // 별도 메시로 달면 다섯 명에게 10번의 드로우콜이 붙는다. 몸통 지오메트리에 미리 붙여 버린다.
+    const torsoR = 0.22 * wide;
+    const torsoGeo = new THREE.CapsuleGeometry(torsoR, 0.62 * tall, 3, 6);
+    // 0.42는 몸통 윗반에서 끝나 어깨 봉으로 보였다. 팔은 허리를 지나야 팔로 읽힌다.
+    const armLen = 0.62 * tall;
+    const armParts = [torsoGeo];
+    for (const s of [-1, 1]) {
+      const a = new THREE.CapsuleGeometry(0.072, armLen, 3, 5);
+      // 캡슐은 중앙이 원점이다. 그대로 돌리면 어깨가 아니라 팔 한가운데가 축이 된다.
+      a.translate(0, -armLen / 2, 0);
+      // 0.13은 팔이 몸에 붙어 실루엣에서 옷 옆선과 구분이 안 됐다. 공간을 벌려 띄운다.
+      a.rotateZ(-s * 0.34);
+      // 어깨는 몸통 꼭대기가 아니라 그 한 칸 아래다. 꼭대기에 달면 목에서 팔이 난다.
+      a.translate(s * (torsoR + 0.05), 0.22 * tall, 0);
+      armParts.push(a);
+    }
+    const body = new THREE.Mesh(mergeGeos(armParts), flatMap(shirt[i], clothTex()));
     body.position.y = 0.86 * tall;
     const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.15 * wide, 0.46 * tall, 3, 6), flat(0x30384a));
     legs.position.y = 0.38 * tall;

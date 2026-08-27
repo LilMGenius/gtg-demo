@@ -675,7 +675,10 @@ export function createScene(canvas) {
             // 두 사람 사이에 두어야 누구에게 반한 것인지가 화면에 남는다.
             const hk = keeper.userData.head.getWorldPosition(new THREE.Vector3());
             const hp = passers[0] ? passers[0].getWorldPosition(new THREE.Vector3()) : null;
-            if (hp) hk.set((hk.x + hp.x) / 2, (hk.y + hp.y + 1.45) / 2 - 0.46, (hk.z + hp.z) / 2 - 0.2);
+            // 중점을 그대로 쓰니 하트 세 개가 키퍼 얼굴을 덮었다. 반한 얼굴이 안 보이면
+            // 한눈팔기라는 사건 자체가 화면에 안 남는다. 두 머리 바로 위로 올린다.
+            // 0.42를 올렸더니 하트가 화면 위로 잘렸다. 잘린 하트는 붉은 얼룩이다.
+            if (hp) hk.set((hk.x + hp.x) / 2, Math.max(hk.y, hp.y + 1.45) + 0.12, (hk.z + hp.z) / 2 - 0.2);
             showHearts(true, hk, e);
           }
           if (passers[0]) {
