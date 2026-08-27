@@ -219,7 +219,10 @@ export function buildPassers(scene) {
   // 키와 폭을 흩고, 다리를 따로 달고, 0번만 실루엣을 다르게 준다.
   // 집중력 판정이 지목하는 미인 행인이 0번이고, 그 하나는 멀리서도 구분돼야 한다.
   const passers = [];
-  const shirt = [0xd8556a, 0x4a72c4, 0xe0a23c, 0x7a4fb0, 0x3fa37a];
+  // 0번은 키커와 나란히 서는 유일한 행인이다. 붉은 계열을 주면 키커 셔츠(0xc9483a)와
+  // 같은 빨간 캡슐 둘이 되고, 화면에서 사람이 바뀐 것 자체가 안 읽힌다.
+  // 키커에도 다른 행인에도 없는 색을 준다.
+  const shirt = [0xf2e9ff, 0x4a72c4, 0xe0a23c, 0x7a4fb0, 0x3fa37a];
   const rnd = seeded(0x9a55e7);
   for (let i = 0; i < 5; i += 1) {
     const g = new THREE.Group();
