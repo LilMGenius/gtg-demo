@@ -261,6 +261,32 @@ export function createScene(canvas) {
   // 떨어져 나간 장갑. 키퍼 그룹에 달린 채로 카메라 쪽으로 날아가면 키퍼가 프레임을 나간 것으로 측정된다.
   let loose = null;
   const heartMat = new THREE.MeshBasicMaterial({ color: 0xff3f6d });
+  // 머리 위로 떠오르는 하트 셋. 눈동자만 하트로 바꾸면 고개가 돌아간 순간 얼굴이 뒤를 보고 있어 안 읽힌다.
+  // 정지 화면 한 장에서 한눈팔림을 알리는 픽셀은 이것뿐이다.
+  const heartShape = new THREE.Shape();
+  heartShape.moveTo(0, -0.5);
+  heartShape.bezierCurveTo(0.9, 0.35, 0.45, 1.05, 0, 0.5);
+  heartShape.bezierCurveTo(-0.45, 1.05, -0.9, 0.35, 0, -0.5);
+  const heartGeo = new THREE.ShapeGeometry(heartShape, 6);
+  const hearts = [];
+  for (let i = 0; i < 3; i += 1) {
+    const h = new THREE.Mesh(heartGeo, heartMat);
+    h.visible = false;
+    h.userData.probeIgnore = true;
+    scene.add(h);
+    hearts.push(h);
+  }
+  // 하트를 띄우는 사건 두 종. 이 밖에서는 항상 꺼져 있어야 한다.
+  function showHearts(on, at, e) {
+    for (const [i, h] of hearts.entries()) {
+      h.visible = on;
+      if (!on) continue;
+      const u = (e * 1.6 + i * 0.33) % 1;
+      h.position.set(at.x + (i - 1) * 0.3 + Math.sin(u * 6 + i) * 0.1, at.y + 0.34 + u * 0.62, at.z - 0.1);
+      h.scale.setScalar((0.3 + i * 0.05) * (1 - u * 0.3));
+      h.quaternion.copy(camera.quaternion);
+    }
+  }
   // 공이 들어간 사건들. 자막이 아니라 화면이 먼저 알려야 한다.
   const CONCEDE = new Set(['carriedIn', 'gloveGone', 'downed', 'openGoalScored', 'talked', 'distracted']);
   // 흰 플래시 한 장 다음 색이 빠진다. 캔버스 필터로 걸면 GPU 한 패스가 더 붙고 프로그램 수가 는다.
@@ -282,6 +308,8 @@ export function createScene(canvas) {
       keeper.userData.bareHands[gi].visible = true;
     }
     tail = { kind, t0: vnow, from: ball.position.clone(), kx: keeper.position.x };
+    // 앞 사건에서 뜬 하트가 다음 사건까지 남으면 선방하면서 반한 것으로 읽힌다.
+    for (const h of hearts) h.visible = false;
     // 사건이 난 뒤에는 연출이 행인을 몰고 간다. 걸어오던 보간을 끄지 않으면 둘이 서로 당긴다.
     if (passers[0]) passers[0].userData.gaze = 0;
     // 사건마다 무게가 다르다. 선방과 실점이 같은 톤으로 지나가면 둘 다 아무 일도 아니게 된다.
@@ -537,6 +565,7 @@ export function createScene(canvas) {
           keeper.position.x = lerp(tail.kx, -2.4, walk);
           keeper.position.z = lerp(KEEPER_Z, 4.2, walk);
           keeper.rotation.z = Math.sin(e * 12) * 0.09;
+          showHearts(true, keeper.userData.head.getWorldPosition(new THREE.Vector3()), e);
           if (passers[0]) {
             passers[0].position.set(lerp(-11.5, -3.6, walk), 0, lerp(18, 4.6, walk));
             passers[0].rotation.z = Math.sin(e * 9) * 0.18;
@@ -552,6 +581,7 @@ export function createScene(canvas) {
             pu.material = heartMat;
             pu.scale.set(1.9, 1.9, 0.5);
           }
+          showHearts(true, head.getWorldPosition(new THREE.Vector3()), e);
           ball.position.set(lerp(tail.from.x, tail.from.x * 1.3, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
           break;
         }
@@ -703,6 +733,7 @@ export function createScene(canvas) {
       loose = null;
     }
     for (const b of keeper.userData.bareHands) b.visible = false;
+    for (const h of hearts) h.visible = false;
     for (const p of passers) p.rotation.z = 0;
     keeper.userData.gloves.forEach((g, i) => { g.position.copy(keeper.userData.gloveHome[i]); g.rotation.set(0, 0, 0); });
     const head = keeper.userData.head;
