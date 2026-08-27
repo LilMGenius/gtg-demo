@@ -503,7 +503,11 @@ export function createScene(canvas) {
           // 손이 어디 있든 공은 거기 있어야 한다. 그래야 잡았다는 말이 화면에서 사실이 된다.
           {
             const gw = gloveWorld(Math.sign(tail.kx || 1));
-            ball.position.set(lerp(tail.from.x, gw.x, e), lerp(tail.from.y, gw.y, e), lerp(tail.from.z, gw.z, e));
+            // 0.8초에 걸쳐 붙이면 대부분의 프레임에서 공이 장갑에서 떨어져 있다.
+            // 잡는 것은 순간이다. 손이 닿는 구간은 130ms 안에 끝나고 나머지 시간은 붙은 채로 간다.
+            const grab = ease(Math.min(1, u * 6));
+            // 장갑 중심에 공 중심을 맞추면 공이 손 안으로 파묻힌다. 공 반경만큼 카메라 쪽으로 내놓는다.
+            ball.position.set(lerp(tail.from.x, gw.x, grab), lerp(tail.from.y, gw.y, grab), lerp(tail.from.z, gw.z - BALL_R, grab));
           }
           keeper.rotation.z = lerp(keeper.rotation.z, 0, 0.08);
           break;
