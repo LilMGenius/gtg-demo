@@ -126,7 +126,9 @@ export function buildPitch(scene) {
     // 골대는 판정 경계다. 굵기를 흔들면 어디까지가 골인지 눈이 헷갈린다. 선만 얹는다.
     addOutline(p, 0.02);
     // 완전한 수직은 새로 세운 규격 골대다. 동네 골대는 조금 기울어 있다.
-    p.rotation.z = (pi === 0 ? 1 : -1) * 0.012;
+    // 좌우를 같은 각도로 반대로 눕히면 그것도 대칭이다. 거울을 대면 겹친다.
+    // 한쪽은 거의 서 있고 한쪽만 눈에 띄게 눕는다. 누가 한 번 들이받은 골대다.
+    p.rotation.z = pi === 0 ? 0.005 : 0.021;
     scene.add(p);
   }
   const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, R_HALF_W * 2, 8), white);
@@ -145,7 +147,8 @@ export function buildPitch(scene) {
   back.position.set(0, R_H / 2, -NET_D);
   scene.add(back);
   for (const sgn of [-1, 1]) {
-    const side = meshPanel(NET_D, R_H, 0.24, NET_C, 0.44, 0.06);
+    // 좌우 그물을 같은 밀도로 치면 골대가 공장에서 나온 물건이 된다. 한쪽이 더 삭았다.
+    const side = meshPanel(NET_D, R_H, 0.24, NET_C, sgn < 0 ? 0.48 : 0.37, 0.06);
     side.rotation.y = Math.PI / 2;
     side.position.set(sgn * R_HALF_W, R_H / 2, -NET_D / 2);
     scene.add(side);
