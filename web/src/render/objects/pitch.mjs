@@ -362,7 +362,8 @@ export function buildPassers(scene) {
       hair.position.set(0, 1.44 * tall, -0.13);
       // 머리 하나만으로는 멀리서 남녀가 안 갈린다. 치마가 실루엣 밑변을 벌려 준다.
       // 몸통 비율은 안 건드린다. 건드리면 다섯이 전부 땅딸해진다.
-      const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.27 * wide, 0.42 * tall, 8, 1, true), flat(0xe4d7ef));
+      // 상의도 치마도 흰 계열이면 근경에서 원통 하나로 뭉친다. 치마에 색과 천 무늬를 준다.
+      const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.27 * wide, 0.42 * tall, 8, 1, true), flatMap(0xb98ad6, clothTex()));
       skirt.position.y = 0.62 * tall;
       skirt.material.side = THREE.DoubleSide;
       // 눈에 띄는 사람은 화면에서도 눈에 띄어야 한다. 머리 위 반짝임 하나가 시선을 잡는다.
