@@ -272,6 +272,17 @@ export function buildPitch(scene) {
   // 동네 아파트는 베이지와 연분홍과 연하늘을 칠한다. 도색이 갈려야 동이 세어진다.
   // 채도를 더 올리면 장난감 블록이 된다. 하늘과 안개에 묻힐 만큼만 넣는다.
   const WALL = [0xd8c6a4, 0xc9a9a4, 0xa8bcc6, 0xcfc8b2, 0x9fae9c];
+  // 열네 동을 다섯 색으로 돌리면 세 번째 동부터 색이 되돌아온다.
+  // 지평선 전체가 한 프레임에 들어오므로 그 주기가 줄 지어 읽힌다.
+  // 동마다 명도와 색조를 따로 굴려 같은 팔레트 칸이어도 같은 벽이 안 되게 한다.
+  const wallColor = (nth) => {
+    const c = new THREE.Color(WALL[nth % WALL.length]);
+    const h = {};
+    c.getHSL(h);
+    const j = seeded(0x7a3c00 + nth * 977);
+    c.setHSL((h.h + (j() - 0.5) * 0.06 + 1) % 1, h.s * (0.72 + j() * 0.62), h.l * (0.84 + j() * 0.3));
+    return c;
+  };
   const rnd = seeded(0x5c17e0);
   let cursor = -32;
   for (let i = 0; i < 14; i += 1) {
@@ -280,7 +291,7 @@ export function buildPitch(scene) {
     const h = 4.5 + rnd() * 7.5;
     const kind = Math.floor(rnd() * 5);
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 3), new THREE.MeshLambertMaterial({
-      color: WALL[(kind + i) % WALL.length], map: windowTexFor(kind, w, h)
+      color: wallColor(kind + i), map: windowTexFor(kind, w, h)
     }));
     b.position.set(cursor + w / 2, h / 2, 38 + rnd() * 7);
     // 0.02는 정렬된 것과 구분이 안 됐고 0.14는 건물이 쓰러지는 것으로 읽혔다.
@@ -296,7 +307,7 @@ export function buildPitch(scene) {
   // 구운 GLB가 서면 위에서 세운 fallback은 버려진다. 화면에 실제로 서는 건 이쪽이다.
   // 창 무늬도 벽색도 동마다 갈라야 열네 동이 열네 동으로 읽힌다.
   loadDecor(scene, 'skyline', skyline, 0.18, (c, nth) => new THREE.MeshLambertMaterial({
-    color: WALL[nth % WALL.length], map: windowTex(nth)
+    color: wallColor(nth), map: windowTex(nth)
   }));
 
   return { ground, box, bar, net: back, netZ: -NET_D };
