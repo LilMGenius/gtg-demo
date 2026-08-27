@@ -24,6 +24,20 @@ function finish(cv, repeat) {
   return t;
 }
 
+// 타일 경계를 넘어가는 개체는 반대편에서 다시 나와야 이음선이 사라진다.
+// 한 번만 찍으면 가장자리에서 생기는 짤린 선이 바닥 전체에 격자로 나타난다.
+// 같은 그림을 아홉 번 그리면 느리지만 텍스처는 한 번만 만든다.
+function tiled(c, S, draw) {
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      c.save();
+      c.translate(dx * S, dy * S);
+      draw();
+      c.restore();
+    }
+  }
+}
+
 // 씨앗 하나에 같은 그림. 새로고침마다 얼룩이 옮겨다니면 배경이 아니라 노이즈다.
 function rng(seed) {
   let s = seed >>> 0;
@@ -42,37 +56,47 @@ function memo(key, make) {
 // 흙바닥. 얼룩과 발자국이다. 균일한 그라데이션 한 장은 카펫으로 읽힌다.
 export function dirtTex() {
   return memo('dirt', () => {
-    const S = 128;
+    // 128에 22번 반복이면 6.8m마다 같은 얼룩이 돌아온다. 화면 안에 한 주기가 여러 번 들어가 격자로 읽힌다.
+    // 텍셀 밀도는 그대로 둘 채 판을 두 배로 키워 주기를 13.6m로 밀어낸다.
+    const S = 256;
     const cv = canvas(S);
     const c = cv.getContext('2d');
     c.fillStyle = '#ffffff';
     c.fillRect(0, 0, S, S);
     const r = rng(0x51d3a1);
     // 큰 얼룩 먼저, 그 위에 작은 얼룩. 한 크기로만 찍으면 물방울무늬가 된다.
-    for (let i = 0; i < 26; i += 1) {
+    for (let i = 0; i < 104; i += 1) {
       const rad = 6 + r() * 22;
       const g = 0.72 + r() * 0.22;
+      const bx = r() * S;
+      const by = r() * S;
+      const ry = rad * (0.5 + r() * 0.7);
+      const rot = r() * 3.14;
       c.fillStyle = 'rgba(' + Math.round(255 * g) + ',' + Math.round(246 * g) + ',' + Math.round(232 * g) + ',0.85)';
-      c.beginPath();
-      c.ellipse(r() * S, r() * S, rad, rad * (0.5 + r() * 0.7), r() * 3.14, 0, 6.283);
-      c.fill();
+      tiled(c, S, () => {
+        c.beginPath();
+        c.ellipse(bx, by, rad, ry, rot, 0, 6.283);
+        c.fill();
+      });
     }
     // 발자국. 짝을 지어 한 방향으로 간다. 흩뿌리면 자국이 아니라 먼지다.
-    for (let k = 0; k < 5; k += 1) {
+    for (let k = 0; k < 20; k += 1) {
       const x0 = r() * S;
       const y0 = r() * S;
       const dx = (r() - 0.5) * 8;
       c.fillStyle = 'rgba(150,138,118,0.55)';
-      for (let i = 0; i < 4; i += 1) {
-        c.fillRect(x0 + dx * i + (i % 2) * 5, y0 + i * 9, 4, 6);
-      }
+      tiled(c, S, () => {
+        for (let i = 0; i < 4; i += 1) {
+          c.fillRect(x0 + dx * i + (i % 2) * 5, y0 + i * 9, 4, 6);
+        }
+      });
     }
     // 잔모래. 이게 없으면 얼룩이 오려붙인 스티커로 보인다.
-    for (let i = 0; i < 900; i += 1) {
+    for (let i = 0; i < 3600; i += 1) {
       c.fillStyle = r() > 0.5 ? 'rgba(120,110,92,0.30)' : 'rgba(255,252,240,0.30)';
       c.fillRect(Math.floor(r() * S), Math.floor(r() * S), 1, 1);
     }
-    return finish(cv, [22, 22]);
+    return finish(cv, [11, 11]);
   });
 }
 
@@ -81,7 +105,7 @@ export function scuffTex() {
   return memo('scuff', () => {
     const t = dirtTex().clone();
     t.needsUpdate = true;
-    t.repeat.set(5, 5);
+    t.repeat.set(2.5, 2.5);
     t.offset.set(0.37, 0.11);
     return t;
   });
