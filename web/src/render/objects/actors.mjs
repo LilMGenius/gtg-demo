@@ -346,7 +346,10 @@ export function buildKicker() {
     hipX: 0.10, legR: 0.085,
     thighLen: 0.40, shinLen: 0.38,
     gloveSize: 0,
-    shirt: 0xc9483a, skin: 0xd8a877, shorts: 0x243043, socks: 0xe4e0d6,
+    // 카메라가 골대 뒤에 있어 크로스바가 키커의 다리를 가로로 자른다.
+    // 흰 양말은 흰 바에, 남색 반바지는 어두운 그물 띠에 먹혀 잘린 조각이 다리로 안 읽힌다.
+    // 배경 어느 띠에도 없는 색을 쓴다.
+    shirt: 0xc9483a, skin: 0xd8a877, shorts: 0xede7d8, socks: 0xf2b431,
     phase: 2.1, rest: POSES.windup
   });
   return g;

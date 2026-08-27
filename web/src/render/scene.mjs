@@ -725,15 +725,19 @@ export function createScene(canvas) {
           // 화면상 크기 = 실제 크기 / 카메라 거리. 거리비를 곱하면 뒤 잔상도 공과 같은 크기로 보인다.
           const dg = g.position.distanceTo(CAM_BASE);
           const db = Math.max(0.01, ball.position.distanceTo(CAM_BASE));
-          // 1.02는 링이 공 안에 먹혔고 1.5는 비눗방울이 됐다. 0.13씩 벌어지는 것이 속도선으로 읽힌다.
-          g.scale.setScalar((dg / db) * (1 + i * 0.13));
+          // 뒤로 갈수록 키우면 공보다 큰 노란 덩어리가 공 옆에 붙는다. 관객은 그것을 두 번째 공으로 읽는다.
+          // 만화의 속도 꼬리는 뒤로 갈수록 가늘어진다. 앞머리만 공만 하고 끝은 점이다.
+          g.scale.setScalar((dg / db) * (1 - i * 0.095));
         }
       }
       // 재질이 한 벌이라 투명도는 한 번만 정한다. 개별로 주려면 재질이 여덟 벌 필요하고 그건 예산 밖이다.
       // 0.2는 흙 위에서 사라졌다. 그렇다고 상수로 올리면 굴러오는 공에도 속도선이 붙어 늘 빠른 것으로 읽힌다.
       // 이번 프레임에 공이 간 거리로 정한다. 느리면 링이 없고 빠르면 진해진다.
       const step = trail.length > 1 ? trail[0].distanceTo(trail[1]) : 0;
-      ghostMat.opacity = Math.min(0.62, Math.max(0, (step - 0.04) * 4.2));
+      // 킥 직후에는 꼬리가 없다. 그런데도 링을 그리면 같은 자리에 여덟 장이 곹쳐
+      // 발치에 노란 덩어리가 붙는다. 꼬리가 길어진 다음에만 켜다.
+      const grown = trail.length >= GHOSTS * 2;
+      ghostMat.opacity = grown ? Math.min(0.42, Math.max(0, (step - 0.04) * 4.2)) : 0;
     } else if (ghosts[0].visible) {
       for (const g of ghosts) g.visible = false;
     }
