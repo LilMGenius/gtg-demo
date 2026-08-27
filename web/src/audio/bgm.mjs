@@ -16,7 +16,9 @@ export function mountBgm(base = '') {
   const pick = SRC.find(([type]) => el.canPlayType(type)) ?? SRC[1];
   el.src = base + pick[1];
 
-  el.volume = readVolume(KEY, 0.5);
+  let level = readVolume(KEY, 0.5);
+  let muted = false;
+  el.volume = level;
 
   // 탭 전환이나 잠깐의 끊김으로 죽지 않는다. 끄는 건 volume 0뿐이다.
   const resume = () => { if (el.paused) el.play().catch(() => {}); };
@@ -33,10 +35,16 @@ export function mountBgm(base = '') {
   for (const ev of ['pointerdown', 'keydown', 'touchstart']) document.addEventListener(ev, kick);
 
   return {
-    get volume() { return el.volume; },
+    get volume() { return level; },
     set volume(v) {
-      el.volume = Math.min(1, Math.max(0, v));
-      localStorage.setItem(KEY, String(el.volume));
+      level = Math.min(1, Math.max(0.01, v));
+      if (!muted) el.volume = level;
+      localStorage.setItem(KEY, String(level));
+    },
+    get muted() { return muted; },
+    set muted(on) {
+      muted = !!on;
+      el.volume = muted ? 0 : level;
     },
   };
 }

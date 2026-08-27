@@ -5,5 +5,9 @@ export function readVolume(key, fallback) {
   const raw = localStorage.getItem(key);
   if (raw === null || raw === '') return fallback;
   const v = Number(raw);
-  return Number.isFinite(v) && v >= 0 && v <= 1 ? v : fallback;
+  // 음소거는 음량을 0으로 쓰지 않는다. 저장된 0은 지난 구현이 남긴 잔재이며, 그대로 읽으면 영영 무음이다.
+  if (Number.isFinite(v) && v > 0 && v <= 1) return v;
+  // 읽고 버리는 것으로는 부족하다. 지우지 않으면 다음 방문에서 또 그 값을 만난다.
+  localStorage.setItem(key, String(fallback));
+  return fallback;
 }

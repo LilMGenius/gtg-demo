@@ -27,6 +27,8 @@ state.fans = Number(saved?.fans) || 0;
 window.__picks = () => state.picks;
 // 사고 연출은 확률로만 나오므로 계측기가 불러낼 수 있어야 한다. 판정은 안 바뀐다.
 window.__act = (kind) => stage.act(kind);
+// 선언값은 증거가 아니다. 게이트가 실제 파형을 재려면 발화를 불러낼 수 있어야 한다.
+window.__sfx = stage.sfx;
 // 불러오기는 판이 시작되기 전에 끝난다. 첨 판을 기다려 그리면 그 사이에 숫자가 없다.
 
 // 손가락 셋. 방향과 타이밍과 나갈지 여부.
@@ -195,23 +197,17 @@ autoBtn.onpointerdown = () => {
 };
 
 // 소리. 끌 수 없는 소리는 소리가 아니라 사고다.
-// 음량을 0으로 써버리면 다시 켜는 것이 아니라 음량을 잃는 것이다. 직전 값을 들고 있는다.
+// 음소거는 음량을 건드리지 않는다. 둘을 섞어버리면 한 번 누른 사람은 다시 켜도 무음으로 남는다.
 const MUTE_KEY = 'gtg.muted';
 const muteBtn = el('mute');
-let held = { bgm: bgm.volume, sfx: stage.sfx.volume };
-function setMuted(on, apply = true) {
-  if (on) held = { bgm: bgm.volume || held.bgm, sfx: stage.sfx.volume || held.sfx };
-  if (apply) {
-    bgm.volume = on ? 0 : held.bgm;
-    // 음량 대입은 AudioContext를 열게 한다. 켜진 상태로 시작할 때는 손 대지 않는다.
-    if (on || stage.sfx.volume === 0) stage.sfx.volume = on ? 0 : held.sfx;
-  }
+function setMuted(on) {
+  bgm.muted = on;
+  stage.sfx.muted = on;
   muteBtn.setAttribute('aria-pressed', String(on));
   muteBtn.setAttribute('aria-label', on ? '소리 켜기' : '소리 끄기');
   localStorage.setItem(MUTE_KEY, on ? '1' : '0');
 }
-const muted0 = localStorage.getItem(MUTE_KEY) === '1';
-setMuted(muted0, muted0);
+setMuted(localStorage.getItem(MUTE_KEY) === '1');
 muteBtn.onpointerdown = (e) => {
   e.stopPropagation();
   setMuted(muteBtn.getAttribute('aria-pressed') !== 'true');

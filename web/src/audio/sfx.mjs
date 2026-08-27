@@ -233,6 +233,8 @@ export function mountSfx() {
   let ctx = null;
   let master = null;
   let noise = null;
+  let muted = false;
+  let level = readVolume(KEY, 0.7);
 
   function ensure() {
     if (ctx) return ctx;
@@ -240,7 +242,7 @@ export function mountSfx() {
     if (!AC) return null;
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = readVolume(KEY, 0.7);
+    master.gain.value = muted ? 0 : level;
     master.connect(ctx.destination);
     noise = makeNoise(ctx);
     return ctx;
@@ -269,11 +271,17 @@ export function mountSfx() {
     dribble: () => fire('dribble'),
     place: () => fire('place'),
     step: (hard) => fire('step', hard),
-    get volume() { return master ? master.gain.value : readVolume(KEY, 0.7); },
+    get volume() { return level; },
     set volume(v) {
-      const x = Math.min(1, Math.max(0, v));
-      if (ensure()) master.gain.value = x;
-      localStorage.setItem(KEY, String(x));
+      level = Math.min(1, Math.max(0.01, v));
+      if (!muted && ensure()) master.gain.value = level;
+      localStorage.setItem(KEY, String(level));
+    },
+    // 음소거는 음량과 따로 산다. 음량에 0을 써버리면 다시 켜는 것이 아니라 음량을 잊는 것이다.
+    get muted() { return muted; },
+    set muted(on) {
+      muted = !!on;
+      if (master) master.gain.value = muted ? 0 : level;
     }
   };
 }
