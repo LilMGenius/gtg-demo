@@ -19,6 +19,9 @@ try {
     recordVideo: { dir: DIR, size: { width: 1280, height: 720 } }
   });
   const p = await ctx.newPage();
+  // 캡처 영상은 오디오를 담지 못한다. 발화 시각을 받아적어 나중에 깔아 넣는다.
+  // beats와 같은 시계를 써야 두 목록을 한 시간축 위에 올릴 수 있다.
+  await p.addInitScript((zero) => { window.__sfxLog = []; window.__sfxT0 = zero; }, t0);
   p.on('pageerror', (e) => console.log('ERR', String(e && e.stack || e)));
   await p.goto('http://127.0.0.1:10310/web/index.html?seed=20', { waitUntil: 'load' });
   await p.waitForTimeout(700);
@@ -102,9 +105,13 @@ try {
   mark('end');
   await wait(2500);
 
+  // 영상 시간축과 맞추려면 페이지 시계를 캡처 시작 시각 기준으로 옮겨야 한다.
+  const sfx = await p.evaluate(() => window.__sfxLog.map(([n, a, t]) => [n, a, +((t + performance.timeOrigin - window.__sfxT0) / 1000).toFixed(3)]));
   await ctx.close();
   const path = await p.video().path();
   fs.writeFileSync(DIR + '/beats.json', JSON.stringify({ video: path, beats }, null, 2));
+  fs.writeFileSync(DIR + '/sfx.json', JSON.stringify({ t0, events: sfx }, null, 2));
+  console.log('sfx', sfx.length);
   console.log('video', path);
   console.log('beats', JSON.stringify(beats));
 } finally { clearTimeout(t); if (b) await b.close(); }

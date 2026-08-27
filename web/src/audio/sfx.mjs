@@ -249,6 +249,8 @@ export function mountSfx() {
   const fire = (name, arg) => {
     const ac = ensure();
     if (!ac) return;
+    // 영상 캡처는 소리를 담지 못한다. 발화 시각을 남겨두면 같은 소리를 같은 자리에 깔아 넣을 수 있다.
+    if (window.__sfxLog) window.__sfxLog.push([name, arg ?? null, performance.now()]);
     buildSfx(name, ac, master, noise, ac.currentTime, arg);
   };
 
