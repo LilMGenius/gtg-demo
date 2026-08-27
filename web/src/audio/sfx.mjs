@@ -235,7 +235,8 @@ export function mountSfx() {
   let master = null;
   let noise = null;
   let muted = false;
-  let level = readVolume(KEY, 0.7);
+  // 0.7은 마스터에서 3dB를 그냥 버리는 값이다. 헤드룸이 아니라 노트북 스피커로 듣는다.
+  let level = readVolume(KEY, 0.9);
 
   function ensure() {
     if (ctx) return ctx;
@@ -252,6 +253,10 @@ export function mountSfx() {
   const fire = (name, arg) => {
     const ac = ensure();
     if (!ac) return;
+    // 브라우저는 신뢰하지 않는 입력으로 열린 컨텍스트를 다시 재우기도 한다.
+    // BGM은 <audio> 요소라 살아있고 효과음만 죽는다. 헤드리스에서는 재현이 안 된다.
+    // 발화 직전에 상태를 보고 깨운다. 깨우는 동안 한 발은 버리고 다음 발부터 들린다.
+    if (ac.state !== 'running') ac.resume();
     // 영상 캡처는 소리를 담지 못한다. 발화 시각을 남겨두면 같은 소리를 같은 자리에 깔아 넣을 수 있다.
     if (window.__sfxLog) window.__sfxLog.push([name, arg ?? null, performance.now()]);
     buildSfx(name, ac, master, noise, ac.currentTime, arg);
