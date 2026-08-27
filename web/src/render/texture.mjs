@@ -217,12 +217,15 @@ export function chippedTex() {
 // 한 장을 열네 동에 돌려 쓰니 도시가 아니라 같은 스티커를 열네 번 붙인 것으로 읽혔다.
 // 변종은 씨앗만 바꾸는 게 아니다. 층 간격과 밀도가 같으면 씨앗이 달라도 같은 리듬이 남는다.
 // 흰 바탕에 어두운 칸. 재질 색과 곱해지므로 벽색은 살고 창만 파인다.
+// 동네를 두르는 건물은 한 종류가 아니다. 난간 달린 아파트, 창만 박힌 빌라, 차양 친 상가가 섞인다.
+// 모두 같은 규칙으로 창을 찍으면 간격만 다른 벽지 열네 장이다. 구조 자체를 갈라야 한다.
+// balcony: 층마다 가로로 지나가는 난간. 이것 하나가 상자를 아파트로 바꿔놓는다.
 const WIN_KIND = [
-  { seed: 0x39f0c2, stepY: 15, stepX: 17, skip: 0.26 },
-  { seed: 0x7ac41d, stepY: 13, stepX: 20, skip: 0.34 },
-  { seed: 0x1de935, stepY: 18, stepX: 15, skip: 0.20 },
-  { seed: 0xc25a70, stepY: 14, stepX: 22, skip: 0.38 },
-  { seed: 0x40b8e1, stepY: 17, stepX: 16, skip: 0.29 }
+  { seed: 0x39f0c2, stepY: 15, stepX: 17, skip: 0.26, balcony: 0.62, wide: 1.9 },
+  { seed: 0x7ac41d, stepY: 13, stepX: 20, skip: 0.34, balcony: 0, wide: 1.0 },
+  { seed: 0x1de935, stepY: 18, stepX: 15, skip: 0.20, balcony: 0.55, wide: 1.5 },
+  { seed: 0xc25a70, stepY: 14, stepX: 22, skip: 0.38, balcony: 0, wide: 1.0 },
+  { seed: 0x40b8e1, stepY: 17, stepX: 16, skip: 0.29, balcony: 0.70, wide: 2.2 }
 ];
 
 export function windowTex(variant = 0) {
@@ -236,17 +239,25 @@ export function windowTex(variant = 0) {
     const r = rng(k.seed);
     // 창을 잘게 찍으면 저해상도로 줄어드는 화면에서 한 픽셀도 안 남는다.
     // 크게 찍고 대신 몇 칸을 비운다. 창이 한 칸도 안 빠지면 격자무늬 벽지다.
+    // 칸마다 따로 흔들면 창이 줄을 잃고 벽에 뚝뚝 흔어진 얼룩이 된다.
+    // 사람은 가로줄을 층으로 읽는다. 흔들림은 층 단위로만 준다.
+    const wW = Math.min(Math.round(5 * k.wide), k.stepX - 5);
     for (let y = 5; y < S - 6; y += k.stepY) {
+      const oy = Math.round((r() - 0.5) * 3);
+      const ox = Math.round((r() - 0.5) * 4);
       for (let x = 5; x < S - 6; x += k.stepX) {
         if (r() < k.skip) continue;
-        // 자로 잰 격자는 창문이 아니라 엑셀 시트다. 층마다 한두 칸씩 어긋나게 찍는다.
-        const ox = Math.round((r() - 0.5) * 4);
-        const oy = Math.round((r() - 0.5) * 3);
         // 낮의 창은 밝기만 다르다. 전부 같은 농도로 파면 구멍 뚫린 판때기가 된다.
         // 커튼 친 집이 몇 있어야 사람이 사는 건물로 읽힌다.
         const v = r();
         c.fillStyle = v > 0.82 ? '#b9c2c8' : (v > 0.45 ? '#4d5d69' : '#3a4954');
-        c.fillRect(x + ox, y + oy, 5 + Math.round(r() * 2), 6 + Math.round(r() * 2));
+        c.fillRect(x + ox, y + oy, wW, 6);
+      }
+      // 난간. 창 아래를 가로지르는 선 하나다.
+      // 이 선이 있으면 층이 세어지고, 없으면 창이 벌판에 띄운 점으로 남는다.
+      if (k.balcony) {
+        c.fillStyle = 'rgba(70,76,84,' + k.balcony + ')';
+        c.fillRect(3, y + oy + 8, S - 6, 2);
       }
     }
     // 배율은 여기서 정하지 않는다. 박스 UV는 면마다 0~1이라 같은 배율을 주면
