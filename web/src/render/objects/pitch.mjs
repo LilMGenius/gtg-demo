@@ -4,6 +4,7 @@ import { flat, flatMap, R_HALF_W, R_H } from '../units.mjs';
 import { dirtTex, scuffTex, clothTex, chippedTex, windowTex, windowTexFor } from '../texture.mjs';
 import { loadDecor } from '../decor.mjs';
 import { jitterMesh, seeded, addOutline } from '../handmade.mjs';
+import { addFace } from './actors.mjs';
 
 // 사각 그물 한 장. wireframe 평면은 삼각형 대각선이 남아 그물이 아니라 격자무늬로 읽힌다.
 // 팽팽한 격자는 그물이 아니라 방충망이다. 가운데를 배가 부르게 늘어뜨려야 천으로 읽힌다.
@@ -267,6 +268,18 @@ export function buildPassers(scene) {
       const spark = new THREE.Mesh(new THREE.OctahedronGeometry(0.11, 0), new THREE.MeshBasicMaterial({ color: 0xffe98a }));
       spark.position.y = 1.72 * tall;
       g.userData.spark = spark;
+      // 이 행인은 한눈팔기 연출에서 골대 앞까지 걸어온다. 화면 한복판에 서는데
+      // 얼굴이 없으면 키퍼만 눈이 있고 옆에는 달걀이 서 있다. 하트가 떠도 왜 한눈파는지가 픽셀에 없다.
+      // 다른 넷은 펜스 너머에만 있으므로 얼굴을 안 준다. 드로우콜은 이 하나만 늘린다.
+      addFace(head, 0.15, 1, 0xe0b48c);
+      // 눈만으로는 행인 넷과 안 갈린다. 볼 두 점이 멀리서도 이 하나를 다르게 만든다.
+      const blushMat = new THREE.MeshBasicMaterial({ color: 0xff8fa3 });
+      for (const s of [-1, 1]) {
+        const bl = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 5), blushMat);
+        bl.position.set(s * 0.088, -0.022, 0.126);
+        bl.scale.set(1.1, 0.7, 0.4);
+        head.add(bl);
+      }
       parts.push(hair, skirt, spark);
     } else if (i % 2 === 1) {
       // 학생. 등에 가방 한 덩어리. 실루엓이 뒤로 불룩해져 머리 없이도 구분된다.

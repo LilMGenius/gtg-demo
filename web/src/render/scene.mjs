@@ -623,7 +623,10 @@ export function createScene(canvas) {
             // 1.2만큼 떨어뜨렸더니 두 캡슐이 화면에서 한 덩어리로 붙었다. 사람이 둘이라는 것부터 안 읽혔다.
             // 한 걸음 더 벌리고, 서로 마주 보게 돌린다. 등을 돌린 채 하트만 뜨면 누구에게 반한 것인지 모른다.
             passers[0].position.set(lerp(-11.5, -0.5, walk), 0, lerp(18, 4.9, walk));
-            passers[0].rotation.y = lerp(0, -1.5, walk);
+            // 카메라는 골대 뒤에서 +z를 본다. 이 각도가 음수면 행인은 렌즈에 등을 진다.
+            // 얼굴을 붙여놓고도 화면에는 뒤통수만 남았다. 걸어오는 방향(2.44)에서
+            // 키퍼 쪽(3.02)으로 틀어야 눈과 볼이 렌즈에 들어온다.
+            passers[0].rotation.y = lerp(2.44, 3.02, walk);
             passers[0].rotation.z = Math.sin(e * 9) * 0.18;
           }
           keeper.rotation.y = lerp(0, -0.9, walk);
