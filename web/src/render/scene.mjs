@@ -709,7 +709,13 @@ export function createScene(canvas) {
         continue;
       }
       p.position.x += p.userData.speed * 0.016;
-      if (p.position.x > 26) p.position.x = -26;
+      // 되돌리는 자리가 화면 안이면 순간이동이 그대로 보인다.
+      // 행인이 서는 z에서 화면 반폭은 27.7m다. 26은 그 안이었다.
+      if (p.position.x > 34) {
+        p.position.x = -34;
+        // 같은 줄로 돌아오면 다섯이 영원히 같은 순서로 지나간다.
+        p.position.z = p.userData.homeZ + (p.userData.phase % 1) * 3.2 - 1.6;
+      }
       p.rotation.z = Math.sin(performance.now() * 0.006 * p.userData.speed + p.userData.phase) * 0.06;
     }
     keeperShadow.scale.setScalar(1 + Math.abs(Math.sin(keeper.rotation.z)) * 0.8);
