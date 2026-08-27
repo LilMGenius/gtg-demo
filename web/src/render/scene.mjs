@@ -292,12 +292,25 @@ export function createScene(canvas) {
   // 흰 플래시 한 장 다음 색이 빠진다. 캔버스 필터로 걸면 GPU 한 패스가 더 붙고 프로그램 수가 는다.
   // DOM 한 겹이 더 싸고, 프레이밍 측정에도 손을 안 댄다.
   const flashEl = document.getElementById('flash');
-  function flash() {
-    if (!flashEl) return;
-    flashEl.classList.remove('hit');
-    // 리플로우를 한 번 강제하지 않으면 연속 실점에서 두 번째가 안 보인다.
-    void flashEl.offsetWidth;
-    flashEl.classList.add('hit');
+  const stampEl = document.getElementById('stamp');
+  // 흰 장은 0.42초 만에 끝난다. 그 뒤 화면에는 골이 들어갔다는 표시가 하나도 남지 않았다.
+  // 자막은 크로스바 위에 작게 뜨고 아무도 안 읽는다. 가운데에 크게 한 번 찍는다.
+  const STAMP = {
+    carriedIn: '같이 들어감', gloveGone: '장갑째 골', downed: '깔려서 골',
+    openGoalScored: '빈 골대', talked: '떠들다 골', distracted: '한눈팔다 골'
+  };
+  function flash(kind) {
+    if (flashEl) {
+      flashEl.classList.remove('hit');
+      // 리플로우를 한 번 강제하지 않으면 연속 실점에서 두 번째가 안 보인다.
+      void flashEl.offsetWidth;
+      flashEl.classList.add('hit');
+    }
+    if (!stampEl) return;
+    stampEl.textContent = STAMP[kind] || '먹혔다';
+    stampEl.classList.remove('hit');
+    void stampEl.offsetWidth;
+    stampEl.classList.add('hit');
   }
   function act(kind) {
     if (kind === 'gloveGone') {
@@ -335,7 +348,7 @@ export function createScene(canvas) {
     const s = SHK[kind];
     if (s) shake(s[0], s[1]);
     // 실점은 화면이 한 번 하얗게 튄 다음 색이 빠진다. 결과를 글자로만 알리면 글자를 안 읽는다.
-    if (CONCEDE.has(kind)) flash();
+    if (CONCEDE.has(kind)) flash(kind);
   }
   function play(shot, input, result, onEnd) {
     tail = null;
@@ -742,6 +755,7 @@ export function createScene(canvas) {
     }
     for (const b of keeper.userData.bareHands) b.visible = false;
     for (const h of hearts) h.visible = false;
+    if (stampEl) stampEl.classList.remove('hit');
     for (const p of passers) p.rotation.z = 0;
     keeper.userData.gloves.forEach((g, i) => { g.position.copy(keeper.userData.gloveHome[i]); g.rotation.set(0, 0, 0); });
     const head = keeper.userData.head;

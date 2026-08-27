@@ -47,6 +47,20 @@ body.playing #hud{opacity:1}
 #flash.hit{animation:flashHit .42s ease-out}
 @keyframes flashHit{0%{opacity:.92}16%{opacity:.34}100%{opacity:0}}
 
+/* 실점 도장. 흰 장은 0.42초에 끝나 스크린샷에도 눈에도 안 남았다.
+   골이 들어간 것은 한 박자 뒤까지 화면에 찍혀 있어야 읽힌다. */
+#stamp{position:fixed;left:50%;top:30%;translate:-50% -50%;pointer-events:none;opacity:0;
+  font-family:var(--disp);font-weight:400;font-size:clamp(28px,4.6vw,54px);color:#ff4d3d;
+  -webkit-text-stroke:clamp(4px,.6vw,8px) var(--edge);paint-order:stroke fill;
+  text-shadow:5px 6px 0 var(--edge);letter-spacing:.04em;white-space:nowrap}
+#stamp.hit{animation:stampHit 1.15s ease-out}
+@keyframes stampHit{
+  0%{opacity:0;rotate:-13deg;scale:2.4}
+  9%{opacity:1;rotate:-7deg;scale:.92}
+  16%{rotate:-9deg;scale:1.04}
+  74%{opacity:1;rotate:-9deg;scale:1.04}
+  100%{opacity:0;rotate:-9deg;scale:1.1}}
+
 /* 자막은 크로스바 위 하늘에 산다. 공과 같은 높이에 두면 판정을 글자가 덮는다. */
 #caption{position:absolute;left:50%;transform:translateX(-50%);
   top:calc(58px + env(safe-area-inset-top));
