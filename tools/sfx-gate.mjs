@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 // 셋 다 예상대로 나와야 이 계측기가 무엇을 보고 있다고 말할 수 있다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const URL = "http://127.0.0.1:10310/web/index.html";
-const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 85000);
+const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();
 
 const fails = [];
@@ -131,6 +131,84 @@ try {
   // 세기가 안 들리면 약한 슛과 강슛이 같은 소리다.
   check("kick:power-changes-what-you-hear", r.kickHard >= r.kickSoft * 1.4,
     r.kickSoft + " -> " + r.kickHard);
+
+
+  // 살아 있는 소리. 위의 검사는 OfflineAudioContext라 마스터 게인을 지나지 않는다.
+  // 음소거가 음량에 0을 써서 영영 무음이 되던 버그는 그 창 밖에서 일어났다.
+  const live = await b.newContext();
+  await live.addInitScript(() => {
+    const AC = window.AudioContext;
+    const gain0 = AC.prototype.createGain;
+    AC.prototype.createGain = function () {
+      const node = gain0.call(this);
+      const self = this;
+      if (!self.__tap) {
+        const a = self.createAnalyser();
+        a.fftSize = 2048;
+        self.__tap = a;
+        const buf = new Float32Array(a.fftSize);
+        window.__peakMax = 0;
+        window.__peakReset = () => { window.__peakMax = 0; };
+        const tick = () => {
+          a.getFloatTimeDomainData(buf);
+          for (let i = 0; i < buf.length; i += 1) {
+            const v = Math.abs(buf[i]);
+            if (v > window.__peakMax) window.__peakMax = v;
+          }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+      const conn = node.connect.bind(node);
+      node.connect = (dst, ...rest) => {
+        const out = conn(dst, ...rest);
+        if (dst === self.destination) conn(self.__tap);
+        return out;
+      };
+      return node;
+    };
+  });
+  const lp = await live.newPage();
+  lp.on("pageerror", (e) => errs.push(String(e)));
+  await lp.goto(URL, { waitUntil: "load" });
+  // 음소거를 한 번 눌렀던 브라우저의 저장 상태를 그대로 만든다.
+  await lp.evaluate(() => { localStorage.clear(); localStorage.setItem("gtg.sfx.volume", "0"); });
+  await lp.reload({ waitUntil: "load" });
+  await lp.waitForTimeout(600);
+  const tap = (sel) => lp.evaluate((s) => {
+    const g = document.querySelector(s);
+    const r = g.getBoundingClientRect();
+    const o = { bubbles: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
+    g.dispatchEvent(new PointerEvent("pointerdown", o));
+    g.dispatchEvent(new MouseEvent("click", o));
+  }, sel);
+  const firePeak = () => lp.evaluate(async () => {
+    window.__peakReset();
+    window.__sfx.kick(1);
+    await new Promise((r) => setTimeout(r, 450));
+    return Number(window.__peakMax.toFixed(4));
+  });
+  await tap("#go");
+  await lp.waitForTimeout(900);
+  const legacyZero = await firePeak();
+  await tap("#mute");
+  await lp.waitForTimeout(250);
+  const whileMuted = await firePeak();
+  await tap("#mute");
+  await lp.waitForTimeout(250);
+  const afterUnmute = await firePeak();
+  const stored = await lp.evaluate(() => localStorage.getItem("gtg.sfx.volume"));
+  await lp.reload({ waitUntil: "load" });
+  await lp.waitForTimeout(600);
+  await tap("#go");
+  await lp.waitForTimeout(900);
+  const afterReload = await firePeak();
+
+  check("control:mute-silences-the-live-master", whileMuted < 0.005, String(whileMuted));
+  check("live:a-stored-zero-volume-still-makes-sound", legacyZero > 0.02, String(legacyZero));
+  check("live:unmute-gives-back-what-mute-took", afterUnmute > 0.02, String(afterUnmute));
+  check("live:mute-is-not-stored-as-zero-volume", stored !== "0" && Number(stored) > 0, String(stored));
+  check("live:sound-survives-a-reload-after-a-mute-toggle", afterReload > 0.02, String(afterReload));
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
 
