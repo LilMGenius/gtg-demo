@@ -153,10 +153,13 @@ export function windowTex() {
     for (let y = 5; y < S - 6; y += 13) {
       for (let x = 5; x < S - 6; x += 14) {
         if (r() > 0.2) continue;
+        // 자로 잰 격자는 창문이 아니라 엑셀 시트다. 층마다 한두 칸씩 어긋나게 찍는다.
+        const ox = Math.round((r() - 0.5) * 4);
+        const oy = Math.round((r() - 0.5) * 3);
         // 색을 섞으니 창문이 아니라 만국기가 됐다. 색수차가 작은 사각형을 세 색으로 갈라놓기 때문이다.
         // 저녁 불빛은 한 가지 색이다. 밝기만 흔든다.
         c.fillStyle = r() > 0.5 ? '#e8b45c' : '#c4903f';
-        c.fillRect(x, y, 6, 7);
+        c.fillRect(x + ox, y + oy, 5 + Math.round(r() * 2), 6 + Math.round(r() * 2));
       }
     }
     // 배율 1은 64칸 창문이 30미터 건물에 늘어나 창이 아니라 벽지 무늬가 됐다.

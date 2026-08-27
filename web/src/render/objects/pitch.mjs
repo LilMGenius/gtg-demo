@@ -15,8 +15,15 @@ export function meshPanel(w, h, cell, color, opacity, sag = 0) {
   // 늘어짐은 가장자리 0, 중앙 최대. 사인 곱이 그 모양이다.
   const drop = (u, vv) => -sag * Math.sin(Math.PI * u) * Math.sin(Math.PI * vv);
   const seg = sag > 0 ? 6 : 1;
+  // 한 칸도 어긋나지 않는 격자는 손으로 엮은 그물이 아니라 공장 방충망이다.
+  // 실마다 매듭 위치가 조금씩 다르다. 0.4칸을 넘기면 실끼리 붙어 구멍이 사라진다.
+  const rnd = seeded(0x2b7f41 + Math.round(w * 13) + Math.round(h * 7));
+  const jx = [];
+  for (let i = 0; i <= nx; i += 1) jx.push((rnd() - 0.5) * cell * 0.3);
+  const jy = [];
+  for (let j = 0; j <= ny; j += 1) jy.push((rnd() - 0.5) * cell * 0.3);
   for (let i = 0; i <= nx; i += 1) {
-    const x = -w / 2 + (w * i) / nx;
+    const x = -w / 2 + (w * i) / nx + (i === 0 || i === nx ? 0 : jx[i]);
     const u = i / nx;
     for (let k = 0; k < seg; k += 1) {
       const y0 = -h / 2 + (h * k) / seg;
@@ -25,7 +32,7 @@ export function meshPanel(w, h, cell, color, opacity, sag = 0) {
     }
   }
   for (let j = 0; j <= ny; j += 1) {
-    const y = -h / 2 + (h * j) / ny;
+    const y = -h / 2 + (h * j) / ny + (j === 0 || j === ny ? 0 : jy[j]);
     const vv = j / ny;
     for (let k = 0; k < seg; k += 1) {
       const x0 = -w / 2 + (w * k) / seg;
@@ -75,8 +82,14 @@ export function buildPitch(scene) {
   const lineMat = new THREE.MeshBasicMaterial({ color: 0xf2f0e4, transparent: true, opacity: 0.7 });
   const marks = new THREE.Group();
   marks.name = 'markings';
+  // 일곱 줄이 같은 흰색으로 같은 굵기면 인쇄물이다. 석회는 줄마다 다르게 닳는다.
+  // 자리와 방향은 건드리지 않는다. 선이 움직이면 거리를 못 읽는다. 진하기와 굵기만 흔든다.
+  const lrnd = seeded(0x4d21a9);
   const stripe = (w, d, x, z) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), lineMat);
+    const thin = 1 + (lrnd() - 0.5) * 0.5;
+    const mat = lineMat.clone();
+    mat.opacity = 0.52 + lrnd() * 0.26;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w < d ? w * thin : w, d < w ? d * thin : d), mat);
     m.rotation.x = -Math.PI / 2;
     m.position.set(x, 0.02, z);
     m.userData.probeIgnore = true;
