@@ -772,7 +772,7 @@ export function createScene(canvas) {
       // 0.2는 흙 위에서 사라졌다. 그렇다고 상수로 올리면 굴러오는 공에도 속도선이 붙어 늘 빠른 것으로 읽힌다.
       // 이번 프레임에 공이 간 거리로 정한다. 느리면 링이 없고 빠르면 진해진다.
       const step = trail.length > 1 ? trail[0].distanceTo(trail[1]) : 0;
-      // 킥 직후에는 꼬리가 없다. 그런데도 링을 그리면 같은 자리에 여덟 장이 곹쳐
+      // 킥 직후에는 꼬리가 없다. 그런데도 링을 그리면 같은 자리에 여덟 장이 겹쳐
       // 발치에 노란 덩어리가 붙는다. 꼬리가 길어진 다음에만 켜다.
       const grown = trail.length >= GHOSTS * 2;
       ghostMat.opacity = grown ? Math.min(0.42, Math.max(0, (step - 0.04) * 4.2)) : 0;

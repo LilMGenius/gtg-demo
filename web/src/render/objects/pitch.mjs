@@ -296,7 +296,7 @@ export function buildPassers(scene) {
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), flat(0xe0b48c));
     head.position.y = 1.36 * tall;
     const parts = [body, legs, head];
-    // 실루엓 세 종. 색만 다른 다섯은 멀리서 한 사람이 다섯 번 지나가는 것으로 읽힐다.
+    // 실루엣 세 종. 색만 다른 다섯은 멀리서 한 사람이 다섯 번 지나가는 것으로 읽힌다.
     // 머리 윗마리만 바꿔도 멀리서 구분된다. 몸통 비율을 건드리면 모두 땅만해진다.
     if (i === 0) {
       // 긴 머리 한 덩이. 이 하나로 멀리서도 다른 사람으로 읽힌다.
@@ -332,7 +332,7 @@ export function buildPassers(scene) {
       }
       parts.push(hair, skirt, spark);
     } else if (i % 2 === 1) {
-      // 학생. 등에 가방 한 덩어리. 실루엓이 뒤로 불룩해져 머리 없이도 구분된다.
+      // 학생. 등에 가방 한 덩어리. 실루엣이 뒤로 불룩해져 머리 없이도 구분된다.
       const bag = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.2), flat(0x2f4f43));
       bag.position.set(0, 0.92 * tall, -0.24);
       parts.push(bag);

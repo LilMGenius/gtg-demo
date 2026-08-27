@@ -27,7 +27,7 @@ export const KICKERS = [
   { name: '비아냥',      role: '공격수',   finishing: 9,  power: 6,  composure: 8, curve: 5,  flair: 5,  fame: 7,  height: 175, weight: 69 },
   { name: '레이울',    role: '공격수',   finishing: 9,  power: 6,  composure: 8, curve: 5,  flair: 6,  fame: 8,  height: 180, weight: 73 },
   { name: '셰이더첸코',    role: '공격수',   finishing: 9,  power: 9,  composure: 7, curve: 5,  flair: 6,  fame: 8,  height: 183, weight: 79 },
-  { name: '뎉피에로',    role: '공격수',   finishing: 8,  power: 7,  composure: 8, curve: 9,  flair: 8,  fame: 8,  height: 170, weight: 73 },
+  { name: '델삐에로',    role: '공격수',   finishing: 8,  power: 7,  composure: 8, curve: 9,  flair: 8,  fame: 8,  height: 170, weight: 73 },
   { name: '토띠',        role: '공격수',   finishing: 8,  power: 8,  composure: 7, curve: 8,  flair: 8,  fame: 8,  height: 180, weight: 78 },
   { name: '인정기',      role: '공격수',   finishing: 9,  power: 5,  composure: 7, curve: 3,  flair: 4,  fame: 7,  height: 182, weight: 74 },
   { name: '에또오',        role: '공격수',   finishing: 9,  power: 7,  composure: 6, curve: 4,  flair: 6,  fame: 8,  height: 180, weight: 75 },

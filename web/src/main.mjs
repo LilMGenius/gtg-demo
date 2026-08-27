@@ -128,7 +128,7 @@ function rollCaptions(result) {
   step();
 }
 
-// 공을 다시 세우는 시간. 스로잉과 골킱이 이 초를 줄이고, 줄어드는 것이 화면에 보여야 선택이 선택이 된다.
+// 공을 다시 세우는 시간. 스로잉과 골킥이 이 초를 줄이고, 줄어드는 것이 화면에 보여야 선택이 선택이 된다.
 function countdown(sec, label, then) {
   const until = performance.now() + sec * 1000;
   const tick = () => {
