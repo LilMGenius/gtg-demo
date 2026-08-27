@@ -52,7 +52,11 @@ export function createScene(canvas) {
       'void main(){',
       // 색채널을 한 텍셀씩 어긋내 뽑는다. 싼 렌즈는 가장자리에서 색이 갈린다.
       // 화면 전체에 균일하게 주면 인쇄 불량으로 보인다. 중심에서 멀수록 커져야 렌즈로 읽힌다.
-      '  vec2 off = (vUv - 0.5) * texel * 0.7;',
+      // 중심거리에 선형으로 주면 화면 중간의 그물 한 가닥마다 빨강과 청록이 갈라져
+      // 렌즈가 아니라 안 고친 z-fighting으로 읽혔다. 세제곱이면 중앙 넓은 자리가 거의 0이 되고
+      // 네 귀퉁이에서만 색이 벌어진다.
+      '  vec2 d0 = vUv - 0.5;',
+      '  vec2 off = d0 * dot(d0, d0) * texel * 2.6;',
       '  vec3 c;',
       '  c.r = texture2D(tDiffuse, vUv + off).r;',
       '  c.g = texture2D(tDiffuse, vUv).g;',
@@ -65,8 +69,7 @@ export function createScene(canvas) {
       // 주사선. 한 줄 걸러 살짝 어둡게. 0.02는 안 보였고 0.11은 낮 경기가 밤이 됐다.
       '  c *= 1.0 - step(0.5, fract(gl_FragCoord.y * 0.5)) * 0.055;',
       // 비네트. 가장자리만 살짝. 0.5는 경기장 절반이 그늘로 들어갔다.
-      '  vec2 d = vUv - 0.5;',
-      '  c *= 1.0 - dot(d, d) * 0.22;',
+      '  c *= 1.0 - dot(d0, d0) * 0.22;',
       '  gl_FragColor = vec4(c, 1.0);',
       '}'
     ].join(String.fromCharCode(10)),
