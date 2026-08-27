@@ -509,7 +509,16 @@ export function createScene(canvas) {
         talked: POSES.swoon, distracted: POSES.swoon, openGoalScored: POSES.faceplant
       };
       kp = TAIL_POSE[tail.kind] ?? kp;
-      if (tail.kind === 'beat' || tail.kind === 'lost') kk = POSES.dribble;
+      // 키퍼만 사건마다 다르게 망가지고 키커는 매번 같은 준비 자세로 돌아갔다.
+      // 정지 프레임 넷을 나란히 놓으면 키커가 복사 붙여넣기로 읽힌다. 결과를 키커도 안다.
+      const KICKER_TAIL = {
+        catch: POSES.despair, save: POSES.despair, skied: POSES.despair,
+        rebound: POSES.despair, lost: POSES.dribble, beat: POSES.dribble,
+        carriedIn: POSES.cheer, gloveGone: POSES.cheer, spill: POSES.cheer,
+        downed: POSES.cheer, reboundMiss: POSES.cheer,
+        talked: POSES.cheer, distracted: POSES.cheer, openGoalScored: POSES.cheer
+      };
+      kk = KICKER_TAIL[tail.kind] ?? kk;
       switch (tail.kind) {
         case 'catch':
         case 'save':
@@ -671,7 +680,7 @@ export function createScene(canvas) {
     // 잡히는 속도는 사건마다 다르다. 자빠짐은 빠르고 회복은 느리다.
     drive('keeper', kp, kp === POSES.faceplant ? 0.22 : (kp === POSES.dribble ? 0.26 : 0.12));
     // 예비는 느리게 잡혀야 버틴 것으로 보이고, 임팩트는 한 프레임에 가까워야 터진 것으로 보인다.
-    drive('kicker', kk, kk === POSES.strike ? 0.62 : (kk === POSES.follow ? 0.24 : (kk === POSES.plant ? 0.16 : 0.10)));
+    drive('kicker', kk, kk === POSES.strike ? 0.62 : (kk === POSES.follow ? 0.24 : (kk === POSES.plant ? 0.16 : (kk === POSES.cheer ? 0.30 : 0.10))));
     // 닿는 순간에만 몸이 부풀어야 힘이 들어간 것으로 읽힌다. 길게 주면 몸집이 변한 것으로 보인다.
     kickPop = Math.max(0, kickPop - dt);
     const kpop = 1 + (kickPop > 0 ? Math.sin((kickPop / 0.07) * Math.PI) * 0.15 : 0);
