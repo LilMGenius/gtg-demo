@@ -31,9 +31,9 @@ body.playing #hud{opacity:1}
   transform:rotate(var(--tilt))}
 #lv{font-family:var(--disp);font-weight:400;font-size:18px;letter-spacing:.02em;
   color:#ffd83d}
-#form{font-size:12px;font-weight:800;opacity:.72;letter-spacing:.02em}
-#fans{font-size:12px;font-weight:800;opacity:.82;letter-spacing:.02em}
-#fans b{font-weight:900;font-style:normal}
+/* 레벨 옆 두 항목은 같은 등급의 정보다. 굵기와 투명도가 갈리면 하나가 더 중요해 보인다. */
+#form,#fans{font-size:12px;font-weight:800;opacity:.78;letter-spacing:.02em}
+#fans b{font-weight:800;font-style:normal}
 #pips{display:flex;gap:6px}
 #pips i{width:9px;height:9px;background:#ffffff26;display:block;border:2px solid var(--edge);
   transition:background .18s}
