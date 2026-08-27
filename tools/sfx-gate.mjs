@@ -95,7 +95,9 @@ try {
   });
 
   // 대조군 먼저. 계측기가 갈라내지 못하면 아래 판정은 전부 무의미하다.
-  check("control:integer-stack-reads-as-a-bell", r.bellHarmonicity <= 0.01, String(r.bellHarmonicity));
+  // FFT 빈 해상도 때문에 완벽한 정수배도 0이 아니라 0.013으로 읽힌다.
+  // 관은 어떤 세 모드를 집어도 0.08 아래로 내려오지 않는다. 그 사이에 선을 긋는다.
+  check("control:integer-stack-reads-as-a-bell", r.bellHarmonicity <= 0.03, String(r.bellHarmonicity));
   check("control:one-layer-step-reads-as-a-hammer", r.hammerContacts === 1, String(r.hammerContacts));
   check("control:square-wave-has-no-contact-transient", r.beepAttackHi < 0.12, String(r.beepAttackHi));
 

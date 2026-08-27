@@ -123,18 +123,19 @@ export function topPeaks(d, fromMs, lenMs, k) {
   return picked.map((x) => x.f).sort((a, x) => a - x);
 }
 
-// 상위 모드가 최저 모드의 정수배에 얼마나 가까운지. 0에 가까우면 종이다.
-// 알루미늄 관은 1 : 2.76 : 5.40 근처라 어느 정수와도 멀다.
+// 종은 모든 모드가 정수배다. 하나만 정수배에 가까워도 종이라고 부르면 관을 종으로 잎는다.
+// 알루미늄 관은 1 : 2.76 : 5.40 : 8.93이고, 마지막은 9에 거의 붙는다.
+// 그래서 가장 먼 모드로 재는다. 종은 가장 먼 것도 0이고, 관은 어떤 세 모드를 집어도 멀다.
 export function harmonicity(peaks) {
   if (peaks.length < 2) return 1;
   const f0 = peaks[0];
-  let worst = 1;
+  let far = 0;
   for (let i = 1; i < peaks.length; i += 1) {
     const r = peaks[i] / f0;
     const d = Math.abs(r - Math.round(r)) / Math.max(1, Math.round(r));
-    worst = Math.min(worst, d);
+    far = Math.max(far, d);
   }
-  return worst;
+  return far;
 }
 
 export function measure(d) {
