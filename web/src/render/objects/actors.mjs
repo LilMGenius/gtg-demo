@@ -231,6 +231,7 @@ function buildBody(o) {
   const arms = [];
   const gloves = [];
   const gloveParent = [];
+  const bareHands = [];
   for (const side of [-1, 1]) {
     const k = side < 0 ? 'L' : 'R';
     const sh = joint(spine, side * o.shoulderX, o.torsoLen * 0.92, 0);
@@ -252,6 +253,16 @@ function buildBody(o) {
       el.add(gv);
       gloves.push(gv);
       gloveParent.push(el);
+      // 장갑이 벗겨지면 그 손은 빈팔이 된다. 맨손을 미리 깔아두고 숨겨둔다.
+      // 장갑만 날리면 팔가 끝에서 잘린 것으로 보인다.
+      const bh = new THREE.Mesh(new THREE.SphereGeometry(o.gloveSize * 0.42, 8, 6), flat(o.skin));
+      bh.name = tag;
+      jitterMesh(bh, 0.02, side < 0 ? 33 : 34);
+      addOutline(bh, 0.028);
+      bh.position.set(0, -o.foreLen - o.gloveSize * 0.16, 0);
+      bh.visible = false;
+      el.add(bh);
+      bareHands.push(bh);
     }
     const hp = joint(hip, side * o.hipX, 0, 0);
     const thigh = seg(o.legR, o.thighLen, o.shorts, tag, side < 0 ? 41 : 42);
@@ -274,6 +285,7 @@ function buildBody(o) {
     g.userData.gloves = gloves;
     g.userData.gloveHome = gloves.map((m) => m.position.clone());
     g.userData.gloveParent = gloveParent;
+    g.userData.bareHands = bareHands;
   }
   return g;
 }

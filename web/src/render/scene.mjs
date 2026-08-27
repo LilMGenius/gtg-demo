@@ -262,9 +262,11 @@ export function createScene(canvas) {
   }
   function act(kind) {
     if (kind === 'gloveGone') {
-      const gl = keeper.userData.gloves[keeper.position.x > 0 ? 1 : 0];
+      const gi = keeper.position.x > 0 ? 1 : 0;
+      const gl = keeper.userData.gloves[gi];
       scene.attach(gl);
       loose = gl;
+      keeper.userData.bareHands[gi].visible = true;
     }
     tail = { kind, t0: vnow, from: ball.position.clone(), kx: keeper.position.x };
     // 사건이 난 뒤에는 연출이 행인을 몰고 간다. 걸어오던 보간을 끄지 않으면 둘이 서로 당긴다.
@@ -681,6 +683,7 @@ export function createScene(canvas) {
       keeper.userData.gloveParent[gi].add(loose);
       loose = null;
     }
+    for (const b of keeper.userData.bareHands) b.visible = false;
     for (const p of passers) p.rotation.z = 0;
     keeper.userData.gloves.forEach((g, i) => { g.position.copy(keeper.userData.gloveHome[i]); g.rotation.set(0, 0, 0); });
     const head = keeper.userData.head;
