@@ -600,9 +600,13 @@ export function createScene(canvas) {
           keeper.rotation.z = Math.sin(e * 12) * 0.09;
           showHearts(true, keeper.userData.head.getWorldPosition(new THREE.Vector3()), e);
           if (passers[0]) {
-            passers[0].position.set(lerp(-11.5, -3.6, walk), 0, lerp(18, 4.6, walk));
+            // 1.2만큼 떨어뜨렸더니 두 캡슐이 화면에서 한 덩어리로 붙었다. 사람이 둘이라는 것부터 안 읽혔다.
+            // 한 걸음 더 벌리고, 서로 마주 보게 돌린다. 등을 돌린 채 하트만 뜨면 누구에게 반한 것인지 모른다.
+            passers[0].position.set(lerp(-11.5, -0.5, walk), 0, lerp(18, 4.9, walk));
+            passers[0].rotation.y = lerp(0, -1.5, walk);
             passers[0].rotation.z = Math.sin(e * 9) * 0.18;
           }
+          keeper.rotation.y = lerp(0, -0.9, walk);
           ball.position.set(lerp(tail.from.x, 0, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
           break;
         }
@@ -771,13 +775,14 @@ export function createScene(canvas) {
     for (const b of keeper.userData.bareHands) b.visible = false;
     for (const h of hearts) h.visible = false;
     if (stampEl) stampEl.classList.remove('hit');
-    for (const p of passers) p.rotation.z = 0;
+    for (const p of passers) { p.rotation.z = 0; p.rotation.y = 0; }
     keeper.userData.gloves.forEach((g, i) => { g.position.copy(keeper.userData.gloveHome[i]); g.rotation.set(0, 0, 0); });
     const head = keeper.userData.head;
     head.rotation.y = 0;
     for (const pu of head.userData.eyes) { pu.material = pupilMat; pu.scale.set(1, 1.1, 0.5); }
     keeper.position.set(0, 0, KEEPER_Z);
     keeper.rotation.z = 0;
+    keeper.rotation.y = 0;
     ball.position.set(0, BALL_R, 11);
     ball.scale.set(1, 1, 1);
     ball.rotation.set(0, 0, 0);
