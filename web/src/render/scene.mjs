@@ -86,10 +86,23 @@ export function createScene(canvas) {
   // 0.30은 슬로모션으로 읽혔고 0.02는 프레임이 멈춘 것으로 읽혔다. 0.08이 걸리는 느낌이다.
   const HIT_SCALE = 0.08;
 
-  scene.add(new THREE.AmbientLight(0xd8e6dc, 2.4));
-  const sun = new THREE.DirectionalLight(0xfff6e0, 2.6);
-  sun.position.set(-5, 9, 7);
-  scene.add(sun);
+  // 암빛을 한 덩어리로 뿌리면 모든 면이 같은 밝기로 서고, 입체는 색칠한 오려붙이기가 된다.
+  // 키·필·림을 나누고 바닥 반사를 따로 준다. 전체 노출은 그대로 두고 방향만 쪼갠다.
+  scene.add(new THREE.AmbientLight(0xd8e6dc, 0.95));
+  // 하늘은 차갑게, 흙바닥은 따뜻하게. 이 한 줄이 바운스 광 역할을 한다.
+  scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x8a7048, 1.65));
+  // 키. 카메라 쪽 왼쪽 위에서 얼굴과 장갑을 친다.
+  const key = new THREE.DirectionalLight(0xfff4dc, 2.3);
+  key.position.set(-6, 8, -4);
+  scene.add(key);
+  // 필. 반대편에서 약하고 차게. 그림자 안이 검게 먹히는 것만 막는다.
+  const fill = new THREE.DirectionalLight(0x9fc0e8, 0.8);
+  fill.position.set(7, 3.5, -2);
+  scene.add(fill);
+  // 림. 뒤에서 치면 어깨와 머리 윤곽에 선이 생기고, 인물이 배경에서 떨어진다.
+  const rim = new THREE.DirectionalLight(0xffd9a0, 2.3);
+  rim.position.set(2, 6, 12);
+  scene.add(rim);
 
   const pitch = buildPitch(scene);
   const passers = buildPassers(scene);
@@ -491,7 +504,8 @@ export function createScene(canvas) {
           // 잡고 나서 드리블하러 나간다. 공이 발 앞에서 튄다.
           keeper.rotation.z = lerp(keeper.rotation.z, 0, 0.34);
           keeper.position.z = lerp(KEEPER_Z, 6.5, e);
-          ball.position.set(keeper.position.x, 0.14 + Math.abs(Math.sin(u * 12)) * 0.28, keeper.position.z + 0.7);
+          // 0.7은 캡슐 반경 안이라 공이 정강이를 뚫고 지나갔다. 발 앞으로 한 걸음 더 내보낸다.
+          ball.position.set(keeper.position.x, 0.14 + Math.abs(Math.sin(u * 12)) * 0.28, keeper.position.z + 1.05);
           break;
         case 'beat':
           keeper.position.z = lerp(6.5, 13, e);
@@ -577,6 +591,11 @@ export function createScene(canvas) {
     // 행인은 판정과 무관하게 계속 걷는다. 멈춘 배경은 그림이고 움직이는 배경은 장소다.
     for (const [i, p] of passers.entries()) {
       passerShadows[i].position.set(p.position.x, 0.03, p.position.z);
+      // 반짝임은 돌면서 커졌다 작아진다. 고정된 마름모는 머리에 박힌 장식으로 읽힌다.
+      if (p.userData.spark) {
+        p.userData.spark.rotation.y = vnow * 2.4;
+        p.userData.spark.scale.setScalar(0.8 + Math.sin(vnow * 6) * 0.25);
+      }
       if (p.userData.gaze) {
         // 1.6초. 0.6초는 달려들어오는 것으로 보였고 3초는 슈팅이 끝나도 펜스 밖이었다.
         p.userData.gaze = Math.min(1, p.userData.gaze + dt / 1.6);
