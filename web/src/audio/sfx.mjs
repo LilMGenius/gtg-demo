@@ -89,15 +89,19 @@ function snap(ac, out, noise, t0, peak, freq, dur) {
 
 // 공을 차는 소리. 먹먹한 쪽은 가죽이 눌리는 저역이고, 발등이 닿는 순간은 고역이다.
 // 고역만 키우면 풍선 터지는 소리가 되고, 저역만 남기면 북이 된다.
+// 노트북과 휴대폰 스피커는 300Hz 아래를 못 낸다. sine으로 52Hz까지 내리면
+// 그래프 피크가 0.95여도 귀에는 아무것도 안 남는다. 무음 신고 일곱 번째의 정체다.
+// triangle은 같은 피치에 홀수 배음을 달고 나온다. 작은 스피커는 그 배음을 듣고
+// 내려가지 않는 기음을 귀가 채워 넣는다. 큰 스피커에서는 저역이 그대로 남는다.
 function kick(ac, out, noise, t0, power = 0.6) {
   const p = Math.min(1, Math.max(0, power));
 
   const body = ac.createOscillator();
-  body.type = 'sine';
-  body.frequency.setValueAtTime(150 + p * 40, t0);
-  body.frequency.exponentialRampToValueAtTime(52, t0 + 0.13);
+  body.type = 'triangle';
+  body.frequency.setValueAtTime(196 + p * 52, t0);
+  body.frequency.exponentialRampToValueAtTime(112, t0 + 0.13);
   const bg = ac.createGain();
-  env(bg, 0.20 + p * 0.30, 0.17, t0);
+  env(bg, 0.05 + p * 0.07, 0.17, t0);
   body.connect(bg).connect(out);
   body.start(t0);
   body.stop(t0 + 0.3);
@@ -105,14 +109,17 @@ function kick(ac, out, noise, t0, power = 0.6) {
   const skin = noiseAt(ac, noise, t0, 0.09);
   const lp = ac.createBiquadFilter();
   lp.type = 'lowpass';
-  lp.frequency.setValueAtTime(1100 + p * 900, t0);
-  lp.frequency.exponentialRampToValueAtTime(320, t0 + 0.08);
+  lp.frequency.setValueAtTime(2100 + p * 1500, t0);
+  lp.frequency.exponentialRampToValueAtTime(880, t0 + 0.08);
   lp.Q.value = 0.7;
+  const hp = ac.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 340;
   const sg = ac.createGain();
-  env(sg, 0.24 + p * 0.40, 0.09, t0);
-  skin.connect(lp).connect(sg).connect(out);
+  env(sg, 0.34 + p * 0.52, 0.09, t0);
+  skin.connect(lp).connect(hp).connect(sg).connect(out);
 
-  snap(ac, out, noise, t0, 0.30 + p * 0.42, 2400, 0.016);
+  snap(ac, out, noise, t0, 0.34 + p * 0.48, 2400, 0.016);
 }
 
 // 골대 맞는 소리. 알루미늄 관의 배음은 정수배가 아니다.
@@ -148,14 +155,14 @@ function post(ac, out, noise, t0) {
 // 드리블. 차는 소리와 같은 재질이라 형태는 같고 크기만 다르다.
 function dribble(ac, out, noise, t0) {
   const o = ac.createOscillator();
-  o.type = 'sine';
-  o.frequency.setValueAtTime(190, t0);
-  o.frequency.exponentialRampToValueAtTime(88, t0 + 0.09);
+  o.type = 'triangle';
+  o.frequency.setValueAtTime(248, t0);
+  o.frequency.exponentialRampToValueAtTime(164, t0 + 0.09);
   const g = ac.createGain();
-  env(g, 0.19, 0.12, t0);
+  env(g, 0.045, 0.12, t0);
   const lp = ac.createBiquadFilter();
   lp.type = 'lowpass';
-  lp.frequency.value = 760;
+  lp.frequency.value = 1500;
   o.connect(lp).connect(g).connect(out);
   o.start(t0);
   o.stop(t0 + 0.25);
@@ -166,10 +173,10 @@ function dribble(ac, out, noise, t0) {
   bp.frequency.value = 1800;
   bp.Q.value = 1.0;
   const tg = ac.createGain();
-  env(tg, 0.27, 0.03, t0);
+  env(tg, 0.36, 0.03, t0);
   tap.connect(bp).connect(tg).connect(out);
 
-  snap(ac, out, noise, t0, 0.27, 2600, 0.012);
+  snap(ac, out, noise, t0, 0.28, 2600, 0.012);
 }
 
 // 공을 땅에 놓는 소리. 흙 위에 얹는 것이라 울림이 없다.
@@ -182,19 +189,19 @@ function place(ac, out, noise, t0) {
   bp.frequency.exponentialRampToValueAtTime(560, t0 + 0.1);
   bp.Q.value = 0.9;
   const dg = ac.createGain();
-  env(dg, 0.26, 0.11, t0);
+  env(dg, 0.40, 0.11, t0);
   dirt.connect(bp).connect(dg).connect(out);
 
   const thud = ac.createOscillator();
-  thud.type = 'sine';
-  thud.frequency.value = 96;
+  thud.type = 'triangle';
+  thud.frequency.value = 172;
   const tg = ac.createGain();
-  env(tg, 0.18, 0.07, t0);
+  env(tg, 0.035, 0.07, t0);
   thud.connect(tg).connect(out);
   thud.start(t0);
   thud.stop(t0 + 0.15);
 
-  snap(ac, out, noise, t0, 0.22, 3000, 0.009);
+  snap(ac, out, noise, t0, 0.30, 3000, 0.009);
 }
 
 // 발소리. 뒤꿈치와 앞꿈치가 십수 밀리초 간격으로 두 번 닿는다.

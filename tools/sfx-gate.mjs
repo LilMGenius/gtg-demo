@@ -140,9 +140,15 @@ try {
     check(name + ":attack-carries-a-contact-transient", x.attack.hi >= 0.05, x.attack.hi.toFixed(3));
   }
 
-  // 몸. 차고 놓고 튀기는 것은 저역이 우세해야 사물이다.
+  // 몸. 차고 놓고 튀기는 것은 저역이 있어야 사물이다. 없으면 바람 소리다.
+  // 다만 저역에만 쌓으면 노트북과 휴대폰 스피커가 통째로 못 낸다.
+  // 저역 60% 이상을 요구하던 이 검사가 안 들리는 설계를 강제했다.
+  // 그래프 피크 0.95에 400Hz 미만 97%는 작은 스피커에서 무음과 같다.
+  // 양쪽을 다 재야 한다. 저역이 있어야 사물이고, 재생되는 대역이 있어야 소리다.
   for (const name of ["kick", "dribble", "place"]) {
-    check(name + ":body-is-low-heavy", r.each[name].body.lo >= 0.6, r.each[name].body.lo.toFixed(3));
+    const lo = r.each[name].body.lo;
+    check(name + ":body-has-weight", lo >= 0.28, lo.toFixed(3));
+    check(name + ":survives-a-laptop-speaker", 1 - lo >= 0.3, (1 - lo).toFixed(3));
   }
 
   // 골대. 금속은 오래 울리고 배음이 정수배가 아니다.
