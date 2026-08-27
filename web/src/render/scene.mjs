@@ -326,6 +326,9 @@ export function createScene(canvas) {
       keeper.userData.bareHands[gi].visible = true;
     }
     tail = { kind, t0: vnow, from: ball.position.clone(), kx: keeper.position.x };
+    // 장갑이 벗겨진 자리가 접촉점이다. 이 좌표를 여기서 잡아 두지 않으면
+    // 뒤에서 장갑은 이미 공을 따라 움직이고 있어 손이 어디였는지 알 길이 없다.
+    if (kind === 'gloveGone' && loose) tail.gw = loose.getWorldPosition(new THREE.Vector3());
     // 앞 사건에서 뜬 하트가 다음 사건까지 남으면 선방하면서 반한 것으로 읽힌다.
     for (const h of hearts) h.visible = false;
     // 사건이 난 뒤에는 연출이 행인을 몰고 간다. 걸어오던 보간을 끄지 않으면 둘이 서로 당긴다.
@@ -529,16 +532,24 @@ export function createScene(canvas) {
           break;
         case 'gloveGone': {
           // 장갑이 공에 딸려 간다. 손이 하나 없는 채로 남는다.
-          ball.position.x = lerp(tail.from.x, tail.from.x * 1.1, e);
-          ball.position.y = lerp(tail.from.y, REST_Y, e);
-          ball.position.z = lerp(tail.from.z, REST_Z, e);
+          // 손을 거치지 않고 골로 흘러가면 장갑이 왜 벗겨졌는지가 화면에 없다.
+          // 먼저 공을 장갑 자리로 당겨 붙이고, 그 자리에서 골망으로 보낸다.
+          {
+            const P = tail.gw ?? tail.from;
+            const c = ease(Math.min(1, u * 5));
+            const f = ease(Math.max(0, (u - 0.2) / 0.8));
+            const cx = lerp(tail.from.x, P.x, c);
+            const cy = lerp(tail.from.y, P.y, c);
+            const cz = lerp(tail.from.z, P.z, c);
+            ball.position.set(lerp(cx, P.x * 1.15, f), lerp(cy, REST_Y, f), lerp(cz, REST_Z, f));
+          }
           if (loose) {
             // 장갑은 공에 딸려 간다. 0.3만큼 띄웠더니 장갑과 공이 따로 날아가는 것으로 읽혔다.
             // 공에 닿을 만큼 붙이고 회전만 따로 준다.
             // 공에 딱 붙어 같이 가면 공에 노란 스티커를 붙인 것으로 읽힌다.
             // 반 박자 뒤처지게 끌리고 크게 돌아야 딸려 가는 중인 것이 보인다.
             // 0.12 지연은 장갑이 손 자리에 남아 공만 날아간 것으로 보였다. 한 뼘만 뒤처지게 한다.
-            const lag = ease(Math.min(1, u * 1.5));
+            const lag = ease(Math.min(1, u * 2.2));
             loose.position.set(
               lerp(tail.from.x, ball.position.x, lag) + 0.1,
               lerp(tail.from.y, ball.position.y, lag) + 0.14 + Math.sin(u * Math.PI) * 0.22,
