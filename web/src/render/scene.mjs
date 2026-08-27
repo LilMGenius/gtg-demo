@@ -63,7 +63,7 @@ export function createScene(canvas) {
       '  c.b = texture2D(tDiffuse, vUv - off).b;',
       // 색을 끊기 전에 잡음을 섞는다. 끊고 나서 섞으면 계단 위에 모래를 뿌린 것으로 보인다.
       '  float n = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);',
-      '  c += (n - 0.5) / steps * 0.9;',
+      '  c += (n - 0.5) / steps * 0.34;',
       // floor만 쓰면 화면 전체가 어두워진다. 반 칸 올려 원래 밝기를 지킨다.
       '  c = (floor(c * steps) + 0.5) / steps;',
       // 주사선. 한 줄 걸러 살짝 어둡게. 0.02는 안 보였고 0.11은 낮 경기가 밤이 됐다.
