@@ -292,8 +292,8 @@ export function createScene(canvas) {
       h.visible = on;
       if (!on) continue;
       const u = (e * 1.6 + i * 0.33) % 1;
-      h.position.set(at.x + (i - 1) * 0.3 + Math.sin(u * 6 + i) * 0.1, at.y + 0.34 + u * 0.62, at.z - 0.1);
-      h.scale.setScalar((0.3 + i * 0.05) * (1 - u * 0.3));
+      h.position.set(at.x + (i - 1) * 0.52 + Math.sin(u * 6 + i) * 0.1, at.y + 0.1 + u * 0.26, at.z - 0.1);
+      h.scale.setScalar((0.38 + i * 0.06) * (1 - u * 0.3));
       h.quaternion.copy(camera.quaternion);
     }
   }
@@ -563,14 +563,17 @@ export function createScene(canvas) {
             // 공에 딱 붙어 같이 가면 공에 노란 스티커를 붙인 것으로 읽힌다.
             // 반 박자 뒤처지게 끌리고 크게 돌아야 딸려 가는 중인 것이 보인다.
             // 0.12 지연은 장갑이 손 자리에 남아 공만 날아간 것으로 보였다. 한 뼘만 뒤처지게 한다.
+            // 처음 한 박자만 뒤처지고 다시 공에 붙는다. 끝까지 떨어져 있으면 공과 상관없는 노란 카드로 읽힌다.
             const lag = ease(Math.min(1, u * 2.2));
+            const cling = ease(Math.min(1, Math.max(0, (u - 0.3) / 0.4)));
+            const off = 1 - cling * 0.78;
             loose.position.set(
-              lerp(tail.from.x, ball.position.x, lag) + 0.1,
-              lerp(tail.from.y, ball.position.y, lag) + 0.14 + Math.sin(u * Math.PI) * 0.22,
-              lerp(tail.from.z, ball.position.z, lag) + 0.12
+              lerp(tail.from.x, ball.position.x, lag) + 0.1 * off,
+              lerp(tail.from.y, ball.position.y, lag) + (0.14 + Math.sin(u * Math.PI) * 0.22) * off,
+              lerp(tail.from.z, ball.position.z, lag) + 0.12 * off
             );
-            loose.rotation.z += 0.62;
-            loose.rotation.x += 0.41;
+            loose.rotation.z += 0.62 * (1 - cling * 0.6);
+            loose.rotation.x += 0.41 * (1 - cling * 0.6);
           }
           break;
         }
@@ -630,7 +633,14 @@ export function createScene(canvas) {
           keeper.position.x = lerp(tail.kx, -2.4, walk);
           keeper.position.z = lerp(KEEPER_Z, 4.2, walk);
           keeper.rotation.z = Math.sin(e * 12) * 0.09;
-          showHearts(true, keeper.userData.head.getWorldPosition(new THREE.Vector3()), e);
+          {
+            // 하트가 키퍼 머리 위로만 뜨니 크로스바를 넘어 하늘에 떠다니는 점 두 개로 보였다.
+            // 두 사람 사이에 두어야 누구에게 반한 것인지가 화면에 남는다.
+            const hk = keeper.userData.head.getWorldPosition(new THREE.Vector3());
+            const hp = passers[0] ? passers[0].getWorldPosition(new THREE.Vector3()) : null;
+            if (hp) hk.set((hk.x + hp.x) / 2, (hk.y + hp.y + 1.45) / 2 - 0.46, (hk.z + hp.z) / 2 - 0.2);
+            showHearts(true, hk, e);
+          }
           if (passers[0]) {
             // 1.2만큼 떨어뜨렸더니 두 캡슐이 화면에서 한 덩어리로 붙었다. 사람이 둘이라는 것부터 안 읽혔다.
             // 한 걸음 더 벌리고, 서로 마주 보게 돌린다. 등을 돌린 채 하트만 뜨면 누구에게 반한 것인지 모른다.
