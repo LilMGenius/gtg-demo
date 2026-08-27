@@ -65,14 +65,17 @@ export function dirtTex() {
     c.fillRect(0, 0, S, S);
     const r = rng(0x51d3a1);
     // 큰 얼룩 먼저, 그 위에 작은 얼룩. 한 크기로만 찍으면 물방울무늬가 된다.
+    // 주기가 길수록 눈에 띄다. 큰 얼룩은 대비를 낮추고 작은 얼룩만 진하게 찍는다.
     for (let i = 0; i < 104; i += 1) {
       const rad = 6 + r() * 22;
-      const g = 0.72 + r() * 0.22;
+      const t = (rad - 6) / 22;
+      const g = 0.78 + r() * (0.16 - t * 0.10);
       const bx = r() * S;
       const by = r() * S;
       const ry = rad * (0.5 + r() * 0.7);
       const rot = r() * 3.14;
-      c.fillStyle = 'rgba(' + Math.round(255 * g) + ',' + Math.round(246 * g) + ',' + Math.round(232 * g) + ',0.85)';
+      const a = 0.85 - t * 0.55;
+      c.fillStyle = 'rgba(' + Math.round(255 * g) + ',' + Math.round(246 * g) + ',' + Math.round(232 * g) + ',' + a.toFixed(3) + ')';
       tiled(c, S, () => {
         c.beginPath();
         c.ellipse(bx, by, rad, ry, rot, 0, 6.283);
