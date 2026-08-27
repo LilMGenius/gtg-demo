@@ -257,7 +257,7 @@ export function createScene(canvas) {
   // 한 구의 연출. 시작 시각과 확정된 결과만 받는다.
   // 포즈는 상태다. 목표 포즈로 매 프레임 조금씩 끌고 간다.
   // 순간 전환은 사람이 아니라 슬라이드로 읽힌다.
-  const poseNow = { keeper: POSES.idle, kicker: POSES.windup };
+  const poseNow = { keeper: POSES.ready, kicker: POSES.windup };
   const actor = { keeper: null, kicker: null };
   function drive(key, target, rate) {
     poseNow[key] = lerpPose(poseNow[key], target, rate);
@@ -407,7 +407,7 @@ export function createScene(canvas) {
     actor.keeper = keeper;
     actor.kicker = kicker;
     // 이번 프레임에 무엇을 연기할지. 결과는 이미 확정됐고 여기서는 각도만 고른다.
-    let kp = POSES.idle;
+    let kp = POSES.ready;
     let kk = POSES.windup;
     // 발밑 높이는 상수로 못 낸다. 관절이 돌면 몸의 최저점이 매 프레임 바뀐다.
     // 원하는 높이를 여기 적고, 실제 접지는 프레임 끝에서 실측해서 맞춘다.
@@ -846,9 +846,9 @@ export function createScene(canvas) {
     shadow.material.opacity = 0.42;
     kicker.position.set(KICKER_OFF, 0, 11.2);
     kicker.rotation.z = 0;
-    poseNow.keeper = POSES.idle;
+    poseNow.keeper = POSES.ready;
     poseNow.kicker = POSES.windup;
-    setPose(keeper, POSES.idle, 0);
+    setPose(keeper, POSES.ready, 0);
     setPose(kicker, POSES.windup, 0);
   }
   reset();

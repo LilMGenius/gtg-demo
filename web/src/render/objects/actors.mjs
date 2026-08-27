@@ -18,12 +18,15 @@ export const JOINTS = ['spine', 'neck', 'shL', 'elL', 'shR', 'elR', 'hipL', 'knL
 export const POSES = {
   // 어깨 각이 0.64와 0.72로 갈렸을 뿐이라 정지 프레임에서는 좌우가 같은 각으로 읽혔다.
   // 무게를 한쪽 다리에 싣는다. 짚은 다리는 펴고 뜬 다리는 굽혀서 골반을 기울인다.
-  idle: {
-    spine: [-0.12, 0, 0.09], neck: [0.06, 0, -0.13],
-    shL: [-0.20, 0, -0.52], elL: [-0.42, 0, 0.24],
-    shR: [-0.36, 0, 0.86], elR: [-0.88, 0, -0.52],
-    hipL: [-0.05, 0, -0.06], knL: [0.08, 0, 0],
-    hipR: [-0.14, 0, 0.24], knR: [0.52, 0, 0]
+  // 공을 기다리는 자세. 무릎을 펴고 서면 정지 한 장에서 골키퍼가 아니라 그냥 서 있는 사람이다.
+  // 무릎을 접고 두 팔을 대칭으로 벌린다. 이 실루엣 하나가 포지션을 말한다.
+  // brace보다는 얕게 접는다. 대기 내내 brace로 서 있으면 매 순간이 절정이라 절정이 사라진다.
+  ready: {
+    spine: [-0.22, 0, 0], neck: [0.10, 0, 0],
+    shL: [-0.54, 0, -0.86], elL: [-0.66, 0, 0.34],
+    shR: [-0.54, 0, 0.86], elR: [-0.66, 0, -0.34],
+    hipL: [-0.26, 0, -0.18], knL: [0.48, 0, 0],
+    hipR: [-0.26, 0, 0.18], knR: [0.48, 0, 0]
   },
   brace: {
     spine: [-0.30, 0, 0], neck: [0.14, 0, 0],
@@ -329,7 +332,7 @@ export function buildKeeper(height, weight) {
     thighLen: h * 0.21, shinLen: h * 0.20,
     gloveSize: h * 0.115,
     shirt: 0x2f8f5b, skin: 0xe8c39a, shorts: 0x14202c, socks: 0x1b2c3c,
-    phase: 0.7, rest: POSES.idle
+    phase: 0.7, rest: POSES.ready
   });
   g.userData.girth = w;
   return g;
