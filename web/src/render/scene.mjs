@@ -537,13 +537,25 @@ export function createScene(canvas) {
           }
           keeper.rotation.z = lerp(keeper.rotation.z, 0, 0.08);
           break;
-        case 'carriedIn':
+        case 'carriedIn': {
           // 막았는데 같이 넘어간다. 공과 몸이 한 덩어리로 골망까지 간다.
           keeper.position.z = lerp(KEEPER_Z, -0.35, e);
           keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.35, 0.08);
           hover = 0.06;
-          ball.position.set(keeper.position.x, 0.55, keeper.position.z - 0.2);
+          // 공을 키퍼 좌표에서 띄우면 엎드린 몸 밖, 하필이면 부츠 옆 땅에 놓인다.
+          // 그러면 안고 넘어간 것이 아니라 발치에 공이 굴러온 것으로 읽힌다.
+          // 장갑의 실제 월드 좌표에 붙이면 몸이 움직일 때 공도 같이 간다.
+          {
+            const gw = gloveWorld(Math.sign(tail.kx || 1));
+            const hug = ease(Math.min(1, u * 6));
+            ball.position.set(
+              lerp(tail.from.x, gw.x, hug),
+              lerp(tail.from.y, Math.max(gw.y, BALL_R + 0.02), hug),
+              lerp(tail.from.z, gw.z - BALL_R, hug)
+            );
+          }
           break;
+        }
         case 'gloveGone': {
           // 장갑이 공에 딸려 간다. 손이 하나 없는 채로 남는다.
           // 손을 거치지 않고 골로 흘러가면 장갑이 왜 벗겨졌는지가 화면에 없다.
