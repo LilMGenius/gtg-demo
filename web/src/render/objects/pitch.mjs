@@ -257,20 +257,26 @@ export function buildPassers(scene) {
     if (i === 0) {
       // 긴 머리 한 덩이. 이 하나로 멀리서도 다른 사람으로 읽힌다.
       // 반경 0.17은 머리(0.15)보다 커서 얼굴을 통째로 삼켰다. 뒤통수 쪽으로 물린다.
-      const hair = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.42, 3, 6), flat(0x2b1d14));
-      hair.position.set(0, 1.24 * tall, -0.09);
+      const hair = new THREE.Mesh(new THREE.CapsuleGeometry(0.115, 0.34, 3, 6), flat(0x2b1d14));
+      hair.position.set(0, 1.44 * tall, -0.13);
       // 머리 하나만으로는 멀리서 남녀가 안 갈린다. 치마가 실루엣 밑변을 벌려 준다.
       // 몸통 비율은 안 건드린다. 건드리면 다섯이 전부 땅딸해진다.
-      const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.34 * wide, 0.42 * tall, 8, 1, true), flat(0xe4d7ef));
+      const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.27 * wide, 0.42 * tall, 8, 1, true), flat(0xe4d7ef));
       skirt.position.y = 0.62 * tall;
       skirt.material.side = THREE.DoubleSide;
       // 눈에 띄는 사람은 화면에서도 눈에 띄어야 한다. 머리 위 반짝임 하나가 시선을 잡는다.
       const spark = new THREE.Mesh(new THREE.OctahedronGeometry(0.11, 0), new THREE.MeshBasicMaterial({ color: 0xffe98a }));
-      spark.position.y = 1.72 * tall;
+      spark.position.y = 1.88 * tall;
       g.userData.spark = spark;
       // 이 행인은 한눈팔기 연출에서 골대 앞까지 걸어온다. 화면 한복판에 서는데
       // 얼굴이 없으면 키퍼만 눈이 있고 옆에는 달걀이 서 있다. 하트가 떠도 왜 한눈파는지가 픽셀에 없다.
       // 다른 넷은 펜스 너머에만 있으므로 얼굴을 안 준다. 드로우콜은 이 하나만 늘린다.
+      // 머리 반경 0.15는 치마와 몸통 옆에서 전구만 해졌다. 얼굴을 붙여도 얼굴이 안 읽힌다.
+      // 몸통은 그대로 두고 머리만 키운다. 병맛 2등신 쪽으로 가는 편이 이 게임에 맞다.
+      head.scale.setScalar(1.3);
+      // 몸통 캡슐 꼭대기가 1.39*tall이다. 머리 중심을 1.4에 두면 목까지 몸에 묻혀
+      // 눈만 어깨 위에 뜬 것처럼 보인다. 목 한 칸만큼 올린다.
+      head.position.y = 1.54 * tall;
       addFace(head, 0.15, 1, 0xe0b48c);
       // 눈만으로는 행인 넷과 안 갈린다. 볼 두 점이 멀리서도 이 하나를 다르게 만든다.
       const blushMat = new THREE.MeshBasicMaterial({ color: 0xff8fa3 });
