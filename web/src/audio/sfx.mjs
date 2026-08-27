@@ -116,10 +116,12 @@ function kick(ac, out, noise, t0, power = 0.6) {
   hp.type = 'highpass';
   hp.frequency.value = 340;
   const sg = ac.createGain();
-  env(sg, 0.34 + p * 0.52, 0.09, t0);
+  // 부드러운 킥과 강슈가 소프트클리퍼 안에서 같은 크기로 눌렸다.
+  // 약한 쪽 바닥을 내려서 세기 차이를 다시 들리게 한다.
+  env(sg, 0.21 + p * 0.72, 0.09, t0);
   skin.connect(lp).connect(hp).connect(sg).connect(out);
 
-  snap(ac, out, noise, t0, 0.34 + p * 0.48, 2400, 0.016);
+  snap(ac, out, noise, t0, 0.19 + p * 0.70, 2400, 0.016);
 }
 
 // 골대 맞는 소리. 알루미늄 관의 배음은 정수배가 아니다.
