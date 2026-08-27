@@ -182,19 +182,19 @@ function place(ac, out, noise, t0) {
   bp.frequency.exponentialRampToValueAtTime(560, t0 + 0.1);
   bp.Q.value = 0.9;
   const dg = ac.createGain();
-  env(dg, 0.26, 0.11, t0);
+  env(dg, 0.5, 0.11, t0);
   dirt.connect(bp).connect(dg).connect(out);
 
   const thud = ac.createOscillator();
   thud.type = 'sine';
   thud.frequency.value = 96;
   const tg = ac.createGain();
-  env(tg, 0.18, 0.07, t0);
+  env(tg, 0.34, 0.07, t0);
   thud.connect(tg).connect(out);
   thud.start(t0);
   thud.stop(t0 + 0.15);
 
-  snap(ac, out, noise, t0, 0.22, 3000, 0.009);
+  snap(ac, out, noise, t0, 0.42, 3000, 0.009);
 }
 
 // 발소리. 뒤꿈치와 앞꿈치가 십수 밀리초 간격으로 두 번 닿는다.
@@ -210,7 +210,8 @@ function step(ac, out, noise, t0, hard = false) {
     env(g, peak, 0.055, at);
     s.connect(bp).connect(g).connect(out);
   };
-  const loud = hard ? 0.34 : 0.2;
+  // 발소리는 현실에서 작다. 그러나 음악과 같이 나면 없는 소리가 된다.
+  const loud = hard ? 0.95 : 0.62;
   layer(t0, loud, 900 + Math.random() * 260);
   layer(t0 + 0.012 + Math.random() * 0.006, loud * 0.7, 1400 + Math.random() * 260);
 }

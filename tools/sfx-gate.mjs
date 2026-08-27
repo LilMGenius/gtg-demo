@@ -91,6 +91,31 @@ try {
       o.stop(0.2);
     }, 0.4);
     out.beepAttackHi = Number(m.bands(beep, 0, 12).hi.toFixed(4));
+
+    // 효과음이 나는 것과 들리는 것은 다른 말이다. 베드 밑으로 내려가면 안 난 것과 같다.
+    const rms = (d) => {
+      let peak = 0;
+      for (let i = 0; i < d.length; i += 1) peak = Math.max(peak, Math.abs(d[i]));
+      const thr = peak * 0.1;
+      let sum = 0;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 1) {
+        if (Math.abs(d[i]) > thr) { sum += d[i] * d[i]; n += 1; }
+      }
+      return Math.sqrt(sum / Math.max(1, n));
+    };
+    out.quietSfxDb = 99;
+    for (const name of sfx.SFX_NAMES) {
+      const d = await m.renderSfx(sfx, name, ARG[name], LEN[name]);
+      out.quietSfxDb = Math.min(out.quietSfxDb, 20 * Math.log10(rms(d) * 0.7));
+    }
+    out.quietSfxDb = Number(out.quietSfxDb.toFixed(1));
+
+    const bgm = await import('/web/src/audio/bgm.mjs');
+    const raw = await (await fetch('/web/assets/audio/bgm.m4a')).arrayBuffer();
+    const ac = new OfflineAudioContext(1, 8, m.SR);
+    const buf = await ac.decodeAudioData(raw);
+    out.bedDb = Number((20 * Math.log10(rms(buf.getChannelData(0)) * bgm.BED)).toFixed(1));
     return out;
   });
 
@@ -131,6 +156,10 @@ try {
   // 세기가 안 들리면 약한 슛과 강슛이 같은 소리다.
   check("kick:power-changes-what-you-hear", r.kickHard >= r.kickSoft * 1.4,
     r.kickSoft + " -> " + r.kickHard);
+
+  // 음악이 발소리보다 크면 효과음은 나와도 안 난다. 파운더가 신고한 것이 그것이다.
+  check("mix:the-quietest-sound-sits-above-the-music-bed", r.quietSfxDb > r.bedDb,
+    "sfx " + r.quietSfxDb + "dB vs bed " + r.bedDb + "dB");
 
 
   // 살아 있는 소리. 위의 검사는 OfflineAudioContext라 마스터 게인을 지나지 않는다.
