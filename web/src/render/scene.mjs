@@ -224,6 +224,8 @@ export function createScene(canvas) {
   const BASE_FOV = 46;
   // 키퍼가 골라인에 붙으면 카메라에 가까워 발이 프레임 아래로 내려간다.
   const KEEPER_Z = 0.9;
+  // 드리블하러 나갔을 때 서는 자리. 뺏기는 연출도 여기서 출발한다.
+  const CHARGE_Z = 4.2;
   function resize() {
     const w = canvas.clientWidth || innerWidth;
     const h = canvas.clientHeight || innerHeight;
@@ -577,15 +579,17 @@ export function createScene(canvas) {
           break;
         case 'charge':
           // 잡고 나서 드리블하러 나간다. 공이 발 앞에서 튄다.
-          keeper.rotation.z = lerp(keeper.rotation.z, 0, 0.34);
-          keeper.position.z = lerp(KEEPER_Z, 6.5, e);
-          // 0.7은 캡슐 반경 안이라 공이 정강이를 뚫고 지나갔다. 발 앞으로 한 걸음 더 내보낸다.
-          // 카메라가 등 뒤에 있어서 정면으로 내보낸 공은 다리에 겹쳐 파묻힌 것으로 보였다.
-          // 드리블은 어차피 발 옆으로 밀고 간다. 한 걸음 옆으로 빼면 다리와 안 겹친다.
-          ball.position.set(keeper.position.x + 0.95, 0.14 + Math.abs(Math.sin(u * 12)) * 0.28, keeper.position.z + 0.85);
+          // 다이빙에서 넘어온 기울기가 남으면 달려 나가는 게 아니라 자빠지는 것으로 읽힌다.
+          keeper.rotation.z = lerp(keeper.rotation.z, 0, 0.62);
+          // z=6.5까지 보내면 키퍼가 골대 그물 너머 원경에 파묻히고 공이 몇 픽셀로 줄어든다.
+          // 나갔다는 사실은 페널티 박스를 벗어나는 것으로 이미 읽힌다. 근경에 세운다.
+          keeper.position.z = lerp(KEEPER_Z, CHARGE_Z, e);
+          // 카메라가 골대 뒤에 있으므로 키퍼보다 먼 자리에 둔 공은 무조건 등에 가려진다.
+          // 드리블하는 공은 카메라 쪽 발 옆으로 온다. 그래야 몸과 안 겹치고 발 옆으로 읽힌다.
+          ball.position.set(keeper.position.x + 0.78, 0.14 + Math.abs(Math.sin(u * 12)) * 0.42, keeper.position.z - 0.34);
           break;
         case 'beat':
-          keeper.position.z = lerp(6.5, 13, e);
+          keeper.position.z = lerp(CHARGE_Z, CHARGE_Z + 5.2, e);
           keeper.rotation.z = lerp(keeper.rotation.z, Math.sin(u * 16) * 0.12, 0.34);
           ball.position.set(keeper.position.x, 0.14, keeper.position.z + 0.7);
           kicker.rotation.z = lerp(0, 1.3, e);
