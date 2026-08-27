@@ -19,7 +19,7 @@ try {
     recordVideo: { dir: DIR, size: { width: 1280, height: 720 } }
   });
   const p = await ctx.newPage();
-  p.on('pageerror', (e) => console.log('ERR', String(e)));
+  p.on('pageerror', (e) => console.log('ERR', String(e && e.stack || e)));
   await p.goto('http://127.0.0.1:10310/web/index.html?seed=20', { waitUntil: 'load' });
   await p.waitForTimeout(700);
   const wait = (ms) => p.waitForTimeout(ms);

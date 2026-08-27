@@ -180,6 +180,9 @@ export function createScene(canvas) {
   scene.add(keeper);
 
   function setKeeper(k) {
+    // 벗겨진 장갑은 장면에 붙어 있다. 키퍼를 다시 짓기 전에 치워야
+    // 새 키퍼의 장갑 목록과 짝이 안 맞는 유령이 남지 않는다.
+    if (loose) { scene.remove(loose); loose = null; }
     scene.remove(keeper);
     keeper = buildKeeper(k.height, k.weight);
     scene.add(keeper);
@@ -807,7 +810,8 @@ export function createScene(canvas) {
     tail = null;
     if (loose) {
       const gi = keeper.userData.gloves.indexOf(loose);
-      keeper.userData.gloveParent[gi].add(loose);
+      if (gi >= 0) keeper.userData.gloveParent[gi].add(loose);
+      else scene.remove(loose);
       loose = null;
     }
     for (const b of keeper.userData.bareHands) b.visible = false;
