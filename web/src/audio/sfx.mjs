@@ -239,7 +239,7 @@ export function mountSfx() {
   let level = readVolume(KEY, 0.9);
 
   function ensure() {
-    if (ctx) return ctx;
+    if (ctx && ctx.state !== 'closed') return ctx;
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
     ctx = new AC();
@@ -248,6 +248,21 @@ export function mountSfx() {
     master.connect(ctx.destination);
     noise = makeNoise(ctx);
     return ctx;
+  }
+
+  // 장치가 바뀌면 <audio>는 새 장치로 따라가고 AudioContext는 안 따라간다.
+  // 헤드셋을 빼거나 블루투스가 붙으면 음악만 남고 효과음은 사라진 장치로 계속 나간다.
+  // 무음 신고가 다섯 번 동안 게이트에서 한 번도 재현되지 않은 이유다. 헤드리스에는 장치가 하나다.
+  // 장치가 바뀌었다는 신호를 받으면 컨텍스트를 버리고 다음 발화에서 새로 열어 잡는다.
+  const drop = () => {
+    const dead = ctx;
+    ctx = null;
+    master = null;
+    noise = null;
+    if (dead && dead.state !== 'closed') dead.close().catch(() => {});
+  };
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener('devicechange', drop);
   }
 
   const fire = (name, arg) => {

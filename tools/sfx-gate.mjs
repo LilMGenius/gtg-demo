@@ -174,6 +174,10 @@ try {
   // 음소거가 음량에 0을 써서 영영 무음이 되던 버그는 그 창 밖에서 일어났다.
   const live = await b.newContext();
   await live.addInitScript(() => {
+    window.__acCount = 0;
+    const AC0 = window.AudioContext;
+    window.AudioContext = function (...a) { window.__acCount += 1; return new AC0(...a); };
+    window.AudioContext.prototype = AC0.prototype;
     const AC = window.AudioContext;
     const gain0 = AC.prototype.createGain;
     AC.prototype.createGain = function () {
@@ -248,6 +252,24 @@ try {
   // 잔재가 남아있으면 그 브라우저만 새 믹스를 영영 받지 못한다.
   check("live:no-stored-mix-survives-a-reload", stored === null, String(stored));
   check("live:sound-survives-a-reload-after-a-mute-toggle", afterReload > 0.02, String(afterReload));
+
+  // 오디오 장치가 바뀌면 <audio>는 따라가고 AudioContext는 사라진 장치로 계속 내보낸다.
+  // 그랬면 음악만 남고 효과음이 사라진다. 신고된 증상과 정확히 같다.
+  // 헤드리스는 장치가 하나라 진짜 전환을 못 만든다. 이벤트만 쏘서 복구를 재는다.
+  // 장치가 하나뿐인 헤드리스에서는 소리가 난다는 것만으로는 아무 말도 안 된다.
+  // 수리를 빼도 그 검사는 통과한다. 컨텍스트가 실제로 교체되었는지를 센다.
+  const dev = await lp.evaluate(async () => {
+    const before = window.__acCount;
+    navigator.mediaDevices.dispatchEvent(new Event("devicechange"));
+    await new Promise((r) => setTimeout(r, 200));
+    window.__peakReset();
+    window.__sfx.kick(1);
+    await new Promise((r) => setTimeout(r, 450));
+    return { opened: window.__acCount - before, peak: Number(window.__peakMax.toFixed(4)) };
+  });
+  check("live:a-device-swap-reopens-the-context-instead-of-shouting-at-the-gone-device",
+    dev.opened === 1, "opened " + dev.opened);
+  check("live:a-device-swap-does-not-take-the-effects-with-it", dev.peak > 0.02, String(dev.peak));
 
   // 발화되는 것과 소리가 난다고 느끼는 것은 다른 말이다.
   // 슛 한 번만 울리고 결과 연출 수초가 통째로 조용하면 플레이어는 무음이라고 말한다.
