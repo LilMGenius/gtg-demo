@@ -244,7 +244,9 @@ try {
   check("control:mute-silences-the-live-master", whileMuted < 0.005, String(whileMuted));
   check("live:a-stored-zero-volume-still-makes-sound", legacyZero > 0.02, String(legacyZero));
   check("live:unmute-gives-back-what-mute-took", afterUnmute > 0.02, String(afterUnmute));
-  check("live:mute-is-not-stored-as-zero-volume", stored !== "0" && Number(stored) > 0, String(stored));
+  // 믹스는 코드가 소유한다. 화면에 음량 슬라이더가 없으니 저장된 믹스는 잔재뿐이다.
+  // 잔재가 남아있으면 그 브라우저만 새 믹스를 영영 받지 못한다.
+  check("live:no-stored-mix-survives-a-reload", stored === null, String(stored));
   check("live:sound-survives-a-reload-after-a-mute-toggle", afterReload > 0.02, String(afterReload));
 
   // 발화되는 것과 소리가 난다고 느끼는 것은 다른 말이다.
@@ -270,8 +272,7 @@ try {
   // 사건을 전부 채워도 공을 다시 세우는 몇 초가 비어 있으면 무음으로 신고된다.
   // 선언이 아니라 마스터를 직접 탭해서 가장 긴 조용한 구간을 초로 잰다.
   // AnalyserNode 폴링은 버킷 사이를 흘려 피크를 놓친다. ScriptProcessor만 유효하다.
-  const gapCtx = await b.newContext();
-  await gapCtx.addInitScript(() => {
+  const TAP_MASTER = () => {
     window.__buckets = [];
     const AC = window.AudioContext;
     const gain0 = AC.prototype.createGain;
@@ -296,7 +297,9 @@ try {
       };
       return node;
     };
-  });
+  };
+  const gapCtx = await b.newContext();
+  await gapCtx.addInitScript(TAP_MASTER);
   const gp = await gapCtx.newPage();
   gp.on("pageerror", (e) => errs.push(String(e)));
   await gp.goto(URL, { waitUntil: "load" });
@@ -321,6 +324,25 @@ try {
   });
   check("live:play-never-goes-quiet-for-more-than-four-seconds", maxGap > 0 && maxGap <= 4,
     maxGap + "s");
+
+  // 여기까지는 전부 새 브라우저다. 새 브라우저는 코드의 믹스를 그대로 받는다.
+  // 신고자는 지난 구현의 믹스가 저장된 채 남은 브라우저였다.
+  // BGM은 audio 요소라 마스터 탭에 잡히지 않는다. 그래서 재는 것은 파형이 아니라
+  // 재생 직전의 두 음량 자체다. 잔재가 코드 기본값을 이기면 새 믹스는 영영 안 간다.
+  const legacyCtx = await b.newContext();
+  await legacyCtx.addInitScript(() => {
+    localStorage.setItem("gtg.sfx.volume", "0.7");
+    localStorage.setItem("gtg.bgm.volume", "0.1");
+  });
+  const xp = await legacyCtx.newPage();
+  await xp.goto(URL, { waitUntil: "load" });
+  await xp.waitForTimeout(900);
+  const legacyMix = await xp.evaluate(() => {
+    return { sfx: window.__sfx.volume, bgm: window.__bgm.volume };
+  });
+  check("live:a-legacy-stored-mix-loses-to-the-code-default",
+    legacyMix.sfx === 0.9 && legacyMix.bgm === 0.072, JSON.stringify(legacyMix));
+  await legacyCtx.close();
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
 

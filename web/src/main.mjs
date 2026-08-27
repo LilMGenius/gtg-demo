@@ -14,6 +14,8 @@ window.__stageProbe = stage.stageProbe;
 window.__goalFrame = stage.goalFrame;
 window.__ballPos = stage.ballPos;
 const bgm = mountBgm();
+// 선언값은 증거가 아니다. 게이트가 실제 베드 음량을 읽을 수 있어야 한다.
+window.__bgm = bgm;
 
 // 재현되지 않는 캐프처는 증거가 아니다. ?seed= 가 있으면 그 씨드로 고정한다.
 const seedParam = new URLSearchParams(location.search).get('seed');
