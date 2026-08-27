@@ -104,14 +104,27 @@ try {
       }
       return Math.sqrt(sum / Math.max(1, n));
     };
+    // 노이즈 재생 배속이 발화마다 달라서 한 번만 재면 네 번에 한 번꿄 틀린 답이 나온다.
+    // 귀가 듣는 것은 한 발이 아니라 수백 발의 분포다. 열한 번씩 재서 중앙값과 양 끝을 남긴다.
+    const RUNS = 11;
+    const med = (a) => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
+    const dbOf = async (name, arg) => {
+      const v = [];
+      for (let i = 0; i < RUNS; i += 1) {
+        const d = await m.renderSfx(sfx, name, arg, LEN[name]);
+        v.push(20 * Math.log10(rms(d) * 0.7));
+      }
+      return { med: Number(med(v).toFixed(1)), lo: Number(Math.min(...v).toFixed(1)), hi: Number(Math.max(...v).toFixed(1)) };
+    };
+    out.spread = {};
     out.db = {};
     for (const name of sfx.SFX_NAMES) {
-      const d = await m.renderSfx(sfx, name, ARG[name], LEN[name]);
-      out.db[name] = Number((20 * Math.log10(rms(d) * 0.7)).toFixed(1));
+      out.spread[name] = await dbOf(name, ARG[name]);
+      out.db[name] = out.spread[name].med;
     }
     // 가장 작은 소리는 살짝 디디는 발소리다. 세게 디디는 쪽만 재면 바닥을 놓친다.
-    const soft = await m.renderSfx(sfx, 'step', false, LEN.step);
-    out.db.stepSoft = Number((20 * Math.log10(rms(soft) * 0.7)).toFixed(1));
+    out.spread.stepSoft = await dbOf('step', false);
+    out.db.stepSoft = out.spread.stepSoft.med;
     out.quietSfxDb = Math.min(...Object.values(out.db));
 
     const bgm = await import('/web/src/audio/bgm.mjs');
@@ -171,9 +184,15 @@ try {
   check("mix:the-quietest-sound-clears-the-music-bed-by-3dB", r.quietSfxDb - r.bedDb >= 3,
     "sfx " + r.quietSfxDb.toFixed(1) + "dB vs bed " + r.bedDb + "dB");
   // 현실의 계층이 뒤집힐 수 있다. 공을 놓거나 디디는 소리가 슛만큼 크면 믹스가 깨진 것이다.
+  const incMed = Math.max(r.db.dribble, r.db.place, r.db.step);
+  const incHi = Math.max(r.spread.dribble.hi, r.spread.place.hi, r.spread.step.hi);
   check("mix:the-kick-stays-above-the-incidental-sounds",
-    r.db.kick >= Math.max(r.db.dribble, r.db.place, r.db.step) + 3,
-    JSON.stringify(r.db));
+    r.db.kick >= incMed + 3,
+    "kick " + r.db.kick + " vs " + incMed.toFixed(1));
+  // 중앙값만 보면 운 나쁜 발에서 계층이 뒤집힌다. 제일 약한 슐이 제일 큰 잡음보다 위에 있어야 한다.
+  check("mix:even-the-weakest-kick-outranks-the-loudest-incidental",
+    r.spread.kick.lo >= incHi,
+    "kick lo " + r.spread.kick.lo + " vs inc hi " + incHi.toFixed(1));
 
 
   // 살아 있는 소리. 위의 검사는 OfflineAudioContext라 마스터 게인을 지나지 않는다.
@@ -352,6 +371,40 @@ try {
   });
   check("live:play-never-goes-quiet-for-more-than-four-seconds", maxGap > 0 && maxGap <= 4,
     maxGap + "s");
+
+  // 발화마다 그래프를 새로 세우고 아무도 안 끊으면 마스터에 노드가 쌓인다.
+  // 방치형이라 탭을 하루 켜두는 게 정상 사용이다. 6만 개까지 밀었을 때
+  // 킥 피크가 0.83에서 1.99로 튀었고 골대 소리는 따다다다로 들렸다.
+  // 발화 수가 아니라 남은 노드 수를 센다. 세지 않으면 안 보이는 종류의 고장이다.
+  const leak = await gp.evaluate(async () => {
+    const seen = new Set();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    // 살아있는 컨텍스트에서 만들어진 노드를 세고, 끊긴 것을 빼야 한다.
+    // 브라우저는 노드 수를 안 알려준다. 대신 우리가 끊는 그 두 개를 직접 감시한다.
+    let alive = 0;
+    const wrap = (proto, key) => {
+      const f = proto[key];
+      proto[key] = function (...a) {
+        const n = f.apply(this, a);
+        if (this.state !== "closed") {
+          alive += 1;
+          const d = n.disconnect.bind(n);
+          n.disconnect = (...r) => { if (!seen.has(n)) { seen.add(n); alive -= 1; } return d(...r); };
+        }
+        return n;
+      };
+    };
+    wrap(AC.prototype, "createWaveShaper");
+    const before = alive;
+    for (let i = 0; i < 300; i += 1) {
+      window.__sfx.post();
+      if (i % 25 === 0) await new Promise((r) => setTimeout(r, 4));
+    }
+    await new Promise((r) => setTimeout(r, 3200));
+    return { before, after: alive };
+  });
+  check("live:three-hundred-shots-do-not-leave-three-hundred-nodes-on-the-master",
+    leak.after - leak.before <= 5, "left " + (leak.after - leak.before));
 
   // 여기까지는 전부 새 브라우저다. 새 브라우저는 코드의 믹스를 그대로 받는다.
   // 신고자는 지난 구현의 믹스가 저장된 채 남은 브라우저였다.

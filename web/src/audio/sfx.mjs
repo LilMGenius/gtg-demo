@@ -66,7 +66,7 @@ function clipper(ac, out) {
   const g = ac.createGain();
   g.gain.value = 1.15;
   w.connect(g).connect(out);
-  return w;
+  return { head: w, tail: g };
 }
 
 // 접촉의 순간. 짧고 높다.
@@ -227,14 +227,19 @@ function step(ac, out, noise, t0, hard = false) {
 
 // 이름 하나로 그래프를 세운다. 실시간과 오프라인이 같은 함수를 탄다.
 // 검사한 소리와 들리는 소리가 다르면 검사가 아무 말도 안 한 것이 된다.
+// 한 번 발화한 노드는 소리가 끝나도 마스터에 계속 붙어 있었다.
+// 400발씩 열네 번 때리자 노드가 6만 개 쌓였고 킥 피크가 0.83에서 1.99로 튀었다.
+// 소리를 다 낸 다음 스스로 떨어져 나가게 한다.
 export function buildSfx(name, ac, out, noise, t0, arg) {
-  out = clipper(ac, out);
-  if (name === 'kick') return kick(ac, out, noise, t0, arg ?? 0.6);
-  if (name === 'post') return post(ac, out, noise, t0);
-  if (name === 'dribble') return dribble(ac, out, noise, t0);
-  if (name === 'place') return place(ac, out, noise, t0);
-  if (name === 'step') return step(ac, out, noise, t0, arg ?? false);
-  throw new Error('unknown sfx ' + name);
+  const clip = clipper(ac, out);
+  const head = clip.head;
+  if (name === 'kick') kick(ac, head, noise, t0, arg ?? 0.6);
+  else if (name === 'post') post(ac, head, noise, t0);
+  else if (name === 'dribble') dribble(ac, head, noise, t0);
+  else if (name === 'place') place(ac, head, noise, t0);
+  else if (name === 'step') step(ac, head, noise, t0, arg ?? false);
+  else throw new Error('unknown sfx ' + name);
+  return clip;
 }
 
 const KEY = 'gtg.sfx.volume';
@@ -283,7 +288,9 @@ export function mountSfx() {
     if (ac.state !== 'running') ac.resume();
     // 영상 캡처는 소리를 담지 못한다. 발화 시각을 남겨두면 같은 소리를 같은 자리에 깔아 넣을 수 있다.
     if (window.__sfxLog) window.__sfxLog.push([name, arg ?? null, performance.now()]);
-    buildSfx(name, ac, master, noise, ac.currentTime, arg);
+    const clip = buildSfx(name, ac, master, noise, ac.currentTime, arg);
+    // 가장 긴 꼬리가 골대의 336ms다. 2초면 어떤 소리도 끝나 있다.
+    setTimeout(() => { try { clip.tail.disconnect(); clip.head.disconnect(); } catch (e) { /* 이미 닫힌 컨텍스트 */ } }, 2000);
   };
 
   // 브라우저는 첫 입력 전에 오디오를 안 열어준다. 그래서 입력에 붙여 깨운다.
