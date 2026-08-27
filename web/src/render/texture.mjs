@@ -140,19 +140,30 @@ export function chippedTex() {
 }
 
 // 건물 창문. 밤이 아니라 저녁이라 몇 칸만 켜져 있다. 전부 켜면 격자무늬 벽지가 된다.
-export function windowTex() {
-  return memo('window', () => {
+// 한 장을 열네 동에 돌려 쓰니 도시가 아니라 같은 스티커를 열네 번 붙인 것으로 읽혔다.
+// 변종은 씨앗만 바꾸는 게 아니다. 층 간격과 점등률이 같으면 씨앗이 달라도 같은 리듬이 남는다.
+const WIN_KIND = [
+  { seed: 0x39f0c2, stepY: 13, stepX: 14, lit: 0.20 },
+  { seed: 0x7ac41d, stepY: 11, stepX: 16, lit: 0.30 },
+  { seed: 0x1de935, stepY: 16, stepX: 12, lit: 0.13 },
+  { seed: 0xc25a70, stepY: 12, stepX: 18, lit: 0.26 },
+  { seed: 0x40b8e1, stepY: 15, stepX: 13, lit: 0.08 }
+];
+
+export function windowTex(variant = 0) {
+  const k = WIN_KIND[variant % WIN_KIND.length];
+  return memo('window:' + (variant % WIN_KIND.length), () => {
     const S = 64;
     const cv = canvas(S);
     const c = cv.getContext('2d');
     c.fillStyle = '#000000';
     c.fillRect(0, 0, S, S);
-    const r = rng(0x39f0c2);
+    const r = rng(k.seed);
     // 창을 잘게 찍으면 저해상도로 줄어드는 화면에서 한 픽셀도 안 남는다.
     // 크게 찍고 대신 켜진 칸을 줄인다. 저녁이라 몇 집만 불이 들어와 있다.
-    for (let y = 5; y < S - 6; y += 13) {
-      for (let x = 5; x < S - 6; x += 14) {
-        if (r() > 0.2) continue;
+    for (let y = 5; y < S - 6; y += k.stepY) {
+      for (let x = 5; x < S - 6; x += k.stepX) {
+        if (r() > k.lit) continue;
         // 자로 잰 격자는 창문이 아니라 엑셀 시트다. 층마다 한두 칸씩 어긋나게 찍는다.
         const ox = Math.round((r() - 0.5) * 4);
         const oy = Math.round((r() - 0.5) * 3);
@@ -162,7 +173,23 @@ export function windowTex() {
         c.fillRect(x + ox, y + oy, 5 + Math.round(r() * 2), 6 + Math.round(r() * 2));
       }
     }
-    // 배율 1은 64칸 창문이 30미터 건물에 늘어나 창이 아니라 벽지 무늬가 됐다.
-    return finish(cv, [1, 2]);
+    // 배율은 여기서 정하지 않는다. 박스 UV는 면마다 0~1이라 같은 배율을 주면
+    // 넓은 동일수록 창이 옆으로 늘어나 창문이 아니라 포스트잇이 된다.
+    // 배율은 건물 실치수를 아는 쪽이 정한다.
+    return finish(cv, null);
   });
+}
+
+// 건물 한 동의 창문. 층 간격은 실제 층고에서 나온다.
+// 박스 UV는 면마다 0~1이라 배율을 고정하면 넓은 동일수록 창이 옆으로 늘어난다.
+// 텍스처 자체는 다섯 장뿐이고, 동마다 배율만 다른 사본을 준다.
+// 3.1과 3.6은 실제 층고에 맞지만 화면에서는 창 한 칸이 포스트잇만 해졌다.
+// 멀리 있는 건물은 실치수가 아니라 보이는 크기로 정해야 한다.
+const FLOOR_M = 2.3;
+const BAY_M = 2.5;
+export function windowTexFor(variant, w, h) {
+  const t = windowTex(variant).clone();
+  t.needsUpdate = true;
+  t.repeat.set(Math.max(1, Math.round(w / BAY_M)), Math.max(1, Math.round(h / FLOOR_M)));
+  return t;
 }

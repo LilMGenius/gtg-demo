@@ -1,7 +1,7 @@
 // 무대. 흙 운동장 하나와 그 너머를 채우는 것들이다.
 import * as THREE from '../../../vendor/three.module.min.js';
 import { flat, flatMap, R_HALF_W, R_H } from '../units.mjs';
-import { dirtTex, scuffTex, clothTex, chippedTex, windowTex } from '../texture.mjs';
+import { dirtTex, scuffTex, clothTex, chippedTex, windowTex, windowTexFor } from '../texture.mjs';
 import { loadDecor } from '../decor.mjs';
 import { jitterMesh, seeded, addOutline } from '../handmade.mjs';
 
@@ -195,13 +195,18 @@ export function buildPitch(scene) {
   // 등간격으로 세우면 도시가 아니라 막대그래프다. 간격과 각도를 손으로 놓은 것처럼 어긋낸다.
   const skyline = new THREE.Group();
   // 순수한 검정 실루엣은 오려붙인 종이다. 창문 몇 칸이 켜지면 사람이 사는 도시가 된다.
-  const blockMat = new THREE.MeshLambertMaterial({ color: 0x5b6f7d, emissive: 0xffffff, emissiveMap: windowTex() });
+  // 한 재질을 열네 동이 나눠 쓰면 같은 스티커를 열네 번 붙인 것으로 읽힌다.
+  // 동마다 창 무늬와 층수와 벽색을 어긋낸다. 창 배율은 그 동의 실치수에서 나온다.
+  const WALL = [0x5b6f7d, 0x4e5f6d, 0x66788a, 0x556878, 0x455567];
   const rnd = seeded(0x5c17e0);
   let cursor = -32;
   for (let i = 0; i < 14; i += 1) {
     const w = 3.4 + rnd() * 3.6;
     const h = 5 + rnd() * 11;
-    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 3), blockMat);
+    const kind = Math.floor(rnd() * 5);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 3), new THREE.MeshLambertMaterial({
+      color: WALL[(kind + i) % WALL.length], emissive: 0xffffff, emissiveMap: windowTexFor(kind, w, h)
+    }));
     b.position.set(cursor + w / 2, h / 2, 38 + rnd() * 7);
     // 0.02는 정렬된 것과 구분이 안 됐고 0.14는 건물이 쓰러지는 것으로 읽혔다.
     b.rotation.y = (rnd() - 0.5) * 0.06;
@@ -213,7 +218,11 @@ export function buildPitch(scene) {
   }
   scene.add(skyline);
   // 라인은 흔들지 않는다. 바닥 선이 물결치면 거리를 못 읽는다. 건물만 흔든다.
-  loadDecor(scene, 'skyline', skyline, 0.18, (c) => new THREE.MeshLambertMaterial({ color: c, emissive: 0xffffff, emissiveMap: windowTex() }));
+  // 구운 GLB가 서면 위에서 세운 fallback은 버려진다. 화면에 실제로 서는 건 이쪽이다.
+  // 창 무늬도 벽색도 동마다 갈라야 열네 동이 열네 동으로 읽힌다.
+  loadDecor(scene, 'skyline', skyline, 0.18, (c, nth) => new THREE.MeshLambertMaterial({
+    color: WALL[nth % WALL.length], emissive: 0xffffff, emissiveMap: windowTex(nth)
+  }));
 
   return { ground, box, bar, net: back, netZ: -NET_D };
 }
