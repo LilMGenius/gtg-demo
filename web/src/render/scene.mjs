@@ -292,8 +292,8 @@ export function createScene(canvas) {
       h.visible = on;
       if (!on) continue;
       const u = (e * 1.6 + i * 0.33) % 1;
-      h.position.set(at.x + (i - 1) * 0.52 + Math.sin(u * 6 + i) * 0.1, at.y + 0.1 + u * 0.26, at.z - 0.1);
-      h.scale.setScalar((0.38 + i * 0.06) * (1 - u * 0.3));
+      h.position.set(at.x + (i - 1) * 0.26 + Math.sin(u * 6 + i) * 0.07, at.y + 0.1 + u * 0.22, at.z - 0.1);
+      h.scale.setScalar((0.24 + i * 0.04) * (1 - u * 0.3));
       h.quaternion.copy(camera.quaternion);
     }
   }
@@ -661,14 +661,14 @@ export function createScene(canvas) {
         case 'talked': {
           // 입을 열었고 몸이 따라갔다. 공은 그대로 빈 골대로 들어간다.
           const head2 = keeper.userData.head;
-          head2.rotation.y = lerp(0, 2.6, Math.min(1, e * 2));
+          head2.rotation.y = lerp(0, 0.72, Math.min(1, e * 2));
           for (const pu of head2.userData.eyes) {
             pu.material = heartMat;
             pu.scale.set(2.1, 2.1, 0.5);
           }
           const walk = Math.min(1, e * 1.5);
           keeper.position.x = lerp(tail.kx, -2.4, walk);
-          keeper.position.z = lerp(KEEPER_Z, 4.2, walk);
+          keeper.position.z = lerp(KEEPER_Z, 3.1, walk);
           keeper.rotation.z = Math.sin(e * 12) * 0.09;
           {
             // 하트가 키퍼 머리 위로만 뜨니 크로스바를 넘어 하늘에 떠다니는 점 두 개로 보였다.
@@ -678,7 +678,9 @@ export function createScene(canvas) {
             // 중점을 그대로 쓰니 하트 세 개가 키퍼 얼굴을 덮었다. 반한 얼굴이 안 보이면
             // 한눈팔기라는 사건 자체가 화면에 안 남는다. 두 머리 바로 위로 올린다.
             // 0.42를 올렸더니 하트가 화면 위로 잘렸다. 잘린 하트는 붉은 얼룩이다.
-            if (hp) hk.set((hk.x + hp.x) / 2, Math.max(hk.y, hp.y + 1.45) + 0.12, (hk.z + hp.z) / 2 - 0.2);
+            // 하의를 늘 줄 를 하른데 크로스바가 하트를 가로지른다.
+            // 두 머리들 사ᅵ 눈놋ᅵ로 내리면 가로대가 하트를 가르지 않는다.
+            if (hp) hk.set((hk.x + hp.x) / 2, Math.min(hk.y, hp.y + 1.5) - 0.1, (hk.z + hp.z) / 2 - 0.2);
             showHearts(true, hk, e);
           }
           if (passers[0]) {
@@ -693,7 +695,9 @@ export function createScene(canvas) {
             passers[0].rotation.y = lerp(2.44, 3.02, walk);
             passers[0].rotation.z = Math.sin(e * 9) * 0.18;
           }
-          keeper.rotation.y = lerp(0, -0.9, walk);
+          // 카메라는 골대 ᄃ니에서 +z를 본다. 키퍼가 그대로 서 잇으면 하트른 눈을 듶의 머리가 가린다.
+          // 한눈 파른 얼굴이 안 보이면 그 산건 자ᄖᅦ 화년에 어ᇆ다.
+          keeper.rotation.y = lerp(0, 2.48, walk);
           ball.position.set(lerp(tail.from.x, 0, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
           break;
         }
