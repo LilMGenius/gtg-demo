@@ -584,6 +584,13 @@ export function createScene(canvas) {
         case 'downed':
           keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.5, 0.06);
           hover = 0.04;
+          // 실점인데 공을 안 움직였다. 자막은 골이라고 하는데 공은 골대 옆 땅에 멈춰 있었다.
+          // 깔린 몸 위를 넘어 굴러가야 깔려서 들어갔다는 것이 한 사건으로 읽힌다.
+          ball.position.set(
+            lerp(tail.from.x, tail.kx * 0.5, e),
+            lerp(tail.from.y, REST_Y, e) - Math.sin(u * Math.PI) * 0.22,
+            lerp(tail.from.z, REST_Z, e)
+          );
           break;
         case 'rebound':
           ball.position.set(lerp(tail.from.x, 0.6, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
