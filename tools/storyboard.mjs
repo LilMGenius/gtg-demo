@@ -5,6 +5,12 @@ import fs from 'node:fs';
 // 대신 장면이 바뀐 시각을 beats.json에 남겨서 오버레이가 그 시각에 붙게 한다.
 const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
 const DIR = process.env.OUT || 'video.local';
+const FRAMES = DIR + '/frames';
+const W = 1920;
+const H = 1080;
+const FPS = 60;
+fs.rmSync(FRAMES, { recursive: true, force: true });
+fs.mkdirSync(FRAMES, { recursive: true });
 const t = setTimeout(() => { console.log('WATCHDOG'); process.exit(1); }, 420000); t.unref();
 
 let b;
@@ -13,19 +19,34 @@ const beats = [];
 const mark = (id) => beats.push({ id, at: +((Date.now() - t0) / 1000).toFixed(2) });
 
 try {
-  b = await chromium.launch({ executablePath: EXE });
-  const ctx = await b.newContext({
-    viewport: { width: 1280, height: 720 },
-    recordVideo: { dir: DIR, size: { width: 1280, height: 720 } }
-  });
+  // 대우수 배율로 들어가면 확대 보간이 한 번 더 걸리고 그 자리에서 자글거림이 난다.
+  // 트레일러가 1920x1080이므로 캡처도 같은 치수로 받는다.
+  b = await chromium.launch({ executablePath: EXE, args: ['--force-device-scale-factor=1'] });
+  const ctx = await b.newContext({ viewport: { width: W, height: H } });
   const p = await ctx.newPage();
   // 캡처 영상은 오디오를 담지 못한다. 발화 시각을 받아적어 나중에 깔아 넣는다.
   // beats와 같은 시계를 써야 두 목록을 한 시간축 위에 올릴 수 있다.
   await p.addInitScript((zero) => { window.__sfxLog = []; window.__sfxT0 = zero; }, t0);
   p.on('pageerror', (e) => console.log('ERR', String(e && e.stack || e)));
   await p.goto('http://127.0.0.1:10310/web/index.html?seed=20', { waitUntil: 'load' });
+  // 저장이 남아 있으면 다음 캡처가 지난 번 레벨에서 시작한다.
+  // 영상은 처음 여는 사람이 보는 것과 같아야 한다. 1레벨부터다.
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: 'load' });
   await p.waitForTimeout(700);
   const wait = (ms) => p.waitForTimeout(ms);
+
+  // Playwright recordVideo는 VP8 25fps 고정이다. CDP 스크린캡스트는 페인트마다 한 장을 준다.
+  // 프레임 간격은 고르지 않으므로 각 장의 시각을 적어 둔다. concat이 그걸 시간축으로 쓴다.
+  const cdp = await ctx.newCDPSession(p);
+  const stamps = [];
+  let seq = 0;
+  cdp.on('Page.screencastFrame', async (f) => {
+    const i = seq; seq += 1;
+    fs.writeFileSync(FRAMES + '/f' + String(i).padStart(6, '0') + '.jpg', Buffer.from(f.data, 'base64'));
+    stamps.push(f.metadata.timestamp);
+    try { await cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }); } catch { /* 페이지가 닫힐 때 난다 */ }
+  });
 
   // 성장 오버레이는 모달이다. 열리면 눌러주기 전까지 게임이 멈춘다.
   await p.evaluate(() => {
@@ -49,6 +70,8 @@ try {
     for (let i = 0; i < limit / 250; i++) { if (await offerUp()) return true; await wait(250); }
     return false;
   };
+
+  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 95, maxWidth: W, maxHeight: H, everyNthFrame: 1 });
 
   // 1장. 타이틀 화면을 그대로 보여준다.
   mark('title');
@@ -107,11 +130,30 @@ try {
 
   // 영상 시간축과 맞추려면 페이지 시계를 캡처 시작 시각 기준으로 옮겨야 한다.
   const sfx = await p.evaluate(() => window.__sfxLog.map(([n, a, t]) => [n, a, +((t + performance.timeOrigin - window.__sfxT0) / 1000).toFixed(3)]));
+  await cdp.send('Page.stopScreencast');
+  await p.waitForTimeout(300);
   await ctx.close();
-  const path = await p.video().path();
-  fs.writeFileSync(DIR + '/beats.json', JSON.stringify({ video: path, beats }, null, 2));
-  fs.writeFileSync(DIR + '/sfx.json', JSON.stringify({ t0, events: sfx }, null, 2));
+
+  // 첫 프레임을 0초로 놓고 나머지를 그 뒤로 줄 세운다.
+  // beats가 캐프쳐 시작 시각 기준이므로 그 차이를 먼저 빼야 두 목록이 같은 시계를 쓴다.
+  const n = Math.min(seq, stamps.length);
+  const rel = stamps.slice(0, n).map((v) => v - stamps[0]);
+  const lines = [];
+  for (let i = 0; i < n; i += 1) {
+    lines.push("file 'frames/f" + String(i).padStart(6, '0') + ".jpg'");
+    const next = i + 1 < n ? rel[i + 1] : rel[i] + 1 / FPS;
+    lines.push('duration ' + Math.max(1 / 240, next - rel[i]).toFixed(6));
+  }
+  lines.push("file 'frames/f" + String(n - 1).padStart(6, '0') + ".jpg'");
+  fs.writeFileSync(DIR + '/frames.txt', lines.join(String.fromCharCode(10)) + String.fromCharCode(10));
+
+  // 캡처가 실제로 시작한 순간은 startScreencast 뒤의 첫 프레임이다.
+  // 그 전까지 흘러간 시간을 빼야 beats가 영상 시간축과 맞는다.
+  const shift = beats.length ? beats[0].at : 0;
+  const shifted = beats.map((x) => ({ id: x.id, at: +(x.at - shift).toFixed(2) }));
+  fs.writeFileSync(DIR + '/beats.json', JSON.stringify({ frames: n, fps: FPS, seconds: +rel[n - 1].toFixed(2), shift, beats: shifted }, null, 2));
+  fs.writeFileSync(DIR + '/sfx.json', JSON.stringify({ t0, shift, events: sfx.map(([nm, a, at]) => [nm, a, +(at - shift).toFixed(3)]) }, null, 2));
   console.log('sfx', sfx.length);
-  console.log('video', path);
-  console.log('beats', JSON.stringify(beats));
+  console.log('frames', n, 'seconds', rel[n - 1].toFixed(2), 'fps', (n / rel[n - 1]).toFixed(1));
+  console.log('beats', JSON.stringify(shifted));
 } finally { clearTimeout(t); if (b) await b.close(); }
