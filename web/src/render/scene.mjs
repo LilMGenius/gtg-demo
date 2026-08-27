@@ -82,6 +82,7 @@ export function createScene(canvas) {
   let vnow = 0;
   let realLast = performance.now() / 1000;
   let stopLeft = 0;
+  let kickPop = 0;
   // 0.30은 슬로모션으로 읽혔고 0.02는 프레임이 멈춘 것으로 읽혔다. 0.08이 걸리는 느낌이다.
   const HIT_SCALE = 0.08;
 
@@ -345,7 +346,11 @@ export function createScene(canvas) {
       const diveSide = Math.sign(VIEW_X * input.dive);
       const divePose = diveSide > 0 ? POSES.diveR : POSES.diveL;
       kp = t < runup ? POSES.brace : (input.dive === 0 ? POSES.brace : divePose);
-      kk = t < runup ? POSES.windup : POSES.strike;
+      // 차는 동작은 네 구간이다. 달리기, 반대로 접는 예비, 임팩트, 끝까지 넘어가는 팔로스루.
+      // 예비와 팔로스루를 뺀 발은 공을 차는 게 아니라 공 옆에 서 있는 것으로 읽힌다.
+      const swing = t - runup;
+      kk = swing < -0.13 ? POSES.windup
+        : (swing < 0 ? POSES.plant : (swing < 0.1 ? POSES.strike : POSES.follow));
       if (t < runup) {
         const p = t / runup;
         kicker.position.z = lerp(11.2, 10.55, ease(p));
@@ -363,6 +368,8 @@ export function createScene(canvas) {
           sfx.step(true);
           // 슛파워가 임팩트의 세기다. 화면이 쓰는 값과 소리가 쓰는 값이 같아야 한 사건으로 들린다.
           sfx.kick(shot.strong ? 0.95 : 0.4 + shot.kicker.power * 0.06);
+          kickPop = 0.07;
+          shake(0.05 + shot.kicker.power * 0.004, 0.12);
         }
         kicker.rotation.z *= 0.86;
         const p = Math.min(1, (t - runup) / flight);
@@ -555,7 +562,12 @@ export function createScene(canvas) {
     }
     // 잡히는 속도는 사건마다 다르다. 자빠짐은 빠르고 회복은 느리다.
     drive('keeper', kp, kp === POSES.faceplant ? 0.22 : (kp === POSES.dribble ? 0.26 : 0.12));
-    drive('kicker', kk, kk === POSES.strike ? 0.30 : 0.10);
+    // 예비는 느리게 잡혀야 버틴 것으로 보이고, 임팩트는 한 프레임에 가까워야 터진 것으로 보인다.
+    drive('kicker', kk, kk === POSES.strike ? 0.62 : (kk === POSES.follow ? 0.24 : (kk === POSES.plant ? 0.16 : 0.10)));
+    // 닿는 순간에만 몸이 부풀어야 힘이 들어간 것으로 읽힌다. 길게 주면 몸집이 변한 것으로 보인다.
+    kickPop = Math.max(0, kickPop - dt);
+    const kpop = 1 + (kickPop > 0 ? Math.sin((kickPop / 0.07) * Math.PI) * 0.15 : 0);
+    kicker.scale.setScalar(kpop);
     // 접지는 선언이 아니라 측정이다. 몸의 실제 최저점을 재서 원하는 높이에 맞춘다.
     keeper.position.y += hover - footY(keeper);
     kicker.position.y += -footY(kicker);
@@ -682,6 +694,8 @@ export function createScene(canvas) {
     trail.length = 0;
     for (const g of ghosts) g.visible = false;
     stopLeft = 0;
+    kickPop = 0;
+    kicker.scale.setScalar(1);
     shakeLeft = 0;
     shakeAmp = 0;
     dutchLeft = 0;
