@@ -4,7 +4,10 @@ const SRC = [
   ['audio/ogg; codecs=opus', 'assets/audio/bgm.ogg'],
   ['audio/mp4; codecs=mp4a.40.2', 'assets/audio/bgm.m4a'],
 ];
+import { readVolume } from './volume.mjs';
+
 const KEY = 'gtg.bgm.volume';
+
 
 export function mountBgm(base = '') {
   const el = new Audio();
@@ -13,8 +16,7 @@ export function mountBgm(base = '') {
   const pick = SRC.find(([type]) => el.canPlayType(type)) ?? SRC[1];
   el.src = base + pick[1];
 
-  const saved = Number(localStorage.getItem(KEY));
-  el.volume = Number.isFinite(saved) && saved >= 0 && saved <= 1 ? saved : 0.5;
+  el.volume = readVolume(KEY, 0.5);
 
   // 탭 전환이나 잠깐의 끊김으로 죽지 않는다. 끄는 건 volume 0뿐이다.
   const resume = () => { if (el.paused) el.play().catch(() => {}); };

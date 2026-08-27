@@ -7,15 +7,24 @@
 // 그래프를 만드는 함수는 전부 (ac, out, t0)를 받는다. 실시간 컨텍스트를 안 잡으므로
 // OfflineAudioContext로 그대로 렌더해서 파형을 잴 수 있다. 귀 없이 소리를 검사하는 유일한 경로다.
 
+import { readVolume } from './volume.mjs';
+
 export const SFX_NAMES = ['kick', 'post', 'dribble', 'place', 'step'];
 
 // 노이즈 소스는 색을 안 정한다. 흙이냐 가죽이냐 금속이냐는 체인의 필터가 정한다.
 // 어두운 소스를 쓰면 그 뒤의 밴드패스가 통과시킬 게 남지 않는다. 측정으로 확인했다.
+// 버퍼를 Math.random으로 채우면 런마다 스펙트럼이 달라져 계측값이 튀고, 게이트가
+// 코드가 그대로인데도 세 번에 한 번꿩 빨간불을 켜다. 버퍼는 고정하고
+// 개별 재생의 배속도와 시점만 흔든다. 귀에는 같은 변화가 남는다.
 export function makeNoise(ac, seconds = 1.2) {
   const n = Math.floor(ac.sampleRate * seconds);
   const buf = ac.createBuffer(1, n, ac.sampleRate);
   const d = buf.getChannelData(0);
-  for (let i = 0; i < n; i += 1) d[i] = Math.random() * 2 - 1;
+  let s = 0x2f6e2b1 >>> 0;
+  for (let i = 0; i < n; i += 1) {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    d[i] = (s / 0x80000000) - 1;
+  }
   return buf;
 }
 
@@ -231,8 +240,7 @@ export function mountSfx() {
     if (!AC) return null;
     ctx = new AC();
     master = ctx.createGain();
-    const saved = Number(localStorage.getItem(KEY));
-    master.gain.value = Number.isFinite(saved) && saved >= 0 && saved <= 1 ? saved : 0.7;
+    master.gain.value = readVolume(KEY, 0.7);
     master.connect(ctx.destination);
     noise = makeNoise(ctx);
     return ctx;
