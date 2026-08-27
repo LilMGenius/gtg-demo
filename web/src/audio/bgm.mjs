@@ -10,7 +10,7 @@ const KEY = 'gtg.bgm.volume';
 
 // 베드는 가장 작은 효과음 아래에 깔린다. bgm 파일 자체가 -13.8dB라 이것보다 크게 틀면
 // 발소리와 공 놓는 소리가 음악 밑에 깔린다. 효과음이 안 난다는 신고의 정체는 그것이었다.
-export const BED = 0.16;
+export const BED = 0.10;
 
 
 export function mountBgm(base = '') {

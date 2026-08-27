@@ -104,12 +104,15 @@ try {
       }
       return Math.sqrt(sum / Math.max(1, n));
     };
-    out.quietSfxDb = 99;
+    out.db = {};
     for (const name of sfx.SFX_NAMES) {
       const d = await m.renderSfx(sfx, name, ARG[name], LEN[name]);
-      out.quietSfxDb = Math.min(out.quietSfxDb, 20 * Math.log10(rms(d) * 0.7));
+      out.db[name] = Number((20 * Math.log10(rms(d) * 0.7)).toFixed(1));
     }
-    out.quietSfxDb = Number(out.quietSfxDb.toFixed(1));
+    // 가장 작은 소리는 살짝 디디는 발소리다. 세게 디디는 쪽만 재면 바닥을 놓친다.
+    const soft = await m.renderSfx(sfx, 'step', false, LEN.step);
+    out.db.stepSoft = Number((20 * Math.log10(rms(soft) * 0.7)).toFixed(1));
+    out.quietSfxDb = Math.min(...Object.values(out.db));
 
     const bgm = await import('/web/src/audio/bgm.mjs');
     const raw = await (await fetch('/web/assets/audio/bgm.m4a')).arrayBuffer();
@@ -158,8 +161,13 @@ try {
     r.kickSoft + " -> " + r.kickHard);
 
   // 음악이 발소리보다 크면 효과음은 나와도 안 난다. 파운더가 신고한 것이 그것이다.
-  check("mix:the-quietest-sound-sits-above-the-music-bed", r.quietSfxDb > r.bedDb,
-    "sfx " + r.quietSfxDb + "dB vs bed " + r.bedDb + "dB");
+  // 간신히 넘기는 것으로는 부족하다. 묻히지 않고 들리려면 여유가 필요하다.
+  check("mix:the-quietest-sound-clears-the-music-bed-by-3dB", r.quietSfxDb - r.bedDb >= 3,
+    "sfx " + r.quietSfxDb.toFixed(1) + "dB vs bed " + r.bedDb + "dB");
+  // 현실의 계층이 뒤집힐 수 있다. 공을 놓거나 디디는 소리가 슛만큼 크면 믹스가 깨진 것이다.
+  check("mix:the-kick-stays-above-the-incidental-sounds",
+    r.db.kick >= Math.max(r.db.dribble, r.db.place, r.db.step) + 3,
+    JSON.stringify(r.db));
 
 
   // 살아 있는 소리. 위의 검사는 OfflineAudioContext라 마스터 게인을 지나지 않는다.
