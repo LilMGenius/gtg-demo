@@ -9,7 +9,7 @@ import { addFace } from './actors.mjs';
 // 사각 그물 한 장. wireframe 평면은 삼각형 대각선이 남아 그물이 아니라 격자무늬로 읽힌다.
 // 팽팽한 격자는 그물이 아니라 방충망이다. 가운데를 배가 부르게 늘어뜨려야 천으로 읽힌다.
 // sag는 선을 조각내야 휜다. 세로선 한 줄을 두 점으로 그으면 직선밖에 안 나온다.
-export function meshPanel(w, h, cell, color, opacity, sag = 0) {
+export function meshPanel(w, h, cell, color, opacity, sag = 0, fadeFloor = false) {
   const pts = [];
   const nx = Math.max(1, Math.round(w / cell));
   const ny = Math.max(1, Math.round(h / cell));
@@ -44,7 +44,25 @@ export function meshPanel(w, h, cell, color, opacity, sag = 0) {
   const geo = new THREE.BufferGeometry();
   const attr = new THREE.Float32BufferAttribute(pts, 3);
   geo.setAttribute('position', attr);
-  const m = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+  // 아래쪽 실을 높이에 따라 지운다. 재질 하나의 opacity로는 그물 전체가 같이 흐려진다.
+  // 카메라가 골대 뒤 3.6m에 있어 그물 아랫단은 화면에서 흙바닥 위에 겹쳐 깔린다.
+  // 골대 안이 아니라 땅에 격자가 그려진 것으로 읽혔다. 뷰포트 그리드의 정체가 이것이다.
+  // 정점색을 색으로 섞으면 재질색과 곱해질 뿐이라 흙색을 넣어도 실이 어두워지기만 한다.
+  // 지우려면 알파여야 한다. 네 채널 정점색이 그 알파를 싣는다.
+  // 실제 동네 골대도 아랫단은 흙이 튀어 배경에 묻는다. 물리적으로도 이쪽이 맞다.
+  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
+  if (fadeFloor) {
+    const cols = new Float32Array((pts.length / 3) * 4);
+    for (let i = 0, k = 0; i < pts.length; i += 3, k += 4) {
+      const u = Math.min(1, Math.max(0, (pts[i + 1] + h / 2) / h));
+      // 위 3분의 1만 온전히 남긴다. 선형이면 중간 높이가 어중간하게 남아 격자가 그대로 읽힌다.
+      const t = Math.min(1, Math.max(0, (u - 0.42) / 0.58));
+      cols[k] = 1; cols[k + 1] = 1; cols[k + 2] = 1; cols[k + 3] = t * t;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 4));
+    mat.vertexColors = true;
+  }
+  const m = new THREE.LineSegments(geo, mat);
   m.userData.probeIgnore = true;
   // 공이 그물에 박히면 그물이 밀린다. 밀리지 않으면 공이 그림 앞을 지나간 것으로 읽힌다.
   // 원본 좌표를 따로 들고 있어야 밀었다 돌아온다. 매 프레임 누적하면 그물이 영영 늘어난다.
@@ -150,7 +168,7 @@ export function buildPitch(scene) {
   // 병맛이 아니라 와이어프레임 디버그 화면으로 읽혔다.
   // 답은 더 지우는 게 아니라 뒤집는 것이다. 밝은 흙 위에 어두운 실을 성기게 친다.
   // 대비는 오히려 올라가서 골이 어디 박혔는지는 더 잘 읽히고, 격자는 시야를 덮지 않는다.
-  const back = meshPanel(R_HALF_W * 2, R_H, 0.36, NET_NEAR, 0.34, 0.22);
+  const back = meshPanel(R_HALF_W * 2, R_H, 0.36, NET_NEAR, 0.34, 0.22, true);
   back.position.set(0, R_H / 2, -NET_D);
   scene.add(back);
   for (const sgn of [-1, 1]) {

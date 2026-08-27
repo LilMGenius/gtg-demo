@@ -797,6 +797,9 @@ export function createScene(canvas) {
 
   // 렌더러가 실제로 무엇을 그렸는지. 선언이 아니라 카운터다.
   // 포스트 패스 한 장이 아니라 세계 패스를 보고한다. 예산은 세계가 쓴다.
+  // 화면에 실제로 선 것을 이름으로 세는 진단구. 코드를 읽어 추측하면 없는 GridHelper를 찾게 된다.
+  window.__sceneRoot = () => scene;
+
   window.__renderInfo = () => ({
     calls: sceneCalls + 1,
     triangles: sceneTris + 2,
