@@ -58,6 +58,40 @@ export function jitterMesh(mesh, amp = 0.035, salt = 1) {
   return mesh;
 }
 
+// 정이십면체 꼭짓점 열둘. 축구공의 검은 오각형이 박히는 자리다.
+const ICO_AXES = (() => {
+  const P = (1 + Math.sqrt(5)) / 2;
+  const raw = [[-1, P, 0], [1, P, 0], [-1, -P, 0], [1, -P, 0], [0, -1, P], [0, 1, P],
+    [0, -1, -P], [0, 1, -P], [P, 0, -1], [P, 0, 1], [-P, 0, -1], [-P, 0, 1]];
+  return raw.map((v) => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; });
+})();
+
+// 축구공은 흰 구가 아니다. 무늬가 없으면 매 프레임 돌리는 회전이 화면에 하나도 안 나타난다.
+// 측정값: 0.14미터 공은 몸통 앞에서 12픽셀이라 그 안에 오각형 두 장이 들어간다. 회전을 읽히기엔 충분하다.
+// 세분 2단이면 면이 180장이고, 꼭짓점마다 가장 가까운 다섯 면이 오각형 한 장이 된다.
+// 공에만 재질을 따로 만들면 프로그램이 하나 늘어난다. 정점색으로 넣으면 flat()과 같은 배치를 쓴다.
+export function ballGeo(r) {
+  const geo = new THREE.IcosahedronGeometry(r, 2);
+  const p = geo.attributes.position;
+  const col = new Float32Array(p.count * 3);
+  for (let f = 0; f < p.count / 3; f += 1) {
+    let cx = 0; let cy = 0; let cz = 0;
+    for (let k = 0; k < 3; k += 1) { cx += p.getX(f * 3 + k); cy += p.getY(f * 3 + k); cz += p.getZ(f * 3 + k); }
+    const l = Math.hypot(cx, cy, cz);
+    let m = -1;
+    for (const a of ICO_AXES) m = Math.max(m, (cx * a[0] + cy * a[1] + cz * a[2]) / l);
+    // 측정값: 꼭짓점 둘레 다섯 면은 0.982, 그 밖은 0.917에서 끕긴다. 0.95가 그 사이다.
+    const dark = m > 0.95;
+    for (let k = 0; k < 3; k += 1) {
+      const i = (f * 3 + k) * 3;
+      // 순검정은 외곽선과 구분이 안 된다. 흑백이 아니라 가죽에 들인 검정이다.
+      col[i] = dark ? 0.13 : 1; col[i + 1] = dark ? 0.12 : 1; col[i + 2] = dark ? 0.11 : 1;
+    }
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
+}
+
 // 시드 고정 난수. 배치 간격을 손으로 놓은 것처럼 어긋내는 데 쓴다.
 export function seeded(seed) {
   let s = seed >>> 0;

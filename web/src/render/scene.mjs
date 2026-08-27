@@ -6,13 +6,13 @@ import { mountSfx } from '../audio/sfx.mjs';
 import { createBallProbe } from '../diagnostics/ball-probe.mjs';
 import { createStageProbe, goalFraming, footY } from '../diagnostics/stage-probe.mjs';
 import {
-  flat, BALL_R, VIEW_X, KICKER_OFF, BALL_PAST, REST_Z, REST_Y,
+  flat, flatVertex, BALL_R, VIEW_X, KICKER_OFF, BALL_PAST, REST_Z, REST_Y,
   R_HALF_W, R_H, SX, SY, lerp, ease
 } from './units.mjs';
 import { pupilMat, buildKeeper, buildKicker, POSES, lerpPose, setPose } from './objects/actors.mjs';
 import { buildPitch, buildPassers } from './objects/pitch.mjs';
 import { createImpact } from './objects/impact.mjs';
-import { jitterMesh, addOutline, blobGeo } from './handmade.mjs';
+import { jitterMesh, addOutline, blobGeo, ballGeo } from './handmade.mjs';
 
 export function createScene(canvas) {
   const sfx = mountSfx();
@@ -111,7 +111,7 @@ export function createScene(canvas) {
   const passers = buildPassers(scene);
   const impact = createImpact(scene);
 
-  const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.14, 1), flat(0xfdfdf6));
+  const ball = new THREE.Mesh(ballGeo(BALL_R), flatVertex(0xfdfdf6));
   // 흰 공이 밝은 하늘 앞을 지나면 사라진다. 외곽선 하나가 그걸 끝낸다.
   jitterMesh(ball, 0.006, 5);
   addOutline(ball, 0.012);

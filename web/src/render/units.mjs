@@ -5,6 +5,8 @@ import { GOAL_HALF_W, GOAL_H } from '../../../src/chain.mjs';
 export const flat = (c) => new THREE.MeshLambertMaterial({ color: c });
 // 같은 색에 잡티를 얹은 재질. 색은 flat과 같고 밝기만 흔들린다.
 export const flatMap = (c, tex) => new THREE.MeshLambertMaterial({ color: c, map: tex });
+// 정점색을 쓰는 재질. 재질 색과 곱해지므로 밑색은 흰색에 가깝게 둔다.
+export const flatVertex = (c) => new THREE.MeshLambertMaterial({ color: c, vertexColors: true });
 export const BALL_R = 0.14;
 // 화면 좌우와 판정 좌우를 맞추는 부호. 판정식은 건드리지 않는다.
 export const VIEW_X = -1;
