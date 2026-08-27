@@ -5,6 +5,9 @@
   /* 손으로 그은 선 한 벌. 유리(backdrop-filter)와 흐린 그림자는 앱의 언어라 안 쓴다.
      1px 테두리는 브라우저 위젯으로 읽혔고 5px은 글자를 먹었다. */
   --line:3px; --lift:4px; --tilt:-1.1deg;
+  /* 베벨 한 줄. 패널 안쪽 왼윗으로 밝은 선, 오른아래로 어두운 선.
+     둥근 모서리와 번진 그림자를 빼면 평면이 되고, 이 한 줄이 다시 두께를 만든다. */
+  --bevel: inset 2px 2px 0 #ffffff1f, inset -2px -2px 0 #00000038;
   --disp:'Black Han Sans','Pretendard','Malgun Gothic',sans-serif;
   --pad-l:calc(16px + env(safe-area-inset-left));
   --pad-r:calc(16px + env(safe-area-inset-right));
@@ -22,9 +25,9 @@ body.playing #hud{opacity:1}
 /* 상단 좌측. 레벨과 다섯 구의 결과만 남긴다. */
 #top{position:absolute;top:calc(12px + env(safe-area-inset-top));left:var(--pad-l);
   display:flex;align-items:center;gap:12px;
-  padding:6px 14px 7px;border-radius:12px;
+  padding:6px 14px 7px;
   background:var(--panel);border:var(--line) solid var(--edge);
-  box-shadow:var(--lift) var(--lift) 0 var(--edge);
+  box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);
   transform:rotate(var(--tilt))}
 #lv{font-family:var(--disp);font-weight:400;font-size:18px;letter-spacing:.02em;
   color:#ffd83d}
@@ -32,10 +35,10 @@ body.playing #hud{opacity:1}
 #fans{font-size:12px;font-weight:800;opacity:.82;letter-spacing:.02em}
 #fans b{font-weight:900;font-style:normal}
 #pips{display:flex;gap:6px}
-#pips i{width:9px;height:9px;border-radius:50%;background:#ffffff26;display:block;
+#pips i{width:9px;height:9px;background:#ffffff26;display:block;border:2px solid var(--edge);
   transition:background .18s}
-#pips i.save{background:var(--good);box-shadow:0 0 9px #4fd08a88}
-#pips i.gone{background:var(--bad);box-shadow:0 0 9px #e0563f88}
+#pips i.save{background:var(--good)}
+#pips i.gone{background:var(--bad)}
 
 /* 실점 한 방. 흰 장 하나가 먼저 튀고 색이 빠진다.
    0.06초는 아무도 못 봤고 0.5초는 화면을 가렸다. */
@@ -55,7 +58,7 @@ body.playing #hud{opacity:1}
   display:flex;flex-direction:column-reverse;align-items:center;gap:7px;min-height:3.6em;
   justify-content:flex-end}
 #caption b{color:#fff;font-size:13px;font-weight:400;letter-spacing:.05em;
-  padding:2px 10px 3px;border-radius:6px;background:var(--bad);
+  padding:2px 10px 3px;background:var(--bad);
   border:var(--line) solid var(--edge);box-shadow:3px 3px 0 var(--edge);
   -webkit-text-stroke:0;transform:rotate(1.6deg)}
 /* 한 줄이 들어올 때마다 튀어나온다. 페이드만 주면 자막이 조용히 갈리고 반전이 반전으로 안 읽힌다.
@@ -73,7 +76,7 @@ body.playing #hud{opacity:1}
   display:flex;align-items:flex-end;justify-content:center;
   padding-bottom:calc(74px + env(safe-area-inset-bottom))}
 .zone+.zone::before{content:'';position:absolute;left:0;top:18%;bottom:18%;
-  width:1px;background:linear-gradient(#fff0,#ffffff1c,#fff0)}
+  width:2px;background:#ffffff14}
 .zone svg{width:clamp(34px,4.1vw,50px);height:clamp(34px,4.1vw,50px);
   stroke-width:4.5;color:#f2f4f0cc;transition:color .12s,transform .12s;
   filter:drop-shadow(2px 3px 0 var(--edge)) drop-shadow(-2px 0 0 var(--edge))
@@ -84,42 +87,40 @@ body.playing #hud{opacity:1}
 
 /* 나가기. 각을 좁히는 선택이라 세 칸과 따로 논다. */
 #out{position:absolute;right:var(--pad-r);bottom:calc(20px + env(safe-area-inset-bottom));
-  pointer-events:auto;width:66px;height:66px;border-radius:50%;
+  pointer-events:auto;width:66px;height:66px;
   border:var(--line) solid var(--edge);background:var(--panel);
-  box-shadow:var(--lift) var(--lift) 0 var(--edge);transform:rotate(2deg);
+  box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(2deg);
   color:var(--dim);font-family:var(--disp);font-size:19px;font-weight:400;letter-spacing:.02em}
-#out.on{background:#e0563f;color:#fff;border-color:#ff8b78;
-  box-shadow:0 0 0 5px #e0563f2e, 0 6px 20px #e0563f55}
+#out.on{background:#e0563f;color:#fff;box-shadow:var(--lift) var(--lift) 0 var(--edge)}
 
 /* 자동. 손가락만 대신한다. */
 #auto{position:absolute;right:var(--pad-r);bottom:calc(94px + env(safe-area-inset-bottom));
-  pointer-events:auto;width:66px;height:66px;border-radius:50%;
+  pointer-events:auto;width:66px;height:66px;
   border:var(--line) solid var(--edge);background:var(--panel);
-  box-shadow:var(--lift) var(--lift) 0 var(--edge);transform:rotate(-2.4deg);
+  box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(-2.4deg);
   color:var(--dim);font-family:var(--disp);font-size:19px;font-weight:400;letter-spacing:.02em}
-#auto.on{background:#4fd08a;color:#0d110c;border-color:#8ef0bb;
-  box-shadow:0 0 0 5px #4fd08a2e, 0 6px 20px #4fd08a55}
+#auto.on{background:#4fd08a;color:#0d110c;box-shadow:var(--lift) var(--lift) 0 var(--edge)}
 
 /* 성장 선택. 가로라 세 장을 나란히 놓을 수 있다. */
 #offer{position:absolute;inset:0;pointer-events:auto;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
-  background:#080b07d9;backdrop-filter:blur(4px)}
+  background:#080b07ef}
 #offer[hidden]{display:none}
 #offer h4{font-family:var(--disp);font-size:clamp(22px,3vw,32px);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
   text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
 #offer .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;
   padding:0 var(--pad-l)}
-#offer button{min-width:150px;padding:16px 22px 18px;border-radius:14px;
+#offer button{min-width:150px;padding:16px 22px 18px;
   border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
   font-family:var(--disp);font-size:19px;font-weight:400;text-align:left;line-height:1.4;
-  box-shadow:6px 6px 0 var(--edge);transition:transform .12s,box-shadow .12s}
+  box-shadow:6px 6px 0 var(--edge), var(--bevel);transition:transform .12s,box-shadow .12s}
 /* 카드는 안 기울인다. 기울이면 세 장의 윗변이 어긋나고 한 줄 판정이 세 줄로 읽힌다.
    손으로 그린 티는 그림자 길이를 장마다 다르게 줘서 낸다. */
-#offer button:nth-child(1){box-shadow:4px 7px 0 var(--edge)}
-#offer button:nth-child(3){box-shadow:8px 5px 0 var(--edge)}
+#offer button:nth-child(1){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
+#offer button:nth-child(3){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
 #offer button em{display:block;font-style:normal;font-size:13px;font-weight:700;
   color:var(--good);margin-top:3px}
 #offer button:hover{background:#25301f;transform:translateY(-4px) rotate(0);
-  box-shadow:8px 10px 0 var(--edge)}
+  box-shadow:8px 10px 0 var(--edge), var(--bevel)}
 #offer button:active{transform:translateY(3px) rotate(0);box-shadow:2px 2px 0 var(--edge)}
