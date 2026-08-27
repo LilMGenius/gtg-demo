@@ -245,16 +245,24 @@ export function windowTex(variant = 0) {
     // 칸마다 따로 흔들면 창이 줄을 잃고 벽에 뚝뚝 흔어진 얼룩이 된다.
     // 사람은 가로줄을 층으로 읽는다. 흔들림은 층 단위로만 준다.
     const wW = Math.min(Math.round(5 * k.wide), k.stepX - 5);
+    // 칸마다 따로 흔들면 줄을 잃고, 전부 같은 자리면 열 간격이 자로 잰 격자가 된다.
+    // 열마다 밀린 거리와 폭을 한 번만 정해 모든 층에 같이 쓴다.
+    // 줄은 그대로 살아있고 격자만 깨진다.
+    const cols = [];
+    for (let x = 5; x < S - 6; x += k.stepX) {
+      cols.push({ x, dx: Math.round((r() - 0.5) * 5), w: Math.max(3, wW + Math.round((r() - 0.5) * 4)) });
+    }
     for (let y = 5; y < S - 6; y += k.stepY) {
       const oy = Math.round((r() - 0.5) * 3);
       const ox = Math.round((r() - 0.5) * 4);
-      for (let x = 5; x < S - 6; x += k.stepX) {
+      for (const col of cols) {
+        const x = col.x + col.dx;
         if (r() < k.skip) continue;
         // 낮의 창은 밝기만 다르다. 전부 같은 농도로 파면 구멍 뚫린 판때기가 된다.
         // 커튼 친 집이 몇 있어야 사람이 사는 건물로 읽힌다.
         const v = r();
         c.fillStyle = v > 0.82 ? '#b9c2c8' : (v > 0.45 ? '#4d5d69' : '#3a4954');
-        c.fillRect(x + ox, y + oy, wW, 6);
+        c.fillRect(x + ox, y + oy, col.w, 6);
       }
       // 난간. 창 아래를 가로지르는 선 하나다.
       // 이 선이 있으면 층이 세어지고, 없으면 창이 벌판에 띄운 점으로 남는다.
