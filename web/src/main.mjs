@@ -57,7 +57,7 @@ function setPad(on) {
 function nextSet() {
   // 기복은 판당 한 번 굴러서 그 판 내내 같은 값으로 선다.
   const form = rollForm(state.keeper, rng);
-  el('form').textContent = form > 0.4 ? '컨디션 좋음' : form < -0.4 ? '컨디션 난조' : '';
+  el('form').textContent = form > 0.4 ? '오늘 몸 좋다' : form < -0.4 ? '오늘 몸 무겁다' : '';
   state.shots = buildSet(rng, state.keeper.level);
   state.i = 0;
   state.results = [];
@@ -74,7 +74,7 @@ function nextShot() {
   setPad(true);
   stage.reset();
   pressAt = performance.now() + shot.flight * 1000 * 0.72;
-  say(shot.kicker.name + ' 준비합니다.', null);
+  say(shot.kicker.name + ', 슛 준비합니다.', null);
   // 창이 닫히면 손가락 대신 자동 입력이 친다. 늦은 만큼은 스탯이 아니라 손가락 탓이다.
   clearTimeout(timer);
   // 자동은 손가락만 대신한다. 공은 같은 시간을 날고 대기시간은 그대로다.
@@ -143,13 +143,13 @@ function countdown(sec, label, then) {
 function restart(result) {
   save(state.keeper, state.auto, state.fans);
   const hand = ballInHand(result);
-  countdown(restartDelay(state.keeper, result), hand ? '손으로 던져준다' : '골킥을 차준다', nextShot);
+  countdown(restartDelay(state.keeper, result), hand ? '공 던져주는 중' : '골킥 차주는 중', nextShot);
 }
 
 function endSet() {
   const conceded = state.results.filter(Boolean).length;
-  say('다섯 구 중 ' + (5 - conceded) + '개 막았습니다.', null);
-  setTimeout(() => countdown(setBreak(), '숨 고르는 중', showOffer), 900);
+  say('슛 다섯 개 중 ' + (5 - conceded) + '개 막았습니다.', null);
+  setTimeout(() => countdown(setBreak(), '한숨 돌리는 중', showOffer), 900);
 }
 
 function showOffer() {
@@ -157,7 +157,7 @@ function showOffer() {
   const offer = growthOffer(rng, state.keeper);
   const box = el('offer');
   box.hidden = false;
-  const head = state.picks > 0 ? '자리 비운 사이 훈련 ' + state.picks + '회 남음' : '어디를 올릴까';
+  const head = state.picks > 0 ? '자리 비운 사이 밀린 훈련 ' + state.picks + '회' : '뭘 올릴까';
   box.innerHTML = '<h4>' + head + '</h4><div class=\"row\">' + offer.map((k) =>
     '<button data-k=\"' + k + '\">' + CAUSE_LABEL[k] + '<em>' + state.keeper[k] + ' → ' + (state.keeper[k] + 1) + '</em></button>'
   ).join('') + '</div>';

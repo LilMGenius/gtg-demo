@@ -101,15 +101,15 @@ body.playing #hud{opacity:1}
 
 /* 나가기. 각을 좁히는 선택이라 세 칸과 따로 논다. */
 #out{position:absolute;right:var(--pad-r);bottom:calc(20px + env(safe-area-inset-bottom));
-  pointer-events:auto;width:66px;height:66px;
+  pointer-events:auto;width:66px;height:66px;white-space:nowrap;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(2deg);
-  color:var(--dim);font-family:var(--disp);font-size:19px;font-weight:400;letter-spacing:.02em}
+  color:var(--dim);font-family:var(--disp);font-size:17px;font-weight:400;letter-spacing:-.02em}
 #out.on{background:#e0563f;color:#fff;box-shadow:var(--lift) var(--lift) 0 var(--edge)}
 
 /* 자동. 손가락만 대신한다. */
 #auto{position:absolute;right:var(--pad-r);bottom:calc(94px + env(safe-area-inset-bottom));
-  pointer-events:auto;width:66px;height:66px;
+  pointer-events:auto;width:66px;height:66px;white-space:nowrap;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(-2.4deg);
   color:var(--dim);font-family:var(--disp);font-size:19px;font-weight:400;letter-spacing:.02em}

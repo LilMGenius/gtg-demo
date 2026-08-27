@@ -106,7 +106,7 @@ function courseOf(aimX, aimY) {
   return aimY >= 1.15 ? "상단" : "하단";
 }
 
-// 한 판은 다섯 구. 앞 두 구는 판독을 가르치고 마지막 한 구는 나가지 않으면 못 막는다.
+// 한 판은 슛 다섯 개. 앞 두 개는 판독을 가르치고 마지막 한 개는 나가지 않으면 못 막는다.
 export function buildSet(rng, level = 5) {
   const shots = [];
   for (let i = 0; i < 5; i++) {
@@ -308,11 +308,11 @@ export function resolve(input) {
   if (overP > 0 || diveP > 0 || gazeP > 0 || talkP > 0) {
     const d = draw();
     if (d < overP) {
-      say("emptyGoal", "나간 사이 넘겨버렸습니다. 골대가 비어 있었습니다.", "greed");
+      say("emptyGoal", "뛰쳐나온 사이 넘겨 찼습니다. 골대는 비어 있었습니다.", "greed");
       return done(true, "greed");
     }
     if (d < overP + diveP * (100 - overP) / 100) {
-      say("dived", "안 와도 될 공에 먼저 누웠습니다.", "judgement");
+      say("dived", "안 날아와도 될 공에 먼저 몸을 던졌습니다.", "judgement");
       return done(true, "judgement");
     }
     const before = overP + diveP * (100 - overP) / 100;
@@ -336,14 +336,14 @@ export function resolve(input) {
     }
     const cause = attributeContact(keeper, shot, inp);
     const lines = {
-      diving: "손끝이 스쳤지만 닿지 않았습니다.",
+      diving: "손끝을 스치고 지나갔습니다.",
       reflex: "반응이 한 박자 늦었습니다.",
       agility: "몸이 늦게 출발했습니다.",
       offball: "서 있던 자리가 틀렸습니다.",
-      composure: "강슈에 서둘렀습니다.",
-      resilience: "앞 구를 먹힌 것이 아직 안 풀렸습니다.",
+      composure: "슛이 강하니까 손이 먼저 나갔습니다.",
+      resilience: "직전에 먹힌 게 아직 안 풀렸습니다.",
       kickerPower: "손 쓸 시간을 안 줬습니다.",
-      kickerCurve: "끝에 휘어졌습니다. 손이 간 자리가 아니었습니다."
+      kickerCurve: "끝에서 휘었습니다. 손은 딴 데 가 있었습니다."
     };
     say("miss", lines[cause], cause);
     return done(true, cause);
@@ -381,17 +381,17 @@ export function resolve(input) {
       say("downed", "쳐냈는데 못 일어납니다.", "balance");
       state.rolls++;
       if (pct(rng, 60 + shot.kicker.finishing * 4)) {
-        say("rebound", "재슛이 빈 골대로 들어갔습니다.", "balance");
+        say("rebound", "다시 찬 슛이 빈 골대로 들어갔습니다.", "balance");
         return done(true, "balance");
       }
-      say("reboundMiss", "누운 채로 봤는데 빗나갔습니다. 세이브입니다.", null);
+      say("reboundMiss", "누운 채로 지켜봤는데 빗나갔습니다. 세이브입니다.", null);
       return done(false, null);
     }
     if (roll(24 + shot.kicker.finishing * 5 - reboundWindow * 0.5)) {
       say("rebound", "리바운드를 밀어 넣었습니다.", "kickerFinishing");
       return done(true, "kickerFinishing");
     }
-    say("reboundMiss", "재슛이 빗나갔습니다. 세이브입니다.", null);
+    say("reboundMiss", "다시 찬 슛이 빗나갔습니다. 세이브입니다.", null);
     return done(false, null);
   }
   say("catch", "잡았습니다.", null);
@@ -403,7 +403,7 @@ export function resolve(input) {
     say("save", "잡고 끝냈습니다. 세이브입니다.", null);
     return done(false, null);
   }
-  say("charge", "잡고 나서 드리블하러 나갑니다.", "mischief");
+  say("charge", "잡자마자 드리블하러 뛰쳐나갑니다.", "mischief");
 
   if (roll(26 + LOCKED.dribbling * 5 + keeper.judgement * 2)) {
     say("beat", "제꼈습니다. 하프라인까지 몰고 갑니다.", null);

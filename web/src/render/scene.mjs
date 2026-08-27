@@ -302,7 +302,7 @@ export function createScene(canvas) {
   // 자막은 크로스바 위에 작게 뜨고 아무도 안 읽는다. 가운데에 크게 한 번 찍는다.
   const STAMP = {
     carriedIn: '같이 들어감', gloveGone: '장갑째 골', downed: '깔려서 골',
-    openGoalScored: '빈 골대', talked: '떠들다 골', distracted: '한눈팔다 골'
+    openGoalScored: '빈 골대에 골', talked: '수다 떨다 골', distracted: '한눈팔다 골'
   };
   function flash(kind) {
     if (flashEl) {
@@ -340,7 +340,7 @@ export function createScene(canvas) {
     const BURST = { save: 1.0, catch: 0.8, gloveGone: 1.15, carriedIn: 1.1, spill: 0.85, downed: 1.0 };
     // 사건 이름을 모르면 화면만 보고는 무슨 일이 난 건지 모른다. 한 단어로 적어준다.
     // 문장을 넣으면 자막과 같은 것이 두 개가 되어 둘 다 안 읽힌다.
-    const WORD = { save: '털!', catch: '찰칵', gloveGone: '어?', carriedIn: '아아', spill: '퍽', downed: '으악' };
+    const WORD = { save: '퍽!', catch: '꽉!', gloveGone: '어?', carriedIn: '으어', spill: '툭', downed: '으악' };
     // 사건이 선언되는 순간 공은 아직 킥 지점 근처에 있다. 거기서 터뜨리면 글자가 키커 머리 위에 뜬다.
     // 손이 닿은 사건은 닿은 자리, 즉 장갑에서 터진다. 나머지는 골라인 앞 키퍼 자리다.
     if (BURST[kind]) {
@@ -651,7 +651,7 @@ export function createScene(canvas) {
         netT = 0;
         netX = ball.position.x;
         netY = ball.position.y - R_H / 2;
-        impact.burst(ball.position, 0.9, '꾹');
+        impact.burst(ball.position, 0.9, '출렁');
         shake(0.03, 0.22);
       }
       shadow.position.set(ball.position.x, 0.02, ball.position.z);

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#0d110c">
-<meta name="description" content="동네 운동장 방치형 골키퍼 키우기. 막든 먹히든 끝까지 봐야 안다.">
+<meta name="description" content="동네 운동장 방치형 골키퍼 키우기. 막아도 안 끝난다, 끝까지 봐야 안다.">
 <title>골키퍼 키우기</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23ffd83d%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%228%22 fill=%22%2312160e%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,7 +30,7 @@
     <button class="zone" data-dive="0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V6"/><path d="M6 12l6-6 6 6"/></svg></button>
     <button class="zone" data-dive="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
   </div>
-  <button id="out">나가</button>
+  <button id="out">나가기</button>
   <button id="auto">자동</button>
   <div id="offer" hidden></div>
 </div>
@@ -39,7 +39,7 @@
   <div id="mark">
     <span id="kicker">동네 운동장 방치형</span>
     <h1 id="word"><span>골키퍼</span><span>키우기</span></h1>
-    <p id="tag">막든 먹히든, 끝까지 봐야 안다</p>
+    <p id="tag">막아도 안 끝난다. 끝까지 봐야 안다</p>
     <button id="go">시작</button>
   </div>
 
@@ -52,21 +52,21 @@
       <ul>
         <li>
           <svg viewBox="0 0 48 48" fill="none" stroke-width="2.4" stroke-linejoin="round"><rect x="4" y="11" width="40" height="26" rx="4" stroke="#ffd83d"/><path d="M17.3 11v26M30.7 11v26" stroke="#5d6957"/><circle cx="10.6" cy="24" r="2.6" fill="#ffd83d" stroke="none"/><circle cx="37.4" cy="24" r="2.6" fill="#ffd83d" stroke="none"/></svg>
-          <div><b>화면 세 칸을 탭</b><small>왼쪽·가운데·오른쪽. 공이 올 곳을 찍는다</small></div>
+          <div><b>화면 세 칸을 누른다</b><small>왼쪽·가운데·오른쪽. 공이 올 곳을 찍는다</small></div>
         </li>
         <li>
           <svg viewBox="0 0 48 48" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="25" r="12" stroke="#4fd08a"/><path d="M24 7v4M9 13l3 3M39 13l-3 3" stroke="#4fd08a"/><path d="M24 18v7l5 3" stroke="#f2f4f0"/></svg>
-          <div><b>타이밍이 전부</b><small>빠르면 반대로 뚫리고, 늦으면 손이 안 닿는다</small></div>
+          <div><b>타이밍이 전부다</b><small>너무 빠르면 역동작, 너무 늦으면 손이 안 닿는다</small></div>
         </li>
         <li>
           <svg viewBox="0 0 48 48" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="10" r="4.5" stroke="#e0563f"/><path d="M24 41V19" stroke="#e0563f"/><path d="M16 27l8-8 8 8" stroke="#e0563f"/></svg>
-          <div><b>나가 버튼</b><small>각을 좁히러 뛰쳐나간다. 뚫리면 빈 골대</small></div>
+          <div><b>뛰쳐나가기</b><small>각을 좁히러 나간다. 뚫리면 골대가 빈다</small></div>
         </li>
       </ul>
       <div class="keys">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#7e8878" stroke-width="2" stroke-linejoin="round"><rect x="8" y="2" width="8" height="13" rx="4"/><path d="M12 6v3"/><path d="M6 12v5a6 6 0 0 0 12 0v-5"/></svg>
         마우스도 같은 세 칸
-        <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd> 키보드도 됨
+        <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd> 키보드도 된다
       </div>
     </div>
   </div>
@@ -75,7 +75,7 @@
 <div id="rotate">
   <svg viewBox="0 0 64 64" fill="none" stroke="#ffd83d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="20" y="6" width="24" height="40" rx="4"/><path d="M14 50a24 24 0 0 0 36 0"/><path d="M8 44l6 6 6-6"/></svg>
   <p>가로로 돌려주세요</p>
-  <small>골대는 좌우로 길다. 세로로는 판정이 안 보인다.</small>
+  <small>골대는 좌우로 길다. 세로로는 좌우가 안 보인다</small>
 </div>
 
 <script type="module" src="src/main.mjs"></script>
