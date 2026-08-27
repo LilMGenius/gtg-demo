@@ -322,7 +322,25 @@ export function createScene(canvas) {
     void stampEl.offsetWidth;
     stampEl.classList.add('hit');
   }
+  // 공이 손에 박히는 사건과 몸이 땅에 떨어지는 사건.
+  // 슛 소리 다음 결과 연출 5초가 통째로 무음이었다. 효과음이 안 난다는 신고의 정체는 그것이다.
+  const GRAB = new Set(['catch', 'save', 'spill', 'gloveGone', 'charge']);
+  const SHOT = new Set(['rebound', 'reboundMiss', 'skied', 'openGoalScored']);
+  const THUD = new Set(['carriedIn', 'downed', 'lost']);
+  const DRIB = new Set(['charge', 'beat']);
+  // 손을 안 대고 그냥 들어간 공. 가장 흔한 결과인데 여기가 통째로 무음이었다.
+  // 손끝을 스치는 사건이라 박히는 소리는 안 난다. 그물이 받는 소리 하나다.
+  const NET = new Set(['miss']);
   function act(kind) {
+    // 장갑에 박히는 것은 가죽이 눌리는 소리다. 슛이 발에 맞는 것과 같은 재질이고 세기만 다르다.
+    if (GRAB.has(kind)) sfx.kick(0.12);
+    // 다시 차는 사건은 새 슛이다. 리바운드도 빈 골대로 미는 것도 발에 맞는 순간이 있다.
+    else if (SHOT.has(kind)) sfx.kick(0.5);
+    // 몸이 흙바닥에 떨어진다. 발이 세게 디디는 소리와 같은 마른 충격음이다.
+    else if (THUD.has(kind)) sfx.step(true);
+    // 드리블은 잡는 순간과 겹친다. 잡자마자 바닥에 튀기며 나가는 것이다.
+    if (DRIB.has(kind)) sfx.dribble();
+    if (NET.has(kind)) sfx.place();
     if (kind === 'gloveGone') {
       const gi = keeper.position.x > 0 ? 1 : 0;
       const gl = keeper.userData.gloves[gi];
@@ -697,6 +715,8 @@ export function createScene(canvas) {
       // 공이 그물에 닿는 순간. 판정이 아니라 좌표 하나를 읽는 것뿐이다.
       if (!tail.netDone && ball.position.z <= pitch.netZ + 0.5 && CONCEDE.has(tail.kind)) {
         tail.netDone = true;
+        // 그물은 울리지 않는다. 마른 마찰 한 겹과 짧은 저역이 전부다.
+        sfx.place();
         netAmp = 0.4;
         netT = 0;
         netX = ball.position.x;

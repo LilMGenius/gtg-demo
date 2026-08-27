@@ -247,6 +247,81 @@ try {
   check("live:mute-is-not-stored-as-zero-volume", stored !== "0" && Number(stored) > 0, String(stored));
   check("live:sound-survives-a-reload-after-a-mute-toggle", afterReload > 0.02, String(afterReload));
 
+  // 발화되는 것과 소리가 난다고 느끼는 것은 다른 말이다.
+  // 슛 한 번만 울리고 결과 연출 수초가 통째로 조용하면 플레이어는 무음이라고 말한다.
+  // 사건마다 강제로 발동시켜 어느 결과가 무음으로 끝나는지 센다.
+  const KINDS = ["catch", "save", "spill", "rebound", "reboundMiss", "gloveGone",
+    "charge", "beat", "carriedIn", "downed", "lost", "talked", "distracted", "openGoalScored", "skied",
+    "miss"];
+  const silent = await lp.evaluate(async (kinds) => {
+    const out = [];
+    for (const k of kinds) {
+      window.__sfxLog = [];
+      window.__act(k);
+      await new Promise((r) => setTimeout(r, 1200));
+      if (window.__sfxLog.length === 0) out.push(k);
+    }
+    return out;
+  }, KINDS);
+  check("live:every-outcome-makes-at-least-one-sound", silent.length === 0,
+    silent.join(",") || String(KINDS.length) + " kinds");
+
+  // 사건마다 소리가 나는 것과 플레이 내내 소리가 들리는 것은 다른 말이다.
+  // 사건을 전부 채워도 공을 다시 세우는 몇 초가 비어 있으면 무음으로 신고된다.
+  // 선언이 아니라 마스터를 직접 탭해서 가장 긴 조용한 구간을 초로 잰다.
+  // AnalyserNode 폴링은 버킷 사이를 흘려 피크를 놓친다. ScriptProcessor만 유효하다.
+  const gapCtx = await b.newContext();
+  await gapCtx.addInitScript(() => {
+    window.__buckets = [];
+    const AC = window.AudioContext;
+    const gain0 = AC.prototype.createGain;
+    AC.prototype.createGain = function (...a) {
+      const node = gain0.apply(this, a);
+      const self = this;
+      const conn = node.connect.bind(node);
+      node.connect = (dst, ...rest) => {
+        if (dst === self.destination && !self.__tap) {
+          const sp = self.createScriptProcessor(1024, 1, 1);
+          self.__tap = sp;
+          sp.onaudioprocess = (e) => {
+            const d = e.inputBuffer.getChannelData(0);
+            let m = 0;
+            for (let i = 0; i < d.length; i += 1) { const v = Math.abs(d[i]); if (v > m) m = v; }
+            window.__buckets.push([self.currentTime, m]);
+          };
+          sp.connect(self.destination);
+          conn(sp);
+        }
+        return conn(dst, ...rest);
+      };
+      return node;
+    };
+  });
+  const gp = await gapCtx.newPage();
+  gp.on("pageerror", (e) => errs.push(String(e)));
+  await gp.goto(URL, { waitUntil: "load" });
+  await gp.waitForTimeout(900);
+  await gp.evaluate(() => {
+    const g = document.querySelector("#go");
+    const r = g.getBoundingClientRect();
+    const o = { bubbles: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
+    g.dispatchEvent(new PointerEvent("pointerdown", o));
+    g.dispatchEvent(new MouseEvent("click", o));
+  });
+  await gp.waitForTimeout(1400);
+  await gp.evaluate(() => { window.__buckets = []; });
+  await gp.keyboard.press("ArrowLeft");
+  await gp.waitForTimeout(16000);
+  const maxGap = await gp.evaluate(() => {
+    const bs = window.__buckets;
+    let gap = 0;
+    let prev = bs.length ? bs[0][0] : 0;
+    for (const [t, v] of bs) { if (v > 0.01) { if (t - prev > gap) gap = t - prev; prev = t; } }
+    return Number(gap.toFixed(2));
+  });
+  check("live:play-never-goes-quiet-for-more-than-four-seconds", maxGap > 0 && maxGap <= 4,
+    maxGap + "s");
+
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
 
   console.log(notes.map((s) => "  ok   " + s).join("\n"));

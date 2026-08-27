@@ -119,9 +119,6 @@ function rollCaptions(result) {
     say(e.line, e.cause);
     // 자막이 말한 사건을 화면도 같이 연기한다. 결과는 이미 확정됐고 여기서 바뀌지 않는다.
     if (e.t !== 'result') stage.act(e.t);
-    // 체인이 드리블로 갔을 때만 공을 튕기는 소리가 붙는다. 자막과 소리가 같은 사건을 가리킨다.
-    if (e.t === 'charge' || e.t === 'beat') stage.sfx.dribble();
-    if (e.t === 'spill' || e.t === 'rebound') stage.sfx.kick(0.5);
     clearTimeout(timer);
     timer = setTimeout(step, e.t === 'result' ? 900 : 850);
     // 자막을 밀어놓는 것은 손가락이다. 스택으로 살 수 있는 것은 공이 다시 놀이는 시간뿐이다.
@@ -133,9 +130,14 @@ function rollCaptions(result) {
 // 공을 다시 세우는 시간. 스로잉과 골킥이 이 초를 줄이고, 줄어드는 것이 화면에 보여야 선택이 선택이 된다.
 function countdown(sec, label, then) {
   const until = performance.now() + sec * 1000;
+  // 공을 다시 세우는 몇 초가 통째로 무음이었다. 키퍼는 그동안 공을 바닥에 튀기고 있다.
+  // 간격을 고정하면 메트로놈이 되어 사람 손이 아니라 기계로 들린다.
+  let bounce = performance.now() + 380;
   const tick = () => {
-    const left = (until - performance.now()) / 1000;
+    const now = performance.now();
+    const left = (until - now) / 1000;
     if (left <= 0) { el('caption').textContent = ''; then(); return; }
+    if (now >= bounce && left > 0.45) { stage.sfx.dribble(); bounce = now + 620 + Math.random() * 360; }
     el('caption').innerHTML = label + ' <b>' + left.toFixed(1) + 's</b>';
     timer = setTimeout(tick, 100);
   };
