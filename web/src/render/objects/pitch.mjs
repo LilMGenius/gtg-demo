@@ -208,9 +208,18 @@ export function buildPassers(scene) {
     if (i === 0) {
       // 긴 머리 한 덩이. 이 하나로 멀리서도 다른 사람으로 읽힌다.
       // 반경 0.17은 머리(0.15)보다 커서 얼굴을 통째로 삼켰다. 뒤통수 쪽으로 물린다.
-      const hair = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.34, 3, 6), flat(0x2b1d14));
-      hair.position.set(0, 1.28 * tall, -0.09);
-      parts.push(hair);
+      const hair = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.42, 3, 6), flat(0x2b1d14));
+      hair.position.set(0, 1.24 * tall, -0.09);
+      // 머리 하나만으로는 멀리서 남녀가 안 갈린다. 치마가 실루엣 밑변을 벌려 준다.
+      // 몸통 비율은 안 건드린다. 건드리면 다섯이 전부 땅딸해진다.
+      const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.34 * wide, 0.42 * tall, 8, 1, true), flat(0xe4d7ef));
+      skirt.position.y = 0.62 * tall;
+      skirt.material.side = THREE.DoubleSide;
+      // 눈에 띄는 사람은 화면에서도 눈에 띄어야 한다. 머리 위 반짝임 하나가 시선을 잡는다.
+      const spark = new THREE.Mesh(new THREE.OctahedronGeometry(0.11, 0), new THREE.MeshBasicMaterial({ color: 0xffe98a }));
+      spark.position.y = 1.72 * tall;
+      g.userData.spark = spark;
+      parts.push(hair, skirt, spark);
     } else if (i % 2 === 1) {
       // 학생. 등에 가방 한 덩어리. 실루엓이 뒤로 불룩해져 머리 없이도 구분된다.
       const bag = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.2), flat(0x2f4f43));
