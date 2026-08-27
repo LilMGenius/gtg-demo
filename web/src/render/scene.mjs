@@ -507,9 +507,17 @@ export function createScene(canvas) {
           if (loose) {
             // 장갑은 공에 딸려 간다. 0.3만큼 띄웠더니 장갑과 공이 따로 날아가는 것으로 읽혔다.
             // 공에 닿을 만큼 붙이고 회전만 따로 준다.
-            loose.position.set(ball.position.x + 0.12, ball.position.y + 0.09, ball.position.z + 0.1);
-            loose.rotation.z += 0.4;
-            loose.rotation.x += 0.26;
+            // 공에 딱 붙어 같이 가면 공에 노란 스티커를 붙인 것으로 읽힌다.
+            // 반 박자 뒤처지게 끌리고 크게 돌아야 딸려 가는 중인 것이 보인다.
+            // 0.12 지연은 장갑이 손 자리에 남아 공만 날아간 것으로 보였다. 한 뼘만 뒤처지게 한다.
+            const lag = ease(Math.min(1, u * 1.5));
+            loose.position.set(
+              lerp(tail.from.x, ball.position.x, lag) + 0.1,
+              lerp(tail.from.y, ball.position.y, lag) + 0.14 + Math.sin(u * Math.PI) * 0.22,
+              lerp(tail.from.z, ball.position.z, lag) + 0.12
+            );
+            loose.rotation.z += 0.62;
+            loose.rotation.x += 0.41;
           }
           break;
         }
