@@ -1,7 +1,7 @@
 // 무대. 흙 운동장 하나와 그 너머를 채우는 것들이다.
 import * as THREE from '../../../vendor/three.module.min.js';
 import { flat, flatMap, R_HALF_W, R_H } from '../units.mjs';
-import { dirtTex, scuffTex, clothTex, chippedTex, windowTex, windowTexFor } from '../texture.mjs';
+import { dirtTex, scuffTex, clothTex, chippedTex, cloudTex, windowTex, windowTexFor } from '../texture.mjs';
 import { loadDecor } from '../decor.mjs';
 import { jitterMesh, seeded, addOutline } from '../handmade.mjs';
 import { addFace } from './actors.mjs';
@@ -168,16 +168,39 @@ export function buildPitch(scene) {
   // 하늘. 안쪽을 보는 반구 하나면 검은 벽이 사라진다.
   // 한 색으로 칠하면 하늘이 아니라 뒤에 세운 파란 벽이다. 지평선이 밝고 천정이 어두워야 하늘이 된다.
   // 포스터라이즈가 이 그라데이션을 몇 단으로 끊는다. 매끈한 하늘보다 끊긴 하늘이 우리 톤이다.
+  // 구름은 메시를 더 얹지 않고 같은 셰이더 안에서 칠한다. 드로우콜 여유가 없다.
   const dome = new THREE.Mesh(
     new THREE.SphereGeometry(90, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2),
     new THREE.ShaderMaterial({
-      uniforms: { lo: { value: new THREE.Color(0xbcd4e2) }, hi: { value: new THREE.Color(0x5c86ad) } },
-      vertexShader: 'varying float vH; void main(){ vH = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      uniforms: {
+        lo: { value: new THREE.Color(0xbcd4e2) },
+        hi: { value: new THREE.Color(0x5c86ad) },
+        cloud: { value: cloudTex() },
+        drift: { value: 0 }
+      },
+      vertexShader: [
+        'varying float vH; varying vec3 vD;',
+        'void main(){',
+        '  vD = normalize(position);',
+        '  vH = vD.y;',
+        '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+        '}'
+      ].join(String.fromCharCode(10)),
       fragmentShader: [
-        'uniform vec3 lo; uniform vec3 hi; varying float vH;',
+        'uniform vec3 lo; uniform vec3 hi; uniform sampler2D cloud; uniform float drift;',
+        'varying float vH; varying vec3 vD;',
         'void main(){',
         // 선형으로 섞으면 위쪽 절반이 거의 같은 색이다. 제곱근이면 지평선 가까이에서 빨리 갈린다.
-        '  gl_FragColor = vec4(mix(lo, hi, sqrt(clamp(vH, 0.0, 1.0))), 1.0);',
+        '  vec3 sky = mix(lo, hi, sqrt(clamp(vH, 0.0, 1.0)));',
+        // 방위각으로 감고 고도로 편다. 반구 UV를 그대로 쓰면 천정에서 텍스처가 한 점으로 빨려든다.
+        '  vec2 uv = vec2((atan(vD.z, vD.x) * 0.15915494 + drift) * 3.0, pow(clamp(vH, 0.0, 1.0), 0.62));',
+        '  float a = texture2D(cloud, uv).a;',
+        // 알파를 두 단으로 끊는다. 몸통은 흰색, 아랫배는 회색. 부드러운 경계는 손그림이 아니다.
+        '  vec3 body = mix(vec3(0.86, 0.88, 0.91), vec3(1.0), step(0.62, a));',
+        '  float on = step(0.30, a);',
+        // 지평선 바로 위는 구름을 걷는다. 건물 실루엣과 겹치면 스티커로 읽힌다.
+        '  on *= smoothstep(0.005, 0.045, vH);',
+        '  gl_FragColor = vec4(mix(sky, body, on), 1.0);',
         '}'
       ].join(String.fromCharCode(10)),
       side: THREE.BackSide, fog: false, depthWrite: false

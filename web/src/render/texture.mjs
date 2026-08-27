@@ -114,6 +114,55 @@ export function clothTex() {
   });
 }
 
+// 구름. 하늘이 빈 그라디언트면 하늘을 안 그린 것으로 읽힌다.
+// 붓으로 그린 뭉게구름이다. 부드러운 알파는 쓰지 않는다. 가장자리가 딱 끊겨야 손그림이다.
+// 알파 채널에 밀도를 담는다. 셰이더가 이걸 몇 단으로 끊어 칠한다.
+export function cloudTex() {
+  return memo('cloud', () => {
+    const W = 512;
+    const H = 256;
+    const cv = document.createElement('canvas');
+    cv.width = W;
+    cv.height = H;
+    const c = cv.getContext('2d');
+    c.clearRect(0, 0, W, H);
+    const r = rng(0x2a91f7);
+    c.fillStyle = '#ffffff';
+    // 덩어리 스물두 개. 같은 크기로 스물두 번 찍으면 벽지가 된다.
+    // 반지름, 납작한 정도, 뭉치는 개수를 덩어리마다 따로 굴린다.
+    // 카메라는 하늘의 아래쪽 띠만 본다. 텍스처 위쪽에 찍으면 화면에 한 조각도 안 걸린다.
+    for (let i = 0; i < 22; i += 1) {
+      const cx = ((i + r() * 0.8) / 22) * W;
+      // 지평선 가까이가 빽빽해야 원근이 생긴다. v가 작을수록 지평선이다.
+      const cy = H * (1 - (0.06 + Math.pow(r(), 1.25) * 0.30));
+      const base = 8 + r() * 13;
+      const squash = 0.34 + r() * 0.30;
+      const puffs = 4 + Math.floor(r() * 5);
+      for (let k = 0; k < puffs; k += 1) {
+        const t = k / (puffs - 1) - 0.5;
+        const rad = base * (0.5 + Math.pow(1 - Math.abs(t) * 1.6, 2) * 0.9);
+        c.beginPath();
+        c.ellipse(cx + t * base * 2.4, cy - rad * squash * 0.4 + (r() - 0.5) * base * 0.3,
+                  rad, rad * squash * 1.35, 0, 0, Math.PI * 2);
+        c.fill();
+      }
+      // 아랫배는 평평하게 자른다. 둥근 덩어리만 쌓으면 솜뭉치다.
+      // 자르는 폭은 덩어리 몸통까지다. 넓게 자르면 옆 덩어리까지 먹어 흰 띠가 생긴다.
+      c.save();
+      c.globalCompositeOperation = 'destination-out';
+      c.fillRect(cx - base * 1.9, cy + base * squash * 1.05, base * 3.8, base * 2);
+      c.restore();
+    }
+    const t = new THREE.CanvasTexture(cv);
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    t.generateMipmaps = false;
+    t.wrapS = THREE.RepeatWrapping;
+    t.wrapT = THREE.ClampToEdgeWrapping;
+    return t;
+  });
+}
+
 // 칠이 벗겨진 쇠. 골대 폴에 쓴다. 새로 세운 규격 골대는 이 게임의 무대가 아니다.
 export function chippedTex() {
   return memo('chipped', () => {
