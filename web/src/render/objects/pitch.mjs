@@ -249,8 +249,11 @@ export function buildPassers(scene) {
     for (const [pi, m] of parts.entries()) { jitterMesh(m, 0.02, 70 + i * 5 + pi); m.userData.probeIgnore = true; }
     addOutline(body, 0.03);
     g.add(...parts);
-    g.position.set(-24 + i * 9.5, 0, 32.5 + (i % 3) * 1.4);
-    g.userData.speed = 1.4 + (i % 4) * 0.5;
+    // 9.5씩 끊어 놓으면 다섯이 같은 간격으로 지나간다. 행렬이지 행인이 아니다.
+    // 시작 위치를 흩고 걸음 위상을 따로 준다. 같은 순간에 같은 쪽으로 기우는 것이 가장 티가 났다.
+    g.position.set(-24 + i * 9.5 + (rnd() - 0.5) * 6.4, 0, 31.6 + rnd() * 3.2);
+    g.userData.speed = 1.15 + rnd() * 1.3;
+    g.userData.phase = rnd() * Math.PI * 2;
     g.userData.homeZ = g.position.z;
     scene.add(g);
     passers.push(g);

@@ -675,7 +675,7 @@ export function createScene(canvas) {
       }
       p.position.x += p.userData.speed * 0.016;
       if (p.position.x > 26) p.position.x = -26;
-      p.rotation.z = Math.sin(performance.now() * 0.006 * p.userData.speed) * 0.06;
+      p.rotation.z = Math.sin(performance.now() * 0.006 * p.userData.speed + p.userData.phase) * 0.06;
     }
     keeperShadow.scale.setScalar(1 + Math.abs(Math.sin(keeper.rotation.z)) * 0.8);
     kickerShadow.position.set(kicker.position.x, 0.03, kicker.position.z);
