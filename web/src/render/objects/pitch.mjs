@@ -156,9 +156,22 @@ export function buildPitch(scene) {
   scene.add(roof);
 
   // 하늘. 안쪽을 보는 반구 하나면 검은 벽이 사라진다.
+  // 한 색으로 칠하면 하늘이 아니라 뒤에 세운 파란 벽이다. 지평선이 밝고 천정이 어두워야 하늘이 된다.
+  // 포스터라이즈가 이 그라데이션을 몇 단으로 끊는다. 매끈한 하늘보다 끊긴 하늘이 우리 톤이다.
   const dome = new THREE.Mesh(
     new THREE.SphereGeometry(90, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color: 0x86aecb, side: THREE.BackSide, fog: false })
+    new THREE.ShaderMaterial({
+      uniforms: { lo: { value: new THREE.Color(0xbcd4e2) }, hi: { value: new THREE.Color(0x5c86ad) } },
+      vertexShader: 'varying float vH; void main(){ vH = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: [
+        'uniform vec3 lo; uniform vec3 hi; varying float vH;',
+        'void main(){',
+        // 선형으로 섞으면 위쪽 절반이 거의 같은 색이다. 제곱근이면 지평선 가까이에서 빨리 갈린다.
+        '  gl_FragColor = vec4(mix(lo, hi, sqrt(clamp(vH, 0.0, 1.0))), 1.0);',
+        '}'
+      ].join(String.fromCharCode(10)),
+      side: THREE.BackSide, fog: false, depthWrite: false
+    })
   );
   scene.add(dome);
 
