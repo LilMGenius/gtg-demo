@@ -212,25 +212,44 @@ export function buildPitch(scene) {
   roof.position.set(0, R_H, -NET_D / 2);
   scene.add(roof);
 
-  // 뒷그물은 서 있는 평면인데 화면에서는 바닥에 깐 카펫으로 읽혔다.
-  // 실 격자만 있으면 어느 쪽이 위인지 알려주는 것이 하나도 없다. 그물을 받치는 틀이 그 일을 한다.
-  // 뒷기둥 둘이 세로선을 긋고 위아래 가로대가 그 선의 끝을 묶는다. 옆 가로대는 앞뒤 거리를 만든다.
+  // 뒷그물은 서 있는 평면인데 실 격자만 있으면 어느 쪽이 위인지 알려주는 것이 하나도 없다.
+  // 그물을 받치는 틀이 그 일을 한다. 뒷기둥 둘이 세로선을 긋고 빗대가 앞뒤 거리를 만든다.
   // 흰 골대와 같은 색으로 칠하면 앞 골대와 겹쳐 한 덩어리로 읽힌다. 뒷틀은 녹슨 쇠다.
-  // 틀을 여섯 개 메시로 두면 드로우콜이 예산을 넘는다. 한 장으로 붙여 하나만 부른다.
+  // 틀을 여러 메시로 두면 드로우콜이 예산을 넘는다. 한 장으로 붙여 하나만 부른다.
+  //
+  // 뒷기둥을 그물 폭과 같은 자리에 세우면 화면에 남지 않는다. 카메라가 앞 골대에서 5.1m,
+  // 뒷면에서 3.6m라 같은 폭이 1.42배로 퍼진다. 앞 골대가 이미 화면 폭을 다 쓰므로
+  // 폭을 그대로 옮긴 기둥은 좌우 밖으로 나가고 가로대만 화면을 가로지르는 띠로 남는다.
+  // 접이식 골대처럼 뒤로 갈수록 좁혀 세운다. 기둥이 화면 안에 들어와 세로선을 긋고,
+  // 앞 기둥 머리에서 뒤 기둥 머리로 물러나는 빗대가 깊이를 그린다.
+  const BACK_HW = 2;
   const railGeo = (len, axis) => {
     const g = new THREE.CylinderGeometry(0.05, 0.05, len, 6);
     if (axis === 'x') g.rotateZ(Math.PI / 2);
-    if (axis === 'z') g.rotateX(Math.PI / 2);
     return g;
+  };
+  // 빗대는 축에 나란하지 않다. 두 끝점을 받아 그 방향으로 눕힌다.
+  const stayGeo = (a, b) => {
+    const dir = new THREE.Vector3().subVectors(b, a);
+    const g = new THREE.CylinderGeometry(0.05, 0.05, dir.length(), 6);
+    const q = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      dir.clone().normalize()
+    );
+    g.applyQuaternion(q);
+    return g.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
   };
   const rails = [];
   for (const sgn of [-1, 1]) {
-    rails.push(railGeo(R_H, 'y').translate(sgn * R_HALF_W, R_H / 2, -NET_D));
-    rails.push(railGeo(NET_D, 'z').translate(sgn * R_HALF_W, R_H, -NET_D / 2));
+    rails.push(railGeo(R_H, 'y').translate(sgn * BACK_HW, R_H / 2, -NET_D));
+    rails.push(
+      stayGeo(
+        new THREE.Vector3(sgn * R_HALF_W, R_H, 0),
+        new THREE.Vector3(sgn * BACK_HW, R_H, -NET_D)
+      )
+    );
   }
-  rails.push(railGeo(R_HALF_W * 2, 'x').translate(0, R_H, -NET_D));
-  // 아래 가로대는 그물 바닥이 흙에 닿는 자리를 찍는다. 그 선이 없으면 그물이 어디서 끝나는지 안 보인다.
-  rails.push(railGeo(R_HALF_W * 2, 'x').translate(0, 0.05, -NET_D));
+  rails.push(railGeo(BACK_HW * 2, 'x').translate(0, R_H, -NET_D));
   const rear = new THREE.Mesh(mergeGeos(rails), flatMap(0x5f6a5c, chippedTex()));
   // 앞 골대는 한 번 들이받혀 기울었다. 뒷틀만 정확히 서 있으면 둘이 다른 날 세운 물건으로 보인다.
   rear.rotation.z = 0.012;
