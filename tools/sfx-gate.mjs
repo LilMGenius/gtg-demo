@@ -104,7 +104,7 @@ try {
       }
       return Math.sqrt(sum / Math.max(1, n));
     };
-    // 노이즈 재생 배속이 발화마다 달라서 한 번만 재면 네 번에 한 번꿄 틀린 답이 나온다.
+    // 노이즈 재생 배속이 발화마다 달라서 한 번만 재면 네 번에 한 번은 틀린 답이 나온다.
     // 귀가 듣는 것은 한 발이 아니라 수백 발의 분포다. 열한 번씩 재서 중앙값과 양 끝을 남긴다.
     const RUNS = 11;
     const med = (a) => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
