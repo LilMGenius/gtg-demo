@@ -59,7 +59,7 @@ export function goalFraming(camera, halfW, height) {
 }
 
 // 한 구 동안의 최악값만 남긴다. 평균은 한 프레임짜리 이탈을 지운다.
-// 배우는 교체된다. 객체를 불들면 낡은 것을 재게 되므로 접근자를 받는다.
+// 배우는 교체된다. 객체를 붙들면 낡은 것을 재게 되므로 접근자를 받는다.
 export function createStageProbe(camera, actors) {
   const worst = {};
   function reset() {
