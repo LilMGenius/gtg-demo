@@ -88,7 +88,8 @@ body.playing #hud{opacity:1}
 #pad{position:absolute;inset:0;display:flex;pointer-events:auto}
 .zone{flex:1;border:0;background:transparent;position:relative;
   display:flex;align-items:flex-end;justify-content:center;
-  padding-bottom:calc(74px + env(safe-area-inset-bottom))}
+  /* 화살표는 골라인 앞 흙바닥에 앉는다. 더 올리면 키퍼가 좌우로 뻗는 통로를 덮는다. */
+  padding-bottom:calc(10px + env(safe-area-inset-bottom))}
 .zone+.zone::before{content:'';position:absolute;left:0;top:18%;bottom:18%;
   width:2px;background:#ffffff14}
 .zone svg{width:clamp(34px,4.1vw,50px);height:clamp(34px,4.1vw,50px);
@@ -99,8 +100,10 @@ body.playing #hud{opacity:1}
 .zone:disabled svg{color:#ffffff1f}
 .zone:disabled{cursor:default}
 
+/* 컨트롤 세 개는 크로스바 위 하늘 띠에 쌓는다. 기둥 아래끝 206px, 크로스바 325px.
+   화면 아래 오른쪽은 골포스트와 골문 구석이고, 그 구석에서 선방과 실점이 갈린다. */
 /* 나가기. 각을 좁히는 선택이라 세 칸과 따로 논다. */
-#out{position:absolute;right:var(--pad-r);bottom:calc(20px + env(safe-area-inset-bottom));
+#out{position:absolute;right:var(--pad-r);top:calc(12px + env(safe-area-inset-top));
   pointer-events:auto;width:66px;height:66px;white-space:nowrap;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(2deg);
@@ -108,8 +111,8 @@ body.playing #hud{opacity:1}
 #out.on{background:#e0563f;color:#fff;box-shadow:var(--lift) var(--lift) 0 var(--edge)}
 
 /* 자동. 손가락만 대신한다. */
-/* 소리. 끌 수 없는 소리는 소리가 아니라 사고다. 자동/나가기 위로 같은 줄에 얹는다. */
-#mute{position:absolute;right:var(--pad-r);bottom:calc(168px + env(safe-area-inset-bottom));
+/* 소리. 끌 수 없는 소리는 소리가 아니라 사고다. 기둥 맨 아래라 오조작이 제일 적다. */
+#mute{position:absolute;right:var(--pad-r);top:calc(160px + env(safe-area-inset-top));
   pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);color:var(--ink);
   transform:rotate(var(--tilt));box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel)}
@@ -119,7 +122,7 @@ body.playing #hud{opacity:1}
 #mute[aria-pressed="true"]{color:var(--bad)}
 #mute[aria-pressed="true"] .wave{opacity:0}
 #mute[aria-pressed="true"] .slash{opacity:1}
-#auto{position:absolute;right:var(--pad-r);bottom:calc(94px + env(safe-area-inset-bottom));
+#auto{position:absolute;right:var(--pad-r);top:calc(86px + env(safe-area-inset-top));
   pointer-events:auto;width:66px;height:66px;white-space:nowrap;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(-2.4deg);
