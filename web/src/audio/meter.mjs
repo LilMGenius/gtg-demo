@@ -123,9 +123,40 @@ export function topPeaks(d, fromMs, lenMs, k) {
   return picked.map((x) => x.f).sort((a, x) => a - x);
 }
 
-// 종은 모든 모드가 정수배다. 하나만 정수배에 가까워도 종이라고 부르면 관을 종으로 잎는다.
+// 밝기의 무게중심. 먹먹하다와 명쾌하다를 가르는 단 하나의 수치다.
+// 대역 비율은 세 칸으로 뭉개서 900Hz 가죽과 3000Hz 금속을 같은 hi로 읽는다.
+// 중심은 그 둘을 숫자 하나로 갈라낸다.
+export function centroid(d, fromMs, lenMs) {
+  const s = spectrum(d, fromMs, lenMs);
+  let num = 0;
+  let den = 0;
+  for (const x of s) { num += x.f * x.a; den += x.a; }
+  return den > 0 ? Math.round(num / den) : 0;
+}
+
+// 피크까지 걸린 시간. 실제 충돌은 접촉이 끝나기 전에 최대가 되므로 밀리초 한 자리다.
+// 이게 길면 때린 소리가 아니라 켜진 소리다.
+export function attackMs(d) {
+  const e = rmsEnvelope(d, 1);
+  const pk = Math.max(...e);
+  if (pk <= 0) return 999;
+  for (let i = 0; i < e.length; i += 1) if (e[i] >= pk * 0.9) return i;
+  return 999;
+}
+
+// 울림이 밝기를 얼마나 들고 가는지. 튕 소리는 꼬리에서도 금속이 남는다.
+// 앞머리만 밝고 꼬리가 어두우면 그건 튕이 아니라 퍽 뒤에 붙은 웅웅거림이다.
+export function tailBrightness(d) {
+  const t = tailMs(d);
+  if (t < 40) return 0;
+  const head = centroid(d, 0, 40);
+  const late = centroid(d, Math.round(t * 0.55), Math.max(40, Math.round(t * 0.35)));
+  return head > 0 ? Number((late / head).toFixed(3)) : 0;
+}
+
+// 종은 모든 모드가 정수배다. 하나만 정수배에 가까워도 종이라고 부르면 관을 종으로 잃는다.
 // 알루미늄 관은 1 : 2.76 : 5.40 : 8.93이고, 마지막은 9에 거의 붙는다.
-// 그래서 가장 먼 모드로 재는다. 종은 가장 먼 것도 0이고, 관은 어떤 세 모드를 집어도 멀다.
+// 그래서 가장 먼 모드로 잰다. 종은 가장 먼 것도 0이고, 관은 어떤 세 모드를 집어도 멀다.
 export function harmonicity(peaks) {
   if (peaks.length < 2) return 1;
   const f0 = peaks[0];

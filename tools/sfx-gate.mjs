@@ -35,6 +35,15 @@ try {
       const d = await m.renderSfx(sfx, name, ARG[name], LEN[name]);
       const x = m.measure(d);
       x.harmonicity = Number(m.harmonicity(x.peaks).toFixed(3));
+      x.cen = m.centroid(d, 0, Math.max(60, x.tailMs));
+      // 발소리는 두 접촉의 크기가 발마다 뒤집힌다. 한 번만 재면 뒷접촉이 큰 발에서
+      // 상승이 25ms로 읽히고 게이트가 코드와 무관하게 붉어진다. 열한 번의 중앙값으로 잰다.
+      const at = [];
+      for (let i = 0; i < 11; i += 1) {
+        at.push(m.attackMs(await m.renderSfx(sfx, name, ARG[name], LEN[name])));
+      }
+      x.attackMs = at.sort((u, v) => u - v)[5];
+      x.tailBright = m.tailBrightness(d);
       out.each[name] = x;
     }
     out.kickSoft = Number(m.peakOf(await m.renderSfx(sfx, "kick", 0.05, 0.6)).toFixed(4));
@@ -171,6 +180,37 @@ try {
   // 흙 위에 놓는 소리는 울리면 안 된다.
   check("place:does-not-ring", r.each.place.tailMs <= 90, r.each.place.tailMs + "ms");
 
+  // 여기부터는 형용사를 잰다. 위의 검사는 전부 구조만 봐서, 킥이 골대보다 밝아도 초록이었다.
+  // 바는 코드가 내는 값이 아니라 물리에서 나온다. 산출물에 맞춰 세운 바는 아무 말도 안 한다.
+  //
+  // 인스텝 킥은 크고 물렁한 가죽 구체를 9ms 남짓 누르는 일이다. 에너지가 100~600Hz에 몰린다.
+  check("kick:is-a-dull-thump-not-a-bright-click", r.each.kick.cen <= 900, r.each.kick.cen + "Hz");
+  // 먹먹함은 저역이 남는 것이다. 40ms에 끊기면 딱 소리지 퍽 소리가 아니다.
+  check("kick:the-low-end-keeps-ringing-after-contact", r.each.kick.tailMs >= 80, r.each.kick.tailMs + "ms");
+  // 알루미늄 크로스바는 712/1965/3845/6358 모드가 다 살아 울린다. 무게중심이 위로 올라간다.
+  check("post:is-a-bright-metal-ring", r.each.post.cen >= 1800, r.each.post.cen + "Hz");
+  // 먹먹하다와 명쾌하다가 같은 밝기면 두 형용사 중 하나는 구현되지 않은 것이다.
+  check("post:reads-brighter-than-the-kick-by-ear",
+    r.each.post.cen >= r.each.kick.cen * 2,
+    "post " + r.each.post.cen + " vs kick " + r.each.kick.cen);
+  // 울림이 금속을 들고 가야 튕이다. 앞머리만 밝으면 퍽 뒤에 웅웅이 붙은 것이다.
+  check("post:the-ring-carries-the-metal-not-just-the-strike",
+    r.each.post.tailBright >= 0.55, String(r.each.post.tailBright));
+  // 튀어오르는 공과 내려놓는 공은 다른 소리다. 꼬리 길이가 갈라야 한다.
+  check("dribble:bounces-instead-of-landing-dead", r.each.dribble.tailMs >= 90, r.each.dribble.tailMs + "ms");
+  check("place:is-drier-than-the-dribble",
+    r.each.dribble.tailMs >= r.each.place.tailMs * 1.6,
+    "dribble " + r.each.dribble.tailMs + " vs place " + r.each.place.tailMs);
+  // 세게 튀기는 것과 살짝 내려놓는 것이 같은 크기면 둘은 한 소리다.
+  check("dribble:hits-harder-than-a-ball-set-down",
+    r.each.dribble.peak >= r.each.place.peak * 1.5,
+    r.each.dribble.peak + " vs " + r.each.place.peak);
+  // 다섯 소리 다 부딪힌 소리다. 피크까지 12ms를 넘으면 켜진 소리로 들린다.
+  for (const name of r.names) {
+    check(name + ":peaks-like-an-impact-not-a-fade-in", r.each[name].attackMs <= 12,
+      r.each[name].attackMs + "ms");
+  }
+
   // 발은 뒤꿈치와 앞꿈치로 두 번 닿는다.
   check("step:lands-on-two-contacts", r.each.step.contacts === 2, String(r.each.step.contacts));
   check("step:repeats-are-not-identical", r.stepVariation > 0.01, String(r.stepVariation));
@@ -189,7 +229,7 @@ try {
   check("mix:the-kick-stays-above-the-incidental-sounds",
     r.db.kick >= incMed + 3,
     "kick " + r.db.kick + " vs " + incMed.toFixed(1));
-  // 중앙값만 보면 운 나쁜 발에서 계층이 뒤집힌다. 제일 약한 슐이 제일 큰 잡음보다 위에 있어야 한다.
+  // 중앙값만 보면 운 나쁜 발에서 계층이 뒤집힌다. 제일 약한 슛이 제일 큰 잡음보다 위에 있어야 한다.
   check("mix:even-the-weakest-kick-outranks-the-loudest-incidental",
     r.spread.kick.lo >= incHi,
     "kick lo " + r.spread.kick.lo + " vs inc hi " + incHi.toFixed(1));
@@ -279,8 +319,8 @@ try {
   check("live:sound-survives-a-reload-after-a-mute-toggle", afterReload > 0.02, String(afterReload));
 
   // 오디오 장치가 바뀌면 <audio>는 따라가고 AudioContext는 사라진 장치로 계속 내보낸다.
-  // 그랬면 음악만 남고 효과음이 사라진다. 신고된 증상과 정확히 같다.
-  // 헤드리스는 장치가 하나라 진짜 전환을 못 만든다. 이벤트만 쏘서 복구를 재는다.
+  // 그러면 음악만 남고 효과음이 사라진다. 신고된 증상과 정확히 같다.
+  // 헤드리스는 장치가 하나라 진짜 전환을 못 만든다. 이벤트만 쏴서 복구를 잰다.
   // 장치가 하나뿐인 헤드리스에서는 소리가 난다는 것만으로는 아무 말도 안 된다.
   // 수리를 빼도 그 검사는 통과한다. 컨텍스트가 실제로 교체되었는지를 센다.
   const dev = await lp.evaluate(async () => {
@@ -418,11 +458,12 @@ try {
   const xp = await legacyCtx.newPage();
   await xp.goto(URL, { waitUntil: "load" });
   await xp.waitForTimeout(900);
-  const legacyMix = await xp.evaluate(() => {
-    return { sfx: window.__sfx.volume, bgm: window.__bgm.volume };
+  const legacyMix = await xp.evaluate(async () => {
+    const m = await import("/web/src/audio/bgm.mjs");
+    return { sfx: window.__sfx.volume, bgm: window.__bgm.volume, bed: m.BED };
   });
   check("live:a-legacy-stored-mix-loses-to-the-code-default",
-    legacyMix.sfx === 0.9 && legacyMix.bgm === 0.072, JSON.stringify(legacyMix));
+    legacyMix.sfx === 0.9 && legacyMix.bgm === legacyMix.bed, JSON.stringify(legacyMix));
   await legacyCtx.close();
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
