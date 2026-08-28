@@ -212,6 +212,31 @@ export function buildPitch(scene) {
   roof.position.set(0, R_H, -NET_D / 2);
   scene.add(roof);
 
+  // 뒷그물은 서 있는 평면인데 화면에서는 바닥에 깐 카펫으로 읽혔다.
+  // 실 격자만 있으면 어느 쪽이 위인지 알려주는 것이 하나도 없다. 그물을 받치는 틀이 그 일을 한다.
+  // 뒷기둥 둘이 세로선을 긋고 위아래 가로대가 그 선의 끝을 묶는다. 옆 가로대는 앞뒤 거리를 만든다.
+  // 흰 골대와 같은 색으로 칠하면 앞 골대와 겹쳐 한 덩어리로 읽힌다. 뒷틀은 녹슨 쇠다.
+  // 틀을 여섯 개 메시로 두면 드로우콜이 예산을 넘는다. 한 장으로 붙여 하나만 부른다.
+  const railGeo = (len, axis) => {
+    const g = new THREE.CylinderGeometry(0.05, 0.05, len, 6);
+    if (axis === 'x') g.rotateZ(Math.PI / 2);
+    if (axis === 'z') g.rotateX(Math.PI / 2);
+    return g;
+  };
+  const rails = [];
+  for (const sgn of [-1, 1]) {
+    rails.push(railGeo(R_H, 'y').translate(sgn * R_HALF_W, R_H / 2, -NET_D));
+    rails.push(railGeo(NET_D, 'z').translate(sgn * R_HALF_W, R_H, -NET_D / 2));
+  }
+  rails.push(railGeo(R_HALF_W * 2, 'x').translate(0, R_H, -NET_D));
+  // 아래 가로대는 그물 바닥이 흙에 닿는 자리를 찍는다. 그 선이 없으면 그물이 어디서 끝나는지 안 보인다.
+  rails.push(railGeo(R_HALF_W * 2, 'x').translate(0, 0.05, -NET_D));
+  const rear = new THREE.Mesh(mergeGeos(rails), flatMap(0x5f6a5c, chippedTex()));
+  // 앞 골대는 한 번 들이받혀 기울었다. 뒷틀만 정확히 서 있으면 둘이 다른 날 세운 물건으로 보인다.
+  rear.rotation.z = 0.012;
+  jitterMesh(rear, 0.018, 5);
+  scene.add(rear);
+
   // 하늘. 안쪽을 보는 반구 하나면 검은 벽이 사라진다.
   // 한 색으로 칠하면 하늘이 아니라 뒤에 세운 파란 벽이다. 지평선이 밝고 천정이 어두워야 하늘이 된다.
   // 포스터라이즈가 이 그라데이션을 몇 단으로 끊는다. 매끈한 하늘보다 끊긴 하늘이 우리 톤이다.
