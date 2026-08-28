@@ -13,7 +13,7 @@ const KEY = 'gtg.bgm.volume';
 // 0.10은 가장 작은 효과음보다 4.3dB 아래였다. 숫자로는 효과음이 이기지만
 // 귀로는 진다. 음악은 내내 울리고 효과음은 수십 밀리초에 끝난다.
 // 순간음이 지속음을 뚫으려면 10dB는 벌어야 한다.
-export const BED = 0.072;
+export const BED = 0.048;
 
 
 export function mountBgm(base = '') {

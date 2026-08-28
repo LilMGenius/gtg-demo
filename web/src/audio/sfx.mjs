@@ -14,8 +14,8 @@ export const SFX_NAMES = ['kick', 'post', 'dribble', 'place', 'step'];
 // 노이즈 소스는 색을 안 정한다. 흙이냐 가죽이냐 금속이냐는 체인의 필터가 정한다.
 // 어두운 소스를 쓰면 그 뒤의 밴드패스가 통과시킬 게 남지 않는다. 측정으로 확인했다.
 // 버퍼를 Math.random으로 채우면 런마다 스펙트럼이 달라져 계측값이 튀고, 게이트가
-// 코드가 그대로인데도 세 번에 한 번꿩 빨간불을 켜다. 버퍼는 고정하고
-// 개별 재생의 배속도와 시점만 흔든다. 귀에는 같은 변화가 남는다.
+// 코드가 그대로인데도 세 번에 한 번은 빨간불을 켰다. 버퍼는 고정하고
+// 개별 재생의 배속과 시점만 흔든다. 귀에는 같은 변화가 남는다.
 export function makeNoise(ac, seconds = 1.2) {
   const n = Math.floor(ac.sampleRate * seconds);
   const buf = ac.createBuffer(1, n, ac.sampleRate);
@@ -39,7 +39,10 @@ function noiseAt(ac, noise, t0, dur) {
   const s = ac.createBufferSource();
   s.buffer = noise;
   s.loop = true;
-  s.playbackRate.value = 0.85 + Math.random() * 0.3;
+  // 재생속도 난수는 반복을 다르게 들리게 하는 장치다. 폭이 넓으면 세기까지 흔든다.
+  // 측정: 폭 0.3에서 킥의 아래꼬리가 중앙값보다 2.9dB 낮았고, 운 나쁜 킥이
+  // 운 좋은 드리블 아래로 내려갔다. 폭을 절반으로 줄여 계층만 지킨다.
+  s.playbackRate.value = 0.93 + Math.random() * 0.14;
   s.start(t0);
   s.stop(t0 + dur + 0.05);
   return s;
@@ -101,7 +104,7 @@ function kick(ac, out, noise, t0, power = 0.6) {
   body.frequency.setValueAtTime(196 + p * 52, t0);
   body.frequency.exponentialRampToValueAtTime(112, t0 + 0.13);
   const bg = ac.createGain();
-  env(bg, 0.05 + p * 0.07, 0.17, t0);
+  env(bg, 0.11 + p * 0.12, 0.32, t0);
   body.connect(bg).connect(out);
   body.start(t0);
   body.stop(t0 + 0.3);
@@ -109,19 +112,20 @@ function kick(ac, out, noise, t0, power = 0.6) {
   const skin = noiseAt(ac, noise, t0, 0.09);
   const lp = ac.createBiquadFilter();
   lp.type = 'lowpass';
-  lp.frequency.setValueAtTime(2100 + p * 1500, t0);
-  lp.frequency.exponentialRampToValueAtTime(880, t0 + 0.08);
+  lp.frequency.setValueAtTime(1500 + p * 650, t0);
+  lp.frequency.exponentialRampToValueAtTime(680, t0 + 0.08);
   lp.Q.value = 0.7;
   const hp = ac.createBiquadFilter();
   hp.type = 'highpass';
   hp.frequency.value = 340;
   const sg = ac.createGain();
-  // 부드러운 킥과 강슈가 소프트클리퍼 안에서 같은 크기로 눌렸다.
+  // 부드러운 킥과 강슛이 소프트클리퍼 안에서 같은 크기로 눌렸다.
   // 약한 쪽 바닥을 내려서 세기 차이를 다시 들리게 한다.
-  env(sg, 0.21 + p * 0.72, 0.09, t0);
+  env(sg, 0.30 + p * 0.88, 0.09, t0);
   skin.connect(lp).connect(hp).connect(sg).connect(out);
 
-  snap(ac, out, noise, t0, 0.19 + p * 0.70, 2400, 0.016);
+  // 접촉을 알리는 최소한만 남긴다. 여기를 키우면 가죽이 아니라 나무 소리가 된다.
+  snap(ac, out, noise, t0, 0.12 + p * 0.40, 1400, 0.016);
 }
 
 // 골대 맞는 소리. 알루미늄 관의 배음은 정수배가 아니다.
@@ -129,6 +133,9 @@ function kick(ac, out, noise, t0, power = 0.6) {
 // 관의 굽힘 모드는 1 : 2.76 : 5.40 : 8.93 근처에 선다. 눈대중으로 고른 값은
 // 정수배로 미끄러지고 그러면 종소리가 된다. 측정 게이트가 그걸 잡아냈다.
 const POST_MODES = [712, 1965, 3845, 6358];
+// 알루미늄 관은 기음보다 중간 모드가 크게 운다. 저역 편중으로 쌓으면 나무 기둥이 된다.
+const POST_PEAKS = [0.14, 0.24, 0.26, 0.20];
+const POST_DECAY = [0.45, 0.80, 0.85, 0.70];
 function post(ac, out, noise, t0) {
   const detune = 0.97 + Math.random() * 0.06;
 
@@ -137,8 +144,7 @@ function post(ac, out, noise, t0) {
     o.type = 'sine';
     o.frequency.value = f * detune;
     const g = ac.createGain();
-    // 위 모드일수록 빨리 죽는다. 금속이 울리다 마는 소리가 여기서 나온다.
-    env(g, 0.3 / (i + 1.2), 0.9 - i * 0.16, t0);
+    env(g, POST_PEAKS[i], POST_DECAY[i], t0);
     o.connect(g).connect(out);
     o.start(t0);
     o.stop(t0 + 1.0);
@@ -161,7 +167,7 @@ function dribble(ac, out, noise, t0) {
   o.frequency.setValueAtTime(248, t0);
   o.frequency.exponentialRampToValueAtTime(164, t0 + 0.09);
   const g = ac.createGain();
-  env(g, 0.045, 0.12, t0);
+  env(g, 0.025, 0.42, t0);
   const lp = ac.createBiquadFilter();
   lp.type = 'lowpass';
   lp.frequency.value = 1500;
@@ -175,10 +181,10 @@ function dribble(ac, out, noise, t0) {
   bp.frequency.value = 1800;
   bp.Q.value = 1.0;
   const tg = ac.createGain();
-  env(tg, 0.36, 0.03, t0);
+  env(tg, 0.187, 0.03, t0);
   tap.connect(bp).connect(tg).connect(out);
 
-  snap(ac, out, noise, t0, 0.28, 2600, 0.012);
+  snap(ac, out, noise, t0, 0.14, 2600, 0.012);
 }
 
 // 공을 땅에 놓는 소리. 흙 위에 얹는 것이라 울림이 없다.
@@ -191,19 +197,19 @@ function place(ac, out, noise, t0) {
   bp.frequency.exponentialRampToValueAtTime(560, t0 + 0.1);
   bp.Q.value = 0.9;
   const dg = ac.createGain();
-  env(dg, 0.40, 0.11, t0);
+  env(dg, 0.15, 0.11, t0);
   dirt.connect(bp).connect(dg).connect(out);
 
   const thud = ac.createOscillator();
   thud.type = 'triangle';
   thud.frequency.value = 172;
   const tg = ac.createGain();
-  env(tg, 0.035, 0.07, t0);
+  env(tg, 0.021, 0.07, t0);
   thud.connect(tg).connect(out);
   thud.start(t0);
   thud.stop(t0 + 0.15);
 
-  snap(ac, out, noise, t0, 0.30, 3000, 0.009);
+  snap(ac, out, noise, t0, 0.055, 3000, 0.009);
 }
 
 // 발소리. 뒤꿈치와 앞꿈치가 십수 밀리초 간격으로 두 번 닿는다.
@@ -220,7 +226,7 @@ function step(ac, out, noise, t0, hard = false) {
     s.connect(bp).connect(g).connect(out);
   };
   // 발소리는 현실에서 작다. 그러나 음악과 같이 나면 없는 소리가 된다.
-  const loud = hard ? 1.1 : 0.85;
+  const loud = hard ? 0.85 : 0.60;
   layer(t0, loud, 900 + Math.random() * 260);
   layer(t0 + 0.012 + Math.random() * 0.006, loud * 0.7, 1400 + Math.random() * 260);
 }
