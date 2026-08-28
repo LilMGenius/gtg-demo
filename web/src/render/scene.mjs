@@ -9,10 +9,14 @@ import {
   flat, flatVertex, BALL_R, VIEW_X, KICKER_OFF, BALL_PAST, REST_Z, REST_Y,
   R_HALF_W, R_H, SX, SY, lerp, ease
 } from './units.mjs';
-import { pupilMat, buildKeeper, buildKicker, POSES, lerpPose, setPose } from './objects/actors.mjs';
+import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, setPose } from './objects/actors.mjs';
 import { buildPitch, buildPassers } from './objects/pitch.mjs';
 import { createImpact } from './objects/impact.mjs';
 import { jitterMesh, addOutline, blobGeo, ballGeo } from './handmade.mjs';
+
+// 몸이 무너지는 포즈는 빨리 잡히고, 발이 살아 있는 포즈는 그 중간이다.
+const WRECK_POSES = new Set([POSES.faceplant, POSES.sprawlR, POSES.sprawlL, POSES.hugfall]);
+const SCRAMBLE_POSES = new Set([POSES.dribble, POSES.stumble]);
 
 export function createScene(canvas) {
   const sfx = mountSfx();
@@ -556,13 +560,16 @@ export function createScene(canvas) {
 
         // 키퍼는 판정된 방향으로 몸을 던진다. 늦게 출발하면 늦게 보인다.
         // 뻗는 거리는 골포스트 안쪽까지다. 화면 밖으로 나가면 결과가 안 보인다.
-        const dp = Math.min(1, Math.max(0, (t - runup - flight * 0.28) / (flight * 0.7)));
-        const span = Math.min(R_HALF_W - 0.5, 1.05 + 0.06 * cueKeeperDiving());
-        keeper.position.x = lerp(0, VIEW_X * input.dive * span, ease(dp));
-        keeper.position.z = lerp(KEEPER_Z, KEEPER_Z + input.advance, ease(Math.min(1, dp * 1.4)));
-        // 관절이 뻗는 방향을 이미 보여주므로 몸통 회전은 거들기만 한다.
-        keeper.rotation.z = lerp(0, VIEW_X * -input.dive * 0.86, ease(dp));
-        hover = Math.sin(ease(dp) * Math.PI) * (input.dive === 0 ? 0.05 : 0.40);
+        // 꼬리가 시작되면 키퍼의 몸은 꼬리 것이다. 큐가 계속 밀면 일어서라는 코드가 있어도 그 자리에 눌려 있는다.
+        if (!tail) {
+          const dp = Math.min(1, Math.max(0, (t - runup - flight * 0.28) / (flight * 0.7)));
+          const span = Math.min(R_HALF_W - 0.5, 1.05 + 0.06 * cueKeeperDiving());
+          keeper.position.x = lerp(0, VIEW_X * input.dive * span, ease(dp));
+          keeper.position.z = lerp(KEEPER_Z, KEEPER_Z + input.advance, ease(Math.min(1, dp * 1.4)));
+          // 관절이 뻗는 방향을 이미 보여주므로 몸통 회전은 거들기만 한다.
+          keeper.rotation.z = lerp(0, VIEW_X * -input.dive * 0.86, ease(dp));
+          hover = Math.sin(ease(dp) * Math.PI) * (input.dive === 0 ? 0.05 : 0.40);
+        }
 
         if (p >= 1 && !cue.ended && t - runup > flight + 0.9) {
           cue.ended = true;
@@ -581,12 +588,17 @@ export function createScene(canvas) {
         return gl ? gl.getWorldPosition(new THREE.Vector3()) : keeper.position.clone();
       };
       const gx = keeper.position.x + Math.sign(tail.kx || 1) * 0.1;
-      const side = Math.sign(tail.kx || 1) > 0 ? POSES.diveR : POSES.diveL;
+      const bySide = (r, l) => Math.sign(tail.kx || 1) > 0 ? r : l;
       // 꼬리 연출의 포즈. 사건마다 몸이 다르게 망가져야 사건이 구분된다.
+      // 같은 포즈를 두 사건이 나눠 쓰면 자막을 지웠을 때 두 컷이 같은 그림이 된다.
       const TAIL_POSE = {
-        catch: POSES.clutch, save: POSES.clutch, carriedIn: POSES.faceplant,
-        gloveGone: side, spill: side, downed: POSES.faceplant,
-        rebound: side, reboundMiss: side, charge: POSES.dribble, beat: POSES.dribble,
+        catch: POSES.clutch, save: POSES.snatch, carriedIn: POSES.hugfall,
+        gloveGone: bySide(POSES.reachR, POSES.reachL),
+        spill: bySide(POSES.swatR, POSES.swatL),
+        downed: POSES.faceplant,
+        rebound: bySide(POSES.shoveR, POSES.shoveL),
+        reboundMiss: bySide(POSES.sprawlR, POSES.sprawlL),
+        charge: POSES.dribble, beat: POSES.stumble,
         lost: POSES.faceplant, skied: POSES.brace,
         talked: POSES.swoon, distracted: POSES.swoon, openGoalScored: POSES.faceplant
       };
@@ -793,7 +805,7 @@ export function createScene(canvas) {
       shadow.material.opacity = Math.max(0.06, 0.42 - lift2 * 0.14);
     }
     // 잡히는 속도는 사건마다 다르다. 자빠짐은 빠르고 회복은 느리다.
-    drive('keeper', kp, kp === POSES.faceplant ? 0.22 : (kp === POSES.dribble ? 0.26 : 0.12));
+    drive('keeper', kp, WRECK_POSES.has(kp) ? 0.22 : (SCRAMBLE_POSES.has(kp) ? 0.26 : 0.12));
     // 예비는 느리게 잡혀야 버틴 것으로 보이고, 임팩트는 한 프레임에 가까워야 터진 것으로 보인다.
     drive('kicker', kk, kk === POSES.strike ? 0.62 : (kk === POSES.follow ? 0.24 : (kk === POSES.plant ? 0.16 : (kk === POSES.cheer ? 0.30 : 0.10))));
     // 닿는 순간에만 몸이 부풀어야 힘이 들어간 것으로 읽힌다. 길게 주면 몸집이 변한 것으로 보인다.
@@ -925,6 +937,24 @@ export function createScene(canvas) {
   // 표정을 바꾸는 코드가 돌았다는 것과 표정이 화면에 있다는 것은 다른 주장이다.
   // 뒤통수를 향한 머리에 하트 눈을 넣어도 관객이 보는 것은 검은 반구다.
   window.__faceVis = () => faceToCamera(keeper.userData.head, camera, 1);
+
+  // 사건이 다른데 실루엣이 같으면 관객은 같은 장면을 두 번 본다.
+  // 선언된 오일러각이 아니라 캡처 순간의 관절 월드 좌표를 뽑는다.
+  // 기울기와 위치까지 합쳐진 최종 몸이 화면에서 갈리는 것이고, 딕셔너리 비교로는 그게 안 잡힌다.
+  window.__poseVis = () => {
+    const j = keeper.userData.joints;
+    keeper.updateMatrixWorld(true);
+    const root = keeper.position;
+    const w = new THREE.Vector3();
+    j.spine.getWorldPosition(w);
+    const scale = Math.max(0.2, w.distanceTo(root));
+    const v = [];
+    for (const n of JOINTS) {
+      j[n].getWorldPosition(w);
+      v.push((w.x - root.x) / scale, (w.y - root.y) / scale, (w.z - root.z) / scale);
+    }
+    return { v, rz: keeper.rotation.z, pos: [root.x, root.y, root.z] };
+  };
 
   window.__renderInfo = () => ({
     calls: sceneCalls + 1,
