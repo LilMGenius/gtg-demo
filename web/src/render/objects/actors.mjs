@@ -200,6 +200,8 @@ export function addFace(head, r, dir, skin) {
   head.add(hair);
   head.userData.eyes = eyes;
   head.userData.mouth = mouth;
+  // 표정은 입 크기로 갈린다. 기준 배율을 여기서 넘겨야 쓰는 쪽이 상수를 두 번 적지 않는다.
+  head.userData.mouthRest = mouth.scale.clone();
   head.userData.skin = skin;
   return head;
 }

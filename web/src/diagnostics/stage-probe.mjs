@@ -4,6 +4,19 @@ import * as THREE from '../../vendor/three.module.min.js';
 
 const box = new THREE.Box3();
 const v = new THREE.Vector3();
+const faceVec = new THREE.Vector3();
+const headVec = new THREE.Vector3();
+
+// 얼굴이 렌즈를 향한 정도. +1이면 정면, 0이면 옆얼굴, -1이면 뒤통수.
+// 눈과 입은 머리 구체 표면에 박혀 있다. 머리가 등을 지면 그 픽셀은 존재해도 화면에 없다.
+// 표정을 바꾸는 코드가 있다는 것과 표정이 보인다는 것은 다른 주장이고, 이 값만 후자를 잰다.
+export function faceToCamera(head, camera, dir = 1) {
+  head.updateMatrixWorld(true);
+  camera.updateMatrixWorld();
+  faceVec.set(0, 0, dir).transformDirection(head.matrixWorld).normalize();
+  headVec.setFromMatrixPosition(head.matrixWorld).sub(camera.position).normalize();
+  return -faceVec.dot(headVec);
+}
 
 // 그룹의 월드 바운딩 박스 밑면. 발이 땅에 닿으면 0에 붙는다.
 export function footY(group) {

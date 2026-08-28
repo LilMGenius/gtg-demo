@@ -4,7 +4,7 @@ import * as THREE from '../../vendor/three.module.min.js';
 import { GOAL_HALF_W, GOAL_H } from '../../../src/chain.mjs';
 import { mountSfx } from '../audio/sfx.mjs';
 import { createBallProbe } from '../diagnostics/ball-probe.mjs';
-import { createStageProbe, goalFraming, footY } from '../diagnostics/stage-probe.mjs';
+import { createStageProbe, goalFraming, footY, faceToCamera } from '../diagnostics/stage-probe.mjs';
 import {
   flat, flatVertex, BALL_R, VIEW_X, KICKER_OFF, BALL_PAST, REST_Z, REST_Y,
   R_HALF_W, R_H, SX, SY, lerp, ease
@@ -281,9 +281,56 @@ export function createScene(canvas) {
   // 체인의 반전은 자막이 아니라 화면에서 일어나야 한다.
   // 여기서 결과를 바꾸지 않는다. 이미 확정된 사건 이름 하나를 받아 그것만 연기한다.
   let tail = null;
+  // 고개가 돌아가는 속도. 사건과 함께 즉시 최대로 돌면 목이 끊긴 것으로 보인다.
+  let tailRamp = 0;
   // 떨어져 나간 장갑. 키퍼 그룹에 달린 채로 카메라 쪽으로 날아가면 키퍼가 프레임을 나간 것으로 측정된다.
   let loose = null;
   const heartMat = new THREE.MeshBasicMaterial({ color: 0xff3f6d });
+  // 사건마다 얼굴이 달라야 자막을 지워도 무엇이 일어났는지 읽힌다.
+  // 입 배율은 addFace가 넘긴 기준값에 곱한다. 절대값을 여기 적으면 두 파일이 갈라진다.
+  const MOOD = {
+    rest: { pupil: [1, 1.1, 0.5], mouth: [1, 1, 1], heart: false },
+    grin: { pupil: [1.15, 0.5, 0.5], mouth: [1.7, 1.4, 1.5], heart: false },
+    shock: { pupil: [0.5, 0.5, 0.5], mouth: [2, 2.8, 2], heart: false },
+    heart: { pupil: [2.1, 2.1, 0.5], mouth: [1.4, 1.6, 1.2], heart: true }
+  };
+  function setMood(head, name) {
+    const m = MOOD[name] ?? MOOD.rest;
+    for (const pu of head.userData.eyes) {
+      pu.material = m.heart ? heartMat : pupilMat;
+      pu.scale.set(m.pupil[0], m.pupil[1], m.pupil[2]);
+    }
+    const mr = head.userData.mouthRest;
+    head.userData.mouth.scale.set(mr.x * m.mouth[0], mr.y * m.mouth[1], mr.z * m.mouth[2]);
+  }
+  // 얼굴은 +z를 보고 렌즈는 -z에 있다. 그대로 두면 관객이 보는 것은 뒤통수뿐이다.
+  // 몸이 굴러 누우면 오일러 각으로는 목을 어디로 돌려야 할지 예측할 수 없다.
+  // lookAt이 로컬 +z를 렌즈로 보내므로 그 자세와 안식 자세를 섞어 노출량만 정한다.
+  const faceRest = new THREE.Quaternion();
+  const faceLensQ = new THREE.Quaternion();
+  function applyFace(amount, mood, ramp) {
+    const head = keeper.userData.head;
+    const a = Math.min(1, Math.max(0, amount * ramp));
+    head.quaternion.identity();
+    keeper.updateMatrixWorld(true);
+    faceRest.copy(head.quaternion);
+    head.lookAt(camera.position);
+    faceLensQ.copy(head.quaternion);
+    head.quaternion.copy(faceRest).slerp(faceLensQ, a);
+    setMood(head, a > 0.25 ? mood : 'rest');
+  }
+  // 평상시 0을 지키지 않으면 경기가 안 읽힌다. 고개는 사건이 터진 동안에만 돈다.
+  const FACE_TURN = {
+    catch: 0.72, save: 0.78, carriedIn: 0.88, gloveGone: 0.74, spill: 0.6,
+    downed: 0.88, rebound: 0.6, reboundMiss: 0.62, charge: 0.52, beat: 0.5,
+    lost: 0.66, skied: 0.58, talked: 0.9, distracted: 0.8, openGoalScored: 0.8
+  };
+  const FACE_MOOD = {
+    catch: 'grin', save: 'grin', carriedIn: 'shock', gloveGone: 'shock',
+    spill: 'shock', downed: 'shock', rebound: 'shock', reboundMiss: 'shock',
+    charge: 'grin', beat: 'shock', lost: 'shock', skied: 'shock',
+    talked: 'heart', distracted: 'heart', openGoalScored: 'shock'
+  };
   // 머리 위로 떠오르는 하트 셋. 눈동자만 하트로 바꾸면 고개가 돌아간 순간 얼굴이 뒤를 보고 있어 안 읽힌다.
   // 정지 화면 한 장에서 한눈팔림을 알리는 픽셀은 이것뿐이다.
   const heartShape = new THREE.Shape();
@@ -526,6 +573,7 @@ export function createScene(canvas) {
     if (tail) {
       const u = Math.min(1, (vnow - tail.t0) / 0.8);
       const e = ease(u);
+      tailRamp = ease(Math.min(1, u * 2.5));
       // 공이 붙는 자리는 선언이 아니라 장갑의 실제 월드 좌표다.
       // 키퍼 좌표에 상수를 더하면 몸이 기울어 있을 때 공이 장갑 옆 허공에 뜬다.
       const gloveWorld = (sgn) => {
@@ -679,12 +727,6 @@ export function createScene(canvas) {
           break;
         case 'talked': {
           // 입을 열었고 몸이 따라갔다. 공은 그대로 빈 골대로 들어간다.
-          const head2 = keeper.userData.head;
-          head2.rotation.y = lerp(0, 0.72, Math.min(1, e * 2));
-          for (const pu of head2.userData.eyes) {
-            pu.material = heartMat;
-            pu.scale.set(2.1, 2.1, 0.5);
-          }
           const walk = Math.min(1, e * 1.5);
           keeper.position.x = lerp(tail.kx, -2.4, walk);
           keeper.position.z = lerp(KEEPER_Z, 3.1, walk);
@@ -697,8 +739,8 @@ export function createScene(canvas) {
             // 중점을 그대로 쓰니 하트 세 개가 키퍼 얼굴을 덮었다. 반한 얼굴이 안 보이면
             // 한눈팔기라는 사건 자체가 화면에 안 남는다. 두 머리 바로 위로 올린다.
             // 0.42를 올렸더니 하트가 화면 위로 잘렸다. 잘린 하트는 붉은 얼룩이다.
-            // 하의를 늘 줄 를 하른데 크로스바가 하트를 가로지른다.
-            // 두 머리들 사ᅵ 눈놋ᅵ로 내리면 가로대가 하트를 가르지 않는다.
+            // 더 올리면 크로스바가 하트를 가로지른다.
+            // 두 머리의 눈높이로 내리면 가로대에 걸리지 않는다.
             if (hp) hk.set((hk.x + hp.x) / 2, Math.min(hk.y, hp.y + 1.5) - 0.1, (hk.z + hp.z) / 2 - 0.2);
             showHearts(true, hk, e);
           }
@@ -714,8 +756,8 @@ export function createScene(canvas) {
             passers[0].rotation.y = lerp(2.44, 3.02, walk);
             passers[0].rotation.z = Math.sin(e * 9) * 0.18;
           }
-          // 카메라는 골대 ᄃ니에서 +z를 본다. 키퍼가 그대로 서 잇으면 하트른 눈을 듶의 머리가 가린다.
-          // 한눈 파른 얼굴이 안 보이면 그 산건 자ᄖᅦ 화년에 어ᇆ다.
+          // 카메라는 골대 뒤에서 +z를 본다. 키퍼가 그대로 서 있으면 뒤통수가 하트 눈을 가린다.
+          // 한눈판 얼굴이 안 보이면 그 사건 자체가 화면에 없다.
           keeper.rotation.y = lerp(0, 2.48, walk);
           ball.position.set(lerp(tail.from.x, 0, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
           break;
@@ -723,11 +765,6 @@ export function createScene(canvas) {
         case 'distracted': {
           // 카메라가 아니라 고개가 돌아간다. 머리가 돌아가 있는 동안 공은 그대로 지나간다.
           const head = keeper.userData.head;
-          head.rotation.y = lerp(0, -1.15, e);
-          for (const pu of head.userData.eyes) {
-            pu.material = heartMat;
-            pu.scale.set(1.9, 1.9, 0.5);
-          }
           showHearts(true, head.getWorldPosition(new THREE.Vector3()), e);
           ball.position.set(lerp(tail.from.x, tail.from.x * 1.3, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
           break;
@@ -765,6 +802,10 @@ export function createScene(canvas) {
     kicker.scale.setScalar(kpop);
     // 접지는 선언이 아니라 측정이다. 몸의 실제 최저점을 재서 원하는 높이에 맞춘다.
     keeper.position.y += hover - footY(keeper);
+    // drive()가 목을 덮어쓰고, 위치 보정 전 월드행렬은 낡았다. 둘이 끝난 뒤에 고개를 돌린다.
+    if (tail) applyFace(FACE_TURN[tail.kind] ?? 0.6, FACE_MOOD[tail.kind] ?? 'shock', tailRamp);
+    else if (titleMode) applyFace(0.92, 'grin', 1);
+    else applyFace(0, 'rest', 1);
     kicker.position.y += -footY(kicker);
     keeperShadow.position.set(keeper.position.x, 0.03, keeper.position.z);
     // 행인은 판정과 무관하게 계속 걷는다. 멈춘 배경은 그림이고 움직이는 배경은 장소다.
@@ -881,6 +922,10 @@ export function createScene(canvas) {
   // 화면에 실제로 선 것을 이름으로 세는 진단구. 코드를 읽어 추측하면 없는 GridHelper를 찾게 된다.
   window.__sceneRoot = () => scene;
 
+  // 표정을 바꾸는 코드가 돌았다는 것과 표정이 화면에 있다는 것은 다른 주장이다.
+  // 뒤통수를 향한 머리에 하트 눈을 넣어도 관객이 보는 것은 검은 반구다.
+  window.__faceVis = () => faceToCamera(keeper.userData.head, camera, 1);
+
   window.__renderInfo = () => ({
     calls: sceneCalls + 1,
     triangles: sceneTris + 2,
@@ -904,8 +949,9 @@ export function createScene(canvas) {
     for (const p of passers) { p.rotation.z = 0; p.rotation.y = 0; }
     keeper.userData.gloves.forEach((g, i) => { g.position.copy(keeper.userData.gloveHome[i]); g.rotation.set(0, 0, 0); });
     const head = keeper.userData.head;
-    head.rotation.y = 0;
-    for (const pu of head.userData.eyes) { pu.material = pupilMat; pu.scale.set(1, 1.1, 0.5); }
+    head.quaternion.identity();
+    // 입 배율까지 되돌리지 않으면 다음 구가 벌어진 입으로 시작한다.
+    setMood(head, 'rest');
     keeper.position.set(0, 0, KEEPER_Z);
     keeper.rotation.z = 0;
     keeper.rotation.y = 0;
