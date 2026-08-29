@@ -22,20 +22,27 @@ button{font-family:inherit;cursor:pointer}
 #hud{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .3s}
 body.playing #hud{opacity:1}
 
-/* 상단 좌측. 레벨과 다섯 구의 결과만 남긴다. */
+/* 상단 좌측. 네 항목을 한 줄에 늘어놓으면 라벨 없는 덩어리 넷이 되어 어디를 봐야 할지가 없다.
+   위칸은 지금 이 판이 어떻게 굴러가는지(레벨, 구 결과), 아래칸은 판 밖에서 쌓이는 값이다. */
 #top{position:absolute;top:calc(12px + env(safe-area-inset-top));left:var(--pad-l);
-  display:flex;align-items:center;gap:12px;
-  padding:6px 14px 7px;
+  display:grid;grid-template-columns:auto auto;
+  grid-template-areas:"lv pips" "form fans";
+  align-items:center;justify-items:start;column-gap:11px;row-gap:2px;
+  padding:4px 13px 5px;
   background:var(--panel);border:var(--line) solid var(--edge);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);
   transform:rotate(var(--tilt))}
-#lv{font-family:var(--disp);font-weight:400;font-size:18px;letter-spacing:.02em;
-  color:#ffd83d}
-/* 레벨 옆 두 항목은 같은 등급의 정보다. 굵기와 투명도가 갈리면 하나가 더 중요해 보인다. */
-#form,#fans{font-size:12px;font-weight:800;opacity:.78;letter-spacing:.02em}
-#fans b{font-weight:800;font-style:normal}
-#pips{display:flex;gap:6px}
-#pips i{width:9px;height:9px;background:#ffffff26;display:block;border:2px solid var(--edge);
+#lv{grid-area:lv;font-family:var(--disp);font-weight:400;font-size:18px;letter-spacing:.02em;
+  color:#ffd83d;line-height:1.05}
+/* 아래칸 두 값은 같은 등급이다. 굵기나 투명도가 갈리면 하나가 더 중요해 보인다.
+   대신 세로 선 하나로 서로 다른 것을 재는 값임을 표시한다. */
+#form,#fans{font-size:12px;font-weight:800;opacity:.72;letter-spacing:.02em;line-height:1.15}
+#form{grid-area:form}
+#fans{grid-area:fans;padding-left:11px;border-left:2px solid #ffffff24;margin-left:-11px}
+#fans b{font-weight:800;font-style:normal;opacity:1;color:#ffd83d}
+#pips{grid-area:pips;display:flex;gap:6px}
+/* 미결 구는 아직 안 굴린 주사위다. #ffffff26은 패널 바닥과 붙어 다섯 칸이 세 칸으로 읽혔다. */
+#pips i{width:9px;height:9px;background:#ffffff4d;display:block;border:2px solid var(--edge);
   transition:background .18s}
 #pips i.save{background:var(--good)}
 #pips i.gone{background:var(--bad)}
@@ -63,7 +70,7 @@ body.playing #hud{opacity:1}
 
 /* 자막은 크로스바 위 하늘에 산다. 공과 같은 높이에 두면 판정을 글자가 덮는다. */
 #caption{position:absolute;left:50%;transform:translateX(-50%);
-  top:calc(58px + env(safe-area-inset-top));
+  top:calc(72px + env(safe-area-inset-top));
   width:min(660px,calc(100vw - 2*(var(--pad-r) + 84px)));text-align:center;pointer-events:none;
   font-family:var(--disp);
   font-size:clamp(17px,2.4vw,25px);line-height:1.34;font-weight:400;
@@ -88,8 +95,9 @@ body.playing #hud{opacity:1}
 #pad{position:absolute;inset:0;display:flex;pointer-events:auto}
 .zone{flex:1;border:0;background:transparent;position:relative;
   display:flex;align-items:flex-end;justify-content:center;
-  /* 화살표는 골라인 앞 흙바닥에 앉는다. 더 올리면 키퍼가 좌우로 뻗는 통로를 덮는다. */
-  padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+  /* 화살표는 골라인 앞 흙바닥에 앉는다. 더 올리면 키퍼가 좌우로 뻗는 통로를 덮는다.
+     10px은 16:9에서 아이콘 아래끝이 화면 밖으로 나가 세 개가 반토막으로 찍혔다. */
+  padding-bottom:calc(clamp(24px,3.4vh,38px) + env(safe-area-inset-bottom))}
 .zone+.zone::before{content:'';position:absolute;left:0;top:18%;bottom:18%;
   width:2px;background:#ffffff14}
 .zone svg{width:clamp(34px,4.1vw,50px);height:clamp(34px,4.1vw,50px);
@@ -101,18 +109,19 @@ body.playing #hud{opacity:1}
 .zone:disabled{cursor:default}
 
 /* 컨트롤 세 개는 크로스바 위 하늘 띠에 쌓는다. 기둥 아래끝 206px, 크로스바 325px.
-   화면 아래 오른쪽은 골포스트와 골문 구석이고, 그 구석에서 선방과 실점이 갈린다. */
-/* 나가기. 각을 좁히는 선택이라 세 칸과 따로 논다. */
-#out{position:absolute;right:var(--pad-r);top:calc(12px + env(safe-area-inset-top));
-  pointer-events:auto;width:66px;height:66px;white-space:nowrap;
+   화면 아래 오른쪽은 골포스트와 골문 구석이고, 그 구석에서 선방과 실점이 갈린다.
+   쌓는 차례는 손이 가는 빈도다. 나가기가 맨 위에서 가장 컸을 때 화면에서 제일 굵은
+   덩어리가 판을 뜨는 버튼이었다. */
+/* 나가기. 되돌릴 수 없는 한 번이라 맨 아래로 내리고 높이를 깎는다. */
+#out{position:absolute;right:var(--pad-r);top:calc(146px + env(safe-area-inset-top));
+  pointer-events:auto;width:66px;height:40px;white-space:nowrap;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(2deg);
-  color:var(--dim);font-family:var(--disp);font-size:17px;font-weight:400;letter-spacing:-.02em}
+  color:var(--dim);font-family:var(--disp);font-size:15px;font-weight:400;letter-spacing:-.03em}
 #out.on{background:#e0563f;color:#fff;box-shadow:var(--lift) var(--lift) 0 var(--edge)}
 
-/* 자동. 손가락만 대신한다. */
-/* 소리. 끌 수 없는 소리는 소리가 아니라 사고다. 기둥 맨 아래라 오조작이 제일 적다. */
-#mute{position:absolute;right:var(--pad-r);top:calc(160px + env(safe-area-inset-top));
+/* 소리. 끌 수 없는 소리는 소리가 아니라 사고다. */
+#mute{position:absolute;right:var(--pad-r);top:calc(90px + env(safe-area-inset-top));
   pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);color:var(--ink);
   transform:rotate(var(--tilt));box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel)}
@@ -122,7 +131,8 @@ body.playing #hud{opacity:1}
 #mute[aria-pressed="true"]{color:var(--bad)}
 #mute[aria-pressed="true"] .wave{opacity:0}
 #mute[aria-pressed="true"] .slash{opacity:1}
-#auto{position:absolute;right:var(--pad-r);top:calc(86px + env(safe-area-inset-top));
+/* 자동. 손가락만 대신한다. 기둥에서 손이 가장 자주 가는 하나라 맨 위에 둔다. */
+#auto{position:absolute;right:var(--pad-r);top:calc(12px + env(safe-area-inset-top));
   pointer-events:auto;width:66px;height:66px;white-space:nowrap;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(-2.4deg);

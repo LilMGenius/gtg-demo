@@ -20,9 +20,13 @@
   text-shadow:clamp(5px,.9vw,12px) clamp(6px,1.05vw,14px) 0 #12160e}
 #word span{display:block}
 #word span:last-child{margin-left:clamp(22px,5.4vw,78px);color:#8ff0a6}
-#tag{margin-top:clamp(14px,1.7vw,24px);color:#dfe6da;opacity:.8;
-  font-family:'Pretendard','Malgun Gothic',sans-serif;font-weight:700;
-  font-size:clamp(12px,1.45vw,19px)}
+/* 한 줄 카피가 흙바닥 위에 얹힌다. 반투명 회색 글자는 밝은 흙과 붙어 안 읽혔다.
+   로고와 같은 검정 스트로크를 지면 배경이 무엇이든 떨어진다. */
+#tag{margin-top:clamp(14px,1.7vw,24px);color:#eef3ea;
+  font-family:'Pretendard','Malgun Gothic',sans-serif;font-weight:800;
+  font-size:clamp(12px,1.45vw,19px);
+  -webkit-text-stroke:clamp(3px,.42vw,5px) #12160e;paint-order:stroke fill;
+  text-shadow:2px 3px 0 #12160e}
 
 /* 시작 버튼. 알약 + 아래 그림자는 앱 위젯의 언어라 타이틀 글자와 화풍이 갈렸다.
    글자와 같은 것을 쓴다. 검정 스트로크, 오프셋 그림자, 기울기. */
