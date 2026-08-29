@@ -1061,7 +1061,65 @@ export function createScene(canvas) {
   }
   reset();
 
-  return { play, act, reset, setKeeper, sfx, ballProbe, stageProbe, goalFrame,
+  // 그림자가 화면 어디에 찍혔는지 눈으로 찍으면 틀린다. 카메라로 투영해서 받는다.
+  const rectBox = new THREE.Box3();
+  const rectV = new THREE.Vector3();
+  function shadowRect(w = 1280, h = 720) {
+    rectBox.setFromObject(keeperShadow);
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let i = 0; i < 8; i++) {
+      rectV.set(
+        (i & 1) ? rectBox.max.x : rectBox.min.x,
+        (i & 2) ? rectBox.max.y : rectBox.min.y,
+        (i & 4) ? rectBox.max.z : rectBox.min.z
+      );
+      rectV.project(camera);
+      const px = (rectV.x * 0.5 + 0.5) * w;
+      const py = (1 - (rectV.y * 0.5 + 0.5)) * h;
+      if (px < minX) minX = px;
+      if (px > maxX) maxX = px;
+      if (py < minY) minY = py;
+      if (py > maxY) maxY = py;
+    }
+    return {
+      x: Math.round(minX), y: Math.round(minY),
+      w: Math.round(maxX - minX), h: Math.round(maxY - minY)
+    };
+  }
+
+
+  // 그림자를 껐다 켠 두 프레임을 시간 진행 없이 같은 픽셀로 잰다.
+  // 흰 라인도 비네트도 디더도 두 프레임에 똑같이 들어간다. 남는 차이가 그림자다.
+  const pairRT = new THREE.WebGLRenderTarget(1280, 720);
+  const pairBuf = new Uint8Array(1280 * 720 * 4);
+  function shadowPair(boxes) {
+    const read = () => {
+      renderer.setRenderTarget(rt);
+      renderer.render(scene, camera);
+      renderer.setRenderTarget(pairRT);
+      renderer.render(postScene, postCam);
+      renderer.readRenderTargetPixels(pairRT, 0, 0, 1280, 720, pairBuf);
+      return boxes.map((b) => {
+        // 통계는 여기서 내지 않는다. 두 프레임을 화소 단위로 맞대여야
+        // 그림자가 실제로 닿은 화소만 골라낼 수 있다.
+        const px = [];
+        for (let y = b.y; y < b.y + b.h; y++) {
+          for (let x = b.x; x < b.x + b.w; x++) {
+            const i = ((719 - y) * 1280 + x) * 4;
+            px.push(0.299 * pairBuf[i] + 0.587 * pairBuf[i + 1] + 0.114 * pairBuf[i + 2]);
+          }
+        }
+        return px;
+      });
+    };
+    keeperShadow.visible = false;
+    const off = read();
+    keeperShadow.visible = true;
+    const on = read();
+    renderer.setRenderTarget(null);
+    return { off, on };
+  }
+  return { play, act, reset, setKeeper, sfx, ballProbe, stageProbe, goalFrame, shadowRect, shadowPair,
     ballPos: () => ({ x: ball.position.x, y: ball.position.y, z: ball.position.z }),
     leaveTitle() { titleMode = false; },
     set diving(v) { divingStat = v; } };
