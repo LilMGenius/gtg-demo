@@ -103,7 +103,8 @@ function commit(dive) {
   stage.diving = state.keeper.diving;
   const result = resolve({ keeper: state.keeper, shot, rng, input });
   state.results[state.i] = result.conceded;
-  say('...', null);
+  // 비행 중에는 자막을 비운다. 자리표시자를 남기면 화면 위쪽에 말줄임표가 박힌 채 촬영된다.
+  el('caption').innerHTML = '';
   stage.play(shot, input, result, () => rollCaptions(result));
 }
 
