@@ -18,6 +18,11 @@ import { jitterMesh, addOutline, blobGeo, ballGeo } from './handmade.mjs';
 const WRECK_POSES = new Set([POSES.faceplant, POSES.sprawlR, POSES.sprawlL, POSES.hugfall]);
 const SCRAMBLE_POSES = new Set([POSES.dribble, POSES.stumble]);
 
+// 몸이 흙에 닿는 포즈. 서서 끝나는 연출은 땅에 아무것도 안 남긴다.
+const SCUFF_POSES = new Set([POSES.faceplant, POSES.sprawlR, POSES.sprawlL, POSES.hugfall,
+  POSES.snatch, POSES.swatR, POSES.swatL, POSES.shoveR, POSES.shoveL,
+  POSES.reachR, POSES.reachL, POSES.diveR, POSES.diveL]);
+
 export function createScene(canvas) {
   const sfx = mountSfx();
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -609,6 +614,15 @@ export function createScene(canvas) {
         talked: POSES.swoon, distracted: POSES.swoon, openGoalScored: POSES.faceplant
       };
       kp = TAIL_POSE[tail.kind] ?? kp;
+      // 몸이 바닥에 닿는 순간 한 번만 흙을 판다. 매 프레임 칠하면 자국이 아니라 진흙탕이 된다.
+      // 자국은 몸통이 아니라 뻗은 팔이 닿는 자리에 남는다. 장갑의 실제 좌표로 찍어야
+      // 왼쪽으로 뛴 구와 오른쪽으로 뛴 구가 땅에서 다른 자리로 갈린다.
+      if (!tail.scuffed && u > 0.45 && SCUFF_POSES.has(kp)) {
+        tail.scuffed = true;
+        const hit = gloveWorld(Math.sign(tail.kx || 1));
+        pitch.box.userData.mark(hit.x, hit.z, Math.sign(tail.kx || 1) * 0.4, 0.62,
+          WRECK_POSES.has(kp) ? 1 : 0.7);
+      }
       // 키퍼만 사건마다 다르게 망가지고 키커는 매번 같은 준비 자세로 돌아갔다.
       // 정지 프레임 넷을 나란히 놓으면 키커가 복사 붙여넣기로 읽힌다. 결과를 키커도 안다.
       const KICKER_TAIL = {

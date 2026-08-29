@@ -105,13 +105,142 @@ export function dirtTex() {
   });
 }
 
-// 페널티 박스 안쪽. 밟히는 자리라 흙보다 닳았다. 배율이 다르면 같은 텍스처도 다른 땅이 된다.
+// 페널티 박스 안쪽. 밟히는 자리라 흙보다 닳았다.
+// 여기는 경기 중에 덧칠되는 면이라 반복 타일이 아니라 박스 전체를 한 장으로 굽는다.
+// 타일을 물리면 한 번 찍은 자국이 바닥 전체에 열한 번 복사된다.
+// 흙 한 장이 6.6m를 덮으면 가까운 땅에서 한 텍셀이 렌더 버퍼 두 픽셀을 넘어간다.
+// 그러면 이웃한 화면 픽셀이 같은 텍셀에 갇혀 바닥이 행마다 평평해졌다 거칠어졌다 한다.
+// 판을 두 배로 키우고 타일 크기는 그대로 둬서 같은 넓이에 흙을 두 배로 깐다.
+const SCUFF_S = 2048;
+const SCUFF_TILE = 1024 / 2.5;
+
+// 박스 한 장에 흙 그림을 깐다. 쌓인 자국을 옅게 덮어 지울 때도 같은 붓을 쓴다.
+export function paintScuffBase(c) {
+  const src = dirtTex().image;
+  const ox = 0.37 * SCUFF_S;
+  const oy = 0.11 * SCUFF_S;
+  for (let i = -2; i <= 6; i += 1) {
+    for (let j = -2; j <= 6; j += 1) {
+      c.drawImage(src, i * SCUFF_TILE - ox, j * SCUFF_TILE - oy, SCUFF_TILE, SCUFF_TILE);
+    }
+  }
+  // 화면은 384줄로 한 번 줄었다가 일곱 단으로 끊긴다.
+  // 잔모래는 가까이서 한 픽셀보다 잘아 평균으로 지워지고, 밝기 차도 한 단 안에 갇혀 사라진다.
+  // 그래서 바닥이 죽은 갈색 한 장이 된다. 발밑에서도 남으려면 자국이 굵고, 단을 넘을 만큼 진해야 한다.
+  paintScuffCoarse(c);
+}
+
+// 고정 씨앗이라 몇 번을 덧칠해도 같은 자리에 같은 자국이 겹친다.
+const COARSE = (() => {
+  const r = rng(0x7b1f42);
+  const worn = [];
+  for (let i = 0; i < 44; i += 1) {
+    // 진흙 웅덩이는 좁게 패이고 마른 자리는 넓게 번진다.
+    const dark = r() > 0.42;
+    const rad = dark ? 30 + r() * 46 : 58 + r() * 66;
+    // 깔끔한 타원 하나는 물방울무늬로 읽힌다. 겹친 조각들의 합집합이라야 밟고 지나간 자리가 된다.
+    const lobes = [];
+    const n = 3 + Math.floor(r() * 3);
+    for (let k = 0; k < n; k += 1) {
+      lobes.push({
+        dx: (r() - 0.5) * rad * 1.2,
+        dy: (r() - 0.5) * rad * 0.7,
+        rad: rad * (0.45 + r() * 0.45),
+        ry: 0.4 + r() * 0.5,
+        rot: r() * 3.14
+      });
+    }
+    worn.push({ x: r() * SCUFF_S, y: r() * SCUFF_S, lobes, dark, amp: r() });
+  }
+  const drag = [];
+  for (let i = 0; i < 34; i += 1) {
+    drag.push({
+      x: r() * SCUFF_S,
+      y: r() * SCUFF_S,
+      len: 120 + r() * 200,
+      wid: 8 + r() * 7,
+      rot: r() * 3.14,
+      dark: r() > 0.5
+    });
+  }
+  return { worn, drag };
+})();
+
+// 골문 바로 앞은 매 경기 밟혀 파인다. 페널티 스폿 쪽으로 갈수록 땅이 성하다.
+// 텍스처 위쪽이 골문 앞이고, 그 줄이 화면 아래쪽 발밑으로 온다.
+const CHURN_H = Math.round(SCUFF_S * 0.44);
+function churnLayer() {
+  return memo('churn', () => {
+    const cv = document.createElement('canvas');
+    cv.width = SCUFF_S;
+    cv.height = CHURN_H;
+    const c = cv.getContext('2d');
+    const r = rng(0x51c3a7);
+    for (let y = 0; y < CHURN_H; y += 6) {
+      const near = 1 - y / CHURN_H;
+      for (let x = 0; x < SCUFF_S; x += 6) {
+        // 골문에서 멀어질수록 파인 자리가 뜸해진다.
+        if (r() > 0.28 + near * 0.66) continue;
+        // 파인 자리와 마른 흙덩이. 한 값만 뿌리면 먼지 한 겹이지 파인 땅이 아니다.
+        const deep = r() > 0.5;
+        const v = deep ? 36 + Math.round(r() * 20) : 150 + Math.round(r() * 26);
+        const a = (0.55 + near * 0.4).toFixed(2);
+        c.fillStyle = 'rgba(' + v + ',' + Math.round(v * 0.96) + ',' + Math.round(v * 0.86) + ',' + a + ')';
+        c.fillRect(x + r() * 3 - 1.5, y + r() * 3 - 1.5, 3 + r() * 5, 3 + r() * 5);
+      }
+    }
+    return cv;
+  });
+}
+
+function paintScuffCoarse(c) {
+  // 밟혀 벗겨진 자리와 마른 자리. 한 쪽만 찍으면 얼룩이 아니라 그늘로 읽힌다.
+  for (const p of COARSE.worn) {
+    const v = p.dark ? 46 + Math.round(p.amp * 22) : 158 + Math.round(p.amp * 15);
+    const rgb = v + ',' + Math.round(v * 0.96) + ',' + Math.round(v * 0.86);
+    const a = p.dark ? 0.86 : 0.94;
+    for (const l of p.lobes) {
+      // 가장자리가 칼같으면 스티커다. 흙은 밟힌 중심에서 바깥으로 옅어진다.
+      const g = c.createRadialGradient(p.x + l.dx, p.y + l.dy, 0, p.x + l.dx, p.y + l.dy, l.rad);
+      g.addColorStop(0, 'rgba(' + rgb + ',' + a + ')');
+      g.addColorStop(0.55, 'rgba(' + rgb + ',' + (a * 0.7).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(' + rgb + ',0)');
+      c.fillStyle = g;
+      c.save();
+      c.translate(p.x + l.dx, p.y + l.dy);
+      c.rotate(l.rot);
+      c.scale(1, l.ry);
+      c.translate(-(p.x + l.dx), -(p.y + l.dy));
+      c.beginPath();
+      c.ellipse(p.x + l.dx, p.y + l.dy, l.rad, l.rad, 0, 0, 6.283);
+      c.fill();
+      c.restore();
+    }
+  }
+  // 끌린 자국. 둥근 얼룩만 있으면 물방울무늬로 돌아간다. 방향이 있어야 밟고 지나간 땅이 된다.
+  for (const d of COARSE.drag) {
+    c.save();
+    c.translate(d.x, d.y);
+    c.rotate(d.rot);
+    c.fillStyle = d.dark ? 'rgba(62,52,38,0.72)' : 'rgba(168,158,132,0.7)';
+    c.fillRect(-d.len / 2, -d.wid / 2, d.len, d.wid);
+    c.restore();
+  }
+  c.drawImage(churnLayer(), 0, 0);
+}
+
 export function scuffTex() {
   return memo('scuff', () => {
-    const t = dirtTex().clone();
-    t.needsUpdate = true;
-    t.repeat.set(2.5, 2.5);
-    t.offset.set(0.37, 0.11);
+    const cv = canvas(SCUFF_S);
+    const c = cv.getContext('2d');
+    paintScuffBase(c);
+    const t = new THREE.CanvasTexture(cv);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    t.generateMipmaps = false;
+    t.wrapS = THREE.ClampToEdgeWrapping;
+    t.wrapT = THREE.ClampToEdgeWrapping;
     return t;
   });
 }

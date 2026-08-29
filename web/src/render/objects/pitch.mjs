@@ -1,14 +1,14 @@
 // 무대. 흙 운동장 하나와 그 너머를 채우는 것들이다.
 import * as THREE from '../../../vendor/three.module.min.js';
-import { flat, flatMap, R_HALF_W, R_H } from '../units.mjs';
-import { dirtTex, scuffTex, clothTex, chippedTex, cloudTex, windowTex, windowTexFor } from '../texture.mjs';
+import { flat, flatMap, flatVertex, R_HALF_W, R_H } from '../units.mjs';
+import { dirtTex, scuffTex, paintScuffBase, clothTex, chippedTex, cloudTex, windowTex, windowTexFor } from '../texture.mjs';
 import { loadDecor } from '../decor.mjs';
 import { jitterMesh, seeded, addOutline } from '../handmade.mjs';
 import { addFace } from './actors.mjs';
 
 // 지오메트리 여러 개를 한 장으로 붙인다. 메시를 더 만들면 그만큼 드로우콜이 늘고,
 // 행인 다섯에게 팔을 달면 예산을 넘긴다. 모양은 늘리되 부를 것은 그대로 둔다.
-function mergeGeos(list) {
+function mergeGeos(list, colors) {
   let n = 0;
   let ni = 0;
   for (const g of list) { n += g.attributes.position.count; ni += g.index.count; }
@@ -16,12 +16,25 @@ function mergeGeos(list) {
   const nor = new Float32Array(n * 3);
   const uv = new Float32Array(n * 2);
   const idx = new Uint16Array(ni);
+  // 색을 안 주면 정점색 자체를 만들지 않는다. 이미 이 함수를 쓰는 곳들은 단색 재질이라
+  // 빈 color 어트리뷰트가 붙으면 검게 곱해진다.
+  const col = colors ? new Float32Array(n * 3) : null;
+  const tmp = colors ? new THREE.Color() : null;
   let vo = 0;
   let io2 = 0;
-  for (const g of list) {
+  for (let gi = 0; gi < list.length; gi += 1) {
+    const g = list[gi];
     pos.set(g.attributes.position.array, vo * 3);
     nor.set(g.attributes.normal.array, vo * 3);
     uv.set(g.attributes.uv.array, vo * 2);
+    if (col) {
+      tmp.setHex(colors[gi]);
+      for (let i = 0; i < g.attributes.position.count; i += 1) {
+        col[(vo + i) * 3] = tmp.r;
+        col[(vo + i) * 3 + 1] = tmp.g;
+        col[(vo + i) * 3 + 2] = tmp.b;
+      }
+    }
     const src = g.index.array;
     for (let i = 0; i < src.length; i += 1) idx[io2 + i] = src[i] + vo;
     io2 += src.length;
@@ -31,6 +44,7 @@ function mergeGeos(list) {
   out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
   out.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  if (col) out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   out.setIndex(new THREE.BufferAttribute(idx, 1));
   return out;
 }
@@ -120,11 +134,43 @@ export function buildPitch(scene) {
   scene.add(ground);
 
   // 박스 안은 더 밟힌다. 같은 잡티를 다른 배율로 물려야 한 장이 두 땅으로 읽힌다.
-  const box = new THREE.Mesh(new THREE.PlaneGeometry(16.5, 16.5), flatMap(0xb08e58, scuffTex()));
+  const scuff = scuffTex();
+  const box = new THREE.Mesh(new THREE.PlaneGeometry(16.5, 16.5), flatMap(0xb08e58, scuff));
   box.rotation.x = -Math.PI / 2;
   box.position.set(0, 0.01, 8.2);
   box.name = 'box';
   scene.add(box);
+
+  // 몸이 흙에 닿으면 흙이 파인다. 다음 구에 그 자리가 새 땅이면 방금 넘어진 일은 없던 일이 된다.
+  // 새 메시를 만들지 않는다. 박스가 이미 들고 있는 캔버스에 직접 칠한다.
+  const scv = scuff.image;
+  const sctx = scv.getContext('2d');
+  box.userData.mark = (wx, wz, ang, len, strength) => {
+    // 오래된 자국은 밟혀서 옅어진다. 칠하기 전에 바탕을 조금 덮어 쌓임을 스스로 제한한다.
+    sctx.globalAlpha = 0.05;
+    paintScuffBase(sctx);
+    sctx.globalAlpha = 1;
+    const px = ((wx + 8.25) / 16.5) * scv.width;
+    const py = ((wz + 0.05) / 16.5) * scv.height;
+    const L = (len / 16.5) * scv.width;
+    sctx.save();
+    sctx.translate(px, py);
+    sctx.rotate(ang);
+    sctx.fillStyle = 'rgba(96,84,66,' + (0.34 * strength).toFixed(3) + ')';
+    sctx.beginPath();
+    sctx.ellipse(0, 0, L, L * 0.34, 0, 0, Math.PI * 2);
+    sctx.fill();
+    // 가장자리가 매끈하면 그림자로 읽힌다. 파인 흙은 알갱이가 튄다.
+    const g = seeded(Math.floor(px) * 131 + Math.floor(py) * 7 + 1);
+    for (let i = 0; i < 14; i += 1) {
+      const a = g() * Math.PI * 2;
+      const rr = L * (0.6 + g() * 0.8);
+      sctx.fillStyle = g() > 0.45 ? 'rgba(78,66,50,0.55)' : 'rgba(196,176,142,0.45)';
+      sctx.fillRect(Math.cos(a) * rr, Math.sin(a) * rr * 0.34, 3, 3);
+    }
+    sctx.restore();
+    scuff.needsUpdate = true;
+  };
 
   // 라인. 흙바닥만 있으면 거리가 안 읽힌다. 공이 어디쯤 왔는지는 선이 알려준다.
   const lineMat = new THREE.MeshBasicMaterial({ color: 0xf2f0e4, transparent: true, opacity: 0.7 });
