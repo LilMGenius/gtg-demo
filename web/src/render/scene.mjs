@@ -313,7 +313,9 @@ export function createScene(canvas) {
   const MOOD = {
     rest: { pupil: [1, 1.1, 0.5], mouth: [1, 1, 1], heart: false },
     grin: { pupil: [1.15, 0.5, 0.5], mouth: [1.7, 1.4, 1.5], heart: false },
-    shock: { pupil: [0.5, 0.5, 0.5], mouth: [2, 2.8, 2], heart: false },
+    // 놀람은 입을 더 키울수록 얼굴 아래 절반이 검게 차서 턱이 사라지고 머리가 몸통에 붙는다.
+    // 입은 턱을 남기는 선에서 멈추고, 동공은 점으로 줄이지 않는다. 흰자만 남으면 눈이 공으로 읽힌다.
+    shock: { pupil: [0.8, 0.8, 0.5], mouth: [1.5, 1.9, 1.5], heart: false },
     heart: { pupil: [2.1, 2.1, 0.5], mouth: [1.4, 1.6, 1.2], heart: true }
   };
   function setMood(head, name) {
@@ -359,10 +361,18 @@ export function createScene(canvas) {
   heartShape.moveTo(0, -0.5);
   heartShape.bezierCurveTo(0.9, 0.35, 0.45, 1.05, 0, 0.5);
   heartShape.bezierCurveTo(-0.45, 1.05, -0.9, 0.35, 0, -0.5);
-  const heartGeo = new THREE.ShapeGeometry(heartShape, 6);
+  // 6분할은 로브를 각진 조각으로 잘라 하트가 아니라 미해결 폴리곤으로 읽혔다.
+  const heartGeo = new THREE.ShapeGeometry(heartShape, 24);
+  // 셋이 같은 색 같은 평면에 겹쳐 한 덩어리로 뭉쳤다. 어두운 테두리가 있어야 셋으로 세어진다.
+  const heartEdgeMat = new THREE.MeshBasicMaterial({ color: 0x3a0d1c });
   const hearts = [];
   for (let i = 0; i < 3; i += 1) {
     const h = new THREE.Mesh(heartGeo, heartMat);
+    const edge = new THREE.Mesh(heartGeo, heartEdgeMat);
+    edge.scale.setScalar(1.24);
+    edge.position.z = -0.004;
+    edge.userData.probeIgnore = true;
+    h.add(edge);
     h.visible = false;
     h.userData.probeIgnore = true;
     scene.add(h);
@@ -374,7 +384,9 @@ export function createScene(canvas) {
       h.visible = on;
       if (!on) continue;
       const u = (e * 1.6 + i * 0.33) % 1;
-      h.position.set(at.x + (i - 1) * 0.26 + Math.sin(u * 6 + i) * 0.07, at.y + 0.1 + u * 0.22, at.z - 0.1);
+      // 0.26 간격은 하트 폭보다 좁아 셋이 한 덩어리로 붙었다.
+      // 깊이까지 같으면 테두리와 몸이 z-파이팅으로 대각선 이음매를 낸다. 렌즈 쪽으로 층을 벌린다.
+      h.position.set(at.x + (i - 1) * 0.4 + Math.sin(u * 6 + i) * 0.07, at.y + 0.38 + u * 0.22, at.z - 0.1 - i * 0.05);
       h.scale.setScalar((0.24 + i * 0.04) * (1 - u * 0.3));
       h.quaternion.copy(camera.quaternion);
     }
