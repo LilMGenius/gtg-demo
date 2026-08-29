@@ -248,15 +248,15 @@ export function buildPitch(scene) {
   };
   const rails = [];
   for (const sgn of [-1, 1]) {
-    rails.push(railGeo(R_H, 'y').translate(sgn * BACK_HW, R_H / 2, -NET_D));
+    rails.push(railGeo(BACK_H, 'y').translate(sgn * BACK_HW, BACK_H / 2, -NET_D));
     rails.push(
       stayGeo(
         new THREE.Vector3(sgn * R_HALF_W, R_H, 0),
-        new THREE.Vector3(sgn * BACK_HW, R_H, -NET_D)
+        new THREE.Vector3(sgn * BACK_HW, BACK_H, -NET_D)
       )
     );
   }
-  rails.push(railGeo(BACK_HW * 2, 'x').translate(0, R_H, -NET_D));
+  rails.push(railGeo(BACK_HW * 2, 'x').translate(0, BACK_H, -NET_D));
   const rear = new THREE.Mesh(mergeGeos(rails), flatMap(0x5f6a5c, chippedTex()));
   // 앞 골대는 한 번 들이받혀 기울었다. 뒷틀만 정확히 서 있으면 둘이 다른 날 세운 물건으로 보인다.
   rear.rotation.z = 0.012;
