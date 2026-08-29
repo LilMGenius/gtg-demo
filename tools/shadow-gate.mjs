@@ -44,9 +44,18 @@ try {
     const w = cl(r.x + r.w, sx + 8, W) - sx;
     const h = cl(r.y + r.h, sy + 8, H) - sy;
     // 음성 대조군. 그림자가 안 닿는 자리라면 두 프레임이 완전히 같아야 한다.
-    const cx = cl(sx > W / 2 ? sx - w - 30 : sx + w + 30, 0, W - w);
-    const boxes = [{ x: sx, y: sy, w, h }, { x: cx, y: sy, w, h }];
-    return { r, boxes, stat: window.__shadowPair(boxes) };
+    // 폭을 그림자 폭에 맞추면 안 된다. 그림자가 화면 폭의 40%를 넘는 순간
+    // "옆으로 w만큼 밀기"가 화면 안에서 불가능해지고, 클램프가 대조군을
+    // 그림자 위로 되돌려 놓는다. 그러면 대조군 안에서 그림자가 켜졌다 꺼지고
+    // 게이트는 자기 계측기가 죽었다고 오판한다.
+    const CW = 160, GAP = 24;
+    const hit = (x) => x < sx + w + GAP && x + CW > sx - GAP;
+    const cand = [0, W - CW, sx - GAP - CW, sx + w + GAP]
+      .filter((x) => x >= 0 && x + CW <= W && !hit(x))
+      .sort((a, bx) => Math.abs(bx + CW / 2 - (sx + w / 2)) - Math.abs(a + CW / 2 - (sx + w / 2)));
+    const boxes = [{ x: sx, y: sy, w, h }];
+    if (cand.length) boxes.push({ x: cand[0], y: sy, w: CW, h });
+    return { r, boxes, ctrl: cand.length ? cand[0] : null, stat: boxes.length > 1 ? window.__shadowPair(boxes) : null };
   });
   await p.screenshot({ path: OUT });
   if (errs.length) console.log("console errors: " + JSON.stringify(errs));
@@ -56,6 +65,10 @@ try {
 }
 
 const f = (v) => v.toFixed(1);
+if (res.ctrl === null) {
+  console.log("판정 중단. 그림자가 화면 폭을 거의 다 먹어 대조군 자리가 없다. rect " + JSON.stringify(res.r) + " INSTRUMENT DEAD");
+  process.exit(2);
+}
 const stat = (a) => {
   const s = a.slice().sort((p, q) => p - q);
   const at = (q) => s[Math.min(s.length - 1, Math.floor(s.length * q))];
