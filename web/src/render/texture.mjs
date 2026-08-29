@@ -14,6 +14,8 @@ function canvas(size) {
 
 function finish(cv, repeat) {
   const t = new THREE.CanvasTexture(cv);
+  // 캔버스 바이트는 sRGB다. 선언하지 않으면 선형으로 오독돼 중간톤이 눌린다.
+  t.colorSpace = THREE.SRGBColorSpace;
   // 보간하면 잡티가 뿌옇게 번져 저해상도 화면에서 아예 안 읽힌다.
   t.magFilter = THREE.NearestFilter;
   t.minFilter = THREE.NearestFilter;
