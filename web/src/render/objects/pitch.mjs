@@ -1,53 +1,10 @@
 // 무대. 흙 운동장 하나와 그 너머를 채우는 것들이다.
 import * as THREE from '../../../vendor/three.module.min.js';
-import { flat, flatMap, flatVertex, R_HALF_W, R_H } from '../units.mjs';
+import { flat, flatMap, flatVertex, mergeGeos, R_HALF_W, R_H } from '../units.mjs';
 import { dirtTex, scuffTex, paintScuffBase, clothTex, chippedTex, cloudTex, windowTex, windowTexFor } from '../texture.mjs';
 import { loadDecor } from '../decor.mjs';
 import { jitterMesh, seeded, addOutline } from '../handmade.mjs';
 import { addFace } from './actors.mjs';
-
-// 지오메트리 여러 개를 한 장으로 붙인다. 메시를 더 만들면 그만큼 드로우콜이 늘고,
-// 행인 다섯에게 팔을 달면 예산을 넘긴다. 모양은 늘리되 부를 것은 그대로 둔다.
-function mergeGeos(list, colors) {
-  let n = 0;
-  let ni = 0;
-  for (const g of list) { n += g.attributes.position.count; ni += g.index.count; }
-  const pos = new Float32Array(n * 3);
-  const nor = new Float32Array(n * 3);
-  const uv = new Float32Array(n * 2);
-  const idx = new Uint16Array(ni);
-  // 색을 안 주면 정점색 자체를 만들지 않는다. 이미 이 함수를 쓰는 곳들은 단색 재질이라
-  // 빈 color 어트리뷰트가 붙으면 검게 곱해진다.
-  const col = colors ? new Float32Array(n * 3) : null;
-  const tmp = colors ? new THREE.Color() : null;
-  let vo = 0;
-  let io2 = 0;
-  for (let gi = 0; gi < list.length; gi += 1) {
-    const g = list[gi];
-    pos.set(g.attributes.position.array, vo * 3);
-    nor.set(g.attributes.normal.array, vo * 3);
-    uv.set(g.attributes.uv.array, vo * 2);
-    if (col) {
-      tmp.setHex(colors[gi]);
-      for (let i = 0; i < g.attributes.position.count; i += 1) {
-        col[(vo + i) * 3] = tmp.r;
-        col[(vo + i) * 3 + 1] = tmp.g;
-        col[(vo + i) * 3 + 2] = tmp.b;
-      }
-    }
-    const src = g.index.array;
-    for (let i = 0; i < src.length; i += 1) idx[io2 + i] = src[i] + vo;
-    io2 += src.length;
-    vo += g.attributes.position.count;
-  }
-  const out = new THREE.BufferGeometry();
-  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-  out.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  if (col) out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  out.setIndex(new THREE.BufferAttribute(idx, 1));
-  return out;
-}
 
 // 사각 그물 한 장. wireframe 평면은 삼각형 대각선이 남아 그물이 아니라 격자무늬로 읽힌다.
 // 팽팽한 격자는 그물이 아니라 방충망이다. 가운데를 배가 부르게 늘어뜨려야 천으로 읽힌다.
@@ -269,6 +226,10 @@ export function buildPitch(scene) {
   // 접이식 골대처럼 뒤로 갈수록 좁혀 세운다. 기둥이 화면 안에 들어와 세로선을 긋고,
   // 앞 기둥 머리에서 뒤 기둥 머리로 물러나는 빗대가 깊이를 그린다.
   const BACK_HW = 2;
+  // 뒷틀 상단은 앞 골대보다 1.5m 가까워 같은 굵기라도 화면에서 1.4배로 퍼진다.
+  // 앞 골대와 같은 높이에 두면 그 띠가 크로스바 한참 아래를 지나 키퍼 머리를 가로로 잘랐다.
+  // 뒤로 갈수록 올려 세우면 띠가 크로스바 바로 밑에 붙어 골대 윗변의 일부로 읽힌다.
+  const BACK_H = 2.74;
   const railGeo = (len, axis) => {
     const g = new THREE.CylinderGeometry(0.05, 0.05, len, 6);
     if (axis === 'x') g.rotateZ(Math.PI / 2);

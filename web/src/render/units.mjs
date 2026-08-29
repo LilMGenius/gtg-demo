@@ -33,3 +33,46 @@ export const standOnGround = (g) => {
   const b = new THREE.Box3().setFromObject(g);
   for (const c of g.children) c.position.y -= b.min.y;
 };
+
+// 지오메트리 여러 개를 한 장으로 붙인다. 메시를 더 만들면 그만큼 드로우콜이 늘고,
+// 행인 다섯에게 팔을 달면 예산을 넘긴다. 모양은 늘리되 부를 것은 그대로 둔다.
+export function mergeGeos(list, colors) {
+  let n = 0;
+  let ni = 0;
+  for (const g of list) { n += g.attributes.position.count; ni += g.index.count; }
+  const pos = new Float32Array(n * 3);
+  const nor = new Float32Array(n * 3);
+  const uv = new Float32Array(n * 2);
+  const idx = new Uint16Array(ni);
+  // 색을 안 주면 정점색 자체를 만들지 않는다. 이미 이 함수를 쓰는 곳들은 단색 재질이라
+  // 빈 color 어트리뷰트가 붙으면 검게 곱해진다.
+  const col = colors ? new Float32Array(n * 3) : null;
+  const tmp = colors ? new THREE.Color() : null;
+  let vo = 0;
+  let io2 = 0;
+  for (let gi = 0; gi < list.length; gi += 1) {
+    const g = list[gi];
+    pos.set(g.attributes.position.array, vo * 3);
+    nor.set(g.attributes.normal.array, vo * 3);
+    uv.set(g.attributes.uv.array, vo * 2);
+    if (col) {
+      tmp.setHex(colors[gi]);
+      for (let i = 0; i < g.attributes.position.count; i += 1) {
+        col[(vo + i) * 3] = tmp.r;
+        col[(vo + i) * 3 + 1] = tmp.g;
+        col[(vo + i) * 3 + 2] = tmp.b;
+      }
+    }
+    const src = g.index.array;
+    for (let i = 0; i < src.length; i += 1) idx[io2 + i] = src[i] + vo;
+    io2 += src.length;
+    vo += g.attributes.position.count;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  out.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  if (col) out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  out.setIndex(new THREE.BufferAttribute(idx, 1));
+  return out;
+}
