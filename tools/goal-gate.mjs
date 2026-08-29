@@ -45,7 +45,7 @@ const verdict = (m) => [m.goalOn, m.past, m.inMouth, m.seen, m.px >= BAR_PX];
 const line = (name, m) => {
   const v = verdict(m);
   return name.padEnd(11)
-    + (v[0] ? " goalOn" : " GOALCUT")
+    + (v[0] ? " goalOn" : " GOALCUT[" + m.gf.map((n) => n.toFixed(2)).join(" ") + "]")
     + (v[1] ? " past" : " NEAR") + "(z=" + m.z.toFixed(2) + ")"
     + (v[2] ? " inMouth" : " OUTSIDE") + "(ndc " + m.ndc[0].toFixed(2) + "," + m.ndc[1].toFixed(2) + ")"
     + (v[3] ? " seen" : " HIDDEN")
