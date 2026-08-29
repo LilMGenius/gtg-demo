@@ -537,6 +537,7 @@ export function createScene(canvas) {
     trail.length = 0;
     for (const g of ghosts) g.visible = false;
     ball.scale.set(1, 1, 1);
+    ballGain = 1;
     kicker.position.set(VIEW_X * shot.aimX * SX * 0.2 + KICKER_OFF, 0, 11.2);
     kicker.userData.startX = kicker.position.x;
     ball.position.set(0, BALL_R, 11);
@@ -624,7 +625,15 @@ export function createScene(canvas) {
         // 대신 발에 맞은 직후에만 짜부라진다. 이건 시선축과 무관해서 화면에 그대로 보인다.
         // 0.5초는 공이 계속 찌그러진 채로 날았다. 0.13초가 맞은 순간으로만 읽힌다.
         const sq = Math.max(0, 1 - (t - runup) / 0.13);
-        ball.scale.set(1 + sq * 0.5, 1 - sq * 0.34, 1 + sq * 0.5);
+        // 실측으로 비행 중 공 지름이 17.7px까지 내려갔다. 720p 화면 폭의 1.4%다.
+        // 그 크기에서는 공이 오는지 서 있는지가 안 읽히고 잔상도 그 점 안에 갇혀 같이 죽는다.
+        // 만화는 이럴 때 원근을 포기하고 공을 키운다. 화면 높이 비율로 하한을 두고 모자란 만큼만 곱한다.
+        const dist = Math.max(0.01, ball.position.distanceTo(CAM_BASE));
+        const angular = (2 * BALL_R / dist) / (2 * Math.tan(BASE_FOV * Math.PI / 360));
+        // 0.12초에 걸쳐 올려봤더니 그 구간이 최소 크기를 만들어 25px에서 걸렸다.
+        // 발에 맞는 순간 커지는 것은 오류가 아니라 임팩트다. 같은 프레임의 짜부라짐과 한 사건으로 읽힌다.
+        ballGain = Math.max(1, Math.min(BALL_GAIN_CAP, BALL_MIN_H / angular));
+        ball.scale.set((1 + sq * 0.5) * ballGain, (1 - sq * 0.34) * ballGain, (1 + sq * 0.5) * ballGain);
         // 골포스트와 크로스바를 스치는 코스만 금속음이 난다.
         // 판정은 이미 끝났고 여기서 읽는 것은 확정된 조준점의 기하뿐이다.
         if (!cue.framed && q >= 0.97) {
@@ -953,7 +962,9 @@ export function createScene(canvas) {
     // 간격을 두 프레임으로 벌려 꼬리가 길어지게 한다.
     if (cue && !tail) {
       trail.unshift(ball.position.clone());
-      if (trail.length > GHOSTS * 2) trail.length = GHOSTS * 2;
+      // 잔상 i는 trail[i*2+2]를 읽는다. 마지막 잔상은 인덱스 16을 요구하므로 상한이 16이면
+      // 여덟 장 중 일곱 장만 켜지고 꼬리 끝이 영영 빈다.
+      if (trail.length > GHOSTS * 2 + 2) trail.length = GHOSTS * 2 + 2;
       for (let i = 0; i < GHOSTS; i++) {
         const p = trail[i * 2 + 2];
         const g = ghosts[i];
@@ -965,7 +976,9 @@ export function createScene(canvas) {
           const db = Math.max(0.01, ball.position.distanceTo(CAM_BASE));
           // 뒤로 갈수록 키우면 공보다 큰 노란 덩어리가 공 옆에 붙는다. 관객은 그것을 두 번째 공으로 읽는다.
           // 만화의 속도 꼬리는 뒤로 갈수록 가늘어진다. 앞머리만 공만 하고 끝은 점이다.
-          g.scale.setScalar((dg / db) * (1 - i * 0.095));
+          // 공에 만화 배율이 걸리면 잔상도 같이 걸어야 한다. 안 걸면 꼬리가 공보다 작아져
+          // 속도선이 아니라 공 뒤에 붙은 부스러기로 읽힌다.
+          g.scale.setScalar((dg / db) * (1 - i * 0.095) * ballGain);
         }
       }
       // 재질이 한 벌이라 투명도는 한 번만 정한다. 개별로 주려면 재질이 여덟 벌 필요하고 그건 예산 밖이다.
@@ -1150,6 +1163,7 @@ export function createScene(canvas) {
     keeper.rotation.y = 0;
     ball.position.set(0, BALL_R, 11);
     ball.scale.set(1, 1, 1);
+    ballGain = 1;
     ball.rotation.set(0, 0, 0);
     trail.length = 0;
     for (const g of ghosts) g.visible = false;
