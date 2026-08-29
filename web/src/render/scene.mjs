@@ -167,9 +167,12 @@ export function createScene(canvas) {
   const trail = [];
 
   // 공 그림자. 공이 어디쯤인지 바닥이 알려주면 궤적을 놓치지 않는다.
+  // 흙과 같은 갈색으로 칠한 그늘은 흙 얼룩 하나로 읽혔다. 바닥에는 이만큼 짙은 얼룩이 이미 널려 있다.
+  // 그림자만 찬 색으로 빼면 같은 밝기라도 흙에서 떨어져 나온다. 만화가 그늘을 파랗게 칠하는 이유다.
+  const SHADOW_INK = 0x171326;
   const shadow = new THREE.Mesh(
     blobGeo(0.16, 0x4411a3),
-    new THREE.MeshBasicMaterial({ color: 0x1c1508, transparent: true, opacity: 0.42 })
+    new THREE.MeshBasicMaterial({ color: SHADOW_INK, transparent: true, opacity: 0.62 })
   );
   shadow.rotation.x = -Math.PI / 2;
   shadow.userData.probeIgnore = true;
@@ -183,11 +186,11 @@ export function createScene(canvas) {
     blobSeed += 0x9e37;
     const m = new THREE.Mesh(
       blobGeo(r, blobSeed),
-      new THREE.MeshBasicMaterial({ color: 0x1c1508, transparent: true, opacity: 0.55 })
+      new THREE.MeshBasicMaterial({ color: SHADOW_INK, transparent: true, opacity: 0.72 })
     );
     const core = new THREE.Mesh(
       blobGeo(r * 0.56, blobSeed + 0x31),
-      new THREE.MeshBasicMaterial({ color: 0x1c1508, transparent: true, opacity: 0.60 })
+      new THREE.MeshBasicMaterial({ color: SHADOW_INK, transparent: true, opacity: 0.86 })
     );
     // 정확히 겹치면 두 장인 줄 모른다. 반지름의 5분의 1만 밀어 발밑을 짙게 만든다.
     core.position.set(r * 0.18, -r * 0.14, 0.001);
@@ -197,10 +200,11 @@ export function createScene(canvas) {
     scene.add(m);
     return m;
   };
-  const keeperShadow = blob(0.42);
-  const kickerShadow = blob(0.3);
+  // 발자국만 한 원판은 다리 뒤에 그대로 숨는다. 몸 밖으로 치마처럼 삐져나와야 접지가 보인다.
+  const keeperShadow = blob(0.55);
+  const kickerShadow = blob(0.36);
   // 행인도 그림자가 있어야 땅을 딘는다. 말걸기 연출은 행인을 앞줄로 데려오므로 더 눈에 띄다.
-  const passerShadows = passers.map(() => blob(0.24));
+  const passerShadows = passers.map(() => blob(0.28));
 
   const kicker = buildKicker();
   scene.add(kicker);
