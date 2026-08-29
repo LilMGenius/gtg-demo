@@ -36,9 +36,12 @@ function ownGrid([cs, rs, w, h]) {
   return out;
 }
 
-// 국소 디테일. 화소와 오른쪽 3칸, 아래 3칸 사이 휘도 차의 합을 셀 안에서 모으고 중앙값을 쓴다.
+// 국소 구조. 3, 8, 16화소 떨어진 이웃과의 휘도 차를 각각 재고 그 중 가장 큰 값을 쓴다.
+// 한 칸짜리 자만 대면 잔노이즈에만 점수가 붙는다. 잔노이즈는 공과 팔다리와 같은 주파수라
+// 그 자를 통과시키려고 바닥을 갈아 놓으면 피사체가 배경에 녹는다. 굵은 얼룩도 구조로 세야 한다.
 // 평균은 흰 선 몇 줄에 통째로 끌려간다. 중앙값은 면 자체가 무엇을 하고 있는지를 답한다.
-async function energy([b64, cs, rs, half]) {
+const SCALES = [3, 8, 16];
+async function energy([b64, cs, rs, half, scales]) {
   const im = new Image();
   im.src = "data:image/png;base64," + b64;
   await im.decode();
@@ -47,15 +50,25 @@ async function energy([b64, cs, rs, half]) {
   cv.getContext("2d").drawImage(im, 0, 0);
   const g = cv.getContext("2d").getImageData(0, 0, im.width, im.height);
   const d = g.data;
-  const L = (i) => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+  const L = (x, y) => {
+    const cx = Math.max(0, Math.min(g.width - 1, x));
+    const cy = Math.max(0, Math.min(g.height - 1, y));
+    const i = (cy * g.width + cx) * 4;
+    return 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+  };
   const cell = (px, py) => {
     const v = [];
     let sr = 0, sg = 0, sb = 0, n = 0;
     for (let y = py - half; y < py + half; y += 1) {
       for (let x = px - half; x < px + half; x += 1) {
         const i = (y * g.width + x) * 4;
-        const a = L(i);
-        v.push(Math.abs(a - L(i + 12)) + Math.abs(a - L(i + g.width * 12)));
+        const a = L(x, y);
+        let best = 0;
+        for (const s of scales) {
+          const e = Math.abs(a - L(x + s, y)) + Math.abs(a - L(x, y + s));
+          if (e > best) best = e;
+        }
+        v.push(best);
         sr += d[i]; sg += d[i + 1]; sb += d[i + 2]; n += 1;
       }
     }
@@ -73,7 +86,7 @@ async function energy([b64, cs, rs, half]) {
 
 // 음성 대조군. 밴드 평균색으로 채운 균일 판에 같은 자를 대면 0이 나와야 한다.
 // 이게 0이 아니면 이 자는 죽음과 살아있음을 구분한다고 말할 수 없다.
-async function flatControl([rgb, half]) {
+async function flatControl([rgb, half, scales]) {
   const cv = document.createElement("canvas");
   cv.width = 64; cv.height = 64;
   const c = cv.getContext("2d");
@@ -81,13 +94,22 @@ async function flatControl([rgb, half]) {
   c.fillRect(0, 0, 64, 64);
   const g = c.getImageData(0, 0, 64, 64);
   const d = g.data;
-  const L = (i) => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+  const L = (x, y) => {
+    const cx = Math.max(0, Math.min(63, x));
+    const cy = Math.max(0, Math.min(63, y));
+    const i = (cy * 64 + cx) * 4;
+    return 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+  };
   const v = [];
   for (let y = 32 - half; y < 32 + half; y += 1) {
     for (let x = 32 - half; x < 32 + half; x += 1) {
-      const i = (y * 64 + x) * 4;
-      const a = L(i);
-      v.push(Math.abs(a - L(i + 12)) + Math.abs(a - L(i + 64 * 12)));
+      const a = L(x, y);
+      let best = 0;
+      for (const s of scales) {
+        const e = Math.abs(a - L(x + s, y)) + Math.abs(a - L(x, y + s));
+        if (e > best) best = e;
+      }
+      v.push(best);
     }
   }
   v.sort((p, q) => p - q);
@@ -111,7 +133,7 @@ try {
 
   const owners = await p.evaluate(ownGrid, [cols, rows, W, H]);
   const shot = (await p.screenshot()).toString("base64");
-  const cells = await p.evaluate(energy, [shot, cols, rows, HALF]);
+  const cells = await p.evaluate(energy, [shot, cols, rows, HALF, SCALES]);
 
   // 밴드마다 누가 몇 칸을 가졌는지 먼저 말한다. 격차의 주어는 여기서 확정된다.
   const tally = {};
@@ -149,7 +171,7 @@ try {
   console.log("MID  rows " + rows[lo] + ".." + rows[lo + 2] + "  det=" + mid.med.toFixed(2) + "  cells=" + mid.n);
   console.log("NEAR rows " + rows[hi - 2] + ".." + rows[hi] + "  det=" + near.med.toFixed(2) + "  cells=" + near.n);
 
-  const ctrl = await p.evaluate(flatControl, [near.rgb, HALF]);
+  const ctrl = await p.evaluate(flatControl, [near.rgb, HALF, SCALES]);
   console.log("CONTROL flat=" + ctrl.toFixed(3) + "  (must be 0)");
 
   const ok = ctrl < 0.5 && mid.med >= 1 && near.med >= mid.med;
@@ -159,4 +181,3 @@ try {
   clearTimeout(t);
   if (br) await br.close();
 }
-
