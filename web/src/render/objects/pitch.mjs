@@ -426,6 +426,9 @@ export function buildPassers(scene) {
     // 0.42는 몸통 윗반에서 끝나 어깨 봉으로 보였다. 팔은 허리를 지나야 팔로 읽힌다.
     const armLen = 0.62 * tall;
     const armParts = [torsoGeo];
+    // 팔이 셔츠와 같은 색이면 흰 몸통에 흰 팔이 묻혀 사각형 한 장으로 읽힌다.
+    // 메시를 나누면 드로우콜이 열 개 붙으므로 정점색으로만 가른다.
+    const armColors = [shirt[i]];
     for (const s of [-1, 1]) {
       const a = new THREE.CapsuleGeometry(0.072, armLen, 3, 5);
       // 캡슐은 중앙이 원점이다. 그대로 돌리면 어깨가 아니라 팔 한가운데가 축이 된다.
@@ -435,10 +438,23 @@ export function buildPassers(scene) {
       // 어깨는 몸통 꼭대기가 아니라 그 한 칸 아래다. 꼭대기에 달면 목에서 팔이 난다.
       a.translate(s * (torsoR + 0.05), 0.22 * tall, 0);
       armParts.push(a);
+      armColors.push(0xe0b48c);
     }
-    const body = new THREE.Mesh(mergeGeos(armParts), flatMap(shirt[i], clothTex()));
+    const bodyMat = flatVertex(0xffffff);
+    bodyMat.map = clothTex();
+    const body = new THREE.Mesh(mergeGeos(armParts, armColors), bodyMat);
     body.position.y = 0.86 * tall;
-    const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.15 * wide, 0.46 * tall, 3, 6), flat(0x30384a));
+    // 다리 한 덩어리는 옆에 선 키퍼의 두 다리와 나란히 놓이면 통짜 기둥으로 읽힌다.
+    // 같은 재질이라 지오메트리만 둘로 갈라도 드로우콜은 그대로다.
+    const legGeos = [];
+    for (const s of [-1, 1]) {
+      // 0.082 반경에 0.08 간격은 두 캡슐이 서로 파묻혀 다시 한 기둥으로 읽혔다.
+      // 사이로 흙이 보여야 다리가 둘로 갈린다.
+      const l = new THREE.CapsuleGeometry(0.068 * wide, 0.46 * tall, 3, 5);
+      l.translate(s * 0.115 * wide, 0, 0);
+      legGeos.push(l);
+    }
+    const legs = new THREE.Mesh(mergeGeos(legGeos), flat(0x30384a));
     legs.position.y = 0.38 * tall;
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), flat(0xe0b48c));
     head.position.y = 1.36 * tall;
