@@ -114,6 +114,9 @@ export function createScene(canvas) {
   let vnow = 0;
   let realLast = performance.now() / 1000;
   let stopLeft = 0;
+  // 계측용 정지. 세계시간만 멈추고 렌더는 계속 돈다.
+  // 렌더까지 멈추면 대조군이 화면 갱신 자체를 못 보므로 계기의 잡음 바닥을 재지 못한다.
+  let frozen = false;
   let kickPop = 0;
   // 0.30은 슬로모션으로 읽혔고 0.02는 프레임이 멈춘 것으로 읽혔다. 0.08이 걸리는 느낌이다.
   const HIT_SCALE = 0.08;
@@ -565,6 +568,7 @@ export function createScene(canvas) {
     // 탭이 백그라운드로 갔다 오면 dt가 몇 초로 들어와 연출이 한 프레임에 끝난다.
     let dt = Math.min(0.05, Math.max(0, real - realLast));
     realLast = real;
+    if (frozen) dt = 0;
     if (stopLeft > 0) {
       stopLeft -= dt;
       dt *= HIT_SCALE;
@@ -1081,6 +1085,10 @@ export function createScene(canvas) {
   // 포스트 패스 한 장이 아니라 세계 패스를 보고한다. 예산은 세계가 쓴다.
   // 화면에 실제로 선 것을 이름으로 세는 진단구. 코드를 읽어 추측하면 없는 GridHelper를 찾게 된다.
   window.__sceneRoot = () => scene;
+
+  // 사건이 없을 때 화면이 정말 멈추는지를 계측이 확인할 수 있어야 한다.
+  // 게임은 사건 사이에도 계속 진행하므로, 대기 시간만으로는 정지 상태를 만들 수 없다.
+  window.__freeze = (on) => { frozen = Boolean(on); return frozen; };
 
   // 표정을 바꾸는 코드가 돌았다는 것과 표정이 화면에 있다는 것은 다른 주장이다.
   // 뒤통수를 향한 머리에 하트 눈을 넣어도 관객이 보는 것은 검은 반구다.
