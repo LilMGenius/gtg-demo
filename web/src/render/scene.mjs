@@ -165,6 +165,12 @@ export function createScene(canvas) {
     ghosts.push(g);
   }
   const trail = [];
+  // 공이 화면에서 차지하는 높이 비율. 화소가 아니라 비율로 잡아야 해상도가 바뀌어도 같은 그림이 나온다.
+  // 0.047은 720p에서 지름 34px이다. 실측으로 비행 중 최소 17.7px까지 내려갔고 그 크기에서는
+  // 공이 오는지 서 있는지가 안 읽혔다. 잔상도 그 점 안에 갇혀 같이 죽었다.
+  const BALL_MIN_H = 0.047;
+  const BALL_GAIN_CAP = 2.4;
+  let ballGain = 1;
 
   // 공 그림자. 공이 어디쯤인지 바닥이 알려주면 궤적을 놓치지 않는다.
   // 흙과 같은 갈색으로 칠한 그늘은 흙 얼룩 하나로 읽혔다. 바닥에는 이만큼 짙은 얼룩이 이미 널려 있다.
@@ -1078,6 +1084,46 @@ export function createScene(canvas) {
     triangles: sceneTris + 2,
     programs: renderer.info.programs ? renderer.info.programs.length : 0
   });
+
+  // 잔상이 코드에 있다는 것과 날아오는 동안 화면에 남는다는 것은 다른 주장이다.
+  // 켜짐 조건, 진하기, 화면상 공 크기를 비행 중에 되물어야 어디가 안 켜지는지 말할 수 있다.
+  window.__flightVis = () => {
+    const h = renderer.domElement.clientHeight || 1;
+    const d = Math.max(0.01, ball.position.distanceTo(camera.position));
+    const px = (2 * BALL_R / d) / (2 * Math.tan(camera.fov * Math.PI / 360)) * h;
+    // 잔상이 켜졌다는 것과 공 바깥에 무언가를 남겼다는 것은 다른 주장이다.
+    // 카메라가 공의 진행축 위에 있으면 잔상은 전부 공 뒤에 겹쳐 한 덩어리가 된다.
+    // 그래서 화면에서 공 실루엣 밖으로 얼마나 나갔는지를 재야 꼬리가 보인다고 말할 수 있다.
+    const w = renderer.domElement.clientWidth || 1;
+    camera.updateMatrixWorld();
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+    const toScreen = (v) => { const n = v.clone().project(camera); return [(n.x * 0.5 + 0.5) * w, (-n.y * 0.5 + 0.5) * h]; };
+    const screenR = (v, r) => {
+      const a = toScreen(v);
+      const b = toScreen(v.clone().addScaledVector(right, r));
+      return Math.hypot(b[0] - a[0], b[1] - a[1]);
+    };
+    const bc = toScreen(ball.position);
+    const br = screenR(ball.position, BALL_R * ball.scale.x);
+    let ringPx = 0;
+    for (const g of ghosts) {
+      if (!g.visible || ghostMat.opacity <= 0) continue;
+      const gc = toScreen(g.position);
+      const gr = screenR(g.position, BALL_R * g.scale.x);
+      ringPx = Math.max(ringPx, Math.hypot(gc[0] - bc[0], gc[1] - bc[1]) + gr);
+    }
+    return {
+      cue: Boolean(cue && !tail),
+      z: ball.position.z,
+      trail: trail.length,
+      step: trail.length > 1 ? trail[0].distanceTo(trail[1]) : 0,
+      opacity: ghostMat.opacity,
+      shown: ghosts.filter((g) => g.visible).length,
+      px,
+      ballPx: br * 2,
+      ringPx
+    };
+  };
 
   renderer.setAnimationLoop(frame);
 
