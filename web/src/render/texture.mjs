@@ -176,17 +176,19 @@ function churnLayer() {
     cv.height = CHURN_H;
     const c = cv.getContext('2d');
     const r = rng(0x51c3a7);
-    for (let y = 0; y < CHURN_H; y += 6) {
+    // 자국이 화면 픽셀만 해지면 공과 팔다리가 같은 주파수의 얼룩에 섞여 사라진다.
+    // 파인 자리는 뭉쳐서 크게, 밝기 차는 흙 한 톤 안쪽으로 눌러 저주파 얼룩으로 남긴다.
+    for (let y = 0; y < CHURN_H; y += 13) {
       const near = 1 - y / CHURN_H;
-      for (let x = 0; x < SCUFF_S; x += 6) {
+      for (let x = 0; x < SCUFF_S; x += 13) {
         // 골문에서 멀어질수록 파인 자리가 뜸해진다.
         if (r() > 0.28 + near * 0.66) continue;
         // 파인 자리와 마른 흙덩이. 한 값만 뿌리면 먼지 한 겹이지 파인 땅이 아니다.
         const deep = r() > 0.5;
-        const v = deep ? 36 + Math.round(r() * 20) : 150 + Math.round(r() * 26);
-        const a = (0.55 + near * 0.4).toFixed(2);
+        const v = deep ? 58 + Math.round(r() * 20) : 142 + Math.round(r() * 20);
+        const a = (0.32 + near * 0.5).toFixed(2);
         c.fillStyle = 'rgba(' + v + ',' + Math.round(v * 0.96) + ',' + Math.round(v * 0.86) + ',' + a + ')';
-        c.fillRect(x + r() * 3 - 1.5, y + r() * 3 - 1.5, 3 + r() * 5, 3 + r() * 5);
+        c.fillRect(x + r() * 6 - 3, y + r() * 6 - 3, 9 + r() * 11, 9 + r() * 11);
       }
     }
     return cv;
