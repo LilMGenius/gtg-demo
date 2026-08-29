@@ -761,7 +761,9 @@ export function createScene(canvas) {
           {
             const P = tail.gw ?? tail.from;
             const c = ease(Math.min(1, u * 5));
-            const f = ease(Math.max(0, (u - 0.2) / 0.8));
+            // 골라인을 넘는 것은 이 사건의 결론이고, 그 결론이 늦게 오면 자막만 먼저 뜬다.
+            // 공은 장갑을 벗기자마자 골망까지 가고, 늘어지는 것은 키퍼의 몸과 카메라뿐이다.
+            const f = ease(Math.min(1, Math.max(0, (u - 0.12) / 0.45)));
             const cx = lerp(tail.from.x, P.x, c);
             const cy = lerp(tail.from.y, P.y, c);
             const cz = lerp(tail.from.z, P.z, c);
@@ -798,9 +800,11 @@ export function createScene(canvas) {
           // 경로의 중간 지점을 쓰러진 몸에 묶는다. 몸 위를 타고 넘어가야 한 사건으로 읽힌다.
           const bx = keeper.position.x;
           const bz = keeper.position.z;
-          const over = ease(Math.min(1, u / 0.45));
-          const past = ease(Math.max(0, (u - 0.45) / 0.55));
-          const crossed = u > 0.45;
+          // 몸을 타고 넘는 구간이 절반을 먹으면 자막이 뜬 뒤에도 공은 아직 골 앞에 있다.
+          // 넘는 것은 앞당기고, 깔린 키퍼가 못 일어나는 시간은 그대로 둔다.
+          const over = ease(Math.min(1, u / 0.28));
+          const past = ease(Math.min(1, Math.max(0, (u - 0.28) / 0.32)));
+          const crossed = u > 0.28;
           ball.position.set(
             crossed ? lerp(bx, bx * 0.35, past) : lerp(tail.from.x, bx, over),
             (crossed ? lerp(0.44, REST_Y, past) : lerp(tail.from.y, 0.44, over)) + Math.sin(Math.min(1, u / 0.9) * Math.PI) * 0.15,
@@ -878,7 +882,12 @@ export function createScene(canvas) {
           // 카메라는 골대 뒤에서 +z를 본다. 키퍼가 그대로 서 있으면 뒤통수가 하트 눈을 가린다.
           // 한눈판 얼굴이 안 보이면 그 사건 자체가 화면에 없다.
           keeper.rotation.y = lerp(0, 2.48, walk);
-          ball.position.set(lerp(tail.from.x, 0, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
+          // 키퍼가 걸어 나가는 속도로 공까지 굴리면 공이 골대 앞에 멈춰 선 채로 촬영된다.
+          // 공은 아무도 안 막았으니 원래 속도로 들어가고, 느린 것은 홀린 사람 쪽이다.
+          {
+            const be = ease(Math.min(1, u * 1.9));
+            ball.position.set(lerp(tail.from.x, 0, be), lerp(tail.from.y, REST_Y, be), lerp(tail.from.z, REST_Z, be));
+          }
           break;
         }
         case 'distracted': {
