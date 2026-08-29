@@ -59,17 +59,11 @@ export function createScene(canvas) {
     fragmentShader: [
       'uniform sampler2D tDiffuse; uniform float steps; uniform vec2 texel; varying vec2 vUv;',
       'void main(){',
-      // 색채널을 한 텍셀씩 어긋내 뽑는다. 싼 렌즈는 가장자리에서 색이 갈린다.
-      // 화면 전체에 균일하게 주면 인쇄 불량으로 보인다. 중심에서 멀수록 커져야 렌즈로 읽힌다.
-      // 중심거리에 선형으로 주면 화면 중간의 그물 한 가닥마다 빨강과 청록이 갈라져
-      // 렌즈가 아니라 안 고친 z-fighting으로 읽혔다. 세제곱이면 중앙 넓은 자리가 거의 0이 되고
-      // 네 귀퉁이에서만 색이 벌어진다.
+      // 색수차는 뺀다. 골포스트처럼 밝고 가는 세로선 옆에서는 폭을 아무리 줄여도
+      // 채널이 한 텍셀 갈리는 순간 빨강과 청록 테두리가 서고, 그게 렌즈가 아니라
+      // 인코딩이 깨진 화면으로 읽혔다. 저해상도와 계단은 이미 포스터라이즈가 말한다.
       '  vec2 d0 = vUv - 0.5;',
-      '  vec2 off = d0 * dot(d0, d0) * texel * 2.6;',
-      '  vec3 c;',
-      '  c.r = texture2D(tDiffuse, vUv + off).r;',
-      '  c.g = texture2D(tDiffuse, vUv).g;',
-      '  c.b = texture2D(tDiffuse, vUv - off).b;',
+      '  vec3 c = texture2D(tDiffuse, vUv).rgb;',
       // 색을 끊기 전에 잡음을 섞는다. 끊고 나서 섞으면 계단 위에 모래를 뿌린 것으로 보인다.
       // 잡음의 좌표는 화면 픽셀이 아니라 렌더타깃 텍셀이다. gl_FragCoord로 뽑으면 덩어리
       // 픽셀 하나 안에서 값이 서너 번 갈려 저해상도 질감이 깨지고 벽이 반짝인다.
