@@ -674,14 +674,23 @@ export function createScene(canvas) {
           hover = 0.06;
           // 공을 키퍼 좌표에서 띄우면 엎드린 몸 밖, 하필이면 부츠 옆 땅에 놓인다.
           // 그러면 안고 넘어간 것이 아니라 발치에 공이 굴러온 것으로 읽힌다.
-          // 장갑의 실제 월드 좌표에 붙이면 몸이 움직일 때 공도 같이 간다.
+          // 장갑에 붙이는 것도 틀렸다. hugfall은 팔뚝을 키커 쪽으로 접는 포즈라
+          // 장갑이 머리 옆에 온다. 깊이만 몸통 앞으로 당겨도 x와 y가 두개골 안이라
+          // 공이 머리 구에 통째로 박힌다. 실측: 공 화소 일곱 개의 임자가 전부 keeper였다.
+          // 안은 자리는 손이 아니라 가슴이다. 골반과 목의 실제 월드 좌표 사이를 잡고
+          // 거기서 몸통 반경과 공 반경만큼 카메라 쪽으로 내놓는다.
           {
-            const gw = gloveWorld(Math.sign(tail.kx || 1));
+            const j = keeper.userData.joints;
+            const hipW = j.spine.getWorldPosition(new THREE.Vector3());
+            const neckW = j.neck.getWorldPosition(new THREE.Vector3());
+            // 0.55는 목 바로 아래다. 옆으로 누운 몸에서 그 점은 화면상 머리와 붙어버려
+            // 공과 머리가 같은 크기의 검은 테두리 원 두 개로 읽혔다. 명치까지 내리면 갈린다.
+            const chest = hipW.lerp(neckW, 0.28);
             const hug = ease(Math.min(1, u * 6));
             ball.position.set(
-              lerp(tail.from.x, gw.x, hug),
-              lerp(tail.from.y, Math.max(gw.y, BALL_R + 0.02), hug),
-              lerp(tail.from.z, gw.z - BALL_R, hug)
+              lerp(tail.from.x, chest.x, hug),
+              lerp(tail.from.y, Math.max(chest.y, BALL_R + 0.02), hug),
+              lerp(tail.from.z, chest.z - (keeper.userData.girth * 0.55 + BALL_R), hug)
             );
           }
           break;
