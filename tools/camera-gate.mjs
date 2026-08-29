@@ -5,9 +5,10 @@ import { chromium } from 'playwright';
 
 const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
 // 렌더 루프가 카메라를 되돌리는 기준. 여기서 얼마나 벗어났는지가 사건 카메라의 크기다.
-const BASE = [0, 3.3, -5.1];
-// 16:9 뷰포트에서 resize가 정하는 화각.
-const FOV = 46;
+// 상수로 박으면 프레이밍을 옮긴 날 자가 먼저 죽고, 죽은 자가 내는 빨간불은 전부 거짓이다.
+// 사건이 하나도 걸리지 않은 정지 상태의 카메라를 페이지에 직접 물어서 기준으로 삼는다.
+let BASE = [0, 3.3, -5.1];
+let FOV = 46;
 // 흔들림 최대 진폭은 0.062다. 그보다 크게 벗어나야 사건이 렌즈를 옮긴 것이다.
 const MOVED = 0.2;
 const FOV_MOVED = 1.0;
@@ -38,16 +39,20 @@ try {
   await p.click('#go', { force: true });
   await p.waitForTimeout(1500);
 
+  const rest = await p.evaluate(() => window.__ballProbe.camState());
+  BASE = rest.pos.slice();
+  FOV = rest.fov;
+  console.log('REST base=' + BASE.map((v) => v.toFixed(2)).join(',') + ' fov=' + FOV.toFixed(1));
+
   const peaks = {};
   for (const kind of KINDS.concat([CONTROL])) {
-    const r = await p.evaluate(async (k) => {
+    const r = await p.evaluate(async ([k, base]) => {
       const cs = () => window.__ballProbe.camState();
       window.__act(k);
       const t0 = performance.now();
       let peak = null;
       let peakD = -1;
       let peakFov = 0;
-      const base = [0, 3.3, -5.1];
       // 1.6초는 표의 가장 긴 지속(1.1초)에 여유를 얹은 값이다.
       while (performance.now() - t0 < 1600) {
         await new Promise((res) => requestAnimationFrame(res));
@@ -59,7 +64,7 @@ try {
       await new Promise((res) => setTimeout(res, 400));
       const end = cs();
       return { peak, peakD, peakFov, end };
-    }, kind);
+    }, [kind, BASE]);
     peaks[kind] = r;
     const home = dist(r.end.pos, BASE);
     const fovHome = Math.abs(r.end.fov - FOV);
