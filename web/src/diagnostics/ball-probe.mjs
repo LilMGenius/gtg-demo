@@ -108,7 +108,7 @@ export function createBallProbe(camera, scene, ball, radius) {
   function camState() {
     camera.updateMatrixWorld();
     const f = camera.getWorldDirection(new THREE.Vector3());
-    return { pos: [camera.position.x, camera.position.y, camera.position.z], fwd: [f.x, f.y, f.z] };
+    return { pos: [camera.position.x, camera.position.y, camera.position.z], fwd: [f.x, f.y, f.z], fov: camera.fov };
   }
 
   return { sample, probeAt, pickAt, reset, camState, stats };
