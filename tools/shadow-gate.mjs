@@ -37,10 +37,12 @@ try {
     const W = 1280, H = 720;
     const r = window.__shadowRect(W, H);
     const cl = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    const w = cl(r.w, 8, W - 8);
-    const h = cl(r.h, 8, H - 8);
-    const sx = cl(r.x, 0, W - w);
-    const sy = cl(r.y, 0, H - h);
+    // 상자가 화면 밖으로 나가면 잘라내야 한다. 밀어 넣으면 그림자가 없는 줄이
+    // 분모에 들어와 면적이 그만큼 낮게 나온다. 발밑 그림자는 화면 아래로 자주 걸친다.
+    const sx = cl(r.x, 0, W - 8);
+    const sy = cl(r.y, 0, H - 8);
+    const w = cl(r.x + r.w, sx + 8, W) - sx;
+    const h = cl(r.y + r.h, sy + 8, H) - sy;
     // 음성 대조군. 그림자가 안 닿는 자리라면 두 프레임이 완전히 같아야 한다.
     const cx = cl(sx > W / 2 ? sx - w - 30 : sx + w + 30, 0, W - w);
     const boxes = [{ x: sx, y: sy, w, h }, { x: cx, y: sy, w, h }];
