@@ -84,8 +84,15 @@ export function createScene(canvas) {
       // 인코딩 깨짐으로 읽혔던 것이 이것이다. 밝기만 끊고 색비를 그대로 곱하면 원리상 색이 갈릴 수 없다.
       '  vec3 W = vec3(0.299, 0.587, 0.114);',
       '  float l = dot(c, W);',
+      // 밴드를 선형 휘도에서 자르면 어두운 쪽에 칸이 하나도 안 남는다. 흙의 선형 휘도가
+      // 이미 최하 칸이라, 그림자처럼 그보다 어두운 값은 floor가 음수 칸을 내고 순검정으로 클램프됐다.
+      // 그래서 접지 그림자가 그늘이 아니라 바닥에 뚫린 구멍으로 읽혔다.
+      // 지각 공간에서 자르면 같은 7칸이 어두운 쪽에 절반쯤 배분된다.
+      '  float e = pow(max(l, 0.0), 0.4545);',
       // floor만 쓰면 화면 전체가 어두워진다. 반 칸 올려 원래 밝기를 지킨다.
-      '  float ql = (floor((l + (n - 0.5) / steps * 0.34) * steps) + 0.5) / steps;',
+      // 음수 칸은 막는다. 한 칸 아래는 어두운 색이 아니라 색이 뒤집힌 값이다.
+      '  float qe = (max(floor((e + (n - 0.5) / steps * 0.34) * steps), 0.0) + 0.5) / steps;',
+      '  float ql = pow(qe, 2.2);',
       // 나누는 밝기는 잡음을 타지 않은 원래 값이다. 잡음 섞인 값으로 나누면 색비가 픽셀마다 흔들린다.
       '  c *= ql / max(l, 0.001);',
       // 주사선. 한 줄 걸러 살짝 어둡게. 0.02는 안 보였고 0.11은 낮 경기가 밤이 됐다.
@@ -119,19 +126,19 @@ export function createScene(canvas) {
 
   // 암빛을 한 덩어리로 뿌리면 모든 면이 같은 밝기로 서고, 입체는 색칠한 오려붙이기가 된다.
   // 키·필·림을 나누고 바닥 반사를 따로 준다. 전체 노출은 그대로 두고 방향만 쪼갠다.
-  scene.add(new THREE.AmbientLight(0xd8e6dc, 0.95));
+  scene.add(new THREE.AmbientLight(0xd8e6dc, 0.62));
   // 하늘은 차갑게, 흙바닥은 따뜻하게. 이 한 줄이 바운스 광 역할을 한다.
-  scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x8a7048, 1.65));
+  scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x8a7048, 1.05));
   // 키. 카메라 쪽 왼쪽 위에서 얼굴과 장갑을 친다.
-  const key = new THREE.DirectionalLight(0xfff4dc, 2.3);
+  const key = new THREE.DirectionalLight(0xfff4dc, 2.05);
   key.position.set(-6, 8, -4);
   scene.add(key);
   // 필. 반대편에서 약하고 차게. 그림자 안이 검게 먹히는 것만 막는다.
-  const fill = new THREE.DirectionalLight(0x9fc0e8, 0.8);
+  const fill = new THREE.DirectionalLight(0x9fc0e8, 0.55);
   fill.position.set(7, 3.5, -2);
   scene.add(fill);
   // 림. 뒤에서 치면 어깨와 머리 윤곽에 선이 생기고, 인물이 배경에서 떨어진다.
-  const rim = new THREE.DirectionalLight(0xffd9a0, 2.3);
+  const rim = new THREE.DirectionalLight(0xffd9a0, 1.9);
   rim.position.set(2, 6, 12);
   scene.add(rim);
 
@@ -182,11 +189,11 @@ export function createScene(canvas) {
     blobSeed += 0x9e37;
     const m = new THREE.Mesh(
       blobGeo(r, blobSeed),
-      new THREE.MeshBasicMaterial({ color: 0x1c1508, transparent: true, opacity: 0.22 })
+      new THREE.MeshBasicMaterial({ color: 0x1c1508, transparent: true, opacity: 0.55 })
     );
     const core = new THREE.Mesh(
       blobGeo(r * 0.56, blobSeed + 0x31),
-      new THREE.MeshBasicMaterial({ color: 0x1c1508, transparent: true, opacity: 0.24 })
+      new THREE.MeshBasicMaterial({ color: 0x1c1508, transparent: true, opacity: 0.60 })
     );
     // 정확히 겹치면 두 장인 줄 모른다. 반지름의 5분의 1만 밀어 발밑을 짙게 만든다.
     core.position.set(r * 0.18, -r * 0.14, 0.001);
@@ -839,7 +846,10 @@ export function createScene(canvas) {
     else if (titleMode) applyFace(0.92, 'grin', 1);
     else applyFace(0, 'rest', 1);
     kicker.position.y += -footY(kicker);
-    keeperShadow.position.set(keeper.position.x, 0.03, keeper.position.z);
+    // 루트 피벗이 발밑이라 몸이 누우면 몸통은 옆으로 나가는데 그림자는 발밑에 남았다.
+    // 회전으로 옮겨간 몸통 중심만큼 그림자를 같이 끌고 간다. 0.72는 화면에서 잰 중심 높이다.
+    const leanX = -Math.sin(keeper.rotation.z) * 0.72;
+    keeperShadow.position.set(keeper.position.x + leanX, 0.03, keeper.position.z);
     // 행인은 판정과 무관하게 계속 걷는다. 멈춘 배경은 그림이고 움직이는 배경은 장소다.
     for (const [i, p] of passers.entries()) {
       passerShadows[i].position.set(p.position.x, 0.03, p.position.z);
