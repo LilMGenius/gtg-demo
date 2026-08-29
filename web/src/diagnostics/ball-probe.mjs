@@ -103,5 +103,13 @@ export function createBallProbe(camera, scene, ball, radius) {
     };
   }
 
-  return { sample, probeAt, pickAt, reset, stats };
+  // 대조군 좌표를 월드에 못 박으면 카메라가 사건마다 움직이는 순간 계측기가 죽는다.
+  // 시점을 되물을 수 있어야 대조군을 그 시점 기준으로 놓는다.
+  function camState() {
+    camera.updateMatrixWorld();
+    const f = camera.getWorldDirection(new THREE.Vector3());
+    return { pos: [camera.position.x, camera.position.y, camera.position.z], fwd: [f.x, f.y, f.z] };
+  }
+
+  return { sample, probeAt, pickAt, reset, camState, stats };
 }

@@ -255,9 +255,50 @@ export function createScene(canvas) {
     shakeSpan = Math.max(shakeLeft, 0.001);
   }
 
+  // 사건마다 렌즈가 자리를 옮긴다. 아홉 장이 전부 같은 광각이면 무슨 일이 났는지는
+  // 자막만 말하게 되고 그림은 배경이 된다.
+  // pos는 CAM_BASE 기준 오프셋, look은 CAM_LOOK 기준 오프셋, fov는 화각 증감이다.
+  // 값이 크면 골대가 프레임을 나가 shot 게이트가 죽는다. 골대는 언제나 화면 안이다.
+  // dur는 1.2를 넘기지 않는다. decal 게이트가 사건 3.1초 뒤에 찍으므로 그때는 제자리여야
+  // 두 프레임의 차분이 흙 자국만 남긴다.
+  const CAM_EV = {
+    save: { pos: [0, -0.3, 0.75], look: [0, -0.08, 0], fov: -3.5, dur: 0.8 },
+    catch: { pos: [0, -0.26, 0.65], look: [0, -0.08, 0], fov: -3, dur: 0.75 },
+    // 골라인이 화면을 가로지르게 낮춘다. 위에서 보면 넘었는지 앞인지 판정이 안 선다.
+    carriedIn: { pos: [0, -1.15, 0.9], look: [0, -0.42, 0.5], fov: -2, dur: 1.1 },
+    // 벗겨진 장갑 쪽으로 붙는다. 장갑이 팔 옆에 그대로 있는 것으로 읽히면 인과가 끊긴다.
+    gloveGone: { pos: [0.55, -0.42, 0.8], look: [0.22, -0.16, 0], fov: -4, dur: 0.95 },
+    // 깔린 키퍼를 크게 잡는다. 광각에서는 누가 쓰러졌는지가 몇 픽셀 차이다.
+    downed: { pos: [0, -0.72, 1.25], look: [0, -0.45, 0.25], fov: -5, dur: 1.05 },
+    // 키퍼가 골라인을 떠나 앞으로 나간다. 렌즈가 따라붙어야 돌진으로 읽힌다.
+    charge: { pos: [0, -0.5, 1.7], look: [0, -0.12, 0.45], fov: -2.5, dur: 0.9 },
+    spill: { pos: [0, -0.2, 0.5], look: [0, -0.06, 0], fov: -2, dur: 0.7 }
+  };
+  let camEv = null;
+  let camEvLeft = 0;
+  let camEvSpan = 1;
+  function camEvent(kind) {
+    const e = CAM_EV[kind];
+    if (!e) return;
+    camEv = e;
+    camEvLeft = e.dur;
+    camEvSpan = e.dur;
+  }
+  // 들어갈 때 빠르고 나올 때 느리다. 선형으로 넣으면 밀려나는 것으로 읽히고 펀치가 안 된다.
+  // 시작과 끝이 정확히 0이라 사건이 끝나면 프레이밍이 원래 자리로 돌아온다.
+  function camEvAmount() {
+    if (camEvLeft <= 0) return 0;
+    const t = 1 - camEvLeft / camEvSpan;
+    return Math.sin(Math.PI * Math.pow(t, 0.55));
+  }
+  const camLook = new THREE.Vector3();
+
   // 가로가 기준이다. 화면이 그보다 좁으면 수직 화각을 늘려 골대 폭을 지킨다.
   const BASE_ASPECT = 16 / 9;
   const BASE_FOV = 46;
+  // resize가 화면 비율마다 화각을 다시 잰다. 이벤트 화각은 그 위에 얹는 증감이라
+  // 기준값을 따로 들고 있어야 한다. BASE_FOV로 되돌리면 좁은 화면에서 골대 폭이 잘린다.
+  let fovBase = BASE_FOV;
   // 키퍼가 골라인에 붙으면 카메라에 가까워 발이 프레임 아래로 내려간다.
   const KEEPER_Z = 0.9;
   // 드리블하러 나갔을 때 서는 자리. 뺏기는 연출도 여기서 출발한다.
@@ -274,6 +315,7 @@ export function createScene(canvas) {
       camera.fov = (Math.atan(halfH) * 360) / Math.PI;
     }
     camera.updateProjectionMatrix();
+    fovBase = camera.fov;
     // 저해상도 버퍼도 화면 비율을 따라간다. 고정 폭이면 화면이 넓어질 때 가로로 늘어난다.
     rt.setSize(Math.max(2, Math.round(RT_H * (w / Math.max(1, h)))), RT_H);
     // 색수차 폭은 텍셀 단위다. 여기서 안 갱신하면 창을 넓힐수록 색이 벌어진다.
@@ -466,6 +508,8 @@ export function createScene(canvas) {
     // 웃겨야 하는 사건에만 렌즈를 기울인다. 선방까지 기울이면 매 구 화면이 비뚤어져 기울기가 안 읽힌다.
     const TILT = { gloveGone: 0.13, carriedIn: -0.14, downed: 0.15, talked: -0.11, distracted: 0.1, beat: -0.12, lost: 0.12 };
     if (TILT[kind]) tilt(TILT[kind], 0.9);
+    // 렌즈가 사건 쪽으로 옮겨 간다. 기울기만으로는 무슨 일인지 안 보인다.
+    camEvent(kind);
     // 흔들림은 실점이 가장 크다. 골이 들어간 것이 화면에서 제일 큰 사건이어야 한다.
     const SHK = {
       save: [0.045, 0.34], catch: [0.032, 0.28], gloveGone: [0.055, 0.42],
@@ -931,6 +975,28 @@ export function createScene(canvas) {
     // 흔들림을 먼저 얹고 그 카메라로 잰다. 흔들리기 전 카메라로 재면 게이트는 흔들림을 못 본다.
     // 측정 프레임만 빼는 것은 우회다. 게이트가 견딜 때까지 진폭을 줄이는 쪽이 맞다.
     camera.position.copy(CAM_BASE);
+    camLook.copy(CAM_LOOK);
+    if (camEvLeft > 0) {
+      const amt = camEvAmount();
+      camEvLeft -= dt;
+      // 타이틀은 자기 궤도를 돈다. 사건 오프셋을 얹으면 그 궤도가 튄다.
+      if (!titleMode) {
+        camera.position.x += camEv.pos[0] * amt;
+        camera.position.y += camEv.pos[1] * amt;
+        camera.position.z += camEv.pos[2] * amt;
+        camLook.x += camEv.look[0] * amt;
+        camLook.y += camEv.look[1] * amt;
+        camLook.z += camEv.look[2] * amt;
+        camera.fov = fovBase + camEv.fov * amt;
+        camera.updateProjectionMatrix();
+      }
+      if (camEvLeft <= 0) {
+        camEv = null;
+        // 화각은 매 프레임 덮어쓰이지 않는다. 끝날 때 기준값으로 되돌리지 않으면 좁아진 채로 굳는다.
+        camera.fov = fovBase;
+        camera.updateProjectionMatrix();
+      }
+    }
     if (shakeLeft > 0) {
       shakeLeft -= dt;
       // 감쇠 없이 흔들면 끝날 때 뚝 끊긴다. 남은 시간에 비례해 잦아든다.
@@ -940,7 +1006,7 @@ export function createScene(canvas) {
       camera.position.y += Math.sin(vnow * 47 + 1.7) * k * 0.8;
       if (shakeLeft <= 0) shakeAmp = 0;
     }
-    camera.lookAt(CAM_LOOK);
+    camera.lookAt(camLook);
     if (titleMode) {
       // 골대 옆 낮은 곳에서 천천히 돌린다. 정면 고정 샷은 스크린샷이지 타이틀이 아니다.
       // 반경 9.5에 높이 2.0. 반경 5는 골대를 벗어나고 15는 선수가 점으로 작아졌다.
