@@ -294,8 +294,9 @@ export function buildPitch(scene) {
         '  vec2 uv = vec2((atan(vD.z, vD.x) * 0.15915494 + drift) * 3.0, pow(clamp(vH, 0.0, 1.0), 0.62));',
         '  float a = texture2D(cloud, uv).a;',
         // 알파를 두 단으로 끊는다. 몸통은 흰색, 아랫배는 회색. 부드러운 경계는 손그림이 아니다.
-        '  vec3 body = mix(vec3(0.86, 0.88, 0.91), vec3(1.0), step(0.62, a));',
-        '  float on = step(0.30, a);',
+        // 여기 리터럴은 선형값이라 sRGB 인코딩을 한 번 더 받는다. 화면에서 흰 판으로 날지 않게 낮춰 적는다.
+        '  vec3 body = mix(vec3(0.60, 0.62, 0.66), vec3(0.85), step(0.62, a));',
+        '  float on = step(0.38, a);',
         // 지평선 바로 위는 구름을 걷는다. 건물 실루엣과 겹치면 스티커로 읽힌다.
         '  on *= smoothstep(0.005, 0.045, vH);',
         '  gl_FragColor = vec4(mix(sky, body, on), 1.0);',
