@@ -87,6 +87,12 @@ export function createScene(canvas) {
       '  c *= 1.0 - step(0.5, fract(gl_FragCoord.y * 0.5)) * 0.055;',
       // 비네트. 가장자리만 살짝. 0.5는 경기장 절반이 그늘로 들어갔다.
       '  c *= 1.0 - dot(d0, d0) * 0.22;',
+      // 마지막에 sRGB로 인코딩한다. 커스텀 ShaderMaterial에는 three가 출력 변환을 붙여주지 않는다.
+      // 이게 빠지면 선형 값이 그대로 화면 바이트가 되고, 중간톤만 감마 한 번만큼 눌린다.
+      // 흰색과 순색은 1.0이라 그대로 나오므로 그 두 색으로는 원리상 이 결함이 안 보인다.
+      '  vec3 lo = c * 12.92;',
+      '  vec3 hi = 1.055 * pow(max(c, vec3(0.0031308)), vec3(0.41666)) - 0.055;',
+      '  c = mix(lo, hi, step(vec3(0.0031308), c));',
       '  gl_FragColor = vec4(c, 1.0);',
       '}'
     ].join(String.fromCharCode(10)),
