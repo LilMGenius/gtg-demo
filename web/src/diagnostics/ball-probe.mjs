@@ -84,5 +84,24 @@ export function createBallProbe(camera, scene, ball, radius) {
     stats.frames = 0; stats.visible = 0; stats.offscreen = 0; stats.occluded = 0; stats.behind = 0; stats.streak = 0; stats.longestStreak = 0; stats.last = null; stats.blockers = {}; stats.worstRun = null; run = null;
   }
 
-  return { sample, probeAt, reset, stats };
+  // 화면 한 점을 누가 차지했는지 되묻는다. 눈으로 본 영역을 이름으로 바꾸지 않으면
+  // "저 아래는 흙 평면이다" 같은 문장은 검증할 수 없는 추측으로 남는다.
+  // 가림 판정과 같은 광선을 타야 이 답이 게이트에 대해 무언가를 증명한다.
+  function pickAt(nx, ny) {
+    camera.updateMatrixWorld();
+    ray.setFromCamera({ x: nx, y: ny }, camera);
+    ray.near = 0.01;
+    ray.far = 500;
+    const hits = ray.intersectObjects(scene.children, true);
+    const hit = hits.find((h) => opaqueBlocker(h.object));
+    if (!hit) return null;
+    const p = hit.point;
+    return {
+      name: hit.object.name || hit.object.geometry?.type || 'unknown',
+      dist: hit.distance,
+      world: [p.x, p.y, p.z],
+    };
+  }
+
+  return { sample, probeAt, pickAt, reset, stats };
 }

@@ -11,8 +11,13 @@ const stage = createScene(el('stage'));
 // 계측 훅. 플레이테스트가 이 값을 읽고, 값이 없으면 게이트를 죽인다.
 window.__ballProbe = stage.ballProbe;
 window.__stageProbe = stage.stageProbe;
+window.__shadowRect = stage.shadowRect;
+window.__shadowPair = stage.shadowPair;
 window.__goalFrame = stage.goalFrame;
 window.__ballPos = stage.ballPos;
+// 화면 한 점의 임자를 되묻는 훅. 어느 면이 그 화소를 차지했는지 모르면
+// 화면이 죽었다는 말은 고칠 대상을 가리키지 못한다.
+window.__pick = (nx, ny) => stage.ballProbe.pickAt(nx, ny);
 const bgm = mountBgm();
 // 선언값은 증거가 아니다. 게이트가 실제 베드 음량을 읽을 수 있어야 한다.
 window.__bgm = bgm;
