@@ -2,7 +2,7 @@
 // 몸통 하나를 통째로 기울이면 T포즈를 회전시킨 것으로만 읽힌다.
 // 어깨와 고관절을 끝단 피벗으로 세우고, 각도를 데이터로 둔다. 과장은 여기서 나온다.
 import * as THREE from '../../../vendor/three.module.min.js';
-import { flat, flatMap, standOnGround } from '../units.mjs';
+import { flat, flatMap, flatVertex, mergeGeos, standOnGround } from '../units.mjs';
 import { clothTex } from '../texture.mjs';
 import { jitterMesh, addOutline } from '../handmade.mjs';
 
@@ -61,7 +61,7 @@ export const POSES = {
   },
   // 한눈판다. 상체가 옆으로 기울고 팔이 풀린다. 목은 연출이 따로 더 돌린다.
   swoon: {
-    spine: [0.06, 0, 0.30], neck: [-0.16, 0, 0.10],
+    spine: [0.06, 0, 0.30], neck: [0.42, 0, 0.10],
     shL: [0.32, 0, -0.16], elL: [-0.22, 0, 0.08],
     shR: [0.38, 0, 0.20], elR: [-0.26, 0, -0.06],
     hipL: [-0.04, 0, -0.14], knL: [0.12, 0, 0],
@@ -71,19 +71,19 @@ export const POSES = {
   // 카메라가 뒤에 있으니 rx로만 흔든 팔은 시선축과 나란해 몸통에 파묻힌다.
   // 압으로 벌리는 것은 rz가 한다. 앞뒤 엇갈림은 rx에 남기고 폭만 줄인다.
   dribble: {
-    spine: [-0.36, 0, 0], neck: [0.18, 0, 0],
-    shL: [-0.58, 0, -0.86], elL: [-0.92, 0, 0.20],
-    shR: [0.52, 0, 0.82], elR: [-0.74, 0, -0.18],
-    hipL: [-0.82, 0, -0.09], knL: [0.92, 0, 0],
-    hipR: [0.58, 0, 0.10], knR: [0.34, 0, 0]
+    spine: [-0.62, 0, 0], neck: [0.44, 0, 0],
+    shL: [-0.30, 0, -0.32], elL: [-1.22, 0, 0.06],
+    shR: [-0.36, 0, 1.08], elR: [-0.94, 0, -0.04],
+    hipL: [-0.95, 0, -0.36], knL: [1.38, 0, 0],
+    hipR: [0.72, 0, 0.32], knR: [0.18, 0, 0]
   },
   // 장갑이 벗겨졌다. 맨손이 된 쪽 팔만 끝까지 뻗고 반대쪽은 몸에 붙는다.
   // 고개가 그 손을 본다. 두 팔이 같은 쪽을 가리키는 다이빙과 여기서 갈린다.
   reachR: {
-    spine: [-0.18, 0, -0.52], neck: [0.10, 0, -0.92],
+    spine: [-0.18, 0, -0.52], neck: [0.60, 0, -0.70],
     shL: [-0.72, 0, -0.30], elL: [-1.30, 0, 0.70],
     shR: [-0.20, 0, 2.48], elR: [0.10, 0, -0.06],
-    hipL: [0.44, 0, -0.16], knL: [0.30, 0, 0],
+    hipL: [0.08, 0, 0.54], knL: [0.66, 0, 0],
     hipR: [-0.30, 0, -0.74], knR: [1.10, 0, 0]
   },
   // 쳐냈다. 손바닥으로 밀어낸 뒤 팔이 튕겨 접힌다. 몸은 아직 서 있다.
@@ -119,12 +119,14 @@ export const POSES = {
     hipR: [-0.24, 0, 0.30], knR: [0.36, 0, 0]
   },
   // 공을 안은 채로 끌려 들어간다. 팔이 가슴에 묶여 있어서 손으로 못 짚는다.
+  // 허벅지는 시선축에서 떼어 놓는다. hip rx가 -1.5면 허벅지가 카메라 정면을 향해
+  // 한 점으로 줄고 몸통 뒤로 숨어서, 접힌 정강이만 떨어져 나온 토막으로 읽힌다.
   hugfall: {
     spine: [-0.94, 0, 0.10], neck: [0.52, 0, 0.14],
-    shL: [-1.30, 0, -0.12], elL: [-2.20, 0, 0.90],
-    shR: [-1.36, 0, 0.16], elR: [-2.26, 0, -0.86],
-    hipL: [-1.50, 0, -0.30], knL: [1.90, 0, 0],
-    hipR: [-1.44, 0, 0.34], knR: [1.80, 0, 0]
+    shL: [1.02, 0, -0.26], elL: [-2.05, 0, 0.72],
+    shR: [1.08, 0, 0.30], elR: [-2.10, 0, -0.68],
+    hipL: [-1.06, 0, -0.64], knL: [1.16, 0, 0],
+    hipR: [-0.84, 0, 0.72], knR: [1.02, 0, 0]
   },
   // 제껴졌다. 팔이 뒤로 휘청이고 상체가 돌아서 공을 쫓는다.
   stumble: {
@@ -238,27 +240,54 @@ export function setPose(g, pose, time = 0) {
 export function addFace(head, r, dir, skin) {
   const whiteMat = new THREE.MeshBasicMaterial({ color: 0xfbfbf5 });
   const darkMat = pupilMat;
+  // 흰자 둘은 표정이 바뀌어도 자리가 그대로다. 한 장으로 붙여야 얼굴 하나가 드로우콜을 아홉 부르지 않는다.
+  const whiteGeos = [];
   const eyes = [];
   for (const s of [-1, 1]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(r * 0.34, 10, 8), whiteMat);
-    eye.position.set(s * r * 0.42, r * 0.16, dir * r * 0.7);
-    eye.scale.set(1, 1.15, 0.42);
+    const w = new THREE.SphereGeometry(r * 0.34, 10, 8);
+    w.scale(1, 1.15, 0.42);
+    w.translate(s * r * 0.42, r * 0.16, dir * r * 0.7);
+    whiteGeos.push(w);
+    // 동공은 감정마다 따로 늘어난다. 붙이면 한쪽 배율이 반대쪽 눈을 밖으로 민다.
     const pupil = new THREE.Mesh(new THREE.SphereGeometry(r * 0.17, 8, 6), darkMat);
     pupil.position.set(s * r * 0.42, r * 0.14, dir * r * 0.95);
     pupil.scale.set(1, 1.1, 0.5);
-    head.add(eye, pupil);
+    head.add(pupil);
     eyes.push(pupil);
   }
+  head.add(new THREE.Mesh(mergeGeos(whiteGeos), whiteMat));
   // 입은 벌어진 채로 둔다. 다물면 표정이 죽고, 벌리면 뭘 봐도 얼빠져 보인다.
   const mouth = new THREE.Mesh(new THREE.SphereGeometry(r * 0.26, 8, 6), darkMat);
   mouth.position.set(0, -r * 0.42, dir * r * 0.84);
-  mouth.scale.set(1.1, 0.7, 0.4);
+  // 폭이 좁으면 검은 원이 되어 공의 검은 오각 무늬와 구별이 안 된다. 가로로 눕혀야 입이다.
+  mouth.scale.set(1.5, 0.62, 0.4);
   head.add(mouth);
-  // 머리카락. 뒤통수가 민머리면 카메라 뒤에서 본 키퍼가 달걀이 된다.
-  // 정수리만 덮는다. 더 내리면 앞머리가 얼굴을 삼켜 검은 헬멧이 된다.
-  const hair = new THREE.Mesh(new THREE.SphereGeometry(r * 1.05, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.42), flat(0x2b1d14));
-  hair.position.set(0, r * 0.08, -dir * r * 0.1);
-  head.add(hair);
+  // 카메라는 골대 뒤에 있다. 키퍼는 키커를 보므로 화면에 잡히는 건 언제나 뒤통수다.
+  // 구 하나에 정수리 반구만 얹으면 그 아래가 굴곡 없는 살색 판이 되어 머리로 안 읽힌다.
+  // 뒷머리가 뒤통수를 어두운 덩어리로 덮고, 귀 둘이 그 위에 밝은 점으로 떨어져 실루엣을 깨다.
+  // 이 넷은 움직이지 않으므로 정점색 한 장으로 붙인다.
+  const hair = new THREE.SphereGeometry(r * 1.05, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.42);
+  hair.translate(0, r * 0.08, -dir * r * 0.1);
+  const nape = new THREE.SphereGeometry(r * 0.98, 10, 8);
+  nape.scale(1, 1, 0.62);
+  nape.translate(0, -r * 0.04, -dir * r * 0.42);
+  const neck = new THREE.CylinderGeometry(r * 1.12, r * 0.66, r * 1.3, 8);
+  neck.translate(0, -r * 1.05, -dir * r * 0.12);
+  // 머리가 젖혀지면 카메라가 턱 밑면을 본다. 입 웨지만 빼고 어둡게 덮는다.
+  const chin = new THREE.SphereGeometry(r * 1.04, 12, 6, Math.PI * (dir > 0 ? 0.64 : 1.64), Math.PI * 1.72, Math.PI * 0.5, Math.PI * 0.5);
+  // 칼라가 머리와 어깨 사이 값을 끊는다.
+  const collar = new THREE.CylinderGeometry(r * 1.22, r * 1.32, r * 0.26, 10);
+  collar.translate(0, -r * 1.02, -dir * r * 0.1);
+  const shellGeos = [hair, nape, neck, chin, collar];
+  const shellColors = [0x2b1d14, 0x5a4030, 0x1a1712, 0x141110, 0xd7dfd2];
+  for (const s of [-1, 1]) {
+    const ear = new THREE.SphereGeometry(r * 0.32, 8, 6);
+    ear.scale(0.44, 1.05, 0.78);
+    ear.translate(s * r * 0.92, r * 0.02, -dir * r * 0.06);
+    shellGeos.push(ear);
+    shellColors.push(skin);
+  }
+  head.add(new THREE.Mesh(mergeGeos(shellGeos, shellColors), flatVertex(0xffffff)));
   head.userData.eyes = eyes;
   head.userData.mouth = mouth;
   // 표정은 입 크기로 갈린다. 기준 배율을 여기서 넘겨야 쓰는 쪽이 상수를 두 번 적지 않는다.
@@ -271,10 +300,19 @@ export function addFace(head, r, dir, skin) {
 // 캡슐을 중앙 피벗으로 두면 어깨를 돌렸을 때 팔이 몸통을 관통한다.
 // 사지에는 외곽선을 안 건다. 팔 여덟 개가 각자 복제본을 달면 드로우콜이 두 배가 되고,
 // 가늘어서 어차피 선만 남는다. 실루엣을 만드는 건 몸통과 머리다.
-function seg(radius, len, color, tag, salt) {
+function seg(radius, len, color, tag, salt, cuff) {
   const geo = new THREE.CapsuleGeometry(radius, len, 3, 6);
   geo.translate(0, -len / 2, 0);
-  const m = new THREE.Mesh(geo, flat(color));
+  // 마디 중간에 밝은 띠를 하나 병합한다. 드로우콜은 그대로다.
+  // 피벗 쪽에 두면 어깨 구와 몸통 측면에 묻혀 화면에 안 나온다.
+  let m;
+  if (cuff) {
+    const ring = new THREE.CylinderGeometry(radius * 1.18, radius * 1.18, len * 0.16, 8);
+    ring.translate(0, -len * 0.55, 0);
+    m = new THREE.Mesh(mergeGeos([geo, ring], [color, cuff]), flatVertex(0xffffff));
+  } else {
+    m = new THREE.Mesh(geo, flat(color));
+  }
   m.name = tag;
   // 사지는 얇다. 0.035를 그대로 주면 팔이 끊어진 것처럼 잘록해진다.
   jitterMesh(m, 0.012, salt);
@@ -324,11 +362,11 @@ function buildBody(o) {
     const sh = joint(spine, side * o.shoulderX, o.torsoLen * 0.92, 0);
     // 어깨에 살이 없으면 팔이 몸통 옆에 떠 있는 별개 물체로 읽힌다.
     // 팔을 어느 각도로 돌려도 피벗에 있는 이 구가 몸통과 팔 사이를 메운다.
-    const delt = new THREE.Mesh(new THREE.SphereGeometry(o.armR * 1.45, 8, 6), flat(o.shirt));
+    const delt = new THREE.Mesh(new THREE.SphereGeometry(o.armR * 1.45, 8, 6), flat(o.sleeve));
     delt.name = tag;
     jitterMesh(delt, 0.015, side < 0 ? 25 : 26);
     sh.add(delt);
-    const upper = seg(o.armR, o.upperLen, o.shirt, tag, side < 0 ? 21 : 22);
+    const upper = seg(o.armR, o.upperLen, o.sleeve, tag, side < 0 ? 21 : 22, o.cuffSleeve);
     sh.add(upper);
     const el = joint(sh, 0, -o.upperLen, 0);
     const fore = seg(o.armR * 0.92, o.foreLen, o.skin, tag, side < 0 ? 23 : 24);
@@ -358,7 +396,7 @@ function buildBody(o) {
       bareHands.push(bh);
     }
     const hp = joint(hip, side * o.hipX, 0, 0);
-    const thigh = seg(o.legR, o.thighLen, o.shorts, tag, side < 0 ? 41 : 42);
+    const thigh = seg(o.legR, o.thighLen, o.shorts, tag, side < 0 ? 41 : 42, o.cuffShorts);
     hp.add(thigh);
     const kn = joint(hp, 0, -o.thighLen, 0);
     const shin = seg(o.legR * 0.82, o.shinLen, o.socks, tag, side < 0 ? 43 : 44);
@@ -406,8 +444,13 @@ export function buildKeeper(height, weight) {
     thighLen: h * 0.21, shinLen: h * 0.20,
     gloveSize: h * 0.115, bootLen: h * 0.14,
     // 반바지·양말·축구화가 전부 검정에 가까워 하반신이 기둥 하나로 뭉쳤다.
-    // 상의 초록과 같은 계열의 양말을 신겨 키트로 묶고, 반바지는 무릎 위치를 알려줄 정도로만 밝힌다.
-    shirt: 0x2f8f5b, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: 0x2f8f5b,
+    // 양말이 상의와 같은 초록이면 몸이 누울 때 정강이가 몸통에서 떨어져 나온 조각으로 읽힌다.
+    // 양말은 상의보다 두 밴드 밝은 청록으로 올려 다리 끝을 따로 세우고,
+    // 반바지는 무릎 위치를 알려줄 정도로만 밝힌다.
+    // 같은 초록을 어둡게만 내린 소매는 팔이 아니라 몸통에 진 그림자로 읽혔다.
+    // 색상을 청록으로 꺾으면 밝기가 아니라 색이 팔을 세우고, 양말과 한 벌로 묶인다.
+    shirt: 0x2f8f5b, sleeve: 0x073239, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: 0x63d3e8,
+    cuffSleeve: 0x5f8f93, cuffShorts: 0x6d8898,
     phase: 0.7, rest: POSES.ready
   });
   g.userData.girth = w;
@@ -428,7 +471,7 @@ export function buildKicker() {
     // 카메라가 골대 뒤에 있어 크로스바가 키커의 다리를 가로로 자른다.
     // 흰 양말은 흰 바에, 남색 반바지는 어두운 그물 띠에 먹혀 잘린 조각이 다리로 안 읽힌다.
     // 배경 어느 띠에도 없는 색을 쓴다.
-    shirt: 0xc9483a, skin: 0xd8a877, shorts: 0xede7d8, socks: 0xf2b431,
+    shirt: 0xc9483a, sleeve: 0x6d1c14, skin: 0xd8a877, shorts: 0xede7d8, socks: 0xf2b431,
     phase: 2.1, rest: POSES.windup
   });
   return g;
