@@ -51,6 +51,8 @@ body.playing #hud{opacity:1}
   transition:background .18s}
 #pips i.save{background:var(--good)}
 #pips i.gone{background:var(--bad)}
+/* 지금 굴리는 칸. 깜빡임은 정지 프레임을 깨서 못 쓰고, 노란 테두리는 멈춘 화면에서도 남는다. */
+#pips i.now{background:#ffd83d;border-color:#ffd83d;box-shadow:0 0 0 2px #1a140a}
 
 /* 실점 한 방. 흰 장 하나가 먼저 튀고 색이 빠진다.
    0.06초는 아무도 못 봤고 0.5초는 화면을 가렸다. */

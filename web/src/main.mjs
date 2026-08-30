@@ -55,7 +55,9 @@ function say(line, cause) {
 function pips() {
   el('pips').innerHTML = state.shots.map((_, i) => {
     const r = state.results[i];
-    return '<i class=\"' + (r === undefined ? '' : r ? 'gone' : 'save') + '\"></i>';
+    // 지금 굴리는 칸을 표시한다. 결과를 미리 칠하면 자막이 뒤집을 것을 먼저 말해버린다.
+    const cls = r === undefined ? (i === state.i ? 'now' : '') : r ? 'gone' : 'save';
+    return '<i class=\"' + cls + '\"></i>';
   }).join('');
   el('lv').textContent = 'Lv ' + state.keeper.level;
   el('fans').innerHTML = '아웃문그램 <b>' + state.fans.toLocaleString() + '</b>';
@@ -82,6 +84,8 @@ function nextShot() {
   state.phase = 'wait';
   advance = 0;
   el('out').classList.remove('on');
+  // 자막 종료 시점의 pips()는 state.i가 오르기 전에 돌아서 마커가 한 칸 뒤에 남는다.
+  pips();
   setPad(true);
   stage.reset();
   pressAt = performance.now() + shot.flight * 1000 * 0.72;
