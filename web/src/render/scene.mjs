@@ -274,6 +274,24 @@ export function createScene(canvas) {
     ghosts.push(g);
   }
   const trail = [];
+  // 잔상을 지나온 거리로 놓으므로 자취는 프레임 수가 아니라 길이를 담아야 한다.
+  // 느린 킥에서도 꼬리 끝까지 닿으려면 1.5초치가 필요하다.
+  const TRAIL_MAX = 90;
+  // 자취를 따라 d만큼 뒤로 걸어간 점. 표본 사이는 직선으로 본다.
+  // 자취가 그보다 짧으면 가장 오래된 점에 멈춘다. 그때 잔상은 한자리에 겹쳐 공을 감싼 무리로 남는다.
+  const trailPoint = (d) => {
+    if (trail.length < 2) return null;
+    let acc = 0;
+    for (let k = 1; k < trail.length; k++) {
+      const seg = trail[k - 1].distanceTo(trail[k]);
+      if (acc + seg >= d) {
+        const t = seg > 1e-6 ? (d - acc) / seg : 0;
+        return trail[k - 1].clone().lerp(trail[k], t);
+      }
+      acc += seg;
+    }
+    return trail[trail.length - 1].clone();
+  };
   // 공이 화면에서 차지하는 높이 비율. 화소가 아니라 비율로 잡아야 해상도가 바뀌어도 같은 그림이 나온다.
   // 0.047은 720p에서 지름 34px이다. 실측으로 비행 중 최소 17.7px까지 내려갔고 그 크기에서는
   // 공이 오는지 서 있는지가 안 읽혔다. 잔상도 그 점 안에 갇혀 같이 죽었다.
@@ -1100,16 +1118,19 @@ export function createScene(canvas) {
     keeperShadow.scale.setScalar(1 + Math.abs(Math.sin(keeper.rotation.z)) * 0.8);
     kickerShadow.position.set(kicker.position.x, 0.03, kicker.position.z);
     // 잔상은 지나온 자리를 따라간다. 매 프레임 전부 옮기면 공이 여덟 개인 것으로 읽힌다.
-    // 간격을 두 프레임으로 벌려 꼬리가 길어지게 한다.
+    // 간격은 공의 겉보기 반지름에 매단다. 그래야 만화 배율이 커져도 꼬리가 같은 비율로 늘어난다.
     // 세계시간이 멈추면 잔상도 그 프레임의 모습 그대로 서 있어야 한다.
-    // 갱신을 계속 돌리면 같은 자리가 열여덟 번 쌓여 step이 0이 되고 링이 스스로 꺼진다.
+    // 갱신을 계속 돌리면 같은 자리가 거듭 쌓여 step이 0이 되고 링이 스스로 꺼진다.
     if (cue && !tail && dt > 0) {
       trail.unshift(ball.position.clone());
-      // 잔상 i는 trail[i*2+2]를 읽는다. 마지막 잔상은 인덱스 16을 요구하므로 상한이 16이면
-      // 여덟 장 중 일곱 장만 켜지고 꼬리 끝이 영영 빈다.
-      if (trail.length > GHOSTS * 2 + 2) trail.length = GHOSTS * 2 + 2;
+      const SP = BALL_R * ballGain * 0.85;
+      // 프레임 간격으로 잔상을 놓으면 간격이 공의 속도를 그대로 따라간다.
+      // 빠른 킥에서는 두 장 사이가 공 지름보다 벌어져 꼬리가 끊기고, 떨어져 나온 노란 판은
+      // 속도선이 아니라 두 번째 공으로 읽힌다. 그래서 지나온 거리로 놓는다.
+      // 간격이 공 반지름보다 좁으면 이웃한 장이 겹쳐 하나의 줄기가 된다.
+      if (trail.length > TRAIL_MAX) trail.length = TRAIL_MAX;
       for (let i = 0; i < GHOSTS; i++) {
-        const p = trail[i * 2 + 2];
+        const p = trailPoint((i + 1) * SP);
         const g = ghosts[i];
         g.visible = Boolean(p);
         g.userData.lit = Boolean(p);
@@ -1118,11 +1139,13 @@ export function createScene(canvas) {
           // 화면상 크기 = 실제 크기 / 카메라 거리. 거리비를 곱하면 뒤 잔상도 공과 같은 크기로 보인다.
           const dg = g.position.distanceTo(CAM_BASE);
           const db = Math.max(0.01, ball.position.distanceTo(CAM_BASE));
-          // 뒤로 갈수록 키우면 공보다 큰 노란 덩어리가 공 옆에 붙는다. 관객은 그것을 두 번째 공으로 읽는다.
-          // 만화의 속도 꼬리는 뒤로 갈수록 가늘어진다. 앞머리만 공만 하고 끝은 점이다.
-          // 공에 만화 배율이 걸리면 잔상도 같이 걸어야 한다. 안 걸면 꼬리가 공보다 작아져
-          // 속도선이 아니라 공 뒤에 붙은 부스러기로 읽힌다.
-          g.scale.setScalar((dg / db) * (1 - i * 0.095) * ballGain);
+          // 거리비는 원근 축소를 정확히 되돌린다. 그래서 여기서 더 곱하지 않으면 잔상의 화면 반지름은
+          // 공과 같고, 공이 카메라를 향해 올 때 잔상은 공 실루엣 안에 통째로 갇힌다.
+          // 옆으로 휜 킥만 꼬리가 보이고 정면으로 온 킥은 서 있는 공과 같은 그림이 된다.
+          // 뒤로 갈수록 화면 반지름을 키워 공을 감싸는 링으로 남긴다. 링은 공 뒤에서 커지므로
+          // 옆에 붙은 두 번째 공이 아니라 충격파로 읽힌다. 끝 장이 공 반지름의 1.8배다.
+          // 공에 만화 배율이 걸리면 잔상도 같이 걸어야 한다. 안 걸면 링이 공 안으로 다시 들어간다.
+          g.scale.setScalar((dg / db) * (1 + i * 0.115) * ballGain);
         }
       }
       // 재질이 한 벌이라 투명도는 한 번만 정한다. 개별로 주려면 재질이 여덟 벌 필요하고 그건 예산 밖이다.
