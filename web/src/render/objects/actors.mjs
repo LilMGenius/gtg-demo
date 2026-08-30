@@ -384,12 +384,20 @@ function buildBody(o) {
     joints['el' + k] = el;
     arms.push(sh);
     if (o.gloveSize) {
-      const gv = new THREE.Mesh(new THREE.BoxGeometry(o.gloveSize, o.gloveSize, o.gloveSize * 0.45), flatMap(0xf2d64b, clothTex()));
+      const s = o.gloveSize;
+      // 정육면체는 어느 각도에서 봐도 노란 상자다. 벗겨져 날아가는 순간에는 카드 한 장으로 읽혔다.
+      // 손바닥, 엄지, 손목밴드를 하나로 병합한다. 실루엣이 벙어리장갑이 되고 드로우콜은 그대로 하나다.
+      const palm = new THREE.BoxGeometry(s, s * 1.15, s * 0.5);
+      const thumb = new THREE.BoxGeometry(s * 0.44, s * 0.52, s * 0.46);
+      thumb.translate(side * s * 0.6, s * 0.1, 0);
+      const cuff = new THREE.BoxGeometry(s * 1.12, s * 0.32, s * 0.58);
+      cuff.translate(0, s * 0.72, 0);
+      const gv = new THREE.Mesh(mergeGeos([palm, thumb, cuff]), flatMap(0xf2d64b, clothTex()));
       gv.name = tag;
       // 장갑은 화면에서 가장 자주 보는 물건이다. 직육면체 그대로면 여기서 티가 제일 크게 난다.
       jitterMesh(gv, 0.02, side < 0 ? 31 : 32);
       addOutline(gv, 0.028);
-      gv.position.set(0, -o.foreLen - o.gloveSize * 0.2, 0);
+      gv.position.set(0, -o.foreLen - s * 0.2, 0);
       el.add(gv);
       gloves.push(gv);
       gloveParent.push(el);
