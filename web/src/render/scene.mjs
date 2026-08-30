@@ -748,7 +748,7 @@ export function createScene(canvas) {
         rebound: bySide(POSES.shoveR, POSES.shoveL),
         reboundMiss: bySide(POSES.sprawlR, POSES.sprawlL),
         charge: POSES.dribble, beat: POSES.stumble,
-        lost: POSES.faceplant, skied: POSES.brace,
+        lost: POSES.faceplant, skied: POSES.skyward,
         talked: POSES.swoon, distracted: POSES.swoon, openGoalScored: POSES.faceplant
       };
       kp = TAIL_POSE[tail.kind] ?? kp;
