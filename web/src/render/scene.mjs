@@ -551,6 +551,19 @@ export function createScene(canvas) {
   const stageProbe = createStageProbe(camera, { kicker: () => kicker, keeper: () => keeper });
   const goalFrame = () => goalFraming(camera, R_HALF_W, R_H);
 
+  // 임팩트 판이 몸 뒤에 서려면 몸이 시선축으로 어디까지 뻗었는지 알아야 한다.
+  // 넘어지거나 손을 뻗은 키퍼는 키의 대부분이 깊이 방향으로 눕는다. 고정값으로는 못 맞춘다.
+  // 0.18은 여유다. 몸 끝에 딱 붙이면 같은 깊이에서 z-파이팅으로 잉크가 몸에 얼룩진다.
+  const bodyBox = new THREE.Box3();
+  const burstDepth = (z) => {
+    bodyBox.setFromObject(keeper);
+    const d = bodyBox.max.z - z + 0.18;
+    lastDepth = { z, maxZ: bodyBox.max.z, minZ: bodyBox.min.z, d };
+    return d;
+  };
+  // 판이 몸 뒤에 섰는지는 계산값을 읽어야 말할 수 있다. 화면만 보면 덮였는지 원인은 못 가린다.
+  let lastDepth = null;
+
   // 한 구의 연출. 시작 시각과 확정된 결과만 받는다.
   // 포즈는 상태다. 목표 포즈로 매 프레임 조금씩 끌고 간다.
   // 순간 전환은 사람이 아니라 슬라이드로 읽힌다.
@@ -1224,7 +1237,7 @@ export function createScene(canvas) {
           if (u > 0.28) {
             // 공 바로 위에 얹었더니 글자가 키퍼 얼굴을 덮었다. 표정이 사라지면 사건의 절반이 없다.
             // 카메라는 +z를 보므로 +x가 화면 바깥쪽이다. 공보다 한 뼘 바깥, 머리 위로 올린다.
-            impact.burst(new THREE.Vector3(ball.position.x + 0.62, ball.position.y + 0.95, ball.position.z), pendingBurst.power, pendingBurst.word, pendingBurst.kind, pendingBurst.word2);
+            impact.burst(new THREE.Vector3(ball.position.x + 0.62, ball.position.y + 0.95, ball.position.z), pendingBurst.power, pendingBurst.word, pendingBurst.kind, pendingBurst.word2, burstDepth(ball.position.z));
             pendingBurst = null;
           }
         } else {
@@ -1233,7 +1246,8 @@ export function createScene(canvas) {
           // 중점은 둘이 실제로 만났을 때만 접촉점이다. 시간 폴백이 먼저 걸린 프레임에서는
           // 공이 이미 저 멀리 있어서, 중점이 아무것도 없는 허공이 된다. 그때는 손에서 터뜨린다.
           if (met || u > 0.3) {
-            impact.burst(met ? gw.clone().lerp(ball.position, 0.5) : gw.clone(), pendingBurst.power, pendingBurst.word, pendingBurst.kind, pendingBurst.word2);
+            const hit = met ? gw.clone().lerp(ball.position, 0.5) : gw.clone();
+            impact.burst(hit, pendingBurst.power, pendingBurst.word, pendingBurst.kind, pendingBurst.word2, burstDepth(hit.z));
             pendingBurst = null;
           }
         }
@@ -1631,6 +1645,7 @@ export function createScene(canvas) {
     shake: shakeLeft,
     camOff: camOffPeak,
     squash: squashPeak,
+    depth: lastDepth,
     ...impact.state()
   });
 

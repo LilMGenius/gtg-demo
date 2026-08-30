@@ -13,8 +13,12 @@ const D_WORD2 = 0.52;
 // 별과 잔막은 접촉점을 지나는 카메라 정면 판이다. 접촉점 z에 그대로 세우면
 // 판이 몸통 한가운데를 갈라 절반이 몸 앞에 그려지고, 사건의 주체가 잉크에 덮인다.
 // 주체 뒤로 물리면 깊이 검사가 몸을 살려 두고 잉크는 몸 둘레로만 뻗는다.
-// 0.42는 키퍼 몸통 두께보다 크고 골대 그물 간격보다 작다.
+// 0.42는 선 키퍼의 몸통 두께다. 못 잰 경우의 바닥값으로만 쓴다.
 const BEHIND = 0.42;
+// 넘어지거나 손을 뻗는 포즈는 몸이 카메라 시선축으로 키만큼 눕는다. 고정값 0.42는 그 몸
+// 한가운데를 갈라서 별이 머리와 팔을 덮고 개그가 안 읽힌다. 부르는 쪽이 실제 깊이를 재서 넘긴다.
+// 1.2는 상한이다. 이보다 밀면 판이 키커 쪽으로 넘어가 사건이 남의 발치에서 터진다.
+const BEHIND_MAX = 1.2;
 // 글자는 월드 크기로 정해 놓으면 카메라가 가까울 때 화면 폭의 사분의 일을 먹고 주체를 밀어낸다.
 // 그러면 정지 프레임에서 무슨 일이 났는지는 글자로만 읽히고 그림은 사라진다. 화면에 대고 재서 깎는다.
 const MAX_WORD_FRAC = 0.25;
@@ -269,6 +273,8 @@ export function createImpact(scene) {
   let stage = 0;
   let life = 0;
   let power = 1;
+  // 이 발이 몸에서 얼마나 물러서야 하는지. 사건마다 몸의 깊이가 다르므로 발마다 다시 잡힌다.
+  let behind = BEHIND;
   const at = new THREE.Vector3();
   // 계측이 임팩트를 뺀 같은 프레임을 찍을 수 있어야 한다.
   // 안 그러면 화면에 남은 화소가 임팩트인지 뒤의 골대인지 말할 수 없다.
@@ -278,9 +284,14 @@ export function createImpact(scene) {
   // 0.34초는 사람 눈에 번짝이고 정지 프레임에는 거의 안 잡힌다. 0.55가 읽힌다.
   // 0.9를 써 보니 다음 구의 배치까지 글자가 남아 화면이 지저분해졌다.
   // 수명 셋 중 가장 긴 잔막이 전체 수명을 정한다.
-  function burst(pos, strength = 1, word = '', kind = '', word2 = '') {
+  function burst(pos, strength = 1, word = '', kind = '', word2 = '', depth = 0) {
+    // 발은 하나뿐이다. 공이 골망에 닿는 순간의 출렁임이 뒤늦게 터지면서, 아직 살아 있는
+    // 사건의 발을 통째로 덮어썼다. 그러면 정지 프레임에 남는 그림은 개그가 아니라 그물이다.
+    // 본체가 살아 있는 동안에는 더 가벼운 발이 끼어들지 못한다. 같은 무게면 나중 것이 이긴다.
+    if (life > 0 && t < D_BODY && power > strength) return false;
     at.copy(pos);
     power = strength;
+    behind = Math.min(BEHIND_MAX, Math.max(BEHIND, depth));
     life = D_VEIL;
     t = 0;
     // 색은 사건이 정한다. 이름이 표에 없으면 예전 흰 얼룩 그대로다.
@@ -293,7 +304,7 @@ export function createImpact(scene) {
     ring.visible = !hidden;
     veil.visible = !hidden;
     star.visible = !hidden;
-    star.position.set(at.x, at.y, at.z + BEHIND);
+    star.position.set(at.x, at.y, at.z + behind);
     blobSpin = Math.random() * Math.PI * 2;
     for (const m of dust) { m.visible = !hidden; m.position.copy(at); }
     for (const m of chips) { m.visible = !hidden; m.position.copy(at); }
@@ -392,7 +403,7 @@ export function createImpact(scene) {
     chipMat.opacity = (1 - u) * 0.8;
     }
     // 잔막은 본체가 다 꺼진 뒤까지 남는다. 커지면서 옅어져야 가라앉는 먼지로 읽힌다.
-    veil.position.set(at.x, at.y + uv * 0.3, at.z + BEHIND);
+    veil.position.set(at.x, at.y + uv * 0.3, at.z + behind);
     veil.quaternion.copy(camera.quaternion);
     veil.rotateZ(blobSpin - 2.4);
     // 잔막이 키퍼를 통째로 덮으면 사건이 아니라 화면 가림으로 읽힌다. 몸보다 작게 둔다.
@@ -476,6 +487,9 @@ export function createImpact(scene) {
       star: starMat.opacity,
       dust: dustMat.opacity,
       word: wordMat.opacity,
+      atZ: at.z,
+      behind,
+      starZ: star.position.z,
       shown: dust.filter((m) => m.visible).length + chips.filter((m) => m.visible).length
         + (star.visible ? 1 : 0) + (flash.visible ? 1 : 0) + (ring.visible ? 1 : 0) + (veil.visible ? 1 : 0),
       hidden
