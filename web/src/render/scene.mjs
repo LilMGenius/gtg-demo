@@ -788,6 +788,11 @@ export function createScene(canvas) {
     // 상단 코스는 비행 선이 시선과 거의 나란해져 바 뒤를 계속 따라간다.
     // 포물선을 키워 시선을 가로지르게 만든다.
     cue.arc = 0.3 + (shot.aimY > 1.0 ? 0.85 : 0);
+    // 슛 세기를 0..1 눈금 하나로 만든다. 침투 깊이, 그물 진폭, 되밀림 거리가 같은 눈금을 써야
+    // 툭 민 공과 강슛이 그물에서 다르게 읽힌다. 지금까지 셋 다 상수라 세기가 화면에 없었다.
+    // 파워는 판정에서 1~10으로 잘려 나오니 (power-1)/9가 0..1이다. 여기에 0.75를 준다.
+    // strong은 코스를 안 보고 때린 구라 나머지 0.25를 얹는다. 파워 10 강슛만 1.0에 닿는다.
+    cue.force = Math.min(1, (shot.kicker.power - 1) / 9 * 0.75 + (shot.strong ? 0.25 : 0));
 
     // 눈에 띄는 행인은 매 구 있지 않다. 그 구에만 앞줄로 걸어온다.
     for (const p of passers) { p.position.z = p.userData.homeZ; p.userData.gaze = 0; }
@@ -867,9 +872,11 @@ export function createScene(canvas) {
         // 정지 프레임 두 장을 비교하는 계측이 그 변화를 잡음 바닥으로 읽는다.
         kicker.rotation.z *= Math.pow(0.86, dt * 60);
         const p = Math.min(1, (t - runup) / flight);
-        // 공은 골라인에서 멈추지 않는다. 실점이면 골망까지 가고 거기서 선다.
-        // 카메라가 골대 뒤에 있으니 그 뒤로 더 보내면 공이 렌즈를 뚫고 사라진다.
-        const past = result.conceded ? BALL_PAST : 1.0;
+        // 공은 골라인에서 멈추지 않는다. 얼마나 깊이 박히는지가 세기다.
+        // 그물 트리거는 z <= netZ + 0.5 = -1.0이라 가장 약한 구도 그 선은 넘어야 한다.
+        // 1.112가 z=-1.12로 여유 0.12를 두고, 1.142가 z=-1.45로 그물 뒷면(-1.5) 바로 앞이다.
+        // BALL_PAST 1.134는 그 사이 한 점이라 이제 force가 대신 고른다.
+        const past = result.conceded ? lerp(1.112, 1.142, cue.force) : 1.0;
         const q = Math.min(p * past, past);
         ball.position.x = lerp(0, VIEW_X * shot.aimX * SX, Math.min(q, 1));
         ball.position.z = lerp(11, 0.1, q);
@@ -898,9 +905,12 @@ export function createScene(canvas) {
           ball.position.y = BALL_R + (y0 - BALL_R) * (1 - s) * Math.abs(Math.cos(s * Math.PI * 1.2));
           // 실점한 공이 골라인 앞으로 굴러 나와 섰다. 실측: 두 구 연속 z=0.55, 골대 바깥이다.
           // 그 자리에서 키퍼가 뒤를 돌아보니 공이 안 넘어갔는데 고개만 도는 것으로 읽혔다.
-          // -0.75는 골라인(0)과 그물 뒷면(-NET_D=-1.5)의 한가운데다. 그물을 치고 되밀린 만큼만 앞으로 온다.
+          // 그물은 공을 삼키기도 하고 뱉기도 한다. 어느 쪽인지는 세기가 정한다.
+          // 약한 구는 -1.15, 그물 뒷면 가까이에서 힘을 잃고 눕는다.
+          // 센 구는 -0.30까지 되밀려 나온다. 골라인(0)은 넘지 않으니 들어간 것으로 계속 읽힌다.
           // 막은 공은 반대로 골라인 앞으로 나온다. 0.55는 키커 쪽이라 다음 구의 시작점으로 읽힌다.
-          ball.position.z = lerp(ball.position.z, result.conceded ? -0.75 : 0.55, s);
+          const restZ = result.conceded ? lerp(-1.15, -0.30, cue.force) : 0.55;
+          ball.position.z = lerp(ball.position.z, restZ, s);
         }
         // 프레임당 상수로 돌리면 세계시간이 멈춰도 공만 계속 구른다.
         // 60fps에서 재던 값을 초당으로 환산한다. 0.4/프레임 = 24/초, 0.22/프레임 = 13.2/초.
@@ -1273,7 +1283,10 @@ export function createScene(canvas) {
         tail.netDone = true;
         // 그물은 울리지 않는다. 마른 마찰 한 겹과 짧은 저역이 전부다.
         sfx.place();
-        netAmp = 0.55;
+        // 그물이 울리는 폭도 세기다. 0.55 고정이면 툭 민 공과 강슛이 같은 깊이로 처졌다.
+        // 0.34는 그물이 겨우 늘어지는 정도, 0.86은 크게 밀리는 정도다.
+        // 세기를 모르는 경로는 __act 단독 재생뿐이고 거기서는 기존 0.55를 그대로 쓴다.
+        netAmp = cue ? 0.34 + 0.52 * cue.force : 0.55;
         netT = 0;
         netX = ball.position.x;
         netY = ball.position.y - R_H / 2;
