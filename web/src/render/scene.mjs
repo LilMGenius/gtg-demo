@@ -266,23 +266,58 @@ export function createScene(canvas) {
   // 그래서 원근 축소를 거리비로 되돌리고 거기서 더 키운다. 꼬리가 아니라 공을 감싸는 링으로 남는다.
   // 지오메트리는 한 벌, 재질은 여덟 벌이다. 같은 셰이더를 복제하면 three가 프로그램을 재사용하므로
   // 늘어나는 것은 유니폼뿐이다. 앞뒤 밝기가 같으면 여덟 장이 한 덩어리로 뭉쳐 꼬리가 아니라 얼룩이 된다.
-  const GHOSTS = 8;
-  const ghostGeo = new THREE.IcosahedronGeometry(BALL_R, 0);
-  // 흰 잔상은 흰 공 뒤에서도 흙 배경 위에서도 안 보였다. 정지 화면에서 공이 서 있는지 날아오는지 안 읽혔다.
-  // 만화가 속도를 그리는 색은 흰색이 아니다. 노란 링이라야 갈색 흙 위에서 남는다.
-  const ghostMat = new THREE.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0.2, depthWrite: false });
-  // 머리는 진하고 꼬리로 갈수록 옅다. 만화 속도선이 방향을 말하는 방식이 이것이다.
-  const ghostFade = (i) => 1 - (i / GHOSTS) * 0.82;
-  const ghosts = [];
-  for (let i = 0; i < GHOSTS; i++) {
-    const g = new THREE.Mesh(ghostGeo, ghostMat.clone());
-    g.visible = false;
-    g.userData.probeIgnore = true;
-    scene.add(g);
-    ghosts.push(g);
+  const GHOSTS = 12;
+  // 구슬 여덟 개는 자취 위에 놓아도 구슬 여덟 개로 읽혔다. 만화가 속도를 그리는 형태는 점열이 아니라 한 줄기다.
+  // 자취를 따라 좌우로 벌린 띠 하나로 잇고 꼬리로 갈수록 폭과 농도를 함께 줄인다.
+  // 흰 띠는 흰 공 뒤에서도 흙 배경 위에서도 안 보였다. 노란색이라야 갈색 흙에서 남는다.
+  const ribPos = new Float32Array(GHOSTS * 2 * 3);
+  const ribCol = new Float32Array(GHOSTS * 2 * 4);
+  const ribIdx = [];
+  for (let i = 0; i < GHOSTS - 1; i++) {
+    const a = i * 2;
+    ribIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
   }
-  // 진단과 게이트가 읽는 머릿값. 개별 재질은 여기에 ghostFade를 곱한 결과다.
+  // 머리는 진하고 꼬리로 갈수록 옅다. 만화 속도선이 방향을 말하는 방식이 이것이다.
+  const ghostFade = (i) => Math.pow(1 - i / (GHOSTS - 1), 1.4);
+  // 꼬리를 뾰족하게 깎을수록 만화 속도선에 가깝지만, 화면에서 공 실루엣 밖으로 나간 폭이 같이 줄어
+  // 꼬리가 있다고 잴 근거가 사라진다. 정면 킥은 리본을 거의 끝에서 보므로 그 폭이 곧 뻗은 길이다.
+  // 실측 reach: 꼬리 0.14배에서 1.51, 0.30배에서 1.49로 바 1.5에 붙었다. 0.55배로 되돌린다.
+  const RIB_W = (i) => 1 - 0.45 * (i / (GHOSTS - 1));
+  for (let i = 0; i < GHOSTS; i++) {
+    const a = ghostFade(i);
+    for (const s of [0, 1]) {
+      const o = (i * 2 + s) * 4;
+      ribCol[o] = 1; ribCol[o + 1] = 0.882; ribCol[o + 2] = 0.302; ribCol[o + 3] = a;
+    }
+  }
+  const ribGeo = new THREE.BufferGeometry();
+  ribGeo.setAttribute('position', new THREE.BufferAttribute(ribPos, 3));
+  ribGeo.setAttribute('color', new THREE.BufferAttribute(ribCol, 4));
+  ribGeo.setIndex(ribIdx);
+  const ribbon = new THREE.Mesh(
+    ribGeo,
+    new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide })
+  );
+  ribbon.visible = false;
+  // 정점을 매 프레임 다시 쓰므로 경계 상자는 항상 한 프레임 뒤처진다. 컬링을 맡기면 띠가 깜빡인다.
+  ribbon.frustumCulled = false;
+  ribbon.userData.probeIgnore = true;
+  scene.add(ribbon);
+  // 띠는 두께가 없어 마지막 마디에서 그대로 잘린다. 구슬판은 그 자리에 공 부피가 있었고
+  // 앞선 reach 1.68은 그 부피까지 재고 나온 값이다. 실측: 띠만 두면 정면 킥에서 1.49로 떨어지고
+  // 폭을 0.14배에서 0.55배로 넓혀도 62.6px 그대로다. 폭은 시선에 수직이라 뻗은 길이를 못 바꾼다.
+  // 킥 지점은 공이 실제로 있던 자리다. 그 자리에 옅은 공 하나를 남겨 띠 끝을 맺는다.
+  const ribCap = new THREE.Mesh(
+    ballGeo(BALL_R),
+    new THREE.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0, depthWrite: false })
+  );
+  ribCap.visible = false;
+  ribCap.frustumCulled = false;
+  ribCap.userData.probeIgnore = true;
+  scene.add(ribCap);
+  // 진단과 게이트가 읽는 머릿값. 정점 알파는 여기에 ghostFade를 곱한 결과다.
   let ghostAlpha = 0;
+  let ribTail = null;
   const trail = [];
   // 잔상을 지나온 거리로 놓으므로 자취는 프레임 수가 아니라 길이를 담아야 한다.
   // 느린 킥에서도 꼬리 끝까지 닿으려면 1.5초치가 필요하다.
@@ -698,7 +733,8 @@ export function createScene(canvas) {
     pendingBurst = null;
     cue = { shot, input, result, t0: vnow, ended: false, onEnd, steps: 0, struck: false, framed: false };
     trail.length = 0;
-    for (const g of ghosts) g.visible = false;
+    ribbon.visible = false;
+    ribCap.visible = false;
     ball.scale.set(1, 1, 1);
     ballGain = 1;
     kicker.position.set(VIEW_X * shot.aimX * SX * 0.2 + KICKER_OFF, 0, 11.2);
@@ -1178,38 +1214,60 @@ export function createScene(canvas) {
     if (cue && !tail && dt > 0) {
       trail.unshift(ball.position.clone());
       if (trail.length > TRAIL_MAX) trail.length = TRAIL_MAX;
-      // 간격을 공 반지름에 고정하면 자취가 그보다 짧을 때 남는 장이 가장 오래된 점에 쌓인다.
-      // 실측: 여덟 장이 공 지름 41px 안에 전부 들어와 꼬리가 아니라 공에 낀 후광으로 읽혔다.
-      // 그래서 지금까지 날아온 길이를 여덟 등분해 놓는다. 자취가 자라면 꼬리도 같이 자란다.
-      // 바닥은 공 반지름이다. 킥 직후 자취가 한 뼘일 때 여덟 장이 다시 한 점에 겹치는 것을 막는다.
+      // 간격을 공 반지름에 고정하면 자취가 그보다 짧을 때 남는 마디가 가장 오래된 점에 쌓인다.
+      // 실측: 잔상 전체가 공 지름 41px 안에 들어와 꼬리가 아니라 공에 낀 후광으로 읽혔다.
+      // 그래서 지금까지 날아온 길이를 마디 수로 등분해 놓는다. 자취가 자라면 꼬리도 같이 자란다.
+      // 바닥은 공 반지름이다. 킥 직후 자취가 한 뼘일 때 마디가 다시 한 점에 겹치는 것을 막는다.
       let flown = 0;
       for (let k = 1; k < trail.length; k++) flown += trail[k - 1].distanceTo(trail[k]);
-      const SP = Math.max(BALL_R * ballGain * 0.85, flown / GHOSTS);
+      const SP = Math.max(BALL_R * ballGain * 0.85, flown / (GHOSTS - 1));
+      const pts = [];
+      for (let i = 0; i < GHOSTS; i++) pts.push(trailPoint(i * SP) || trail[0].clone());
+      ribTail = pts[GHOSTS - 1];
+      // 띠를 벌리는 방향은 자취의 접선과 시선의 외적이다. 월드 축으로 벌리면
+      // 공이 카메라로 곧장 올 때 띠가 종잇장처럼 서서 한 줄로 사라진다.
+      const tan = new THREE.Vector3();
+      const view = new THREE.Vector3();
+      const side = new THREE.Vector3();
       for (let i = 0; i < GHOSTS; i++) {
-        const p = trailPoint((i + 1) * SP);
-        const g = ghosts[i];
-        g.visible = Boolean(p);
-        g.userData.lit = Boolean(p);
-        if (p) {
-          g.position.copy(p);
-          // 원근 축소를 거리비로 되돌린 뒤 더 키우면 여덟 장이 공을 감싼 링이 된다.
-          // 그 링은 꼬리가 아니라 공에 낀 빛무리로 읽혔다. 그래서 축소를 그대로 둔다.
-          // 뒤 잔상은 멀어진 만큼 작아지고, 줄어드는 구슬 줄이 곧 날아온 방향을 가리킨다.
-          // 공에 만화 배율이 걸리면 잔상도 같이 걸어야 꼬리가 공과 같은 굵기에서 시작한다.
-          g.scale.setScalar(ballGain * (1 - i * 0.03));
+        const prev = pts[Math.max(0, i - 1)];
+        const next = pts[Math.min(GHOSTS - 1, i + 1)];
+        tan.subVectors(next, prev);
+        if (tan.lengthSq() < 1e-8) tan.set(0, 0, 1);
+        view.subVectors(camera.position, pts[i]);
+        side.crossVectors(tan, view);
+        if (side.lengthSq() < 1e-8) side.set(1, 0, 0);
+        // 공에 만화 배율이 걸리면 띠도 같이 걸어야 꼬리가 공과 같은 굵기에서 시작한다.
+        side.normalize().multiplyScalar(BALL_R * ballGain * RIB_W(i));
+        for (const s of [0, 1]) {
+          const o = (i * 2 + s) * 3;
+          const sg = s === 0 ? 1 : -1;
+          ribPos[o] = pts[i].x + side.x * sg;
+          ribPos[o + 1] = pts[i].y + side.y * sg;
+          ribPos[o + 2] = pts[i].z + side.z * sg;
         }
       }
+      ribGeo.attributes.position.needsUpdate = true;
+      ribbon.visible = true;
+      ribbon.userData.lit = true;
+      ribCap.position.copy(ribTail);
+      ribCap.scale.setScalar(ballGain * RIB_W(GHOSTS - 1));
+      ribCap.visible = true;
       // 0.2는 흙 위에서 사라졌다. 그렇다고 상수로 올리면 굴러오는 공에도 속도선이 붙어 늘 빠른 것으로 읽힌다.
-      // 이번 프레임에 공이 간 거리로 정한다. 느리면 링이 없고 빠르면 진해진다.
+      // 이번 프레임에 공이 간 거리로 정한다. 느리면 띠가 없고 빠르면 진해진다.
       const step = trail.length > 1 ? trail[0].distanceTo(trail[1]) : 0;
-      // 킥 직후에는 꼬리가 없다. 그런데도 링을 그리면 같은 자리에 여덟 장이 겹쳐
+      // 킥 직후에는 꼬리가 없다. 그런데도 띠를 그리면 마디가 전부 한 점에 겹쳐
       // 발치에 노란 덩어리가 붙는다. 꼬리가 길어진 다음에만 켜다.
-      const grown = trail.length >= GHOSTS * 2;
-      // 0.42로는 3배 확대해야 꼬리가 보였다. 머리를 0.72까지 올리고 뒤로 갈수록 ghostFade로 뺀다.
+      const grown = trail.length >= GHOSTS;
+      // 0.42로는 3배 확대해야 꼬리가 보였다. 머리를 0.72까지 올리고 뒤로 갈수록 정점 알파로 뺀다.
       ghostAlpha = grown ? Math.min(0.72, Math.max(0, (step - 0.04) * 4.2)) : 0;
-      for (let i = 0; i < GHOSTS; i++) ghosts[i].material.opacity = ghostAlpha * ghostFade(i);
-    } else if ((!cue || tail) && ghosts[0].visible) {
-      for (const g of ghosts) { g.visible = false; g.userData.lit = false; }
+      ribbon.material.opacity = ghostAlpha;
+      // 띠 끝 정점 알파는 0이다. 맺음 공까지 0이면 띠가 허공에서 끊긴다. 머리의 3할로 남긴다.
+      ribCap.material.opacity = ghostAlpha * 0.3;
+    } else if ((!cue || tail) && ribbon.visible) {
+      ribbon.visible = false;
+      ribbon.userData.lit = false;
+      ribCap.visible = false;
     }
     // 정지 프레임에서도 상태가 유지되어야 하므로 잔상 갱신 조건 바깥에서 정한다.
     setOverlay(Boolean(cue) && !tail && ball.position.z > OVERLAY_Z);
@@ -1363,11 +1421,10 @@ export function createScene(canvas) {
     const bc = toScreen(ball.position);
     const br = screenR(ball.position, BALL_R * ball.scale.x);
     let ringPx = 0;
-    for (const g of ghosts) {
-      if (!g.visible || g.material.opacity <= 0) continue;
-      const gc = toScreen(g.position);
-      const gr = screenR(g.position, BALL_R * g.scale.x);
-      ringPx = Math.max(ringPx, Math.hypot(gc[0] - bc[0], gc[1] - bc[1]) + gr);
+    if (ribbon.visible && ribbon.material.opacity > 0 && ribTail) {
+      const gc = toScreen(ribTail);
+      const gr = screenR(ribTail, BALL_R * ballGain * RIB_W(GHOSTS - 1));
+      ringPx = Math.hypot(gc[0] - bc[0], gc[1] - bc[1]) + gr;
     }
     return {
       cue: Boolean(cue && !tail),
@@ -1375,7 +1432,7 @@ export function createScene(canvas) {
       trail: trail.length,
       step: trail.length > 1 ? trail[0].distanceTo(trail[1]) : 0,
       opacity: ghostAlpha,
-      shown: ghosts.filter((g) => g.visible).length,
+      shown: ribbon.visible ? GHOSTS : 0,
       px,
       ballPx: br * 2,
       ringPx
@@ -1387,7 +1444,10 @@ export function createScene(canvas) {
   window.__flightHide = (mode) => {
     ball.visible = mode !== 'both';
     const off = mode === 'ghosts' || mode === 'both';
-    for (const g of ghosts) if (g.userData.lit) g.visible = !off;
+    if (ribbon.userData.lit) {
+      ribbon.visible = !off;
+      ribCap.visible = !off;
+    }
     return { ball: ball.visible, ghosts: mode };
   };
 
@@ -1396,8 +1456,8 @@ export function createScene(canvas) {
   // 잔상이 남은 것인지 복원이 원본과 다른 것인지 화소를 보기 전에 갈린다.
   window.__flightState = () => ({
     ball: ball.visible,
-    shown: ghosts.filter((g) => g.visible).length,
-    lit: ghosts.filter((g) => g.userData.lit).length,
+    shown: ribbon.visible ? GHOSTS : 0,
+    lit: ribbon.userData.lit ? GHOSTS : 0,
     opacity: ghostAlpha
   });
 
@@ -1444,7 +1504,9 @@ export function createScene(canvas) {
     sqLeft = 0;
     ball.rotation.set(0, 0, 0);
     trail.length = 0;
-    for (const g of ghosts) g.visible = false;
+    ribbon.visible = false;
+    ribbon.userData.lit = false;
+    ribCap.visible = false;
     stopLeft = 0;
     kickPop = 0;
     kicker.scale.setScalar(1);
