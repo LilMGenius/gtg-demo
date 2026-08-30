@@ -460,7 +460,10 @@ export function createScene(canvas) {
   const CAM_EV = {
     // 프리셋이 열두 장 중 열한 장을 같은 정면 로우앵글로 만들었다. 차이가 눈에 안 걸리면 프리셋이 없는 것과 같다.
     // 선방은 짧고 세게 당긴다. 오래 끌면 줌이 아니라 그냥 다른 화각으로 읽힌다.
-    save: { pos: [0, -0.3, 0.62], look: [0, -0.08, 0], fov: -5, dur: 0.5 },
+    // 0.5초는 사건 선언 520ms 뒤 프레임에서 이미 끝나 있다. 그 프레임이 선방을 판단하는 유일한 그림인데
+    // 렌즈가 기본 자리로 돌아와 있어 선방만 카메라가 없는 사건이 됐다.
+    // 정면으로만 당기면 조준 화면과 같은 구도다. 다이빙한 쪽으로 붙어야 옆에서 본 그림이 된다.
+    save: { pos: [0.44, -0.3, 0.86], look: [0.2, -0.08, 0], fov: -5, dur: 0.85, mirror: true },
     // 쳐낸 것과 잡은 것이 같은 각도면 둘은 같은 그림이다. 잡은 것은 옆에서 붙어
     // 가슴에 안긴 공을 본다. 정면에서 조금 당기기만 하면 선방과 구별이 안 된다.
     catch: { pos: [-0.6, -0.12, 0.4], look: [-0.22, -0.02, 0], fov: -3, dur: 0.75 },
@@ -473,16 +476,20 @@ export function createScene(canvas) {
     // 기울기가 이미 0.15rad 걸려 있어 프레임이 돌면서 모서리를 먼저 잘라먹는다.
     downed: { pos: [0.35, -1.2, 0.3], look: [0.08, -0.65, 0.2], fov: -2, dur: 1.05 },
     // 키퍼가 골라인을 떠나 앞으로 나간다. 렌즈가 따라붙어야 돌진으로 읽힌다.
-    charge: { pos: [0, -0.62, 0.62], look: [0, -0.12, 0.45], fov: -2, dur: 0.9 },
+    // 나머지 프리셋이 전부 낮추고 좁힌다. 돌진만 올리고 넓혀야 같은 렌즈가 아닌 것으로 읽힌다.
+    charge: { pos: [0, 0.52, 0.85], look: [0, 0.08, 0.7], fov: 4, dur: 0.9 },
     spill: { pos: [0.35, -0.2, 0.3], look: [0, -0.06, 0], fov: -4, dur: 0.7 }
   };
   let camEv = null;
+  // 다이빙한 쪽으로 렌즈를 붙일 때 쓰는 부호. 프리셋은 한 방향만 적어 두고 여기서 뒤집는다.
+  let camMx = 1;
   let camEvLeft = 0;
   let camEvSpan = 1;
-  function camEvent(kind) {
+  function camEvent(kind, sign) {
     const e = CAM_EV[kind];
     if (!e) return;
     camEv = e;
+    camMx = e.mirror ? (Math.sign(sign) || 1) : 1;
     camEvLeft = e.dur;
     camEvSpan = e.dur;
   }
@@ -729,7 +736,7 @@ export function createScene(canvas) {
     const TILT = { gloveGone: 0.13, carriedIn: -0.14, downed: 0.15, talked: -0.11, distracted: 0.1, beat: -0.12, lost: 0.12 };
     if (TILT[kind]) tilt(TILT[kind], 0.9);
     // 렌즈가 사건 쪽으로 옮겨 간다. 기울기만으로는 무슨 일인지 안 보인다.
-    camEvent(kind);
+    camEvent(kind, tail.kx);
     // 흔들림은 실점이 가장 크다. 골이 들어간 것이 화면에서 제일 큰 사건이어야 한다.
     const SHK = {
       save: [0.045, 0.34], catch: [0.032, 0.28], gloveGone: [0.055, 0.42],
@@ -1322,10 +1329,10 @@ export function createScene(canvas) {
       camEvLeft -= dt;
       // 타이틀은 자기 궤도를 돈다. 사건 오프셋을 얹으면 그 궤도가 튄다.
       if (!titleMode) {
-        camera.position.x += camEv.pos[0] * amt;
+        camera.position.x += camEv.pos[0] * amt * camMx;
         camera.position.y += camEv.pos[1] * amt;
         camera.position.z += camEv.pos[2] * amt;
-        camLook.x += camEv.look[0] * amt;
+        camLook.x += camEv.look[0] * amt * camMx;
         camLook.y += camEv.look[1] * amt;
         camLook.z += camEv.look[2] * amt;
         camera.fov = fovBase + camEv.fov * amt;
