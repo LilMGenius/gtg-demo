@@ -633,8 +633,10 @@ export function createScene(canvas) {
         ball.position.x = lerp(0, VIEW_X * shot.aimX * SX, Math.min(q, 1));
         ball.position.z = lerp(11, 0.1, q);
         ball.position.y = lerp(BALL_R, shot.aimY * SY, Math.min(q, 1)) + Math.sin(Math.min(p, 1) * Math.PI) * cue.arc;
-        ball.rotation.x -= 0.4;
-        ball.rotation.y -= 0.22;
+        // 프레임당 상수로 돌리면 세계시간이 멈춰도 공만 계속 구른다.
+        // 60fps에서 재던 값을 초당으로 환산한다. 0.4/프레임 = 24/초, 0.22/프레임 = 13.2/초.
+        ball.rotation.x -= 24 * stepDt;
+        ball.rotation.y -= 13.2 * stepDt;
         // 진행축 스트레치는 여기서 안 쓴다. 공은 카메라를 향해 오므로 진행축이 시선축과 거의 나란하고,
         // 그 방향으로 늘려봐야 화면에는 크기 변화로만 나타난다. 속도는 잔상이 대신 말한다.
         // 대신 발에 맞은 직후에만 짜부라진다. 이건 시선축과 무관해서 화면에 그대로 보인다.
