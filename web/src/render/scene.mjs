@@ -616,7 +616,9 @@ export function createScene(canvas) {
           kickPop = 0.07;
           shake(0.05 + shot.kicker.power * 0.004, 0.12);
         }
-        kicker.rotation.z *= 0.86;
+        // 프레임당 곱으로 줄이면 세계시간이 멈춰도 상체가 계속 펴진다.
+        // 정지 프레임 두 장을 비교하는 계측이 그 변화를 잡음 바닥으로 읽는다.
+        kicker.rotation.z *= Math.pow(0.86, dt * 60);
         const p = Math.min(1, (t - runup) / flight);
         // 공은 골라인에서 멈추지 않는다. 실점이면 골망까지 가고 거기서 선다.
         // 카메라가 골대 뒤에 있으니 그 뒤로 더 보내면 공이 렌즈를 뚫고 사라진다.
@@ -791,8 +793,11 @@ export function createScene(canvas) {
               lerp(tail.from.y, ball.position.y, lag) + (0.14 + Math.sin(u * Math.PI) * 0.22) * off,
               lerp(tail.from.z, ball.position.z, lag) + 0.12 * off
             );
-            loose.rotation.z += 0.62 * (1 - cling * 0.6);
-            loose.rotation.x += 0.41 * (1 - cling * 0.6);
+            // 회전만 프레임당 상수로 쌓으면 세계시간이 멈춰도 장갑이 계속 돈다.
+            // 정지 프레임 두 장을 비교하는 계측이 그 회전을 잡음 바닥으로 읽는다.
+            const spin = dt * 60;
+            loose.rotation.z += 0.62 * (1 - cling * 0.6) * spin;
+            loose.rotation.x += 0.41 * (1 - cling * 0.6) * spin;
           }
           break;
         }
@@ -962,7 +967,9 @@ export function createScene(canvas) {
         p.rotation.z = Math.sin(vnow * 9) * 0.13;
         continue;
       }
-      p.position.x += p.userData.speed * 0.016;
+      // 프레임당 상수로 걸으면 세계시간이 멈춰도 행인만 계속 간다.
+      // 정지 프레임을 두 장 찍어 비교하는 계측이 그 걸음을 전부 잡음으로 읽는다.
+      p.position.x += p.userData.speed * dt;
       // 되돌리는 자리가 화면 안이면 순간이동이 그대로 보인다.
       // 행인이 서는 z에서 화면 반폭은 27.7m다. 26은 그 안이었다.
       if (p.position.x > 34) {
@@ -970,13 +977,15 @@ export function createScene(canvas) {
         // 같은 줄로 돌아오면 다섯이 영원히 같은 순서로 지나간다.
         p.position.z = p.userData.homeZ + (p.userData.phase % 1) * 3.2 - 1.6;
       }
-      p.rotation.z = Math.sin(performance.now() * 0.006 * p.userData.speed + p.userData.phase) * 0.06;
+      p.rotation.z = Math.sin(vnow * 6 * p.userData.speed + p.userData.phase) * 0.06;
     }
     keeperShadow.scale.setScalar(1 + Math.abs(Math.sin(keeper.rotation.z)) * 0.8);
     kickerShadow.position.set(kicker.position.x, 0.03, kicker.position.z);
     // 잔상은 지나온 자리를 따라간다. 매 프레임 전부 옮기면 공이 여덟 개인 것으로 읽힌다.
     // 간격을 두 프레임으로 벌려 꼬리가 길어지게 한다.
-    if (cue && !tail) {
+    // 세계시간이 멈추면 잔상도 그 프레임의 모습 그대로 서 있어야 한다.
+    // 갱신을 계속 돌리면 같은 자리가 열여덟 번 쌓여 step이 0이 되고 링이 스스로 꺼진다.
+    if (cue && !tail && dt > 0) {
       trail.unshift(ball.position.clone());
       // 잔상 i는 trail[i*2+2]를 읽는다. 마지막 잔상은 인덱스 16을 요구하므로 상한이 16이면
       // 여덟 장 중 일곱 장만 켜지고 꼬리 끝이 영영 빈다.
@@ -985,6 +994,7 @@ export function createScene(canvas) {
         const p = trail[i * 2 + 2];
         const g = ghosts[i];
         g.visible = Boolean(p);
+        g.userData.lit = Boolean(p);
         if (p) {
           g.position.copy(p);
           // 화면상 크기 = 실제 크기 / 카메라 거리. 거리비를 곱하면 뒤 잔상도 공과 같은 크기로 보인다.
@@ -1005,8 +1015,8 @@ export function createScene(canvas) {
       // 발치에 노란 덩어리가 붙는다. 꼬리가 길어진 다음에만 켜다.
       const grown = trail.length >= GHOSTS * 2;
       ghostMat.opacity = grown ? Math.min(0.42, Math.max(0, (step - 0.04) * 4.2)) : 0;
-    } else if (ghosts[0].visible) {
-      for (const g of ghosts) g.visible = false;
+    } else if ((!cue || tail) && ghosts[0].visible) {
+      for (const g of ghosts) { g.visible = false; g.userData.lit = false; }
     }
 
     // 흔들림을 먼저 얹고 그 카메라로 잰다. 흔들리기 전 카메라로 재면 게이트는 흔들림을 못 본다.
@@ -1156,6 +1166,15 @@ export function createScene(canvas) {
       ballPx: br * 2,
       ringPx
     };
+  };
+
+  // 선언된 잔상과 화면에 남은 잔상은 다른 주장이다. 화소로 재려면 같은 프레임을
+  // 공만 뺀 것, 공과 잔상을 뺀 것으로도 그려야 차분이 무엇의 화소인지 말할 수 있다.
+  window.__flightHide = (mode) => {
+    ball.visible = mode !== 'both';
+    const off = mode === 'ghosts' || mode === 'both';
+    for (const g of ghosts) if (g.userData.lit) g.visible = !off;
+    return { ball: ball.visible, ghosts: mode };
   };
 
   renderer.setAnimationLoop(frame);
