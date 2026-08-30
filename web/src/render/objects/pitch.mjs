@@ -79,6 +79,8 @@ export function meshPanel(w, h, cell, color, opacity, sag = 0, fadeFloor = false
     }
     attr.needsUpdate = true;
   };
+  // 밀렸다는 주장은 원본과의 차분으로만 증명된다. 계측이 원본을 못 읽으면 변위는 선언으로 남는다.
+  m.userData.restPos = base;
   return m;
 }
 

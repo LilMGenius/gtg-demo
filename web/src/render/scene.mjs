@@ -1462,6 +1462,36 @@ export function createScene(canvas) {
   });
 
   // 임팩트 프레임은 선언으로 증명되지 않는다. 세계시계가 실제로 늦었는지,
+  // 그물이 밀렸다는 것과 화면에서 출렁여 보인다는 것은 다른 주장이다.
+  // 카메라가 골대 뒤에서 +z를 보므로 뒷그물의 z 변위는 시선축과 거의 나란하다.
+  // 월드 변위가 아무리 커도 화면에서는 원근 축소로만 남을 수 있어 화소로 같이 잰다.
+  window.__netVis = () => {
+    const n = pitch.net;
+    const rest = n.userData.restPos;
+    const arr = n.geometry.attributes.position.array;
+    const w = renderer.domElement.clientWidth || 1;
+    const h = renderer.domElement.clientHeight || 1;
+    camera.updateMatrixWorld();
+    n.updateMatrixWorld();
+    const a = new THREE.Vector3();
+    const c = new THREE.Vector3();
+    let maxDz = 0;
+    let maxPx = 0;
+    let moved = 0;
+    for (let i = 0; i < arr.length; i += 3) {
+      const dz = arr[i + 2] - rest[i + 2];
+      if (Math.abs(dz) > maxDz) maxDz = Math.abs(dz);
+      if (Math.abs(dz) < 1e-5) continue;
+      moved += 1;
+      a.set(rest[i], rest[i + 1], rest[i + 2]).applyMatrix4(n.matrixWorld).project(camera);
+      c.set(arr[i], arr[i + 1], arr[i + 2]).applyMatrix4(n.matrixWorld).project(camera);
+      const px = Math.hypot((c.x - a.x) * w * 0.5, (c.y - a.y) * h * 0.5);
+      if (px > maxPx) maxPx = px;
+    }
+    return { amp: netAmp, maxDz, maxPx, moved };
+  };
+
+  // 임팩트 프레임은 선언으로 증명되지 않는다. 세계시계가 실제로 늦었는지,
   // 렌즈가 밀렸는지, 공이 찌그러졌는지를 사건마다 최고값으로 적는다.
   window.__impactVis = () => ({
     stop: stopLeft,
