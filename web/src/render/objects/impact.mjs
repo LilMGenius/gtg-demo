@@ -118,7 +118,9 @@ export function createImpact(scene) {
   ring.userData.probeIgnore = true;
   scene.add(ring);
 
-  const starMat = new THREE.MeshBasicMaterial({ color: 0xfffbe8, transparent: true, opacity: 0, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+  // 별은 뻗은 길이가 키퍼 몸통을 넘는다. 깊이 검사를 끄면 몸 앞을 그대로 지나가서
+  // 접점이 아니라 화면에 얹힌 스티커로 읽혔다. 깊이는 읽고 쓰지만 않는다.
+  const starMat = new THREE.MeshBasicMaterial({ color: 0xfffbe8, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
   const star = new THREE.Mesh(starGeo(SPOKES), starMat);
   star.renderOrder = 8;
   star.visible = false;
