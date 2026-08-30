@@ -203,13 +203,24 @@ export function createImpact(scene) {
   scene.add(flash);
 
   // 충격파 고리. 바깥으로만 밀린다. 고리가 완전히 닫히면 도넛으로 읽히므로 두께를 얇게 둔다.
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
+  // 가산 합성은 갈색 흙 위에서 색을 잃고 회색 얼룩이 된다. 흙 명도가 높아 더할 여지가 없기 때문이다.
+  // 일반 합성에 0.95면 사건 색이 그대로 남는다. 배경 명도와 무관해지는 값이 이것이다.
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, depthTest: false });
   // 색이 사건마다 갈리고 나니 두꺼운 띠가 가산 합성으로 키퍼를 통째로 물들였다. 띠를 테두리까지 좁힌다.
   const ring = new THREE.Mesh(blobGeo(4.2, 20, 0.24, 0.87), ringMat);
   ring.visible = false;
   ring.renderOrder = 8;
   ring.userData.probeIgnore = true;
   scene.add(ring);
+
+  // 고리 뒤에 까는 검정 테두리. 글자에 쓰던 lead/leadEdge와 같은 수법이다.
+  // 1.06 배율에 안쪽 0.79를 물리면 고리 안팎으로 반지름의 3~4%씩 검정이 남는다. 흙 명도와 무관하게 형태가 선다.
+  const ringEdgeMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthWrite: false, depthTest: false });
+  const ringEdge = new THREE.Mesh(blobGeo(4.2, 20, 0.24, 0.79), ringEdgeMat);
+  ringEdge.visible = false;
+  ringEdge.renderOrder = 7.9;
+  ringEdge.userData.probeIgnore = true;
+  scene.add(ringEdge);
 
   // 별은 뻗은 길이가 키퍼 몸통을 넘는다. 깊이 검사를 끄면 몸 앞을 그대로 지나가서
   // 접점이 아니라 화면에 얹힌 스티커로 읽혔다. 깊이는 읽고 쓰지만 않는다.
@@ -340,6 +351,7 @@ export function createImpact(scene) {
     star.geometry = shapeGeo(tone.shape, tone.spokes);
     flash.visible = !hidden;
     ring.visible = !hidden;
+    ringEdge.visible = !hidden;
     veil.visible = !hidden;
     star.visible = !hidden;
     star.position.set(at.x, at.y, at.z + behind);
@@ -394,12 +406,18 @@ export function createImpact(scene) {
       // 층마다 각을 어긋내지 않으면 삐뚠 테두리끼리 겹쳐 다시 매끈한 원이 된다.
       ring.rotateZ(blobSpin + 1.9);
       ring.scale.setScalar((0.46 + uf * 0.72) * power);
-      ringMat.opacity = Math.pow(f, 1.5) * 0.62;
+      ringMat.opacity = Math.pow(f, 1.5) * 0.95;
+      ringEdge.position.copy(ring.position);
+      ringEdge.quaternion.copy(ring.quaternion);
+      ringEdge.scale.copy(ring.scale).multiplyScalar(1.06);
+      ringEdgeMat.opacity = ringMat.opacity;
     } else if (flash.visible) {
       flash.visible = false;
       ring.visible = false;
+      ringEdge.visible = false;
       flashMat.opacity = 0;
       ringMat.opacity = 0;
+      ringEdgeMat.opacity = 0;
     }
     if (u >= 1) {
       star.visible = false;
@@ -529,6 +547,7 @@ export function createImpact(scene) {
   function hideAll() {
     flash.visible = false;
     ring.visible = false;
+    ringEdge.visible = false;
     veil.visible = false;
     star.visible = false;
     wordMesh.visible = false;
@@ -538,6 +557,7 @@ export function createImpact(scene) {
     for (const m of chips) m.visible = false;
     flashMat.opacity = 0;
     ringMat.opacity = 0;
+    ringEdgeMat.opacity = 0;
     veilMat.opacity = 0;
     starMat.opacity = 0;
     wordMat.opacity = 0;
@@ -555,6 +575,7 @@ export function createImpact(scene) {
     const bodyLive = live && t < D_BODY;
     flash.visible = live && t < D_FLASH;
     ring.visible = flash.visible;
+    ringEdge.visible = flash.visible;
     veil.visible = live;
     star.visible = bodyLive;
     // 글자는 본체보다 오래 산다. 뒤따르는 소리가 본체가 꺼진 뒤에 뜨기 때문이다.
