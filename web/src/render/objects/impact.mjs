@@ -181,12 +181,18 @@ export function createImpact(scene) {
     } else if (flash.visible) {
       flash.visible = false;
       ring.visible = false;
+      flashMat.opacity = 0;
+      ringMat.opacity = 0;
     }
     if (u >= 1) {
       star.visible = false;
       wordMesh.visible = false;
       for (const m of dust) m.visible = false;
       for (const m of chips) m.visible = false;
+      starMat.opacity = 0;
+      wordMat.opacity = 0;
+      dustMat.opacity = 0;
+      chipMat.opacity = 0;
     } else {
     // 별은 빠르게 커지고 빠르게 빠진다. 천천히 사라지면 충격이 아니라 후광이 된다.
     star.scale.setScalar((0.9 + u * 1.15) * power);
@@ -235,6 +241,13 @@ export function createImpact(scene) {
     wordMesh.visible = false;
     for (const m of dust) m.visible = false;
     for (const m of chips) m.visible = false;
+    flashMat.opacity = 0;
+    ringMat.opacity = 0;
+    veilMat.opacity = 0;
+    starMat.opacity = 0;
+    wordMat.opacity = 0;
+    dustMat.opacity = 0;
+    chipMat.opacity = 0;
   }
 
   // 층마다 수명이 다르므로 되켤 때 일괄로 켜면 죽은 층이 되살아난다.
