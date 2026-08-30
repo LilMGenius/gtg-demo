@@ -385,6 +385,10 @@ export function createScene(canvas) {
   let pelvisRest = 0;
   const hipA = new THREE.Vector3();
   const hipB = new THREE.Vector3();
+  // 그림자의 방향과 길이를 정하는 축. 목과 두 무릎이 리그의 실재 점 중 가장 먼 양 끝이다.
+  const headW = new THREE.Vector3();
+  const footA = new THREE.Vector3();
+  const footB = new THREE.Vector3();
   // 행인도 그림자가 있어야 땅을 딘는다. 말걸기 연출은 행인을 앞줄로 데려오므로 더 눈에 띄다.
   const passerShadows = passers.map(() => blob(0.28));
 
@@ -1217,12 +1221,28 @@ export function createScene(canvas) {
     const pelvisY = (hipA.y + hipB.y) * 0.5;
     // 서 있는 프레임의 값을 그대로 기준선으로 쓴다. 프레임당 수렴은 정지 프레임 두 장을 갈라놓는다.
     if (!tail && !cue) pelvisRest = pelvisY;
-    keeperShadow.position.set((hipA.x + hipB.x) * 0.5, 0.03, (hipA.z + hipB.z) * 0.5);
+    // 몸이 누우면 그늘도 누워야 한다. 골반 한 점만 쓰면 원판이 몸에서 떨어져 나와
+    // 흙에 따로 찍힌 얼룩으로 읽힌다. 목과 무릎을 바닥에 내리꽂아 축을 얻는다.
+    keeper.userData.joints.neck.getWorldPosition(headW);
+    keeper.userData.joints.knL.getWorldPosition(footA);
+    keeper.userData.joints.knR.getWorldPosition(footB);
+    const footX = (footA.x + footB.x) * 0.5;
+    const footZ = (footA.z + footB.z) * 0.5;
+    const axX = headW.x - footX;
+    const axZ = headW.z - footZ;
+    // 서 있으면 이 값이 0에 가깝고 완전히 누우면 몸길이만큼 나온다. 1.1m를 완전히 누운 것으로 본다.
+    const span = Math.hypot(axX, axZ);
+    keeperShadow.position.set((headW.x + footX) * 0.5, 0.03, (headW.z + footZ) * 0.5);
+    // 로컬 x는 rotation.x=-PI/2를 거쳐 월드 x로, 로컬 y는 월드 -z로 간다. 각도는 그 평면에서 잰다.
+    // 5cm 미만은 서 있는 것이다. 그 각을 믿으면 잡음이 원판을 제자리에서 돌린다.
+    keeperShadow.rotation.z = span > 0.05 ? Math.atan2(-axZ, axX) : 0;
     // 뜬 높이만큼 그늘이 작고 옅어져야 몸이 공중에 있는 것으로 읽힌다.
     // 눕는 각만 보던 이전 식은 다이빙으로 몸이 떠도 농도가 그대로라 바닥에 붙어 보였다.
     const rise = Math.max(0, pelvisY - pelvisRest);
     const shrink = Math.max(0.45, 1 - rise * 0.30);
-    keeperShadow.scale.setScalar(shrink);
+    // 누울수록 길고 좁아진다. 균일 배율은 몸이 어떤 자세든 같은 동전을 바닥에 놓는다.
+    const tilt = Math.min(1, span / 1.1);
+    keeperShadow.scale.set(shrink * (1 + tilt * 1.15), shrink * (1 - tilt * 0.4), shrink);
     keeperShadow.material.opacity = 0.72 * shrink;
     keeperShadow.children[0].material.opacity = 0.86 * shrink;
     // 행인은 판정과 무관하게 계속 걷는다. 멈춘 배경은 그림이고 움직이는 배경은 장소다.
@@ -1610,20 +1630,22 @@ export function createScene(canvas) {
   reset();
 
   // 그림자가 화면 어디에 찍혔는지 눈으로 찍으면 틀린다. 카메라로 투영해서 받는다.
-  const rectBox = new THREE.Box3();
   const rectV = new THREE.Vector3();
+  // 로컬 판의 네 귀퉁이를 그대로 투영한다. 월드 축정렬 상자를 쓰면 그림자가 누운 각만큼
+  // 상자가 부풀어 같은 그늘이 더 작아 보인다. 면적을 재는 쪽에서는 그게 곧 오판이다.
+  const rectCorner = [[0, 0], [1, 0], [1, 1], [0, 1]];
   function shadowRect(w = 1280, h = 720) {
-    rectBox.setFromObject(keeperShadow);
+    keeperShadow.updateMatrixWorld(true);
+    if (!keeperShadow.geometry.boundingBox) keeperShadow.geometry.computeBoundingBox();
+    const bb = keeperShadow.geometry.boundingBox;
+    const quad = [];
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (let i = 0; i < 8; i++) {
-      rectV.set(
-        (i & 1) ? rectBox.max.x : rectBox.min.x,
-        (i & 2) ? rectBox.max.y : rectBox.min.y,
-        (i & 4) ? rectBox.max.z : rectBox.min.z
-      );
-      rectV.project(camera);
+    for (const [cx, cy] of rectCorner) {
+      rectV.set(cx ? bb.max.x : bb.min.x, cy ? bb.max.y : bb.min.y, 0);
+      rectV.applyMatrix4(keeperShadow.matrixWorld).project(camera);
       const px = (rectV.x * 0.5 + 0.5) * w;
       const py = (1 - (rectV.y * 0.5 + 0.5)) * h;
+      quad.push([px, py]);
       if (px < minX) minX = px;
       if (px > maxX) maxX = px;
       if (py < minY) minY = py;
@@ -1631,7 +1653,7 @@ export function createScene(canvas) {
     }
     return {
       x: Math.round(minX), y: Math.round(minY),
-      w: Math.round(maxX - minX), h: Math.round(maxY - minY)
+      w: Math.round(maxX - minX), h: Math.round(maxY - minY), quad
     };
   }
 

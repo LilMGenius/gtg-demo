@@ -8,7 +8,9 @@ import { chromium } from "playwright";
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const OUT = "shadow-gate.local.png";
 const DIFF_MIN = 6;
-// 타원은 자기 AABB의 약 78%를 채운다. 몸에 가려 절반을 잃어도 39%가 남는다.
+// 분모는 그림자 자신의 방향 사각형이다. 타원은 그 안을 약 78% 채운다.
+// 몸에 가려 절반을 잃어도 39%가 남는다. 누운 그늘의 축정렬 상자를 분모로 쓰면
+// 기울인 각만큼 빈칸이 분모에 들어와 같은 그늘이 점점 흐려지는 것으로 나온다.
 const COVER_MIN = 0.30;
 const DARK_MARGIN = 18;
 const VOID_FLOOR = 0.4;
@@ -86,12 +88,30 @@ if (drift > CTRL_DRIFT_MAX) {
   process.exit(2);
 }
 
+// 그림자 판의 네 귀퉁이가 만든 사각형 안만 분모로 센다. 바깥은 그림자가 닿을 자리가 아니다.
+const b0 = res.boxes[0];
+const q = res.r.quad;
+const inQuad = (x, y) => {
+  let sign = 0;
+  for (let k = 0; k < 4; k++) {
+    const a = q[k], c = q[(k + 1) % 4];
+    const cr = (c[0] - a[0]) * (y - a[1]) - (c[1] - a[1]) * (x - a[0]);
+    if (cr === 0) continue;
+    const s = cr > 0 ? 1 : -1;
+    if (sign === 0) sign = s;
+    else if (s !== sign) return false;
+  }
+  return true;
+};
 const selOn = [], selOff = [];
+let denom = 0;
 for (let i = 0; i < off.length; i++) {
+  if (!inQuad(b0.x + (i % b0.w), b0.y + Math.floor(i / b0.w))) continue;
+  denom++;
   if (off[i] - on[i] >= DIFF_MIN) { selOn.push(on[i]); selOff.push(off[i]); }
 }
-const cover = selOn.length / off.length;
-console.log("cover   " + (cover * 100).toFixed(1) + "% of " + off.length + " px  (>= " + (COVER_MIN * 100) + "%)");
+const cover = denom ? selOn.length / denom : 0;
+console.log("cover   " + (cover * 100).toFixed(1) + "% of " + denom + " px  (>= " + (COVER_MIN * 100) + "%)");
 if (!selOn.length) {
   console.log("SHADOW FAIL");
   process.exit(0);
