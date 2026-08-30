@@ -1296,6 +1296,8 @@ export function createScene(canvas) {
   }
   return { play, act, reset, setKeeper, sfx, ballProbe, stageProbe, goalFrame, shadowRect, shadowPair,
     ballPos: () => ({ x: ball.position.x, y: ball.position.y, z: ball.position.z }),
+    // 세계시계. 히트스톱과 정지가 여기서 멈추므로, 화면에 숫자를 쓰는 쪽은 실시간 대신 이걸 읽는다.
+    now: () => vnow,
     leaveTitle() { titleMode = false; },
     set diving(v) { divingStat = v; } };
 }

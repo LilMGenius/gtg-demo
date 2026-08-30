@@ -137,15 +137,17 @@ function rollCaptions(result) {
 
 // 공을 다시 세우는 시간. 스로잉과 골킥이 이 초를 줄이고, 줄어드는 것이 화면에 보여야 선택이 선택이 된다.
 function countdown(sec, label, then) {
-  const until = performance.now() + sec * 1000;
+  // 실시간이 아니라 세계시간으로 센다. 히트스톱이 걸린 동안에도 초가 흐르면
+  // 화면은 멈췄는데 숫자만 혼자 가고, 정지 프레임 두 장이 그 숫자 하나로 갈린다.
+  const until = stage.now() + sec;
   // 공을 다시 세우는 몇 초가 통째로 무음이었다. 키퍼는 그동안 공을 바닥에 튀기고 있다.
   // 간격을 고정하면 메트로놈이 되어 사람 손이 아니라 기계로 들린다.
-  let bounce = performance.now() + 380;
+  let bounce = stage.now() + 0.38;
   const tick = () => {
-    const now = performance.now();
-    const left = (until - now) / 1000;
+    const now = stage.now();
+    const left = until - now;
     if (left <= 0) { el('caption').textContent = ''; then(); return; }
-    if (now >= bounce && left > 0.45) { stage.sfx.dribble(); bounce = now + 620 + Math.random() * 360; }
+    if (now >= bounce && left > 0.45) { stage.sfx.dribble(); bounce = now + 0.62 + Math.random() * 0.36; }
     el('caption').innerHTML = label + ' <b>' + left.toFixed(1) + 's</b>';
     timer = setTimeout(tick, 100);
   };
