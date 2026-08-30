@@ -83,17 +83,32 @@ async function diff([A, B, lum]) {
 const shots = async (p) => {
   const cv = p.locator("#stage");
   const shot = async () => (await cv.screenshot({ type: "png" })).toString("base64");
+  const st = [];
+  const note = async () => st.push(await p.evaluate(() => window.__flightState()));
   const a = await shot();
+  await note();
   await p.evaluate(() => window.__flightHide("ghosts"));
   await p.waitForTimeout(120);
   const b = await shot();
+  await note();
   await p.evaluate(() => window.__flightHide("both"));
   await p.waitForTimeout(120);
   const c = await shot();
+  await note();
   await p.evaluate(() => window.__flightHide("none"));
   await p.waitForTimeout(120);
   const a2 = await shot();
-  return { a, b, c, a2 };
+  await note();
+  return { a, b, c, a2, st };
+};
+
+// 실패한 라운드는 네 장 전부 남긴다. 한 장만 보면 공이 작은 것인지 가려진 것인지 갈리지 않는다.
+const dump = (tag, s) => {
+  for (const k of ["a", "b", "c", "a2"]) {
+    writeFileSync("flight-" + tag + "-" + k + ".local.png", Buffer.from(s[k], "base64"));
+  }
+  console.log("  wrote flight-" + tag + "-{a,b,c,a2}.local.png");
+  console.log("  state " + s.st.map((x) => "b" + (x.ball ? 1 : 0) + "/s" + x.shown + "/l" + x.lit + "/o" + x.opacity.toFixed(2)).join(" "));
 };
 
 const measure = async (p, s) => {
@@ -145,8 +160,7 @@ try {
     console.log("  decl dia=" + hit.ballPx.toFixed(1) + "px z=" + hit.z.toFixed(2)
       + " bbox " + m.bx0 + ".." + m.bx1 + "," + m.by0 + ".." + m.by1);
     if (m.dia < BAR_BALL) {
-      writeFileSync("flight-fail-" + i + ".local.png", Buffer.from(s.a, "base64"));
-      console.log("  wrote flight-fail-" + i + ".local.png");
+      dump("fail" + i, s);
     }
     await p.waitForTimeout(1200);
   }
@@ -158,6 +172,7 @@ try {
   const idleShots = await shots(p);
   await p.evaluate(() => window.__freeze(false));
   const idle = await measure(p, idleShots);
+  if (idle.trailN > 0 || idle.noise > 0) dump("idle", idleShots);
 
   const minDia = Math.min(...rows.map((r) => r.dia));
   const minTrail = Math.min(...rows.map((r) => r.trailN));

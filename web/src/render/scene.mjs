@@ -1187,6 +1187,16 @@ export function createScene(canvas) {
     return { ball: ball.visible, ghosts: mode };
   };
 
+  // 차분이 갈렸다는 것과 무엇이 갈렸는지는 다른 주장이다.
+  // 네 장을 찍는 사이에 선언 상태가 어떻게 움직였는지 같이 적어야
+  // 잔상이 남은 것인지 복원이 원본과 다른 것인지 화소를 보기 전에 갈린다.
+  window.__flightState = () => ({
+    ball: ball.visible,
+    shown: ghosts.filter((g) => g.visible).length,
+    lit: ghosts.filter((g) => g.userData.lit).length,
+    opacity: ghostMat.opacity
+  });
+
   renderer.setAnimationLoop(frame);
 
   function reset() {
