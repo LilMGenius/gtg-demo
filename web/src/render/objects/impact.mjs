@@ -15,6 +15,15 @@ const D_WORD2 = 0.52;
 // 주체 뒤로 물리면 깊이 검사가 몸을 살려 두고 잉크는 몸 둘레로만 뻗는다.
 // 0.42는 키퍼 몸통 두께보다 크고 골대 그물 간격보다 작다.
 const BEHIND = 0.42;
+// 글자는 월드 크기로 정해 놓으면 카메라가 가까울 때 화면 폭의 사분의 일을 먹고 주체를 밀어낸다.
+// 그러면 정지 프레임에서 무슨 일이 났는지는 글자로만 읽히고 그림은 사라진다. 화면에 대고 재서 깎는다.
+const MAX_WORD_FRAC = 0.25;
+// 글자판 원본 폭. PlaneGeometry(1.4, 0.7)과 같이 움직여야 계산이 맞는다.
+const WORD_W = 1.4;
+// 키퍼 몸통 반폭. 글자 반폭에 이만큼을 더해야 글자 사각형이 몸에 안 걸린다.
+const SUBJ_HALF = 0.62;
+// 글자 중심이 이보다 가장자리에 붙으면 화면 밖으로 잘린다. 넘으면 반대쪽으로 뒤집는다.
+const EDGE_NDC = 0.78;
 
 // 파편이 튀는 방향. 균등한 각으로 놓으면 부채가 되므로 미리 흩어 고정한 각 여덟 개를 쓴다.
 const SPOKES = [0.14, 0.92, 1.68, 2.51, 3.29, 4.05, 4.61, 5.55];
@@ -298,9 +307,17 @@ export function createImpact(scene) {
       // 같은 각도로 매번 뜨면 도장찍기로 읽힌다. 매번 달리 기울인다.
       wordSpin = (Math.random() - 0.5) * 0.52;
       // 글자를 머리 위로 피하면 접촉점과 100px 넘게 벌어져 자막으로 읽힌다.
-      // 얼굴은 옆으로 비켜서 피한다. 좌우로 확실히 밀어내고 높이는 접점 곁에 둔다.
-      wordSide = (Math.random() < 0.5 ? -1 : 1) * (0.66 + Math.random() * 0.22);
+      // 얼굴은 옆으로 비켜서 피한다. 어느 쪽인지만 여기서 정하고, 얼마나 미는지는 화면을 보고 정한다.
+      wordSide = Math.random() < 0.5 ? -1 : 1;
     }
+  }
+
+  // 화면 폭 한 개가 이 깊이에서 월드로 몇인지. 월드 변위가 아니라 화면 화소가 기준이다.
+  const camPos = new THREE.Vector3();
+  const probe = new THREE.Vector3();
+  function worldSpanAt(camera, p) {
+    const dist = Math.max(0.5, camera.getWorldPosition(camPos).distanceTo(p));
+    return 2 * Math.tan((camera.fov * Math.PI) / 360) * dist * camera.aspect;
   }
 
   function update(dt, camera) {
@@ -389,17 +406,27 @@ export function createImpact(scene) {
         wordMat.map = texCache.get(follow);
         wordMat.needsUpdate = true;
         wordSpin = -wordSpin * 0.8 + 0.18;
-        wordSide = -wordSide * 0.72;
+        // 반대쪽으로 넘어가되 밀어내는 양은 줄이지 않는다. 줄이면 두 번째 소리가 몸 위로 돌아온다.
+        wordSide = -wordSide;
       }
       // 0에서 키우면 충돌 프레임에 글자가 점만 하다. 만화 글자는 첫 칸에 이미 다 그려져 있다.
       // 연속으로 줄이면 바람 빠지는 풍선이 된다. 세 칸으로 끊어 튀었다가 주저앉힌다.
       const w = stage === 0 ? t / D_WORD2 : (t - D_WORD2) / (D_VEIL - D_WORD2);
       const base = stage === 0 ? 1.34 : 0.92;
       const pop = base * (w < 0.16 ? 1 : w < 0.36 ? 0.82 : 0.9);
-      wordMesh.position.set(at.x + wordSide, at.y + 0.28 + w * 0.24 + stage * 0.2, at.z);
+      // 글자 크기는 화면이 정한다. 화면 폭의 사분의 일을 넘기면 글자가 장면이 되고 주체가 배경이 된다.
+      const span = worldSpanAt(camera, at);
+      const fit = Math.min(pop * (0.7 + power * 0.35), (span * MAX_WORD_FRAC) / WORD_W);
+      // 미는 양은 취향이 아니라 계산이다. 글자 반폭에 몸통 반폭을 더해야 두 사각형이 안 겹친다.
+      const push = WORD_W * fit * 0.5 + SUBJ_HALF;
+      let side = Math.sign(wordSide) || 1;
+      // 밀어낸 자리가 화면 밖이면 사건 대신 잘린 글자가 남는다. 그때만 반대쪽으로 넘긴다.
+      probe.set(at.x + side * push, at.y, at.z).project(camera);
+      if (Math.abs(probe.x) > EDGE_NDC) side = -side;
+      wordMesh.position.set(at.x + side * push, at.y + 0.28 + w * 0.24 + stage * 0.2, at.z);
       wordMesh.quaternion.copy(camera.quaternion);
       wordMesh.rotateZ(wordSpin);
-      wordMesh.scale.setScalar(pop * (0.7 + power * 0.35));
+      wordMesh.scale.setScalar(fit);
       wordMat.opacity = w > 0.78 ? Math.max(0, (1 - w) / 0.22) : 1;
     }
   }
