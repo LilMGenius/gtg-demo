@@ -36,6 +36,8 @@ window.__picks = () => state.picks;
 window.__act = (kind) => stage.act(kind);
 // 선언값은 증거가 아니다. 게이트가 실제 파형을 재려면 발화를 불러낼 수 있어야 한다.
 window.__sfx = stage.sfx;
+// 정지가 정말 정지인지 재려면 세계시계를 밖에서 읽을 수 있어야 한다.
+window.__now = () => stage.now();
 // 불러오기는 판이 시작되기 전에 끝난다. 첨 판을 기다려 그리면 그 사이에 숫자가 없다.
 
 // 손가락 셋. 방향과 타이밍과 나갈지 여부.
@@ -85,16 +87,16 @@ function nextShot() {
   pressAt = performance.now() + shot.flight * 1000 * 0.72;
   say(shot.kicker.name + ', 슛 준비합니다.', null);
   // 창이 닫히면 손가락 대신 자동 입력이 친다. 늦은 만큼은 스탯이 아니라 손가락 탓이다.
-  clearTimeout(timer);
+  stage.cancel(timer);
   // 자동은 손가락만 대신한다. 공은 같은 시간을 날고 대기시간은 그대로다.
   const wait = state.auto ? Math.max(0, pressAt - performance.now()) : shot.flight * 1000 + 900;
-  timer = setTimeout(() => { if (state.phase === 'wait') commit(null); }, wait);
+  timer = stage.after(wait / 1000, () => { if (state.phase === 'wait') commit(null); });
 }
 
 function commit(dive) {
   if (state.phase !== 'wait') return;
   state.phase = 'flying';
-  clearTimeout(timer);
+  stage.cancel(timer);
   setPad(false);
   const shot = state.shots[state.i];
   const input = dive === null
@@ -127,10 +129,10 @@ function rollCaptions(result) {
     say(e.line, e.cause);
     // 자막이 말한 사건을 화면도 같이 연기한다. 결과는 이미 확정됐고 여기서 바뀌지 않는다.
     if (e.t !== 'result') stage.act(e.t);
-    clearTimeout(timer);
-    timer = setTimeout(step, e.t === 'result' ? 900 : 850);
+    stage.cancel(timer);
+    timer = stage.after(e.t === 'result' ? 0.9 : 0.85, step);
     // 자막을 밀어놓는 것은 손가락이다. 스택으로 살 수 있는 것은 공이 다시 놀이는 시간뿐이다.
-    state.skip = () => { clearTimeout(timer); step(); };
+    state.skip = () => { stage.cancel(timer); step(); };
   };
   step();
 }
@@ -149,7 +151,7 @@ function countdown(sec, label, then) {
     if (left <= 0) { el('caption').textContent = ''; then(); return; }
     if (now >= bounce && left > 0.45) { stage.sfx.dribble(); bounce = now + 0.62 + Math.random() * 0.36; }
     el('caption').innerHTML = label + ' <b>' + left.toFixed(1) + 's</b>';
-    timer = setTimeout(tick, 100);
+    timer = stage.after(0.1, tick);
   };
   tick();
 }
@@ -163,7 +165,7 @@ function restart(result) {
 function endSet() {
   const conceded = state.results.filter(Boolean).length;
   say('슛 다섯 개 중 ' + (5 - conceded) + '개 막았습니다.', null);
-  setTimeout(() => countdown(setBreak(), '한숨 돌리는 중', showOffer), 900);
+  timer = stage.after(0.9, () => countdown(setBreak(), '한숨 돌리는 중', showOffer));
 }
 
 function showOffer() {

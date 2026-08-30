@@ -119,6 +119,29 @@ export function createScene(canvas) {
   // 계측용 정지. 세계시간만 멈추고 렌더는 계속 돈다.
   // 렌더까지 멈추면 대조군이 화면 갱신 자체를 못 보므로 계기의 잡음 바닥을 재지 못한다.
   let frozen = false;
+  // 세계시계 위의 타이머. setTimeout은 정지 중에도 깨어나 DOM을 다시 그리므로
+  // 연출과 자막은 실시간이 아니라 이 목록으로 예약한다.
+  const timers = new Map();
+  let timerSeq = 0;
+  function after(sec, fn) {
+    const id = ++timerSeq;
+    timers.set(id, { at: vnow + sec, fn });
+    return id;
+  }
+  function cancel(id) {
+    if (id != null) timers.delete(id);
+  }
+  function runTimers() {
+    if (timers.size === 0) return;
+    // 콜백이 다시 예약하므로 만기된 것만 먼저 떼어낸 뒤 부른다.
+    let due = null;
+    for (const [id, t] of timers) {
+      if (t.at <= vnow) (due || (due = [])).push([id, t.fn]);
+    }
+    if (!due) return;
+    for (const [id] of due) timers.delete(id);
+    for (const [, fn] of due) fn();
+  }
   let kickPop = 0;
   // 0.30은 슬로모션으로 읽혔고 0.02는 프레임이 멈춘 것으로 읽혔다. 0.08이 걸리는 느낌이다.
   const HIT_SCALE = 0.08;
@@ -599,6 +622,7 @@ export function createScene(canvas) {
     }
     vnow += dt;
     stepDt = dt;
+    runTimers();
     actor.keeper = keeper;
     actor.kicker = kicker;
     // 이번 프레임에 무엇을 연기할지. 결과는 이미 확정됐고 여기서는 각도만 고른다.
@@ -1329,6 +1353,8 @@ export function createScene(canvas) {
     ballPos: () => ({ x: ball.position.x, y: ball.position.y, z: ball.position.z }),
     // 세계시계. 히트스톱과 정지가 여기서 멈추므로, 화면에 숫자를 쓰는 쪽은 실시간 대신 이걸 읽는다.
     now: () => vnow,
+    after,
+    cancel,
     leaveTitle() { titleMode = false; },
     set diving(v) { divingStat = v; } };
 }
