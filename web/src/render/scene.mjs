@@ -954,8 +954,11 @@ export function createScene(canvas) {
             const lag = ease(Math.min(1, u * 2.2));
             const cling = ease(Math.min(1, Math.max(0, (u - 0.3) / 0.4)));
             const off = 1 - cling * 0.78;
+            // 장갑이 공 위로 겹치면 공이 사라지고 노란 덩어리만 남는다.
+            // 다시 붙은 뒤에도 공 반지름만큼은 옆으로 비켜 서 있어야 둘 다 보인다.
+            const sx = Math.sign(ball.position.x || tail.kx || 1);
             loose.position.set(
-              lerp(tail.from.x, ball.position.x, lag) + 0.1 * off,
+              lerp(tail.from.x, ball.position.x, lag) + sx * (0.3 + 0.1 * off),
               lerp(tail.from.y, ball.position.y, lag) + (0.14 + Math.sin(u * Math.PI) * 0.22) * off,
               lerp(tail.from.z, ball.position.z, lag) + 0.12 * off
             );
