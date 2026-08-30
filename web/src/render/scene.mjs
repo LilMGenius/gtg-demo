@@ -772,8 +772,9 @@ export function createScene(canvas) {
   function play(shot, input, result, onEnd) {
     tail = null;
     pendingBurst = null;
-    // deflect는 철봉 접촉이 정한 밀림 벡터다. 접촉 전에는 null이라 비행 코드가 통째로 건너뛴다.
-    cue = { shot, input, result, t0: vnow, ended: false, onEnd, steps: 0, struck: false, framed: false, deflect: null };
+   // deflect는 철봉 접촉이 정한 밀림 벡터다. 접촉 전에는 null이라 비행 코드가 통째로 건너뛴다.
+    // settle은 비행이 끝난 자리다. 정착이 시작될 때 한 번만 채운다.
+    cue = { shot, input, result, t0: vnow, ended: false, onEnd, steps: 0, struck: false, framed: false, deflect: null, settle: null };
     trail.length = 0;
     ribbon.visible = false;
     ribCap.visible = false;
@@ -896,21 +897,47 @@ export function createScene(canvas) {
         // 실측: 기둥 하나가 103프레임 연속으로 공을 통째로 먹었다.
         // 그물은 공을 세우지 못한다. 힘을 잃고 떨어져 골대 안쪽으로 굴러 들어간다.
         if (p >= 1) {
-          const s = ease(Math.min(1, (t - runup - flight) / 0.8));
-          // 안쪽으로 0.24는 기둥을 피하려고 고른 값이 아니라 그물이 공을 되밀어 주는 만큼이다.
-          // x=2 근처에 멈춰 선 공이 이 폭이면 기둥의 시선 그림자 밖으로 나온다.
-          const y0 = ball.position.y;
-          ball.position.x *= 1 - 0.24 * s;
-          // 한 번 튀고 눕는다. 그냥 내리면 공이 아니라 엘리베이터로 읽힌다.
-          ball.position.y = BALL_R + (y0 - BALL_R) * (1 - s) * Math.abs(Math.cos(s * Math.PI * 1.2));
+          const u = t - runup - flight;
+          if (!cue.settle) {
+            // 정착 시작 자리를 한 번만 붙잡는다. 매 프레임 현재 값을 다시 읽으면
+            // 보간이 자기 출력을 먹어 지수감쇠가 되고, x y z가 한 덩어리로 미끄러진다.
+            cue.settle = { x: ball.position.x, y: ball.position.y, z: ball.position.z };
+          }
+          const s0 = cue.settle;
           // 실점한 공이 골라인 앞으로 굴러 나와 섰다. 실측: 두 구 연속 z=0.55, 골대 바깥이다.
-          // 그 자리에서 키퍼가 뒤를 돌아보니 공이 안 넘어갔는데 고개만 도는 것으로 읽혔다.
           // 그물은 공을 삼키기도 하고 뱉기도 한다. 어느 쪽인지는 세기가 정한다.
           // 약한 구는 -1.15, 그물 뒷면 가까이에서 힘을 잃고 눕는다.
           // 센 구는 -0.30까지 되밀려 나온다. 골라인(0)은 넘지 않으니 들어간 것으로 계속 읽힌다.
           // 막은 공은 반대로 골라인 앞으로 나온다. 0.55는 키커 쪽이라 다음 구의 시작점으로 읽힌다.
           const restZ = result.conceded ? lerp(-1.15, -0.30, cue.force) : 0.55;
-          ball.position.z = lerp(ball.position.z, restZ, s);
+          // 그물이 공을 세우는 데 0.22초. 실이 늘어났다가 되밀어 주는 왕복이라 짧다.
+          const sz = ease(Math.min(1, u / 0.22));
+          ball.position.z = lerp(s0.z, restZ, sz);
+          // 안쪽으로 0.24 밀리는 것은 그물이 되밀어 준 결과라 z가 선 다음에 온다.
+          // 0.38초는 되밀림이 끝나고 공이 옆으로 눕는 데 걸리는 시간이다.
+          const sx = ease(Math.min(1, Math.max(0, u - 0.22) / 0.38));
+          ball.position.x = lerp(s0.x, s0.x * 0.76, sx);
+          // 낙하는 중력이다. 9.8을 이 판의 눈금에 그대로 쓴다. 1 단위 = 1 m로 지은 판이라 환산이 없다.
+          const g = 9.8;
+          const drop = Math.max(0, s0.y - BALL_R);
+          const tf = Math.sqrt(2 * drop / g);
+          let y;
+          if (u < tf) y = s0.y - 0.5 * g * u * u;
+          else {
+            // 반발 0.34는 흙 운동장이다. 잔디보다 덜 튀고 콘크리트보다는 튄다.
+            const e = 0.34;
+            let vt = g * tf * e;
+            let tb = u - tf;
+            const air = 2 * vt / g;
+            if (tb < air) y = BALL_R + vt * tb - 0.5 * g * tb * tb;
+            else {
+              // 두 번째 튐까지만 그린다. 세 번째는 진폭이 e^3 = 0.04라 화면에서 안 보인다.
+              vt *= e; tb -= air;
+              const air2 = 2 * vt / g;
+              y = tb < air2 ? BALL_R + vt * tb - 0.5 * g * tb * tb : BALL_R;
+            }
+          }
+          ball.position.y = Math.max(BALL_R, y);
         }
         // 프레임당 상수로 돌리면 세계시간이 멈춰도 공만 계속 구른다.
         // 60fps에서 재던 값을 초당으로 환산한다. 0.4/프레임 = 24/초, 0.22/프레임 = 13.2/초.
