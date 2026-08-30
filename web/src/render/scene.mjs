@@ -1636,15 +1636,19 @@ export function createScene(canvas) {
 
   // 골대 스침은 조준점이 골대 가장자리 0.16 안에 들어야 난다. 난수 시드로는 사실상 안 나온다.
   // 확률로만 나오는 분기는 아무도 눈으로 못 본다. 그래서 그 코스를 직접 재생한다.
-  window.__frameShot = (aimX, aimY, conceded) => {
+  // power와 strong은 선택이다. 생략하면 철봉 접촉용 기본값이 그대로 서고,
+  // 넣으면 세기가 침투 깊이와 그물 진폭을 얼마나 벌리는지 두 극단으로 비교할 수 있다.
+  window.__frameShot = (aimX, aimY, conceded, power, strong) => {
+    const pw = power === undefined ? 14 : power;
+    const st = strong === undefined ? true : !!strong;
     const shot = {
       aimX, aimY,
       // 철봉 접촉은 세게 찬 공에서 가장 잘 읽힌다. 약한 공은 튕김이 화면에 거의 안 남는다.
-      strong: true, chip: false, gaze: false, bend: 0,
+      strong: st, chip: false, gaze: false, bend: 0,
       // flight가 없으면 835행 비행 보간이 통째로 NaN이 된다.
-      // chain.mjs의 clamp(1.05 - power*0.05 - 0.1) 식에 power 14를 넣은 값이다.
-      flight: 0.55,
-      kicker: { power: 14, name: '테스트' },
+      // chain.mjs 143행과 같은 식이라야 세기를 바꿨을 때 비행 시간도 같이 따라온다.
+      flight: Math.min(1.1, Math.max(0.55, 1.05 - pw * 0.05 - (st ? 0.1 : 0))),
+      kicker: { power: pw, name: '테스트' },
       side: 0, course: 'top', index: 0, forced: true
     };
     play(shot, { dive: 0, advance: false },
