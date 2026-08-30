@@ -730,6 +730,10 @@ export function createScene(canvas) {
     // 손이 안 닿은 사건. 장갑 좌표에 띄우면 닿지도 않은 자리에서 흙이 뜬다.
     // 흙 없이 공 옆에 단어만 얹는다. charge 프레임은 화면에 글자가 하나도 없었다.
     const CALL = { charge: '나간다!', beat: '제꼈다', lost: '뺏겼다', skied: '넘겼다', rebound: '튕김', reboundMiss: '흘렀다' };
+    // 글자의 앵커는 그 문장의 주어다. 이 셋은 주어가 키퍼인데 앵커가 공에 남아 있었다.
+    // 실측: charge에서 키퍼가 z=3.34로 뛰쳐나갔는데 앵커는 공(z=1.24)에 붙어 글자가 머리에서 304px 떨어진 허공에 떴다.
+    // 나머지 셋(skied, rebound, reboundMiss)은 주어가 공이므로 공에 남긴다.
+    const SUBJ_KEEPER = new Set(['charge', 'beat', 'lost']);
     // 첫 소리는 충돌 프레임의 것이고, 반 초 뒤 프레임에는 이미 다 꺼져 있다.
     // 소리가 하나면 사건이 끝난 뒤를 찍은 정지 화면은 아무 말도 안 한다. 뒤따르는 소리를 하나 더 둔다.
     const FOLLOW = {
@@ -746,7 +750,7 @@ export function createScene(canvas) {
     if (BURST[kind]) {
       pendingBurst = { power: BURST[kind], word: WORD[kind] || '', word2: FOLLOW[kind] || '', at: 'glove', kind };
     } else if (CALL[kind]) {
-      pendingBurst = { power: 0.3, word: CALL[kind], word2: FOLLOW[kind] || '', at: 'ball', kind };
+      pendingBurst = { power: 0.3, word: CALL[kind], word2: FOLLOW[kind] || '', at: SUBJ_KEEPER.has(kind) ? 'head' : 'ball', kind };
     }
     // 웃겨야 하는 사건에만 렌즈를 기울인다. 선방까지 기울이면 매 구 화면이 비뚤어져 기울기가 안 읽힌다.
     const TILT = { gloveGone: 0.13, carriedIn: -0.14, downed: 0.15, talked: -0.11, distracted: 0.1, beat: -0.12, lost: 0.12 };
@@ -1286,11 +1290,15 @@ export function createScene(canvas) {
       // u 상한은 접촉이 끝내 안 나는 사건의 안전판이다. 없으면 폭발이 아예 사라진다.
       if (pendingBurst) {
         // 손이 안 닿는 사건은 장갑을 기다리면 영영 안 터진다. 공 바로 위에 단어만 얹는다.
-        if (pendingBurst.at === 'ball') {
+        if (pendingBurst.at === 'ball' || pendingBurst.at === 'head') {
           if (u > 0.28) {
             // 공 바로 위에 얹었더니 글자가 키퍼 얼굴을 덮었다. 표정이 사라지면 사건의 절반이 없다.
             // 카메라는 +z를 보므로 +x가 화면 바깥쪽이다. 공보다 한 뼘 바깥, 머리 위로 올린다.
-            impact.burst(new THREE.Vector3(ball.position.x + 0.62, ball.position.y + 0.95, ball.position.z), pendingBurst.power, pendingBurst.word, pendingBurst.kind, pendingBurst.word2, burstDepth(ball.position.z));
+            // 주어가 키퍼인 사건은 키퍼 머리에 붙는다. 0.26은 머리 반지름 남짓이라 글자가 정수리에 겹치지 않는다.
+            const anc = pendingBurst.at === 'head'
+              ? keeper.userData.head.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.26, 0))
+              : new THREE.Vector3(ball.position.x + 0.62, ball.position.y + 0.95, ball.position.z);
+            impact.burst(anc, pendingBurst.power, pendingBurst.word, pendingBurst.kind, pendingBurst.word2, burstDepth(anc.z));
             pendingBurst = null;
           }
         } else {
