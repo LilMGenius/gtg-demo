@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { writeFileSync } from "node:fs";
 
 // 날아오는 공과 그 잔상이 화면에 남는지 화소로 재는 자.
 // 앞선 판은 __flightVis가 돌려주는 씬 그래프 값만 읽었다. 투영 크기 33.8px, 잔상 여덟 장 전부 켜짐,
@@ -107,7 +108,8 @@ const measure = async (p, s) => {
     const d = Math.hypot(trail.px[i] - cx, trail.px[i + 1] - cy);
     if (d > ring) ring = d;
   }
-  return { ballN: ball.n, dia, trailN: trail.n, ring, noise: noise.n };
+  return { ballN: ball.n, dia, trailN: trail.n, ring, noise: noise.n,
+    bx0: ball.x0, bx1: ball.x1, by0: ball.y0, by1: ball.y1 };
 };
 
 let br;
@@ -138,6 +140,14 @@ try {
     rows.push(m);
     console.log("round " + i + " ballPx=" + m.ballN + " dia=" + m.dia + " trailPx=" + m.trailN
       + " ring=" + m.ring.toFixed(1) + " ratio=" + (m.ring / Math.max(1, m.dia / 2)).toFixed(2) + " noise=" + m.noise);
+    // 통과 못 한 라운드는 눈으로 볼 수 있어야 고칠 대상이 정해진다.
+    // 선언 지름과 실측 지름을 같이 적어야 공이 작은 것인지 가려진 것인지 갈린다.
+    console.log("  decl dia=" + hit.ballPx.toFixed(1) + "px z=" + hit.z.toFixed(2)
+      + " bbox " + m.bx0 + ".." + m.bx1 + "," + m.by0 + ".." + m.by1);
+    if (m.dia < BAR_BALL) {
+      writeFileSync("flight-fail-" + i + ".local.png", Buffer.from(s.a, "base64"));
+      console.log("  wrote flight-fail-" + i + ".local.png");
+    }
     await p.waitForTimeout(1200);
   }
   if (!rows.length) { console.log("INSTRUMENT DEAD: no flight frames"); process.exit(1); }
