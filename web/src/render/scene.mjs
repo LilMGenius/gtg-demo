@@ -939,7 +939,13 @@ export function createScene(canvas) {
           break;
         case 'carriedIn': {
           // 막았는데 같이 넘어간다. 공과 몸이 한 덩어리로 골망까지 간다.
-          keeper.position.z = lerp(KEEPER_Z, -0.35, e);
+          // -0.35에서 멈추면 몸이 골문 안에 서 있기만 하고 그물에는 닿지 않는다.
+          // 그물 트리거는 좌표 하나를 읽으므로 닿지 않은 몸은 그물을 못 울린다.
+          // 그물면이 -1.5이니 몸통 반경만큼 앞에서 멈춰야 처박힌 그림이 된다.
+          // 더 밀면 가슴에 안긴 공이 그물면을 뚫고 뒤로 나간다.
+          // 0.8초를 다 써서 밀면 그물에 닿는 순간이 꼬리 끝이라 출렁임이 화면 밖에서 끝난다.
+          // 밀려 들어가는 것은 앞쪽 순간이고 남은 시간은 처박힌 채로 흐른다.
+          keeper.position.z = lerp(KEEPER_Z, -1.05, ease(Math.min(1, u * 1.9)));
           keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.35, damp(0.08));
           hover = 0.06;
           // 공을 키퍼 좌표에서 띄우면 엎드린 몸 밖, 하필이면 부츠 옆 땅에 놓인다.
