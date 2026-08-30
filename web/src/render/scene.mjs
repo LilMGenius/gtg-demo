@@ -703,9 +703,20 @@ export function createScene(canvas) {
     // 사건 이름을 모르면 화면만 보고는 무슨 일이 난 건지 모른다. 한 단어로 적어준다.
     // 문장을 넣으면 자막과 같은 것이 두 개가 되어 둘 다 안 읽힌다.
     const WORD = { save: '퍽!', catch: '꽉!', gloveGone: '어?', carriedIn: '으어', spill: '툭', downed: '으악' };
+    // 손이 안 닿은 사건. 장갑 좌표에 띄우면 닿지도 않은 자리에서 흙이 뜬다.
+    // 흙 없이 공 옆에 단어만 얹는다. charge 프레임은 화면에 글자가 하나도 없었다.
+    const CALL = { charge: '나간다!', beat: '제꼈다', lost: '뺏겼다', skied: '넘겼다', rebound: '튕김', reboundMiss: '흘렀다' };
+    // 자막이 말한 사건인데 화면에 글자가 없으면 정지 화면 한 장은 아무 말도 안 한다.
+    // 한 사건만 고치면 같은 구멍이 다섯 개 남는다. 표에서 빠진 이름이 스스로 드러나야 한다.
+    const SILENT = new Set(['miss', 'contact', 'dived', 'emptyGoal']);
+    if (!SILENT.has(kind) && !STAMP[kind] && !WORD[kind] && !CALL[kind]) {
+      console.error('label missing: ' + kind);
+    }
     // 손이 닿은 사건만 터진다. 다만 선언 순간에는 아직 안 닿았으므로 여기서는 예약만 한다.
     if (BURST[kind]) {
-      pendingBurst = { power: BURST[kind], word: WORD[kind] || '' };
+      pendingBurst = { power: BURST[kind], word: WORD[kind] || '', at: 'glove' };
+    } else if (CALL[kind]) {
+      pendingBurst = { power: 0.3, word: CALL[kind], at: 'ball' };
     }
     // 웃겨야 하는 사건에만 렌즈를 기울인다. 선방까지 기울이면 매 구 화면이 비뚤어져 기울기가 안 읽힌다.
     const TILT = { gloveGone: 0.13, carriedIn: -0.14, downed: 0.15, talked: -0.11, distracted: 0.1, beat: -0.12, lost: 0.12 };
@@ -1129,10 +1140,20 @@ export function createScene(canvas) {
       // 공과 장갑이 실제로 만난 프레임에서 한 번만 터진다. 좌표는 둘의 중점이다.
       // u 상한은 접촉이 끝내 안 나는 사건의 안전판이다. 없으면 폭발이 아예 사라진다.
       if (pendingBurst) {
-        const gw = gloveWorld(Math.sign(tail.kx || 1));
-        if (ball.position.distanceTo(gw) < 0.55 || u > 0.3) {
-          impact.burst(gw.clone().lerp(ball.position, 0.5), pendingBurst.power, pendingBurst.word);
-          pendingBurst = null;
+        // 손이 안 닿는 사건은 장갑을 기다리면 영영 안 터진다. 공 바로 위에 단어만 얹는다.
+        if (pendingBurst.at === 'ball') {
+          if (u > 0.28) {
+            // 공 바로 위에 얹었더니 글자가 키퍼 얼굴을 덮었다. 표정이 사라지면 사건의 절반이 없다.
+            // 카메라는 +z를 보므로 +x가 화면 바깥쪽이다. 공보다 한 뼘 바깥, 머리 위로 올린다.
+            impact.burst(new THREE.Vector3(ball.position.x + 0.62, ball.position.y + 0.95, ball.position.z), pendingBurst.power, pendingBurst.word);
+            pendingBurst = null;
+          }
+        } else {
+          const gw = gloveWorld(Math.sign(tail.kx || 1));
+          if (ball.position.distanceTo(gw) < 0.55 || u > 0.3) {
+            impact.burst(gw.clone().lerp(ball.position, 0.5), pendingBurst.power, pendingBurst.word);
+            pendingBurst = null;
+          }
         }
       }
       // 공이 그물에 닿는 순간. 판정이 아니라 좌표 하나를 읽는 것뿐이다.
