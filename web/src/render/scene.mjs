@@ -325,6 +325,10 @@ export function createScene(canvas) {
   const BALL_MIN_H = 0.047;
   const BALL_GAIN_CAP = 2.4;
   let ballGain = 1;
+  // 골대 접촉을 판정하는 비행 진행도. 조준점이 골포스트나 크로스바를 스치는 코스일 때
+  // 공이 실제로 그 높이에 닿는 지점이다. 1.0은 조준점 도달이니 그보다 조금 앞이어야
+  // 튕김이 도달 전에 일어난 것으로 읽힌다. 소리와 그림이 같은 상수를 봐야 한 사건이 된다.
+  const Q_FRAME = 0.97;
 
   // 공 그림자. 공이 어디쯤인지 바닥이 알려주면 궤적을 놓치지 않는다.
   // 흙과 같은 갈색으로 칠한 그늘은 흙 얼룩 하나로 읽혔다. 바닥에는 이만큼 짙은 얼룩이 이미 널려 있다.
@@ -768,7 +772,8 @@ export function createScene(canvas) {
   function play(shot, input, result, onEnd) {
     tail = null;
     pendingBurst = null;
-    cue = { shot, input, result, t0: vnow, ended: false, onEnd, steps: 0, struck: false, framed: false };
+    // deflect는 철봉 접촉이 정한 밀림 벡터다. 접촉 전에는 null이라 비행 코드가 통째로 건너뛴다.
+    cue = { shot, input, result, t0: vnow, ended: false, onEnd, steps: 0, struck: false, framed: false, deflect: null };
     trail.length = 0;
     ribbon.visible = false;
     ribCap.visible = false;
@@ -869,6 +874,16 @@ export function createScene(canvas) {
         ball.position.x = lerp(0, VIEW_X * shot.aimX * SX, Math.min(q, 1));
         ball.position.z = lerp(11, 0.1, q);
         ball.position.y = lerp(BALL_R, shot.aimY * SY, Math.min(q, 1)) + Math.sin(Math.min(p, 1) * Math.PI) * cue.arc;
+        // 철봉에 맞은 공은 코스를 바꾼다. 소리만 나고 공이 직진하면 금속음이 어디서 났는지 안 읽힌다.
+        // 접촉 지점부터 조준점 도달까지의 남은 구간에 걸쳐 밀어낸다. 실점이면 램프가 0.16,
+        // 아니면 0.03이라 훨씬 급한데 금속 반사는 급한 것이 맞다.
+        if (cue.deflect) {
+          const dfr = Math.min(1, Math.max(0, (q - Q_FRAME) / (past - Q_FRAME)));
+          ball.position.x += cue.deflect.x * dfr;
+          ball.position.y = Math.max(BALL_R, ball.position.y + cue.deflect.y * dfr);
+          // 맞은 축이 바뀌면 회전축도 바뀐다. 이게 없으면 밀린 공이 미끄러지는 것으로 읽힌다.
+          ball.rotation.z -= 21 * stepDt * dfr;
+        }
         // 공은 조준점에 닿은 뒤 그 자리에 박혀 있었다. 다음 구까지 1.7초를 허공에 선 채로 버틴다.
         // 골이 아니라 정지 화면으로 읽히고, 하필 뒷골대 세로 기둥과 겹치면 아예 사라진다.
         // 실측: 기둥 하나가 103프레임 연속으로 공을 통째로 먹었다.
@@ -907,11 +922,30 @@ export function createScene(canvas) {
         ball.scale.set((1 + sq * 0.5) * ballGain, (1 - sq * 0.34) * ballGain, (1 + sq * 0.5) * ballGain);
         // 골포스트와 크로스바를 스치는 코스만 금속음이 난다.
         // 판정은 이미 끝났고 여기서 읽는 것은 확정된 조준점의 기하뿐이다.
-        if (!cue.framed && q >= 0.97) {
+        if (!cue.framed && q >= Q_FRAME) {
           cue.framed = true;
           const nearPost = Math.abs(GOAL_HALF_W - Math.abs(shot.aimX)) < 0.16;
           const nearBar = Math.abs(GOAL_H - shot.aimY) < 0.16;
-          if (nearPost || nearBar) sfx.post();
+          if (nearPost || nearBar) {
+            sfx.post();
+            // 골포스트는 옆으로, 크로스바는 아래위로 튕긴다. 들어간 공은 안쪽으로,
+            // 안 들어간 공은 바깥으로 밀린다. 판정은 chain.mjs가 이미 끝냈으므로 결과는 건드리지 않는다.
+            // 0.45는 골대 반폭 R_HALF_W(3.66)의 약 1/8이다. 이보다 작으면 화면에서 안 읽히고
+            // 크면 조준점을 뭉개서 어디를 노렸는지가 사라진다.
+            const side = result.conceded ? -1 : 1;
+            if (nearPost) cue.deflect = { x: side * Math.sign(ball.position.x || 1) * 0.45, y: 0 };
+            // 크로스바 밑면을 맞고 골로 떨어지는 그림이 0.45다. 넘어가는 쪽은 0.30인데
+            // 더 올리면 공이 화면 위로 빠져 결과가 안 보인다.
+            else cue.deflect = { x: 0, y: result.conceded ? -0.45 : 0.30 };
+            // 불꽃은 공이 아니라 철봉에서 난다. 공 위치로 찍으면 포물선 고도가 남아 있는 만큼
+            // 위로 어긋난다. 실측: aimY 1.8 구에서 불꽃이 크로스바보다 0.38 위, 빌딩 하늘에 떴다.
+            // 접촉점은 골대 기하로 정해진다. 기둥이면 그 기둥의 x, 가로대면 가로대의 y,
+            // 나머지 축은 공을 따라간다. z는 골라인이다. 골대는 골라인 위에 서 있다.
+            const hitX = nearPost ? Math.sign(ball.position.x || 1) * R_HALF_W : ball.position.x;
+            const hitY = nearBar ? R_H : ball.position.y;
+            impact.burst({ x: hitX, y: hitY, z: 0 }, 0.9, '땅', 'frame', '덜컹', burstDepth(0));
+            shake(0.075, 0.14);
+          }
         }
         shadow.position.set(ball.position.x, 0.02, ball.position.z);
         const lift = Math.max(0, ball.position.y - BALL_R);
@@ -1586,6 +1620,25 @@ export function createScene(canvas) {
     lit: ribbon.userData.lit ? GHOSTS : 0,
     opacity: ghostAlpha
   });
+
+  // 골대 스침은 조준점이 골대 가장자리 0.16 안에 들어야 난다. 난수 시드로는 사실상 안 나온다.
+  // 확률로만 나오는 분기는 아무도 눈으로 못 본다. 그래서 그 코스를 직접 재생한다.
+  window.__frameShot = (aimX, aimY, conceded) => {
+    const shot = {
+      aimX, aimY,
+      // 철봉 접촉은 세게 찬 공에서 가장 잘 읽힌다. 약한 공은 튕김이 화면에 거의 안 남는다.
+      strong: true, chip: false, gaze: false, bend: 0,
+      // flight가 없으면 835행 비행 보간이 통째로 NaN이 된다.
+      // chain.mjs의 clamp(1.05 - power*0.05 - 0.1) 식에 power 14를 넣은 값이다.
+      flight: 0.55,
+      kicker: { power: 14, name: '테스트' },
+      side: 0, course: 'top', index: 0, forced: true
+    };
+    play(shot, { dive: 0, advance: false },
+      { conceded: !!conceded, cause: 'frameTest', events: [], stage: '', rolls: [], fame: 0 },
+      () => {});
+    return { aimX, aimY, conceded: !!conceded };
+  };
 
   // 임팩트 프레임은 선언으로 증명되지 않는다. 세계시계가 실제로 늦었는지,
   // 그물이 밀렸다는 것과 화면에서 출렁여 보인다는 것은 다른 주장이다.

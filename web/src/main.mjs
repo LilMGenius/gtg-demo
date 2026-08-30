@@ -38,6 +38,11 @@ window.__act = (kind) => stage.act(kind);
 window.__sfx = stage.sfx;
 // 정지가 정말 정지인지 재려면 세계시계를 밖에서 읽을 수 있어야 한다.
 window.__now = () => stage.now();
+// 강제 재생 훅은 라운드 대기 타이머와 경쟁한다. 잠그지 않으면 타이머가 터져
+// 자기 shot으로 덮어쓰고, 지정한 조준점이 무시된 것처럼 보인다.
+// 실측: aimX 2.1을 넣었는데 비행 궤적이 aimX 0.72로 읽혔다.
+// 'demo'는 commit이 요구하는 'wait'가 아니므로 그 경로가 통째로 막힌다.
+window.__lockRound = () => { stage.cancel(timer); state.phase = 'demo'; return state.phase; };
 // 불러오기는 판이 시작되기 전에 끝난다. 첨 판을 기다려 그리면 그 사이에 숫자가 없다.
 
 // 손가락 셋. 방향과 타이밍과 나갈지 여부.

@@ -162,6 +162,10 @@ const TONE = {
   spill: { c: 0xf2ffe0, ring: 0xc4e77a, spokes: 5, shape: 'shard' },
   downed: { c: 0xffd0d0, ring: 0xff5f52, spokes: 7, shape: 'zig' },
   net: { c: 0xf6f1ff, ring: 0xb59cff, spokes: 6, shape: 'zig' },
+  // 골대는 그물과 정반대의 재질이다. 그물은 먹고 늘어지고 철봉은 튕기고 운다.
+  // 바퀴살 4개는 표 전체에서 가장 적다. 성기고 딱딱한 불꽃이 금속 접촉으로 읽힌다.
+  // 낡은 철봉의 녹슨 놋쇠색을 테두리로 쓰면 하얀 선방 얼룩과 정지 프레임에서 갈린다.
+  frame: { c: 0xfff6d8, ring: 0xf2b23a, spokes: 4, shape: 'shard' },
 };
 const TONE_DEFAULT = { c: 0xfffdf0, ring: 0xffffff, spokes: 8, shape: 'spike' };
 
