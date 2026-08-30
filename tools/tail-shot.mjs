@@ -5,6 +5,8 @@ import { chromium } from "playwright";
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const KIND = process.argv[2] || "talked";
 const OUT = process.argv[3] || "tail-" + KIND + ".png";
+// 520ms는 크리틱이 보는 시점이다. 그물 밀림처럼 더 이른 국면을 확인할 때만 다른 값을 준다.
+const DELAY = Number(process.argv[4] || 520);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 60000);
 t.unref();
 let b;
@@ -21,7 +23,7 @@ try {
   await p.keyboard.press("ArrowLeft");
   await p.waitForTimeout(700);
   await p.evaluate((k) => window.__act(k), KIND);
-  await p.waitForTimeout(520);
+  await p.waitForTimeout(DELAY);
   await p.screenshot({ path: OUT });
   console.log(JSON.stringify({ kind: KIND, out: OUT, errs }));
 } finally {
