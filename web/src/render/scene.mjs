@@ -705,6 +705,9 @@ export function createScene(canvas) {
     }
     vnow += dt;
     stepDt = dt;
+    // 구름은 세계시계로만 흐른다. 실시간을 쓰면 정지 프레임에서 하늘만 계속 움직인다.
+    // 0.004는 한 바퀴에 4분이 조금 넘는다. 눈에 띄면 배경이 주인공을 뺏는다.
+    pitch.drift.value = vnow * 0.004;
     runTimers();
     actor.keeper = keeper;
     actor.kicker = kicker;
