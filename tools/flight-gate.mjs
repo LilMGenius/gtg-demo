@@ -20,7 +20,7 @@ const BAR_RATIO = 1.5;
 const BAR_TRAIL = 200;
 const BAR_NOISE = 50;
 const LUM = 12;
-const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 170000);
+const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 260000);
 t.unref();
 
 // 킥이 시작될 때까지 기다린다. 앞선 판은 고정 2600ms 뒤에 방향키를 눌렀는데,
@@ -46,6 +46,18 @@ const waitFlight = () => new Promise((res) => {
   };
   requestAnimationFrame(tick);
 });
+
+// 성장 카드가 떠 있으면 킥이 영원히 안 온다. 카드를 한 장 골라 닫고 다음 세트를 연다.
+const clearOffer = async (p) => {
+  const shown = await p.evaluate(() => {
+    const box = document.getElementById("offer");
+    return Boolean(box && !box.hidden && box.querySelector("button"));
+  });
+  if (!shown) return false;
+  await p.click("#offer button", { force: true });
+  await p.waitForTimeout(700);
+  return true;
+};
 
 // 페이지 안에서 두 장을 디코드하고 밝기가 갈린 화소를 모은다.
 async function diff([A, B, lum]) {
@@ -144,26 +156,33 @@ try {
 
   const rows = [];
   for (let i = 0; i < ROUNDS; i += 1) {
-    const armed = await p.evaluate(waitCue);
-    if (!armed) { console.log("skip round " + i + " no kick within 14s"); continue; }
-    await p.keyboard.press(i % 2 ? "ArrowRight" : "ArrowLeft");
-    const hit = await p.evaluate(waitFlight);
-    if (!hit) { console.log("skip round " + i + " no flight frame"); continue; }
-    // 차분은 base64 문자열만 보므로 세계를 세워둘 이유가 없다.
-    // 정지를 measure까지 끌면 한 라운드가 수 초 멈추고 다음 킥 주기를 통째로 놓친다.
-    const s = await shots(p);
-    await p.evaluate(() => window.__freeze(false));
-    const m = await measure(p, s);
-    rows.push(m);
-    console.log("round " + i + " ballPx=" + m.ballN + " dia=" + m.dia + " trailPx=" + m.trailN
-      + " ring=" + m.ring.toFixed(1) + " ratio=" + (m.ring / Math.max(1, m.dia / 2)).toFixed(2) + " noise=" + m.noise);
-    // 통과 못 한 라운드는 눈으로 볼 수 있어야 고칠 대상이 정해진다.
-    // 선언 지름과 실측 지름을 같이 적어야 공이 작은 것인지 가려진 것인지 갈린다.
-    console.log("  decl dia=" + hit.ballPx.toFixed(1) + "px z=" + hit.z.toFixed(2)
-      + " bbox " + m.bx0 + ".." + m.bx1 + "," + m.by0 + ".." + m.by1);
-    if (m.dia < BAR_BALL) {
-      dump("fail" + i, s);
+    let m = null;
+    // 세트가 끝나면 성장 카드가 떠 킥이 멈춘다. 카드를 닫기 전까지는 기다려도 큐가 안 온다.
+    // 앞선 판은 그 라운드를 건너뛰고 표본을 셋으로 줄였다. 표본을 줄이는 것은 바를 내리는 것과 같다.
+    for (let a = 0; a < 3 && !m; a += 1) {
+      await clearOffer(p);
+      const armed = await p.evaluate(waitCue);
+      if (!armed) { console.log("round " + i + " retry " + a + ": no kick within 14s"); continue; }
+      await p.keyboard.press(i % 2 ? "ArrowRight" : "ArrowLeft");
+      const hit = await p.evaluate(waitFlight);
+      if (!hit) { console.log("round " + i + " retry " + a + ": no flight frame"); continue; }
+      // 차분은 base64 문자열만 보므로 세계를 세워둘 이유가 없다.
+      // 정지를 measure까지 끌면 한 라운드가 수 초 멈추고 다음 킥 주기를 통째로 놓친다.
+      const s = await shots(p);
+      await p.evaluate(() => window.__freeze(false));
+      m = await measure(p, s);
+      rows.push(m);
+      console.log("round " + i + " ballPx=" + m.ballN + " dia=" + m.dia + " trailPx=" + m.trailN
+        + " ring=" + m.ring.toFixed(1) + " ratio=" + (m.ring / Math.max(1, m.dia / 2)).toFixed(2) + " noise=" + m.noise);
+      // 통과 못 한 라운드는 눈으로 볼 수 있어야 고칠 대상이 정해진다.
+      // 선언 지름과 실측 지름을 같이 적어야 공이 작은 것인지 가려진 것인지 갈린다.
+      console.log("  decl dia=" + hit.ballPx.toFixed(1) + "px z=" + hit.z.toFixed(2)
+        + " bbox " + m.bx0 + ".." + m.bx1 + "," + m.by0 + ".." + m.by1);
+      if (m.dia < BAR_BALL) {
+        dump("fail" + i, s);
+      }
     }
+    if (!m) { console.log("skip round " + i + " after 3 retries"); }
     await p.waitForTimeout(1200);
   }
   if (!rows.length) { console.log("INSTRUMENT DEAD: no flight frames"); process.exit(1); }
