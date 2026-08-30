@@ -50,7 +50,8 @@ export function meshPanel(w, h, cell, color, opacity, sag = 0, fadeFloor = false
   // 정점색을 색으로 섞으면 재질색과 곱해질 뿐이라 흙색을 넣어도 실이 어두워지기만 한다.
   // 지우려면 알파여야 한다. 네 채널 정점색이 그 알파를 싣는다.
   // 실제 동네 골대도 아랫단은 흙이 튀어 배경에 묻는다. 물리적으로도 이쪽이 맞다.
-  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
+  // 그물 실이 깊이를 쓰면 뒤에 오는 반투명이 실 격자 모양으로 잘려나간다. 실은 깊이를 읽기만 한다.
+  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
   if (fadeFloor) {
     const cols = new Float32Array((pts.length / 3) * 4);
     for (let i = 0, k = 0; i < pts.length; i += 3, k += 4) {
@@ -191,6 +192,10 @@ export function buildPitch(scene) {
 
   // 골망. 뒷면 한 장이 아니라 상자다. 평면 하나면 골대에 깊이가 없다.
   const NET_D = 1.5;
+  // 그물 상단을 정확히 R_H에 두면 크로스바 원기둥의 축을 그대로 지난다.
+  // 실과 기둥 표면이 같은 깊이를 다투어 프레임마다 어느 쪽이 이길지 바뀐다.
+  // 기둥 반지름 0.06보다 살짝 위로 올려 실이 크로스바 등 위에 얹히게 한다.
+  const NET_LIFT = 0.07;
   const NET_C = 0xe6ede0;
   // 카메라 쪽 한 장은 다른 색을 쓴다. 실은 빛을 등지면 어두워진다.
   const NET_NEAR = 0x8fa294;
@@ -201,18 +206,18 @@ export function buildPitch(scene) {
   // 답은 더 지우는 게 아니라 뒤집는 것이다. 밝은 흙 위에 어두운 실을 성기게 친다.
   // 대비는 오히려 올라가서 골이 어디 박혔는지는 더 잘 읽히고, 격자는 시야를 덮지 않는다.
   const back = meshPanel(R_HALF_W * 2, R_H, 0.36, NET_NEAR, 0.34, 0.22, true);
-  back.position.set(0, R_H / 2, -NET_D);
+  back.position.set(0, R_H / 2 + NET_LIFT, -NET_D);
   scene.add(back);
   for (const sgn of [-1, 1]) {
     // 좌우 그물을 같은 밀도로 치면 골대가 공장에서 나온 물건이 된다. 한쪽이 더 삭았다.
-    const side = meshPanel(NET_D, R_H, 0.24, NET_C, sgn < 0 ? 0.48 : 0.37, 0.06);
+    const side = meshPanel(NET_D, R_H, 0.24, NET_C, sgn < 0 ? 0.48 : 0.44, 0.06);
     side.rotation.y = Math.PI / 2;
-    side.position.set(sgn * R_HALF_W, R_H / 2, -NET_D / 2);
+    side.position.set(sgn * R_HALF_W, R_H / 2 + NET_LIFT, -NET_D / 2);
     scene.add(side);
   }
   const roof = meshPanel(R_HALF_W * 2, NET_D, 0.24, NET_C, 0.4, 0.10);
   roof.rotation.x = -Math.PI / 2;
-  roof.position.set(0, R_H, -NET_D / 2);
+  roof.position.set(0, R_H + NET_LIFT, -NET_D / 2);
   scene.add(roof);
 
   // 뒷그물은 서 있는 평면인데 실 격자만 있으면 어느 쪽이 위인지 알려주는 것이 하나도 없다.
