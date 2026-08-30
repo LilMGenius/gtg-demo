@@ -52,15 +52,23 @@ export function meshPanel(w, h, cell, color, opacity, sag = 0, fadeFloor = false
   // 실제 동네 골대도 아랫단은 흙이 튀어 배경에 묻는다. 물리적으로도 이쪽이 맞다.
   // 그물 실이 깊이를 쓰면 뒤에 오는 반투명이 실 격자 모양으로 잘려나간다. 실은 깊이를 읽기만 한다.
   const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
+  let colAttr = null;
+  let baseA = null;
   if (fadeFloor) {
+    // 평상시 투명도를 재질이 쥐고 있으면 국소로 켤 수 있는 상한도 그 값이다.
+    // 재질을 불투명으로 두고 평상시 값을 정점 알파에 곱해 넣으면 곱은 그대로고 상한만 1로 열린다.
+    mat.opacity = 1;
     const cols = new Float32Array((pts.length / 3) * 4);
+    baseA = new Float32Array(pts.length / 3);
     for (let i = 0, k = 0; i < pts.length; i += 3, k += 4) {
       const u = Math.min(1, Math.max(0, (pts[i + 1] + h / 2) / h));
       // 위 3분의 1만 온전히 남긴다. 선형이면 중간 높이가 어중간하게 남아 격자가 그대로 읽힌다.
       const t = Math.min(1, Math.max(0, (u - 0.42) / 0.58));
-      cols[k] = 1; cols[k + 1] = 1; cols[k + 2] = 1; cols[k + 3] = t * t;
+      cols[k] = 1; cols[k + 1] = 1; cols[k + 2] = 1; cols[k + 3] = t * t * opacity;
+      baseA[i / 3] = t * t * opacity;
     }
-    geo.setAttribute('color', new THREE.BufferAttribute(cols, 4));
+    colAttr = new THREE.BufferAttribute(cols, 4);
+    geo.setAttribute('color', colAttr);
     mat.vertexColors = true;
   }
   const m = new THREE.LineSegments(geo, mat);
@@ -78,6 +86,23 @@ export function meshPanel(w, h, cell, color, opacity, sag = 0, fadeFloor = false
       a[i + 2] = base[i + 2] + amp * Math.exp(-(dx * dx + dy * dy) / r2);
     }
     attr.needsUpdate = true;
+    // 밀린 실이 안 보이면 밀린 적 없는 것과 같다. 공이 정착하는 높이는 바닥 페이드가
+    // 알파를 0.05까지 지워둔 구간이라, 골 순간의 처짐이 투명한 실 위에서 일어났다.
+    // 전역 알파를 올리면 화면 전체가 방안지가 된다. 그래서 맞은 자리만 켠다.
+    if (!colAttr) return;
+    const c = colAttr.array;
+    // 진폭 0.3이면 이미 눈에 띄는 처짐이다. 그 위는 더 밝힐 것이 없어 1로 잘린다.
+    const glow = Math.min(1, Math.abs(amp) / 0.3);
+    // 밝아지는 원이 밀리는 원과 같으면 테두리가 딱 끊겨 스포트라이트로 읽힌다. 더 넓게 번진다.
+    const gr2 = r2 * 2.6;
+    for (let i = 0, k = 0; i < a.length; i += 3, k += 4) {
+      const dx = base[i] - px;
+      const dy = base[i + 1] - py;
+      const w = glow * Math.exp(-(dx * dx + dy * dy) / gr2);
+      const b = baseA[i / 3];
+      c[k + 3] = b + w * (1 - b);
+    }
+    colAttr.needsUpdate = true;
   };
   // 밀렸다는 주장은 원본과의 차분으로만 증명된다. 계측이 원본을 못 읽으면 변위는 선언으로 남는다.
   m.userData.restPos = base;
