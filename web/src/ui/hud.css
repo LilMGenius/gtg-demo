@@ -105,11 +105,20 @@ body.playing #hud{opacity:1}
   padding-bottom:calc(clamp(24px,3.4vh,38px) + env(safe-area-inset-bottom))}
 .zone+.zone::before{content:'';position:absolute;left:0;top:18%;bottom:18%;
   width:2px;background:#ffffff14}
+/* 세 화살표는 같은 자로 그은 셰브런이 아니다. 기울기와 획 굵기를 버튼마다 어긋내면
+   손으로 세 번 그린 자국으로 읽힌다. 같은 각·같은 굵기는 앱 아이콘으로 읽혔다. */
+.zone{--tw:0deg}
+.zone:nth-child(1){--tw:-1.5deg}
+.zone:nth-child(2){--tw:.8deg}
+.zone:nth-child(3){--tw:-2deg}
 .zone svg{width:clamp(34px,4.1vw,50px);height:clamp(34px,4.1vw,50px);
-  stroke-width:4.5;color:#f2f4f0cc;transition:color .12s,transform .12s;
+  stroke-width:4.5;color:#f6efdc;transition:color .12s,transform .12s;
+  transform:rotate(var(--tw));
   filter:drop-shadow(2px 3px 0 var(--edge)) drop-shadow(-2px 0 0 var(--edge))
          drop-shadow(0 -2px 0 var(--edge)) drop-shadow(2px 0 0 var(--edge))}
-.zone:active svg{color:#ffd83d;transform:scale(1.22)}
+.zone:nth-child(2) svg{stroke-width:5.2}
+.zone:nth-child(3) svg{stroke-width:4.1}
+.zone:active svg{color:#ffd83d;transform:rotate(var(--tw)) scale(1.18) translateY(3px)}
 .zone:disabled svg{color:#ffffff1f}
 .zone:disabled{cursor:default}
 
