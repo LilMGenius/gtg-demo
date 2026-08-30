@@ -138,6 +138,9 @@ export function createScene(canvas) {
   let stepDt = 0;
   let realLast = performance.now() / 1000;
   let stopLeft = 0;
+  // 사건 선언 시점의 장갑 좌표는 다이빙 전 몸 옆이다. 공이 손에 붙는 것은 그 뒤 꼬리 연출 중이다.
+  // 선언 순간에 터뜨리면 폭발이 접점이 아니라 허공에 뜨므로, 예약해 두고 접점에서 발화한다.
+  let pendingBurst = null;
   // 계측용 정지. 세계시간만 멈추고 렌더는 계속 돈다.
   // 렌더까지 멈추면 대조군이 화면 갱신 자체를 못 보므로 계기의 잡음 바닥을 재지 못한다.
   let frozen = false;
@@ -661,12 +664,9 @@ export function createScene(canvas) {
     // 사건 이름을 모르면 화면만 보고는 무슨 일이 난 건지 모른다. 한 단어로 적어준다.
     // 문장을 넣으면 자막과 같은 것이 두 개가 되어 둘 다 안 읽힌다.
     const WORD = { save: '퍽!', catch: '꽉!', gloveGone: '어?', carriedIn: '으어', spill: '툭', downed: '으악' };
-    // 사건이 선언되는 순간 공은 아직 킥 지점 근처에 있다. 거기서 터뜨리면 글자가 키커 머리 위에 뜬다.
-    // 손이 닿은 사건은 닿은 자리, 즉 장갑에서 터진다. 나머지는 골라인 앞 키퍼 자리다.
+    // 손이 닿은 사건만 터진다. 다만 선언 순간에는 아직 안 닿았으므로 여기서는 예약만 한다.
     if (BURST[kind]) {
-      const gi = keeper.userData.gloves[keeper.position.x >= 0 ? 1 : 0];
-      const at = gi ? gi.getWorldPosition(new THREE.Vector3()) : keeper.position.clone().setY(1.2);
-      impact.burst(at, BURST[kind], WORD[kind] || '');
+      pendingBurst = { power: BURST[kind], word: WORD[kind] || '' };
     }
     // 웃겨야 하는 사건에만 렌즈를 기울인다. 선방까지 기울이면 매 구 화면이 비뚤어져 기울기가 안 읽힌다.
     const TILT = { gloveGone: 0.13, carriedIn: -0.14, downed: 0.15, talked: -0.11, distracted: 0.1, beat: -0.12, lost: 0.12 };
@@ -691,6 +691,7 @@ export function createScene(canvas) {
   }
   function play(shot, input, result, onEnd) {
     tail = null;
+    pendingBurst = null;
     cue = { shot, input, result, t0: vnow, ended: false, onEnd, steps: 0, struck: false, framed: false };
     trail.length = 0;
     for (const g of ghosts) g.visible = false;
@@ -1076,6 +1077,15 @@ export function createScene(canvas) {
         default:
           break;
       }
+      // 공과 장갑이 실제로 만난 프레임에서 한 번만 터진다. 좌표는 둘의 중점이다.
+      // u 상한은 접촉이 끝내 안 나는 사건의 안전판이다. 없으면 폭발이 아예 사라진다.
+      if (pendingBurst) {
+        const gw = gloveWorld(Math.sign(tail.kx || 1));
+        if (ball.position.distanceTo(gw) < 0.55 || u > 0.3) {
+          impact.burst(gw.clone().lerp(ball.position, 0.5), pendingBurst.power, pendingBurst.word);
+          pendingBurst = null;
+        }
+      }
       // 공이 그물에 닿는 순간. 판정이 아니라 좌표 하나를 읽는 것뿐이다.
       if (!tail.netDone && ball.position.z <= pitch.netZ + 0.5 && CONCEDE.has(tail.kind)) {
         tail.netDone = true;
@@ -1391,6 +1401,7 @@ export function createScene(canvas) {
   function reset() {
     cue = null;
     tail = null;
+    pendingBurst = null;
     if (loose) {
       const gi = keeper.userData.gloves.indexOf(loose);
       if (gi >= 0) keeper.userData.gloveParent[gi].add(loose);
