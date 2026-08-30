@@ -7,6 +7,9 @@ import * as THREE from '../../../vendor/three.module.min.js';
 const D_FLASH = 0.07;
 const D_BODY = 0.55;
 const D_VEIL = 1.05;
+// 만화 효과음은 한 번 쓰고 사라지지 않는다. 때리는 소리 뒤에 따라붙는 소리가 있다.
+// 520ms는 정지 프레임이 사건을 찍는 시각이다. 그때 글자가 비면 사건이 없던 것으로 읽힌다.
+const D_WORD2 = 0.52;
 
 // 파편이 튀는 방향. 균등한 각으로 놓으면 부채가 되므로 미리 흩어 고정한 각 여덟 개를 쓴다.
 const SPOKES = [0.14, 0.92, 1.68, 2.51, 3.29, 4.05, 4.61, 5.55];
@@ -247,6 +250,9 @@ export function createImpact(scene) {
   // 얼룩을 매번 같은 각으로 띄우면 삐뚤어도 도장으로 읽힌다. 구마다 통째로 돌린다.
   let blobSpin = 0;
   let wordSide = 0;
+  // 뒤따르는 소리와 지금 몇 단째인지. 단이 바뀌면 글자만이 아니라 기울기와 자리도 바뀐다.
+  let follow = '';
+  let stage = 0;
   let life = 0;
   let power = 1;
   const at = new THREE.Vector3();
@@ -258,7 +264,7 @@ export function createImpact(scene) {
   // 0.34초는 사람 눈에 번짝이고 정지 프레임에는 거의 안 잡힌다. 0.55가 읽힌다.
   // 0.9를 써 보니 다음 구의 배치까지 글자가 남아 화면이 지저분해졌다.
   // 수명 셋 중 가장 긴 잔막이 전체 수명을 정한다.
-  function burst(pos, strength = 1, word = '', kind = '') {
+  function burst(pos, strength = 1, word = '', kind = '', word2 = '') {
     at.copy(pos);
     power = strength;
     life = D_VEIL;
@@ -278,6 +284,8 @@ export function createImpact(scene) {
     for (const m of dust) { m.visible = !hidden; m.position.copy(at); }
     for (const m of chips) { m.visible = !hidden; m.position.copy(at); }
     wordMesh.visible = Boolean(word) && !hidden;
+    follow = word2;
+    stage = 0;
     if (word) {
       if (!texCache.has(word)) texCache.set(word, wordTex(word));
       wordMat.map = texCache.get(word);
@@ -366,14 +374,26 @@ export function createImpact(scene) {
     // 잔막이 키퍼를 통째로 덮으면 사건이 아니라 화면 가림으로 읽힌다. 몸보다 작게 둔다.
     veil.scale.setScalar((0.5 + uv * 0.95) * power);
     veilMat.opacity = Math.pow(1 - uv, 1.6) * 0.24;
-    // 튀어나왔다가 제자리로 주저앉는다. 선형으로 키우면 풍선처럼 보인다.
     if (wordMesh.visible) {
-      const pop = u < 0.24 ? (u / 0.24) * 1.3 : 1.3 - (u - 0.24) / 0.76 * 0.3;
-      wordMesh.position.set(at.x + wordSide, at.y + 0.28 + u * 0.24, at.z);
+      // 뒤따르는 소리로 갈아 끼운다. 반대쪽으로 밀고 반대로 기울여야 잔상이 아니라 다음 소리로 읽힌다.
+      if (stage === 0 && follow && t >= D_WORD2) {
+        stage = 1;
+        if (!texCache.has(follow)) texCache.set(follow, wordTex(follow));
+        wordMat.map = texCache.get(follow);
+        wordMat.needsUpdate = true;
+        wordSpin = -wordSpin * 0.8 + 0.18;
+        wordSide = -wordSide * 0.72;
+      }
+      // 0에서 키우면 충돌 프레임에 글자가 점만 하다. 만화 글자는 첫 칸에 이미 다 그려져 있다.
+      // 연속으로 줄이면 바람 빠지는 풍선이 된다. 세 칸으로 끊어 튀었다가 주저앉힌다.
+      const w = stage === 0 ? t / D_WORD2 : (t - D_WORD2) / (D_VEIL - D_WORD2);
+      const base = stage === 0 ? 1.34 : 0.92;
+      const pop = base * (w < 0.16 ? 1 : w < 0.36 ? 0.82 : 0.9);
+      wordMesh.position.set(at.x + wordSide, at.y + 0.28 + w * 0.24 + stage * 0.2, at.z);
       wordMesh.quaternion.copy(camera.quaternion);
       wordMesh.rotateZ(wordSpin);
       wordMesh.scale.setScalar(pop * (0.7 + power * 0.35));
-      wordMat.opacity = u > 0.7 ? (1 - u) / 0.3 : 1;
+      wordMat.opacity = w > 0.78 ? Math.max(0, (1 - w) / 0.22) : 1;
     }
   }
 
@@ -404,7 +424,8 @@ export function createImpact(scene) {
     ring.visible = flash.visible;
     veil.visible = live;
     star.visible = bodyLive;
-    wordMesh.visible = bodyLive && Boolean(wordMat.map);
+    // 글자는 본체보다 오래 산다. 뒤따르는 소리가 본체가 꺼진 뒤에 뜨기 때문이다.
+    wordMesh.visible = live && Boolean(wordMat.map);
     for (const m of dust) m.visible = bodyLive;
     for (const m of chips) m.visible = bodyLive;
     return hidden;

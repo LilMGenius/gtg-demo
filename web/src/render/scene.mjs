@@ -724,6 +724,12 @@ export function createScene(canvas) {
     // 손이 안 닿은 사건. 장갑 좌표에 띄우면 닿지도 않은 자리에서 흙이 뜬다.
     // 흙 없이 공 옆에 단어만 얹는다. charge 프레임은 화면에 글자가 하나도 없었다.
     const CALL = { charge: '나간다!', beat: '제꼈다', lost: '뺏겼다', skied: '넘겼다', rebound: '튕김', reboundMiss: '흘렀다' };
+    // 첫 소리는 충돌 프레임의 것이고, 반 초 뒤 프레임에는 이미 다 꺼져 있다.
+    // 소리가 하나면 사건이 끝난 뒤를 찍은 정지 화면은 아무 말도 안 한다. 뒤따르는 소리를 하나 더 둔다.
+    const FOLLOW = {
+      save: '텅', catch: '착', gloveGone: '어어', carriedIn: '쑥', spill: '데굴', downed: '털썩',
+      charge: '두두두', beat: '휘익', lost: '아앗', skied: '휘잉', rebound: '통통', reboundMiss: '데구르'
+    };
     // 자막이 말한 사건인데 화면에 글자가 없으면 정지 화면 한 장은 아무 말도 안 한다.
     // 한 사건만 고치면 같은 구멍이 다섯 개 남는다. 표에서 빠진 이름이 스스로 드러나야 한다.
     const SILENT = new Set(['miss', 'contact', 'dived', 'emptyGoal']);
@@ -732,9 +738,9 @@ export function createScene(canvas) {
     }
     // 손이 닿은 사건만 터진다. 다만 선언 순간에는 아직 안 닿았으므로 여기서는 예약만 한다.
     if (BURST[kind]) {
-      pendingBurst = { power: BURST[kind], word: WORD[kind] || '', at: 'glove', kind };
+      pendingBurst = { power: BURST[kind], word: WORD[kind] || '', word2: FOLLOW[kind] || '', at: 'glove', kind };
     } else if (CALL[kind]) {
-      pendingBurst = { power: 0.3, word: CALL[kind], at: 'ball', kind };
+      pendingBurst = { power: 0.3, word: CALL[kind], word2: FOLLOW[kind] || '', at: 'ball', kind };
     }
     // 웃겨야 하는 사건에만 렌즈를 기울인다. 선방까지 기울이면 매 구 화면이 비뚤어져 기울기가 안 읽힌다.
     const TILT = { gloveGone: 0.13, carriedIn: -0.14, downed: 0.15, talked: -0.11, distracted: 0.1, beat: -0.12, lost: 0.12 };
@@ -1167,7 +1173,7 @@ export function createScene(canvas) {
           if (u > 0.28) {
             // 공 바로 위에 얹었더니 글자가 키퍼 얼굴을 덮었다. 표정이 사라지면 사건의 절반이 없다.
             // 카메라는 +z를 보므로 +x가 화면 바깥쪽이다. 공보다 한 뼘 바깥, 머리 위로 올린다.
-            impact.burst(new THREE.Vector3(ball.position.x + 0.62, ball.position.y + 0.95, ball.position.z), pendingBurst.power, pendingBurst.word, pendingBurst.kind);
+            impact.burst(new THREE.Vector3(ball.position.x + 0.62, ball.position.y + 0.95, ball.position.z), pendingBurst.power, pendingBurst.word, pendingBurst.kind, pendingBurst.word2);
             pendingBurst = null;
           }
         } else {
@@ -1176,7 +1182,7 @@ export function createScene(canvas) {
           // 중점은 둘이 실제로 만났을 때만 접촉점이다. 시간 폴백이 먼저 걸린 프레임에서는
           // 공이 이미 저 멀리 있어서, 중점이 아무것도 없는 허공이 된다. 그때는 손에서 터뜨린다.
           if (met || u > 0.3) {
-            impact.burst(met ? gw.clone().lerp(ball.position, 0.5) : gw.clone(), pendingBurst.power, pendingBurst.word, pendingBurst.kind);
+            impact.burst(met ? gw.clone().lerp(ball.position, 0.5) : gw.clone(), pendingBurst.power, pendingBurst.word, pendingBurst.kind, pendingBurst.word2);
             pendingBurst = null;
           }
         }
@@ -1190,7 +1196,7 @@ export function createScene(canvas) {
         netT = 0;
         netX = ball.position.x;
         netY = ball.position.y - R_H / 2;
-        impact.burst(ball.position, 0.9, '출렁', 'net');
+        impact.burst(ball.position, 0.9, '출렁', 'net', '펄럭');
         shake(0.03, 0.22);
       }
       shadow.position.set(ball.position.x, 0.02, ball.position.z);
