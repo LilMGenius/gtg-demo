@@ -376,6 +376,10 @@ export function createScene(canvas) {
   // 계측이 폴링으로 잡으면 피크는 프레임 사이로 빠져나간다. 그리는 쪽이 적어야 한다.
   let camOffPeak = 0;
   let squashPeak = 0;
+  // 손에 닿은 공이 모양 그대로 튀면 맞은 것이 아니라 스친 것으로 읽힌다.
+  // 0.16초는 히트스톱 길이와 같다. 정지가 풀릴 때 공도 같이 원형으로 돌아온다.
+  const SQ_DUR = 0.16;
+  let sqLeft = 0;
   // 더치 앵글. 카메라 위치를 옮기면 골대 프레이밍 측정이 통째로 흔들린다.
   // 렌즈만 기울이면 프레임 안의 것들은 그대로 있고 화면만 비뚤어진다. 게이트가 재는 축을 안 건드린다.
   // 0.04는 모니터가 삐뚤어진 줄 알았고 0.28은 골대 모서리가 프레임을 나갔다.
@@ -680,6 +684,7 @@ export function createScene(canvas) {
     const s = SHK[kind];
     camOffPeak = 0;
     squashPeak = 0;
+    sqLeft = HIT[kind] ? SQ_DUR : 0;
     if (s) shake(s[0], s[1]);
     // 실점은 화면이 한 번 하얗게 튄 다음 색이 빠진다. 결과를 글자로만 알리면 글자를 안 읽는다.
     if (CONCEDE.has(kind)) flash(kind);
@@ -692,6 +697,7 @@ export function createScene(canvas) {
     ball.scale.set(1, 1, 1);
     ballGain = 1;
     kicker.position.set(VIEW_X * shot.aimX * SX * 0.2 + KICKER_OFF, 0, 11.2);
+    sqLeft = 0;
     kicker.userData.startX = kicker.position.x;
     ball.position.set(0, BALL_R, 11);
     // 카메라는 골대 뒤 위에 있고 크로스바는 골대 전체 폭을 가로지르는 봉이다.
@@ -1242,6 +1248,13 @@ export function createScene(canvas) {
       pitch.net.userData.punch(0, 0, 0);
     }
     impact.update(dt, camera);
+    // 세계시계로 줄인다. 히트스톱이 걸린 사건에서는 짜부라짐도 같이 늘어져 보인다.
+    // 진행축이 아니라 화면축으로 눌린다. 공은 카메라를 향해 오므로 진행축 변형은 크기 변화로만 보인다.
+    if (sqLeft > 0) {
+      sqLeft = Math.max(0, sqLeft - stepDt);
+      const e = Math.pow(sqLeft / SQ_DUR, 2);
+      ball.scale.set(ballGain * (1 + e * 0.34), ballGain * (1 - e * 0.26), ballGain * (1 + e * 0.34));
+    }
     squashPeak = Math.max(squashPeak, Math.abs(ball.scale.x / Math.max(0.001, ball.scale.y) - 1));
     if (cue) { ballProbe.sample(); stageProbe.sample(); }
     renderer.setRenderTarget(rt);
@@ -1399,6 +1412,7 @@ export function createScene(canvas) {
     ball.position.set(0, BALL_R, 11);
     ball.scale.set(1, 1, 1);
     ballGain = 1;
+    sqLeft = 0;
     ball.rotation.set(0, 0, 0);
     trail.length = 0;
     for (const g of ghosts) g.visible = false;
