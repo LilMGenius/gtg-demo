@@ -22,6 +22,11 @@ const BAR_BALL = 30;
 const BAR_RATIO = 1.5;
 const BAR_REACH = 2.0;
 const BAR_FAR = 120;
+// 어느 프레임에서 재느냐가 바보다 먼저다. z<8은 공이 발을 떠난 지 반 미터인 지점이라
+// 꼬리가 지나온 길이 자체가 없고, 그 구간의 이동은 카메라 축과 거의 나란해서
+// 월드 공간 꼬리가 화면에 투영되지 않는다. 실측: 같은 프레임에서 링 27px, 공 지름 41px.
+// 플레이어가 공을 읽는 순간은 공이 커지고 화면 위치가 소실점에서 벌어지는 중반이다. 거기서 잰다.
+const Z_FREEZE = 4;
 const BAR_TRAIL = 200;
 const BAR_NOISE = 50;
 const LUM = 12;
@@ -41,11 +46,11 @@ const waitCue = () => new Promise((res) => {
 });
 
 // 비행이 무르익은 프레임에서 멈춘다. 킥 직후는 꼬리가 아직 안 자랐고 발밑 프레임은 이동이 없다.
-const waitFlight = () => new Promise((res) => {
+const waitFlight = (z) => new Promise((res) => {
   const t0 = performance.now();
   const tick = () => {
     const r = window.__flightVis();
-    if (r.cue && r.step > 0.05 && r.trail >= 16 && r.z < 8) { window.__freeze(true); res(r); return; }
+    if (r.cue && r.step > 0.05 && r.trail >= 16 && r.z < z) { window.__freeze(true); res(r); return; }
     if (performance.now() - t0 > 3000) { res(null); return; }
     requestAnimationFrame(tick);
   };
@@ -171,7 +176,7 @@ try {
       const armed = await p.evaluate(waitCue);
       if (!armed) { console.log("round " + i + " retry " + a + ": no kick within 14s"); continue; }
       await p.keyboard.press(i % 2 ? "ArrowRight" : "ArrowLeft");
-      const hit = await p.evaluate(waitFlight);
+      const hit = await p.evaluate(waitFlight, Z_FREEZE);
       if (!hit) { console.log("round " + i + " retry " + a + ": no flight frame"); continue; }
       // 차분은 base64 문자열만 보므로 세계를 세워둘 이유가 없다.
       // 정지를 measure까지 끌면 한 라운드가 수 초 멈추고 다음 킥 주기를 통째로 놓친다.
