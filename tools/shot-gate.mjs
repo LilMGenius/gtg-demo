@@ -57,7 +57,7 @@ try {
   // 가린 물건만 알면 어디서 가렸는지를 몰라 고칠 자리를 못 찾는다. 공의 시작과 끝 좌표까지 찍는다.
   const w = ball.worst;
   const at = w && w.ballFrom
-    ? " from [" + w.ballFrom.map((n) => n.toFixed(2)) + "] to [" + w.ballTo.map((n) => n.toFixed(2)) + "]"
+    ? " in " + (w.phase || "?") + " from [" + w.ballFrom.map((n) => n.toFixed(2)) + "] to [" + w.ballTo.map((n) => n.toFixed(2)) + "]"
     : "";
   check("ball:longest-blackout-under-24-frames", ball.longest <= 24,
     ball.longest + " by " + JSON.stringify(w ? w.by : {}) + at);

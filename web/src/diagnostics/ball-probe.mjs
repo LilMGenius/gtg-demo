@@ -41,7 +41,7 @@ export function createBallProbe(camera, scene, ball, radius) {
   let run = null;
 
   // 한 프레임의 판정. 투영해서 NDC를 구하고, 카메라에서 공까지 실제로 광선을 쏜다.
-  function sample() {
+  function sample(phase) {
     camera.updateMatrixWorld();
     v.copy(ball.position).project(camera);
     const behind = v.z > 1 || v.z < -1;
@@ -78,7 +78,8 @@ export function createBallProbe(camera, scene, ball, radius) {
     else {
       stats.streak += 1;
       // 숫자만 남기면 어디서 사라졌는지를 몰라 고칠 수가 없다.
-      if (!run) run = { from: [v.x, v.y, v.z], ballFrom: [ball.position.x, ball.position.y, ball.position.z], by: {} };
+      // 어느 사건에서 사라졌는지를 모르면 좌표만 보고 어느 연출을 고칠지 못 고른다.
+      if (!run) run = { from: [v.x, v.y, v.z], ballFrom: [ball.position.x, ball.position.y, ball.position.z], phase: phase || '', by: {} };
       run.to = [v.x, v.y, v.z];
       run.ballTo = [ball.position.x, ball.position.y, ball.position.z];
       run.len = stats.streak;

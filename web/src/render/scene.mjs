@@ -862,6 +862,22 @@ export function createScene(canvas) {
         ball.position.x = lerp(0, VIEW_X * shot.aimX * SX, Math.min(q, 1));
         ball.position.z = lerp(11, 0.1, q);
         ball.position.y = lerp(BALL_R, shot.aimY * SY, Math.min(q, 1)) + Math.sin(Math.min(p, 1) * Math.PI) * cue.arc;
+        // 공은 조준점에 닿은 뒤 그 자리에 박혀 있었다. 다음 구까지 1.7초를 허공에 선 채로 버틴다.
+        // 골이 아니라 정지 화면으로 읽히고, 하필 뒷골대 세로 기둥과 겹치면 아예 사라진다.
+        // 실측: 기둥 하나가 103프레임 연속으로 공을 통째로 먹었다.
+        // 그물은 공을 세우지 못한다. 힘을 잃고 떨어져 골대 안쪽으로 굴러 들어간다.
+        if (p >= 1) {
+          const s = ease(Math.min(1, (t - runup - flight) / 0.8));
+          // 안쪽으로 0.24는 기둥을 피하려고 고른 값이 아니라 그물이 공을 되밀어 주는 만큼이다.
+          // x=2 근처에 멈춰 선 공이 이 폭이면 기둥의 시선 그림자 밖으로 나온다.
+          const y0 = ball.position.y;
+          ball.position.x *= 1 - 0.24 * s;
+          // 한 번 튀고 눕는다. 그냥 내리면 공이 아니라 엘리베이터로 읽힌다.
+          ball.position.y = BALL_R + (y0 - BALL_R) * (1 - s) * Math.abs(Math.cos(s * Math.PI * 1.2));
+          // 골망 바닥은 화면 아래 끝 밖이다. 거기 눕히면 공이 떨어지자마자 프레임을 나간다.
+          // 실측: 501프레임이 offscreen이었다. 되튄 공은 골라인 앞으로 굴러 나와 선다.
+          ball.position.z = lerp(ball.position.z, 0.55, s);
+        }
         // 프레임당 상수로 돌리면 세계시간이 멈춰도 공만 계속 구른다.
         // 60fps에서 재던 값을 초당으로 환산한다. 0.4/프레임 = 24/초, 0.22/프레임 = 13.2/초.
         ball.rotation.x -= 24 * stepDt;
@@ -1420,7 +1436,7 @@ export function createScene(canvas) {
       ball.scale.set(ballGain * (1 + e * 0.34), ballGain * (1 - e * 0.26), ballGain * (1 + e * 0.34));
     }
     squashPeak = Math.max(squashPeak, Math.abs(ball.scale.x / Math.max(0.001, ball.scale.y) - 1));
-    if (cue) { ballProbe.sample(); stageProbe.sample(); }
+    if (cue) { ballProbe.sample(tail ? tail.kind : 'flight'); stageProbe.sample(); }
     renderer.setRenderTarget(rt);
     renderer.render(scene, camera);
     // 두 번째 render 호출이 카운터를 0으로 되돌린다. 세계를 그린 값은 여기서 걷어야 한다.
