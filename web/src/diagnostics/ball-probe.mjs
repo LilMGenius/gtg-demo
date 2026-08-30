@@ -13,6 +13,26 @@ function opaqueBlocker(o) {
   return true;
 }
 
+// 이름 없는 메시는 blocker 표에 BufferGeometry로 찍혀 무엇이 가렸는지 말해주지 않는다.
+// 부모를 거슬러 올라가면 조립된 리그나 장식의 이름이 나온다.
+function label(o) {
+  let n = o;
+  const trail = [];
+  while (n) {
+    if (n.name) trail.unshift(n.name);
+    n = n.parent;
+  }
+  if (trail.length) return trail.slice(-2).join('/');
+  // 이름도 없으면 위치로라도 지목해야 한다. 월드 좌표 한 자리면 어느 물건인지 갈린다.
+  const p = new THREE.Vector3();
+  o.getWorldPosition(p);
+  const g = o.geometry;
+  if (g && !g.boundingBox) g.computeBoundingBox();
+  const b = g?.boundingBox;
+  const size = b ? [b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z].map((n) => n.toFixed(1)).join('x') : '?';
+  return (g?.type || 'unknown') + '@' + p.x.toFixed(1) + ',' + p.y.toFixed(1) + ',' + p.z.toFixed(1) + ' ' + size;
+}
+
 export function createBallProbe(camera, scene, ball, radius) {
   const ray = new THREE.Raycaster();
   const v = new THREE.Vector3();
@@ -40,7 +60,7 @@ export function createBallProbe(camera, scene, ball, radius) {
       occluded = Boolean(hit);
       // 무엇이 가렸는지 모르면 가렸다는 숫자로 아무 판단도 못 한다.
       if (hit) {
-        const k = hit.object.name || hit.object.geometry?.type || 'unknown';
+        const k = label(hit.object);
         stats.blockers[k] = (stats.blockers[k] || 0) + 1;
         lastBlocker = k;
       }

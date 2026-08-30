@@ -54,8 +54,13 @@ try {
   });
   const frac = ball.frames ? ball.visible / ball.frames : 0;
   check("ball:visible-frames-over-86pct", frac >= 0.86, (frac * 100).toFixed(1) + "% of " + ball.frames);
+  // 가린 물건만 알면 어디서 가렸는지를 몰라 고칠 자리를 못 찾는다. 공의 시작과 끝 좌표까지 찍는다.
+  const w = ball.worst;
+  const at = w && w.ballFrom
+    ? " from [" + w.ballFrom.map((n) => n.toFixed(2)) + "] to [" + w.ballTo.map((n) => n.toFixed(2)) + "]"
+    : "";
   check("ball:longest-blackout-under-24-frames", ball.longest <= 24,
-    ball.longest + " by " + JSON.stringify(ball.worst ? ball.worst.by : {}));
+    ball.longest + " by " + JSON.stringify(w ? w.by : {}) + at);
 
   const stage = await p.evaluate(() => JSON.parse(JSON.stringify(window.__stageProbe.worst)));
   // 발은 땅에 붙는다. 다이빙과 점프로 뜨는 만큼만 허용한다.
