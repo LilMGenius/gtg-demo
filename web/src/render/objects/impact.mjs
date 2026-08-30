@@ -10,6 +10,11 @@ const D_VEIL = 1.05;
 // 만화 효과음은 한 번 쓰고 사라지지 않는다. 때리는 소리 뒤에 따라붙는 소리가 있다.
 // 520ms는 정지 프레임이 사건을 찍는 시각이다. 그때 글자가 비면 사건이 없던 것으로 읽힌다.
 const D_WORD2 = 0.52;
+// 별과 잔막은 접촉점을 지나는 카메라 정면 판이다. 접촉점 z에 그대로 세우면
+// 판이 몸통 한가운데를 갈라 절반이 몸 앞에 그려지고, 사건의 주체가 잉크에 덮인다.
+// 주체 뒤로 물리면 깊이 검사가 몸을 살려 두고 잉크는 몸 둘레로만 뻗는다.
+// 0.42는 키퍼 몸통 두께보다 크고 골대 그물 간격보다 작다.
+const BEHIND = 0.42;
 
 // 파편이 튀는 방향. 균등한 각으로 놓으면 부채가 되므로 미리 흩어 고정한 각 여덟 개를 쓴다.
 const SPOKES = [0.14, 0.92, 1.68, 2.51, 3.29, 4.05, 4.61, 5.55];
@@ -279,7 +284,7 @@ export function createImpact(scene) {
     ring.visible = !hidden;
     veil.visible = !hidden;
     star.visible = !hidden;
-    star.position.copy(at);
+    star.position.set(at.x, at.y, at.z + BEHIND);
     blobSpin = Math.random() * Math.PI * 2;
     for (const m of dust) { m.visible = !hidden; m.position.copy(at); }
     for (const m of chips) { m.visible = !hidden; m.position.copy(at); }
@@ -342,7 +347,9 @@ export function createImpact(scene) {
     } else {
     // 별은 빠르게 커지고 빠르게 빠진다. 천천히 사라지면 충격이 아니라 후광이 된다.
     // 크기를 연속으로 키우면 풍선처럼 부푼다. 손으로 그린 잉크는 프레임마다 튄다. 세 칸으로 끊는다.
-    const step = u < 0.2 ? 1.44 : u < 0.46 ? 0.96 : 1.2;
+    // 1.44는 화면 폭의 사분의 일을 먹어 사건이 아니라 화면 가림으로 읽혔다.
+    // 잉크는 접촉점에 붙는 주석이지 배경을 대신하는 판이 아니다. 폭을 절반으로 접는다.
+    const step = u < 0.2 ? 0.78 : u < 0.46 ? 0.52 : 0.65;
     star.scale.setScalar(step * power);
     star.quaternion.copy(camera.quaternion);
     // 같은 각으로 뜨면 형태를 갈라도 도장으로 읽힌다. 구마다 통째로 돌린다.
@@ -368,7 +375,7 @@ export function createImpact(scene) {
     chipMat.opacity = (1 - u) * 0.8;
     }
     // 잔막은 본체가 다 꺼진 뒤까지 남는다. 커지면서 옅어져야 가라앉는 먼지로 읽힌다.
-    veil.position.set(at.x, at.y + uv * 0.3, at.z);
+    veil.position.set(at.x, at.y + uv * 0.3, at.z + BEHIND);
     veil.quaternion.copy(camera.quaternion);
     veil.rotateZ(blobSpin - 2.4);
     // 잔막이 키퍼를 통째로 덮으면 사건이 아니라 화면 가림으로 읽힌다. 몸보다 작게 둔다.
