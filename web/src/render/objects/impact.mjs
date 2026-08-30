@@ -13,6 +13,38 @@ const D_VEIL = 1.05;
 // 선을 원점에서 시작하면 가운데가 뭉쳐 별이 아니라 점이 된다. 안쪽 반경을 띄운다.
 // 각도를 균등하게 놓으면 바퀴살이 되어 가짜로 읽힌다. 각도와 길이를 둘 다 흩는다.
 const SPOKES = [0.14, 0.92, 1.68, 2.51, 3.29, 4.05, 4.61, 5.55];
+// 완전한 원 셋이 같은 중심에 겹치면 폭발이 아니라 과녁으로 읽힌다. 손그림 잉크는 원을 못 그린다.
+// 반지름을 각도마다 두 주기로 흔들어 테두리를 삐뚤게 만든다. seed가 층마다 다른 얼룩을 준다.
+function blobGeo(seed, seg, wob, inner) {
+  const rAt = (i) => {
+    const a = (i / seg) * Math.PI * 2;
+    return 1 + Math.sin(a * 3 + seed) * wob + Math.sin(a * 7 + seed * 2.7) * wob * 0.45;
+  };
+  const pos = [];
+  for (let i = 0; i < seg; i += 1) {
+    const a0 = (i / seg) * Math.PI * 2;
+    const a1 = ((i + 1) / seg) * Math.PI * 2;
+    const r0 = rAt(i);
+    const r1 = rAt(i + 1);
+    const x0 = Math.cos(a0) * r0;
+    const y0 = Math.sin(a0) * r0;
+    const x1 = Math.cos(a1) * r1;
+    const y1 = Math.sin(a1) * r1;
+    if (inner > 0) {
+      const ix0 = Math.cos(a0) * r0 * inner;
+      const iy0 = Math.sin(a0) * r0 * inner;
+      const ix1 = Math.cos(a1) * r1 * inner;
+      const iy1 = Math.sin(a1) * r1 * inner;
+      pos.push(ix0, iy0, 0, x0, y0, 0, x1, y1, 0);
+      pos.push(ix0, iy0, 0, x1, y1, 0, ix1, iy1, 0);
+    } else {
+      pos.push(0, 0, 0, x0, y0, 0, x1, y1, 0);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  return g;
+}
 function starGeo(list) {
   const pts = [];
   for (let i = 0; i < list.length; i += 1) {
@@ -52,7 +84,7 @@ export function createImpact(scene) {
   // 플래시. 두 프레임짜리다. 사건 직후 프레임에서 화면을 덮는 층은 이것 하나뿐이다.
   // 깊이 검사를 끄고 맨 위에 그린다. 접점이 키퍼 몸에 묻히면 층이 통째로 안 보인다.
   const flashMat = new THREE.MeshBasicMaterial({ color: 0xfffdf0, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
-  const flash = new THREE.Mesh(new THREE.CircleGeometry(1, 14), flashMat);
+  const flash = new THREE.Mesh(blobGeo(1.7, 15, 0.2, 0), flashMat);
   flash.visible = false;
   flash.renderOrder = 8;
   flash.userData.probeIgnore = true;
@@ -60,7 +92,7 @@ export function createImpact(scene) {
 
   // 충격파 고리. 바깥으로만 밀린다. 고리가 완전히 닫히면 도넛으로 읽히므로 두께를 얇게 둔다.
   const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.74, 1, 22), ringMat);
+  const ring = new THREE.Mesh(blobGeo(4.2, 20, 0.24, 0.74), ringMat);
   ring.visible = false;
   ring.renderOrder = 8;
   ring.userData.probeIgnore = true;
@@ -103,7 +135,7 @@ export function createImpact(scene) {
 
   // 잔막. 본체와 별개의 훨씬 크고 구조 없는 먼지 워시다. 이것이 사건 뒤의 여운을 만든다.
   const veilMat = new THREE.MeshBasicMaterial({ color: 0xcbb28c, transparent: true, opacity: 0, depthWrite: false });
-  const veil = new THREE.Mesh(new THREE.CircleGeometry(1, 12), veilMat);
+  const veil = new THREE.Mesh(blobGeo(2.9, 13, 0.3, 0), veilMat);
   veil.visible = false;
   veil.userData.probeIgnore = true;
   scene.add(veil);
@@ -121,6 +153,8 @@ export function createImpact(scene) {
 
   let t = 0;
   let wordSpin = 0;
+  // 얼룩을 매번 같은 각으로 띄우면 삐뚤어도 도장으로 읽힌다. 구마다 통째로 돌린다.
+  let blobSpin = 0;
   let wordSide = 0;
   let life = 0;
   let power = 1;
@@ -143,6 +177,7 @@ export function createImpact(scene) {
     veil.visible = !hidden;
     star.visible = !hidden;
     star.position.copy(at);
+    blobSpin = Math.random() * Math.PI * 2;
     for (const m of dust) { m.visible = !hidden; m.position.copy(at); }
     for (const m of chips) { m.visible = !hidden; m.position.copy(at); }
     wordMesh.visible = Boolean(word) && !hidden;
@@ -172,10 +207,13 @@ export function createImpact(scene) {
       const f = 1 - uf;
       flash.position.copy(at);
       flash.quaternion.copy(camera.quaternion);
-      flash.scale.setScalar((0.4 + uf * 0.14) * power);
-      flashMat.opacity = Math.pow(f, 0.55);
+      flash.rotateZ(blobSpin);
+      flash.scale.setScalar((0.3 + uf * 0.12) * power);
+      flashMat.opacity = Math.pow(f, 0.55) * 0.7;
       ring.position.copy(at);
       ring.quaternion.copy(camera.quaternion);
+      // 층마다 각을 어긋내지 않으면 삐뚠 테두리끼리 겹쳐 다시 매끈한 원이 된다.
+      ring.rotateZ(blobSpin + 1.9);
       ring.scale.setScalar((0.46 + uf * 0.72) * power);
       ringMat.opacity = Math.pow(f, 1.5) * 0.85;
     } else if (flash.visible) {
@@ -220,8 +258,10 @@ export function createImpact(scene) {
     // 잔막은 본체가 다 꺼진 뒤까지 남는다. 커지면서 옅어져야 가라앉는 먼지로 읽힌다.
     veil.position.set(at.x, at.y + uv * 0.3, at.z);
     veil.quaternion.copy(camera.quaternion);
-    veil.scale.setScalar((0.75 + uv * 1.6) * power);
-    veilMat.opacity = Math.pow(1 - uv, 1.6) * 0.34;
+    veil.rotateZ(blobSpin - 2.4);
+    // 잔막이 키퍼를 통째로 덮으면 사건이 아니라 화면 가림으로 읽힌다. 몸보다 작게 둔다.
+    veil.scale.setScalar((0.5 + uv * 0.95) * power);
+    veilMat.opacity = Math.pow(1 - uv, 1.6) * 0.24;
     // 튀어나왔다가 제자리로 주저앉는다. 선형으로 키우면 풍선처럼 보인다.
     if (wordMesh.visible) {
       const pop = u < 0.24 ? (u / 0.24) * 1.3 : 1.3 - (u - 0.24) / 0.76 * 0.3;
