@@ -1229,9 +1229,9 @@ export function createScene(canvas) {
         // 정지 프레임을 두 장 찍어 비교하는 계측이 그 걸음을 전부 잡음으로 읽는다.
         p.position.x += p.userData.speed * dt;
         // 되돌리는 자리가 화면 안이면 순간이동이 그대로 보인다.
-        // 행인이 서는 z에서 화면 반폭은 27.7m다. 26은 그 안이었다.
-        if (p.position.x > 34) {
-          p.position.x = -34;
+        // 행인을 깊이로 흩은 뒤 가장 먼 줄(z≈39)의 화면 반폭이 33.4m가 됐다. 34는 그 턱밑이다.
+        if (p.position.x > 42) {
+          p.position.x = -42;
           // 같은 줄로 돌아오면 다섯이 영원히 같은 순서로 지나간다.
           p.position.z = p.userData.homeZ + (p.userData.phase % 1) * 3.2 - 1.6;
         }

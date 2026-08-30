@@ -386,7 +386,8 @@ export function buildPassers(scene) {
   const rnd = seeded(0x9a55e7);
   for (let i = 0; i < 5; i += 1) {
     const g = new THREE.Group();
-    const tall = 0.85 + rnd() * 0.35;
+    // 0.85~1.20은 원경에서 화소 몇 개 차이라 다섯이 같은 키로 읽혔다. 폭을 넓힌다.
+    const tall = 0.76 + rnd() * 0.54;
     const wide = 0.85 + rnd() * 0.35;
     // 머리만 사람이고 아래는 페인트 통이었다. 팔이 없으면 서 있는 것인지 꽂혀 있는 것인지가 안 갈린다.
     // 별도 메시로 달면 다섯 명에게 10번의 드로우콜이 붙는다. 몸통 지오메트리에 미리 붙여 버린다.
@@ -482,7 +483,10 @@ export function buildPassers(scene) {
     g.add(...parts);
     // 9.5씩 끊어 놓으면 다섯이 같은 간격으로 지나간다. 행렬이지 행인이 아니다.
     // 시작 위치를 흩고 걸음 위상을 따로 준다. 같은 순간에 같은 쪽으로 기우는 것이 가장 티가 났다.
-    g.position.set(-24 + i * 9.5 + (rnd() - 0.5) * 6.4, 0, 31.6 + rnd() * 3.2);
+    // 깊이까지 흩어야 원근이 크기를 갈라 준다. 한 줄에 세우면 키만 다른 같은 인형이다.
+    // 0번은 한눈팔기 연출에서 골대 앞까지 걸어오므로 거리 밴드를 그대로 둔다.
+    const z = i === 0 ? 31.6 + rnd() * 1.8 : 26.8 + rnd() * 12.4;
+    g.position.set(-25 + i * 9.5 + (rnd() - 0.5) * 9.8, 0, z);
     g.userData.speed = 1.15 + rnd() * 1.3;
     g.userData.phase = rnd() * Math.PI * 2;
     g.userData.homeZ = g.position.z;
