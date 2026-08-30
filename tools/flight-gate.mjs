@@ -22,6 +22,18 @@ const LUM = 12;
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 170000);
 t.unref();
 
+// 킥이 시작될 때까지 기다린다. 앞선 판은 고정 2600ms 뒤에 방향키를 눌렀는데,
+// 공을 다시 세우는 카운트다운이 그보다 길어서 1~3라운드가 통째로 비었다. 표본 하나로는 최솟값이 최솟값이 아니다.
+const waitCue = () => new Promise((res) => {
+  const t0 = performance.now();
+  const tick = () => {
+    if (window.__flightVis().cue) { res(true); return; }
+    if (performance.now() - t0 > 14000) { res(false); return; }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+});
+
 // 비행이 무르익은 프레임에서 멈춘다. 킥 직후는 꼬리가 아직 안 자랐고 발밑 프레임은 이동이 없다.
 const waitFlight = () => new Promise((res) => {
   const t0 = performance.now();
@@ -113,9 +125,11 @@ try {
 
   const rows = [];
   for (let i = 0; i < ROUNDS; i += 1) {
+    const armed = await p.evaluate(waitCue);
+    if (!armed) { console.log("skip round " + i + " no kick within 14s"); continue; }
     await p.keyboard.press(i % 2 ? "ArrowRight" : "ArrowLeft");
     const hit = await p.evaluate(waitFlight);
-    if (!hit) { console.log("skip round " + i + " no flight frame"); await p.waitForTimeout(2600); continue; }
+    if (!hit) { console.log("skip round " + i + " no flight frame"); continue; }
     // 차분은 base64 문자열만 보므로 세계를 세워둘 이유가 없다.
     // 정지를 measure까지 끌면 한 라운드가 수 초 멈추고 다음 킥 주기를 통째로 놓친다.
     const s = await shots(p);
@@ -124,7 +138,7 @@ try {
     rows.push(m);
     console.log("round " + i + " ballPx=" + m.ballN + " dia=" + m.dia + " trailPx=" + m.trailN
       + " ring=" + m.ring.toFixed(1) + " ratio=" + (m.ring / Math.max(1, m.dia / 2)).toFixed(2) + " noise=" + m.noise);
-    await p.waitForTimeout(2600);
+    await p.waitForTimeout(1200);
   }
   if (!rows.length) { console.log("INSTRUMENT DEAD: no flight frames"); process.exit(1); }
 
