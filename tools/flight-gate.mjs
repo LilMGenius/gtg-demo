@@ -124,7 +124,9 @@ const measure = async (p, s) => {
     if (d > ring) ring = d;
   }
   return { ballN: ball.n, dia, trailN: trail.n, ring, noise: noise.n,
-    bx0: ball.x0, bx1: ball.x1, by0: ball.y0, by1: ball.y1 };
+    bx0: ball.x0, bx1: ball.x1, by0: ball.y0, by1: ball.y1,
+    tx0: trail.x0, tx1: trail.x1, ty0: trail.y0, ty1: trail.y1,
+    nx0: noise.x0, nx1: noise.x1, ny0: noise.y0, ny1: noise.y1 };
 };
 
 let br;
@@ -172,7 +174,12 @@ try {
   const idleShots = await shots(p);
   await p.evaluate(() => window.__freeze(false));
   const idle = await measure(p, idleShots);
-  if (idle.trailN > 0 || idle.noise > 0) dump("idle", idleShots);
+  if (idle.trailN > 0 || idle.noise > 0) {
+    dump("idle", idleShots);
+    // 대조군에서 갈린 화소가 어디인지 좌표로 못 박아야 원인이 좁혀진다.
+    console.log("  idle trail bbox " + idle.tx0 + ".." + idle.tx1 + "," + idle.ty0 + ".." + idle.ty1
+      + " noise bbox " + idle.nx0 + ".." + idle.nx1 + "," + idle.ny0 + ".." + idle.ny1);
+  }
 
   const minDia = Math.min(...rows.map((r) => r.dia));
   const minTrail = Math.min(...rows.map((r) => r.trailN));
