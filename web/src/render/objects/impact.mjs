@@ -271,10 +271,11 @@ export function createImpact(scene) {
   // 글자는 사건의 소리가 아니라 화면 위의 자막으로 읽힌다. 충돌점까지 꼬리를 그어 붙인다.
   // 삼각형 하나면 충분하다. 만화의 소리 꼬리는 밑변이 글자, 꼭짓점이 사건이다.
   const LEAD_W = 0.19;
-  // 0.24로 띄웠더니 꼭짓점이 사건이 아니라 그 위 허공을 가리켰다. 접점 바로 옆에서 시작해야
-  // 눈이 꼭짓점을 따라 사건으로 간다. 밑변은 글자에 딱 붙이면 글자를 뚫으므로 조금 못 미친다.
-  const LEAD_NEAR = 0.07;
   const LEAD_FAR = 0.8;
+  // 시작점을 거리 비율로 잡으면 사건이 사람일 때 꼭짓점이 몸 안에서 시작한다(실측: gloveGone,
+  // save 520ms 프레임에서 키퍼 머리가 꼬리에 통째로 덮임). 몸 반폭 밖에서 시작하되 밑변까지
+  // 최소 이만큼은 남겨야 삼각형이 선으로 뭉개지지 않는다.
+  const LEAD_MIN_RUN = 0.12;
   // 외곽선은 글자와 같은 굵기로 읽혀야 한 세트가 된다. 무게중심에서 균일 확대한다.
   const LEAD_EDGE = 1.42;
   const leadMat = new THREE.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
@@ -494,9 +495,12 @@ export function createImpact(scene) {
       if (drawLead) {
         leadP.copy(leadR).multiplyScalar(-ldy / llen).addScaledVector(leadU, ldx / llen);
         const hw = LEAD_W * fit;
-        const ax = at.x + leadD.x * LEAD_NEAR;
-        const ay = at.y + leadD.y * LEAD_NEAR;
-        const az = at.z + leadD.z * LEAD_NEAR;
+        // 꼭짓점을 거리 비율로 잡으면 사건이 사람일 때 몸 안에서 시작한다. 밀어내는 양은 취향이
+        // 아니라 몸 반폭이다. 그래야 꼬리가 글자와 몸 사이 빈 자리에만 놓인다.
+        const near = Math.min(LEAD_FAR - LEAD_MIN_RUN, SUBJ_HALF / llen);
+        const ax = at.x + leadD.x * near;
+        const ay = at.y + leadD.y * near;
+        const az = at.z + leadD.z * near;
         const bx = at.x + leadD.x * LEAD_FAR;
         const by = at.y + leadD.y * LEAD_FAR;
         const bz = at.z + leadD.z * LEAD_FAR;
