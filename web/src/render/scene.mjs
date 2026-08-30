@@ -1154,8 +1154,11 @@ export function createScene(canvas) {
           }
         } else {
           const gw = gloveWorld(Math.sign(tail.kx || 1));
-          if (ball.position.distanceTo(gw) < 0.55 || u > 0.3) {
-            impact.burst(gw.clone().lerp(ball.position, 0.5), pendingBurst.power, pendingBurst.word, pendingBurst.kind);
+          const met = ball.position.distanceTo(gw) < 0.55;
+          // 중점은 둘이 실제로 만났을 때만 접촉점이다. 시간 폴백이 먼저 걸린 프레임에서는
+          // 공이 이미 저 멀리 있어서, 중점이 아무것도 없는 허공이 된다. 그때는 손에서 터뜨린다.
+          if (met || u > 0.3) {
+            impact.burst(met ? gw.clone().lerp(ball.position, 0.5) : gw.clone(), pendingBurst.power, pendingBurst.word, pendingBurst.kind);
             pendingBurst = null;
           }
         }
