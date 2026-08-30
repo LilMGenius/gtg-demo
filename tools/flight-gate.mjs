@@ -7,6 +7,9 @@ import { writeFileSync } from "node:fs";
 // 그래서 잰다: 세계시간을 멈춘 같은 프레임을 세 번 그린다. 원본, 잔상만 뺀 것, 공까지 뺀 것.
 // 차분이 무엇의 화소인지 그때서야 말할 수 있다. 공 = B-C, 잔상 = A-B.
 // 바: 비행 중 공 지름 30px, 잔상 화소 200개, 잔상이 공 반지름의 1.5배 밖까지 나감.
+// 반지름만 보는 바는 뭉친 후광을 통과시킨다. 실측: 고스트 간격 18px에 공 지름 34px이라
+// 고스트가 앞 고스트를 반지름만큼 덮어 링 반지름 53px 안에 여덟 장이 전부 뭉쳤는데 비율 3.1로 통과했다.
+// 그래서 뻗은 길이를 따로 잰다: reach = 링/지름이 2.0 이상, 공 지름 밖에 놓인 잔상 화소가 120개 이상.
 // 대조군 둘. 같은 프레임을 두 번 그린 잡음 바닥이 50화소 미만이어야 자가 예민한 것이고,
 // 비행이 아닐 때 잔상 화소가 0이면서 공 화소는 남아야 자가 잔상만 골라 보는 것이다.
 
@@ -17,6 +20,8 @@ const H = 720;
 const ROUNDS = 4;
 const BAR_BALL = 30;
 const BAR_RATIO = 1.5;
+const BAR_REACH = 2.0;
+const BAR_FAR = 120;
 const BAR_TRAIL = 200;
 const BAR_NOISE = 50;
 const LUM = 12;
@@ -131,11 +136,13 @@ const measure = async (p, s) => {
   const cx = (ball.x0 + ball.x1) / 2;
   const cy = (ball.y0 + ball.y1) / 2;
   let ring = 0;
+  let far = 0;
   for (let i = 0; i < trail.px.length; i += 2) {
     const d = Math.hypot(trail.px[i] - cx, trail.px[i + 1] - cy);
     if (d > ring) ring = d;
+    if (dia && d > dia) far += 1;
   }
-  return { ballN: ball.n, dia, trailN: trail.n, ring, noise: noise.n,
+  return { ballN: ball.n, dia, trailN: trail.n, ring, far, noise: noise.n,
     bx0: ball.x0, bx1: ball.x1, by0: ball.y0, by1: ball.y1,
     tx0: trail.x0, tx1: trail.x1, ty0: trail.y0, ty1: trail.y1,
     nx0: noise.x0, nx1: noise.x1, ny0: noise.y0, ny1: noise.y1 };
@@ -203,10 +210,14 @@ try {
   const minDia = Math.min(...rows.map((r) => r.dia));
   const minTrail = Math.min(...rows.map((r) => r.trailN));
   const minRatio = Math.min(...rows.map((r) => r.ring / Math.max(1, r.dia / 2)));
+  const minReach = Math.min(...rows.map((r) => r.ring / Math.max(1, r.dia)));
+  const minFar = Math.min(...rows.map((r) => r.far));
   const maxNoise = Math.max(...rows.map((r) => r.noise), idle.noise);
   console.log("MIN_DIA " + minDia + "px (bar " + BAR_BALL + ")");
   console.log("MIN_TRAIL " + minTrail + "px (bar " + BAR_TRAIL + ")");
   console.log("MIN_RATIO " + minRatio.toFixed(2) + " (bar " + BAR_RATIO + ")");
+  console.log("MIN_REACH " + minReach.toFixed(2) + " (bar " + BAR_REACH + ")");
+  console.log("MIN_FAR " + minFar + "px (bar " + BAR_FAR + ")");
   console.log("NOISE " + maxNoise + " (bar <" + BAR_NOISE + ")");
   console.log("CONTROL idle trailPx=" + idle.trailN + " ballPx=" + idle.ballN);
   console.log("ERRORS " + errs.length);
@@ -217,6 +228,8 @@ try {
   if (minDia < BAR_BALL) fail += 1;
   if (minTrail < BAR_TRAIL) fail += 1;
   if (minRatio < BAR_RATIO) fail += 1;
+  if (minReach < BAR_REACH) fail += 1;
+  if (minFar < BAR_FAR) fail += 1;
   if (errs.length) fail += 1;
   console.log(fail ? "FAIL" : "PASS");
 } finally {
