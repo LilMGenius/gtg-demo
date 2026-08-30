@@ -263,6 +263,39 @@ export function createImpact(scene) {
   wordMesh.userData.probeIgnore = true;
   scene.add(wordMesh);
 
+  // 소리를 몸 밖으로 밀어내면 화면에서 글자가 사건과 211화소 떨어진다(실측). 그 거리만큼
+  // 글자는 사건의 소리가 아니라 화면 위의 자막으로 읽힌다. 충돌점까지 꼬리를 그어 붙인다.
+  // 삼각형 하나면 충분하다. 만화의 소리 꼬리는 밑변이 글자, 꼭짓점이 사건이다.
+  const LEAD_W = 0.19;
+  // 0.24로 띄웠더니 꼭짓점이 사건이 아니라 그 위 허공을 가리켰다. 접점 바로 옆에서 시작해야
+  // 눈이 꼭짓점을 따라 사건으로 간다. 밑변은 글자에 딱 붙이면 글자를 뚫으므로 조금 못 미친다.
+  const LEAD_NEAR = 0.07;
+  const LEAD_FAR = 0.8;
+  // 외곽선은 글자와 같은 굵기로 읽혀야 한 세트가 된다. 무게중심에서 균일 확대한다.
+  const LEAD_EDGE = 1.42;
+  const leadMat = new THREE.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+  const leadEdgeMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+  const leadGeo = new THREE.BufferGeometry();
+  leadGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
+  const leadEdgeGeo = new THREE.BufferGeometry();
+  leadEdgeGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
+  const lead = new THREE.Mesh(leadGeo, leadMat);
+  const leadEdge = new THREE.Mesh(leadEdgeGeo, leadEdgeMat);
+  lead.renderOrder = 8.7;
+  leadEdge.renderOrder = 8.6;
+  lead.frustumCulled = false;
+  leadEdge.frustumCulled = false;
+  lead.visible = false;
+  leadEdge.visible = false;
+  lead.userData.probeIgnore = true;
+  leadEdge.userData.probeIgnore = true;
+  scene.add(leadEdge);
+  scene.add(lead);
+  const leadR = new THREE.Vector3();
+  const leadU = new THREE.Vector3();
+  const leadD = new THREE.Vector3();
+  const leadP = new THREE.Vector3();
+
   let t = 0;
   let wordSpin = 0;
   // 얼룩을 매번 같은 각으로 띄우면 삐뚤어도 도장으로 읽힌다. 구마다 통째로 돌린다.
@@ -366,10 +399,14 @@ export function createImpact(scene) {
     if (u >= 1) {
       star.visible = false;
       wordMesh.visible = false;
+      lead.visible = false;
+      leadEdge.visible = false;
       for (const m of dust) m.visible = false;
       for (const m of chips) m.visible = false;
       starMat.opacity = 0;
       wordMat.opacity = 0;
+      leadMat.opacity = 0;
+      leadEdgeMat.opacity = 0;
       dustMat.opacity = 0;
       chipMat.opacity = 0;
     } else {
@@ -439,6 +476,45 @@ export function createImpact(scene) {
       wordMesh.rotateZ(wordSpin);
       wordMesh.scale.setScalar(fit);
       wordMat.opacity = w > 0.78 ? Math.max(0, (1 - w) / 0.22) : 1;
+      // 꼬리는 글자를 따라간다. 단이 바뀌어 글자가 반대쪽으로 넘어가도 다시 계산되므로 따로 뒤집지 않는다.
+      leadR.setFromMatrixColumn(camera.matrixWorld, 0);
+      leadU.setFromMatrixColumn(camera.matrixWorld, 1);
+      leadD.copy(wordMesh.position).sub(at);
+      const ldx = leadD.dot(leadR);
+      const ldy = leadD.dot(leadU);
+      const llen = Math.hypot(ldx, ldy);
+      // 글자가 이미 접점 위에 있으면 꼬리는 얼룩일 뿐이다. 붙일 거리가 있을 때만 그린다.
+      const drawLead = llen > 0.5;
+      lead.visible = drawLead;
+      leadEdge.visible = drawLead;
+      if (drawLead) {
+        leadP.copy(leadR).multiplyScalar(-ldy / llen).addScaledVector(leadU, ldx / llen);
+        const hw = LEAD_W * fit;
+        const ax = at.x + leadD.x * LEAD_NEAR;
+        const ay = at.y + leadD.y * LEAD_NEAR;
+        const az = at.z + leadD.z * LEAD_NEAR;
+        const bx = at.x + leadD.x * LEAD_FAR;
+        const by = at.y + leadD.y * LEAD_FAR;
+        const bz = at.z + leadD.z * LEAD_FAR;
+        const v = [ax, ay, az, bx + leadP.x * hw, by + leadP.y * hw, bz + leadP.z * hw, bx - leadP.x * hw, by - leadP.y * hw, bz - leadP.z * hw];
+        const pa = leadGeo.attributes.position;
+        const pe = leadEdgeGeo.attributes.position;
+        const cx = (v[0] + v[3] + v[6]) / 3;
+        const cy = (v[1] + v[4] + v[7]) / 3;
+        const cz = (v[2] + v[5] + v[8]) / 3;
+        for (let i = 0; i < 9; i += 3) {
+          pa.array[i] = v[i];
+          pa.array[i + 1] = v[i + 1];
+          pa.array[i + 2] = v[i + 2];
+          pe.array[i] = cx + (v[i] - cx) * LEAD_EDGE;
+          pe.array[i + 1] = cy + (v[i + 1] - cy) * LEAD_EDGE;
+          pe.array[i + 2] = cz + (v[i + 2] - cz) * LEAD_EDGE;
+        }
+        pa.needsUpdate = true;
+        pe.needsUpdate = true;
+        leadMat.opacity = wordMat.opacity;
+        leadEdgeMat.opacity = wordMat.opacity;
+      }
     }
   }
 
@@ -448,6 +524,8 @@ export function createImpact(scene) {
     veil.visible = false;
     star.visible = false;
     wordMesh.visible = false;
+    lead.visible = false;
+    leadEdge.visible = false;
     for (const m of dust) m.visible = false;
     for (const m of chips) m.visible = false;
     flashMat.opacity = 0;
@@ -455,6 +533,8 @@ export function createImpact(scene) {
     veilMat.opacity = 0;
     starMat.opacity = 0;
     wordMat.opacity = 0;
+    leadMat.opacity = 0;
+    leadEdgeMat.opacity = 0;
     dustMat.opacity = 0;
     chipMat.opacity = 0;
   }
@@ -471,6 +551,9 @@ export function createImpact(scene) {
     star.visible = bodyLive;
     // 글자는 본체보다 오래 산다. 뒤따르는 소리가 본체가 꺼진 뒤에 뜨기 때문이다.
     wordMesh.visible = live && Boolean(wordMat.map);
+    // 꼬리는 글자에 딸린 층이다. 글자가 꺼진 프레임에 꼬리만 남으면 차분이 거짓말을 한다.
+    lead.visible = wordMesh.visible && leadMat.opacity > 0;
+    leadEdge.visible = lead.visible;
     for (const m of dust) m.visible = bodyLive;
     for (const m of chips) m.visible = bodyLive;
     return hidden;
@@ -490,6 +573,11 @@ export function createImpact(scene) {
       atZ: at.z,
       behind,
       starZ: star.position.z,
+      atX: at.x,
+      atY: at.y,
+      wordX: wordMesh.position.x,
+      wordY: wordMesh.position.y,
+      wordZ: wordMesh.position.z,
       shown: dust.filter((m) => m.visible).length + chips.filter((m) => m.visible).length
         + (star.visible ? 1 : 0) + (flash.visible ? 1 : 0) + (ring.visible ? 1 : 0) + (veil.visible ? 1 : 0),
       hidden

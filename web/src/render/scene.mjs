@@ -1652,6 +1652,15 @@ export function createScene(canvas) {
   // 임팩트를 뺀 같은 프레임. 차분이 임팩트의 화소다.
   window.__impactHide = (on) => impact.hide(on);
 
+  // 화면 화소로 재려면 월드 좌표를 실제 카메라로 투영해야 한다. 월드 변위는 화소를 말해주지 않는다.
+  window.__proj = (x, y, z) => {
+    const w = renderer.domElement.clientWidth || 1;
+    const h = renderer.domElement.clientHeight || 1;
+    camera.updateMatrixWorld();
+    const n = new THREE.Vector3(x, y, z).project(camera);
+    return [(n.x * 0.5 + 0.5) * w, (-n.y * 0.5 + 0.5) * h];
+  };
+
   renderer.setAnimationLoop(frame);
 
   function reset() {
