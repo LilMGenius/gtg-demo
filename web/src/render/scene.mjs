@@ -239,29 +239,9 @@ export function createScene(canvas) {
   addOutline(ball, 0.012);
   ball.userData.probeIgnore = true;
   scene.add(ball);
-  // 카메라가 골대 뒤에 있어서 골라인 너머의 공은 크로스바와 그물과 키커 뒤로 들어간다.
-  // 킥 직후가 정확히 그 구간이고, 비행 시작이 화면에서 통째로 사라진다.
-  // 실측: 지름 33.9px로 그려진 공이 화소로는 23px만 남았다.
-  // 공이 골라인 너머에 있는 동안만 깊이 검사를 끄고 위에 그린다. 그 구간에는 키퍼가 없다.
-  // 외곽선 재질은 씬 전체가 한 벌을 공유하므로 공 것만 따로 떼어야 한 개만 끌 수 있다.
-  const ballOutline = ball.children.find((c) => c.userData.isOutline);
-  if (ballOutline) ballOutline.material = ballOutline.material.clone();
-  // 공 외곽선은 깊이 검사를 따로 끄려고 이미 복제해 뒀다. 공유본 표시를 지워야
-  // 전경 칠하기가 이것을 공유 외곽선으로 되돌리지 않는다.
-  if (ballOutline) ballOutline.material.userData.shared = false;
   markForeground(ball);
-  const OVERLAY_Z = 2;
-  let overlay = false;
-  const setOverlay = (on) => {
-    if (on === overlay) return;
-    overlay = on;
-    ball.material.depthTest = !on;
-    ball.renderOrder = on ? 7 : 0;
-    if (ballOutline) {
-      ballOutline.material.depthTest = !on;
-      ballOutline.renderOrder = on ? 6 : -1;
-    }
-  };
+  // 공은 깊이 검사를 그대로 받는다. 골라인 너머의 공이 안 보이던 진짜 원인은 뒷 가로대였고
+  // 그것을 지오메트리에서 걷어냈다. 실측: 최장 가림 45프레임에서 4프레임으로 떨어졌다.
 
   // 잔상. 공 한 개만 그리면 빠른 공과 느린 공이 같은 그림이 된다.
   // 공이 카메라를 향해 오므로 지나온 자리는 화면에서 공 뒤에 그대로 숨는다.
@@ -1412,9 +1392,6 @@ export function createScene(canvas) {
       ribbon.userData.lit = false;
       ribCap.visible = false;
     }
-    // 정지 프레임에서도 상태가 유지되어야 하므로 잔상 갱신 조건 바깥에서 정한다.
-    setOverlay(Boolean(cue) && !tail && ball.position.z > OVERLAY_Z);
-
     // 흔들림을 먼저 얹고 그 카메라로 잰다. 흔들리기 전 카메라로 재면 게이트는 흔들림을 못 본다.
     // 측정 프레임만 빼는 것은 우회다. 게이트가 견딜 때까지 진폭을 줄이는 쪽이 맞다.
     camera.position.copy(CAM_BASE);
