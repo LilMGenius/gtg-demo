@@ -2,14 +2,23 @@
 // 파티클 시스템은 없다. 도형 몇 개를 키우고 지우는 것이 전부다.
 import * as THREE from '../../../vendor/three.module.min.js';
 
+// 한 번의 충돌은 수명 하나가 아니다. 순간 플래시, 본체, 남아 떠 있는 잔막 셋이 겹쳐야 한 발로 읽힌다.
+// 수명이 하나면 사건 직후 프레임에 아무것도 없다. 별과 흙은 시간이 지나야 커지기 때문이다.
+const D_FLASH = 0.07;
+const D_BODY = 0.55;
+const D_VEIL = 1.05;
+
 // 방사형 흰 선. 만화가 충격을 그리는 방법이 이것이다.
-// 셰이더가 필요 없다. 원점에서 뻗은 선분 여섯 개를 카메라 쪽으로 돌려세우면 된다.
+// 셰이더가 필요 없다. 원점에서 뻗은 선분을 카메라 쪽으로 돌려세우면 된다.
 // 선을 원점에서 시작하면 가운데가 뭉쳐 별이 아니라 점이 된다. 안쪽 반경을 띄운다.
-function starGeo(n) {
+// 각도를 균등하게 놓으면 바퀴살이 되어 가짜로 읽힌다. 각도와 길이를 둘 다 흩는다.
+const SPOKES = [0.14, 0.92, 1.68, 2.51, 3.29, 4.05, 4.61, 5.55];
+function starGeo(list) {
   const pts = [];
-  for (let i = 0; i < n; i += 1) {
-    const a = (i / n) * Math.PI * 2 + 0.31;
-    pts.push(Math.cos(a) * 0.35, Math.sin(a) * 0.35, 0, Math.cos(a), Math.sin(a), 0);
+  for (let i = 0; i < list.length; i += 1) {
+    const a = list[i];
+    const len = 0.78 + ((i * 0.37 + a * 0.21) % 1) * 0.46;
+    pts.push(Math.cos(a) * 0.35, Math.sin(a) * 0.35, 0, Math.cos(a) * len, Math.sin(a) * len, 0);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
@@ -40,8 +49,25 @@ function wordTex(word) {
 }
 
 export function createImpact(scene) {
+  // 플래시. 두 프레임짜리다. 사건 직후 프레임에서 화면을 덮는 층은 이것 하나뿐이다.
+  // 깊이 검사를 끄고 맨 위에 그린다. 접점이 키퍼 몸에 묻히면 층이 통째로 안 보인다.
+  const flashMat = new THREE.MeshBasicMaterial({ color: 0xfffdf0, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
+  const flash = new THREE.Mesh(new THREE.CircleGeometry(1, 14), flashMat);
+  flash.visible = false;
+  flash.renderOrder = 8;
+  flash.userData.probeIgnore = true;
+  scene.add(flash);
+
+  // 충격파 고리. 바깥으로만 밀린다. 고리가 완전히 닫히면 도넛으로 읽히므로 두께를 얇게 둔다.
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.74, 1, 22), ringMat);
+  ring.visible = false;
+  ring.renderOrder = 8;
+  ring.userData.probeIgnore = true;
+  scene.add(ring);
+
   const starMat = new THREE.LineBasicMaterial({ color: 0xfffbe8, transparent: true, opacity: 0 });
-  const star = new THREE.LineSegments(starGeo(7), starMat);
+  const star = new THREE.LineSegments(starGeo(SPOKES), starMat);
   star.visible = false;
   star.userData.probeIgnore = true;
   scene.add(star);
@@ -60,6 +86,27 @@ export function createImpact(scene) {
     scene.add(m);
     dust.push(m);
   }
+
+  // 파편. 흙덩이는 증발하지 않고 한 번 튀고 구른다. 그 한 번의 바운스가 흙바닥을 흙바닥으로 만든다.
+  const chipMat = new THREE.MeshBasicMaterial({ color: 0x6b5334, transparent: true, opacity: 0, depthWrite: false });
+  const chipGeo = new THREE.CircleGeometry(0.055, 5);
+  const chips = [];
+  for (let i = 0; i < 5; i += 1) {
+    const m = new THREE.Mesh(chipGeo, chipMat);
+    m.visible = false;
+    m.userData.probeIgnore = true;
+    const a = SPOKES[i] * 1.19 + 0.4;
+    m.userData.dir = new THREE.Vector3(Math.cos(a) * (1.1 + (i % 4) * 0.42), 1.5 + (i % 3) * 0.7, Math.sin(a) * (0.6 + (i % 2) * 0.3));
+    scene.add(m);
+    chips.push(m);
+  }
+
+  // 잔막. 본체와 별개의 훨씬 크고 구조 없는 먼지 워시다. 이것이 사건 뒤의 여운을 만든다.
+  const veilMat = new THREE.MeshBasicMaterial({ color: 0xcbb28c, transparent: true, opacity: 0, depthWrite: false });
+  const veil = new THREE.Mesh(new THREE.CircleGeometry(1, 12), veilMat);
+  veil.visible = false;
+  veil.userData.probeIgnore = true;
+  scene.add(veil);
 
 
   // 글자 판. 도형 하나를 돌려세우고 텍스처만 갈아 끼운다.
@@ -85,14 +132,19 @@ export function createImpact(scene) {
   // 사건이 일어난 좌표를 받는다. 세기는 사건의 무게다.
   // 0.34초는 사람 눈에 번짝이고 정지 프레임에는 거의 안 잡힌다. 0.55가 읽힌다.
   // 0.9를 써 보니 다음 구의 배치까지 글자가 남아 화면이 지저분해졌다.
+  // 수명 셋 중 가장 긴 잔막이 전체 수명을 정한다.
   function burst(pos, strength = 1, word = '') {
     at.copy(pos);
     power = strength;
-    life = 0.55;
+    life = D_VEIL;
     t = 0;
+    flash.visible = !hidden;
+    ring.visible = !hidden;
+    veil.visible = !hidden;
     star.visible = !hidden;
     star.position.copy(at);
     for (const m of dust) { m.visible = !hidden; m.position.copy(at); }
+    for (const m of chips) { m.visible = !hidden; m.position.copy(at); }
     wordMesh.visible = Boolean(word) && !hidden;
     if (word) {
       if (!texCache.has(word)) texCache.set(word, wordTex(word));
@@ -107,16 +159,37 @@ export function createImpact(scene) {
   function update(dt, camera) {
     if (life <= 0) return;
     t += dt;
-    const u = Math.min(1, t / life);
+    const uf = t / D_FLASH;
+    const u = Math.min(1, t / D_BODY);
+    const uv = t / D_VEIL;
+    if (uv >= 1) {
+      hideAll();
+      life = 0;
+      return;
+    }
+    // 플래시는 첫 프레임이 최대다. 커지면서 나타나는 층은 사건 직후 프레임에 아무것도 남기지 못한다.
+    if (uf < 1) {
+      const f = 1 - uf;
+      flash.position.copy(at);
+      flash.quaternion.copy(camera.quaternion);
+      flash.scale.setScalar((0.4 + uf * 0.14) * power);
+      flashMat.opacity = Math.pow(f, 0.55);
+      ring.position.copy(at);
+      ring.quaternion.copy(camera.quaternion);
+      ring.scale.setScalar((0.46 + uf * 0.72) * power);
+      ringMat.opacity = Math.pow(f, 1.5) * 0.85;
+    } else if (flash.visible) {
+      flash.visible = false;
+      ring.visible = false;
+    }
     if (u >= 1) {
       star.visible = false;
       wordMesh.visible = false;
       for (const m of dust) m.visible = false;
-      life = 0;
-      return;
-    }
+      for (const m of chips) m.visible = false;
+    } else {
     // 별은 빠르게 커지고 빠르게 빠진다. 천천히 사라지면 충격이 아니라 후광이 된다.
-    star.scale.setScalar((0.35 + u * 1.5) * power);
+    star.scale.setScalar((0.9 + u * 1.15) * power);
     star.quaternion.copy(camera.quaternion);
     starMat.opacity = (1 - u) * 0.9;
     // 먼지는 흩어지면서 가라앉는다. 위로만 보내면 연기가 된다.
@@ -124,9 +197,25 @@ export function createImpact(scene) {
       const d = m.userData.dir;
       m.position.set(at.x + d.x * u * 1.1 * power, Math.max(0.04, at.y + (d.y * u - u * u * 1.6) * power), at.z + d.z * u * 1.1 * power);
       m.quaternion.copy(camera.quaternion);
-      m.scale.setScalar((0.5 + u * 1.4) * power);
+      m.scale.setScalar((0.85 + u * 1.4) * power);
     }
     dustMat.opacity = (1 - u) * 0.55;
+    // 파편은 반사 방향으로 날아가 한 번 튄다. 음수 높이를 감쇠해 되접으면 바운스가 된다.
+    for (const m of chips) {
+      const d = m.userData.dir;
+      let h = (d.y * u * 2.1 - u * u * 4.6) * power;
+      if (h < 0) h = -h * 0.3 * (1 - u);
+      m.position.set(at.x + d.x * u * 1.9 * power, Math.max(0.03, at.y + h), at.z + d.z * u * 1.9 * power);
+      m.quaternion.copy(camera.quaternion);
+      m.scale.setScalar((0.8 + u * 0.5) * power);
+    }
+    chipMat.opacity = (1 - u) * 0.8;
+    }
+    // 잔막은 본체가 다 꺼진 뒤까지 남는다. 커지면서 옅어져야 가라앉는 먼지로 읽힌다.
+    veil.position.set(at.x, at.y + uv * 0.3, at.z);
+    veil.quaternion.copy(camera.quaternion);
+    veil.scale.setScalar((0.75 + uv * 1.6) * power);
+    veilMat.opacity = Math.pow(1 - uv, 1.6) * 0.34;
     // 튀어나왔다가 제자리로 주저앉는다. 선형으로 키우면 풍선처럼 보인다.
     if (wordMesh.visible) {
       const pop = u < 0.24 ? (u / 0.24) * 1.3 : 1.3 - (u - 0.24) / 0.76 * 0.3;
@@ -138,12 +227,29 @@ export function createImpact(scene) {
     }
   }
 
+  function hideAll() {
+    flash.visible = false;
+    ring.visible = false;
+    veil.visible = false;
+    star.visible = false;
+    wordMesh.visible = false;
+    for (const m of dust) m.visible = false;
+    for (const m of chips) m.visible = false;
+  }
+
+  // 층마다 수명이 다르므로 되켤 때 일괄로 켜면 죽은 층이 되살아난다.
+  // 그 한 층이 차분에 섞이면 잡음 바닥이 임팩트 화소로 계산된다.
   function hide(on) {
     hidden = Boolean(on);
     const live = !hidden && life > 0;
-    star.visible = live;
-    wordMesh.visible = live && Boolean(wordMat.map);
-    for (const m of dust) m.visible = live;
+    const bodyLive = live && t < D_BODY;
+    flash.visible = live && t < D_FLASH;
+    ring.visible = flash.visible;
+    veil.visible = live;
+    star.visible = bodyLive;
+    wordMesh.visible = bodyLive && Boolean(wordMat.map);
+    for (const m of dust) m.visible = bodyLive;
+    for (const m of chips) m.visible = bodyLive;
     return hidden;
   }
 
@@ -152,10 +258,14 @@ export function createImpact(scene) {
     return {
       life,
       u: life > 0 ? Math.min(1, t / life) : 1,
+      flash: flashMat.opacity,
+      veil: veilMat.opacity,
+      chip: chipMat.opacity,
       star: starMat.opacity,
       dust: dustMat.opacity,
       word: wordMat.opacity,
-      shown: dust.filter((m) => m.visible).length + (star.visible ? 1 : 0),
+      shown: dust.filter((m) => m.visible).length + chips.filter((m) => m.visible).length
+        + (star.visible ? 1 : 0) + (flash.visible ? 1 : 0) + (ring.visible ? 1 : 0) + (veil.visible ? 1 : 0),
       hidden
     };
   }
