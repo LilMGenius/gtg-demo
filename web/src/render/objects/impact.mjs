@@ -69,13 +69,13 @@ function rnd(i, k) {
   return v - Math.floor(v);
 }
 // 뻗는 별. 길이 편차를 두 배 넘게 벌려야 자로 그린 바퀴살에서 벗어난다.
-function spikeGeo(n, seed) {
+function spikeGeo(n, seed, grow = 0) {
   const pts = [];
   for (let i = 0; i < n; i += 1) {
     const a = (i / n) * Math.PI * 2 + (rnd(i, seed) - 0.5) * 0.62;
-    const len = 0.58 + rnd(i, seed + 3) * 1.02;
+    const len = 0.58 + rnd(i, seed + 3) * 1.02 + grow;
     // 1픽셀 선은 흙 운동장 위에서 사라진다. 안쪽이 두껍고 끝이 뾰족한 삼각형이라야 잉크로 읽힌다.
-    const w = 0.046 + rnd(i, seed + 7) * 0.042;
+    const w = 0.046 + rnd(i, seed + 7) * 0.042 + grow;
     const px = -Math.sin(a) * w;
     const py = Math.cos(a) * w;
     const bx = Math.cos(a) * 0.32;
@@ -87,18 +87,18 @@ function spikeGeo(n, seed) {
   return g;
 }
 // 톱니 왕관. 안쪽이 닫힌 띠라서 뻗는 별과 실루엣이 겹치지 않는다. 무언가에 먹힌 사건 쪽에 쓴다.
-function zigGeo(n, seed) {
+function zigGeo(n, seed, grow = 0) {
   const pts = [];
   // 톱니는 면이라 같은 반지름에서도 뻗는 별보다 화면을 몇 배 더 덮는다.
   // 중심까지 채우면 터지는 지점의 공이 100프레임 넘게 가려지므로, 가운데를 비운 띠로 만든다.
   // 구멍 반지름 0.4는 배율 1.2를 곱해도 공 반지름 0.14보다 크니 공이 항상 뚫고 보인다.
-  const inner = 0.4;
-  const band = 0.6;
+  const inner = 0.4 - grow;
+  const band = 0.6 + grow;
   for (let i = 0; i < n; i += 1) {
     const a0 = (i / n) * Math.PI * 2;
     const a1 = ((i + 1) / n) * Math.PI * 2;
     const am = (a0 + a1) * 0.5;
-    const tip = 0.86 + rnd(i, seed) * 0.34;
+    const tip = 0.86 + rnd(i, seed) * 0.34 + grow;
     const i0 = inner * (0.82 + rnd(i, seed + 5) * 0.36);
     const i1 = inner * (0.82 + rnd(i + 1, seed + 5) * 0.36);
     const x0 = Math.cos(a0) * i0;
@@ -119,13 +119,13 @@ function zigGeo(n, seed) {
   return g;
 }
 // 흩어진 쐐기. 중심이 비어 있어 무언가가 떨어져 나간 사건에 붙는다.
-function shardGeo(n, seed) {
+function shardGeo(n, seed, grow = 0) {
   const pts = [];
   for (let i = 0; i < n; i += 1) {
     const a = (i / n) * Math.PI * 2 + (rnd(i, seed + 1) - 0.5) * 0.8;
     const d = 0.42 + rnd(i, seed + 2) * 0.52;
-    const len = 0.3 + rnd(i, seed + 4) * 0.36;
-    const w = 0.09 + rnd(i, seed + 6) * 0.08;
+    const len = 0.3 + rnd(i, seed + 4) * 0.36 + grow * 2;
+    const w = 0.09 + rnd(i, seed + 6) * 0.08 + grow;
     const cx = Math.cos(a) * d;
     const cy = Math.sin(a) * d;
     const ux = Math.cos(a);
@@ -140,11 +140,11 @@ function shardGeo(n, seed) {
 }
 // 형태를 매 사건마다 새로 만들면 GPU 버퍼가 계속 늘어난다. 형태와 갈래 수 조합은 유한하니 캐시한다.
 const SHAPES = new Map();
-function shapeGeo(kindShape, n) {
-  const key = kindShape + n;
+function shapeGeo(kindShape, n, grow = 0) {
+  const key = [kindShape, n, grow].join();
   if (!SHAPES.has(key)) {
     const seed = n * 1.7 + kindShape.length;
-    const g = kindShape === 'zig' ? zigGeo(n, seed) : kindShape === 'shard' ? shardGeo(n, seed) : spikeGeo(n, seed);
+    const g = kindShape === 'zig' ? zigGeo(n, seed, grow) : kindShape === 'shard' ? shardGeo(n, seed, grow) : spikeGeo(n, seed, grow);
     SHAPES.set(key, g);
   }
   return SHAPES.get(key);
@@ -230,6 +230,17 @@ export function createImpact(scene) {
   star.visible = false;
   star.userData.probeIgnore = true;
   scene.add(star);
+
+  // 별도 고리와 같은 병을 앓았다. 연한 사건색 뾰족선이 픽셀화를 거치면 흙과 섞여 회색 실이 된다.
+  // 균일 배율은 이미 실패했다. 12퍼센트를 키워도 폭 4화소짜리 뾰족선에 반 화소가 붙어 화면에 아무것도 안 남았다.
+  // EDGE_GROW 0.06은 도형 좌표계에서 뾰족선 반폭 0.046~0.088에 맞먹는 값이라, 검정 테가 선 자체만큼 두꺼워진다.
+  const EDGE_GROW = 0.06;
+  const starEdgeMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+  const starEdge = new THREE.Mesh(shapeGeo(TONE_DEFAULT.shape, TONE_DEFAULT.spokes, EDGE_GROW), starEdgeMat);
+  starEdge.renderOrder = 7.95;
+  starEdge.visible = false;
+  starEdge.userData.probeIgnore = true;
+  scene.add(starEdge);
 
   // 흙먼지. 흙 운동장이라 부딪히면 흙이 뜬다. 잔디였으면 이걸 안 넣었다.
   const dustMat = new THREE.MeshBasicMaterial({ color: 0xbf9a63, transparent: true, opacity: 0, depthWrite: false });
@@ -349,12 +360,15 @@ export function createImpact(scene) {
     ringMat.color.setHex(tone.ring);
     starMat.color.setHex(tone.c);
     star.geometry = shapeGeo(tone.shape, tone.spokes);
+    starEdge.geometry = shapeGeo(tone.shape, tone.spokes, EDGE_GROW);
     flash.visible = !hidden;
     ring.visible = !hidden;
     ringEdge.visible = !hidden;
     veil.visible = !hidden;
     star.visible = !hidden;
+    starEdge.visible = !hidden;
     star.position.set(at.x, at.y, at.z + behind);
+    starEdge.position.copy(star.position);
     blobSpin = Math.random() * Math.PI * 2;
     for (const m of dust) { m.visible = !hidden; m.position.copy(at); }
     for (const m of chips) { m.visible = !hidden; m.position.copy(at); }
@@ -421,12 +435,14 @@ export function createImpact(scene) {
     }
     if (u >= 1) {
       star.visible = false;
+      starEdge.visible = false;
       wordMesh.visible = false;
       lead.visible = false;
       leadEdge.visible = false;
       for (const m of dust) m.visible = false;
       for (const m of chips) m.visible = false;
       starMat.opacity = 0;
+      starEdgeMat.opacity = 0;
       wordMat.opacity = 0;
       leadMat.opacity = 0;
       leadEdgeMat.opacity = 0;
@@ -442,7 +458,15 @@ export function createImpact(scene) {
     star.quaternion.copy(camera.quaternion);
     // 같은 각으로 뜨면 형태를 갈라도 도장으로 읽힌다. 구마다 통째로 돌린다.
     star.rotateZ(blobSpin * 1.7);
-    starMat.opacity = (1 - u) * 0.9;
+    // 선형 감쇠는 전 구간을 흐린 회색으로 만든다. 계측상 크리틱이 보는 520ms에 0.27까지 빠졌다.
+    // 제곱 감쇠는 본체 구간을 진하게 유지하다 끝에서 한 번에 사라진다. 같은 시각에 0.78이 남는다.
+    starMat.opacity = (1 - u * u) * 0.9;
+    // 외곽선은 별과 같은 자세, 같은 배율이다. 굵기 차이는 도형 자체가 이미 가지고 있다.
+    starEdge.position.copy(star.position);
+    starEdge.quaternion.copy(star.quaternion);
+    starEdge.scale.copy(star.scale);
+    // 테가 채움보다 옅으면 외곽선이 아니라 그림자로 읽힌다. 1.6은 채움 0.6에서 테를 불투명으로 만드는 배수다.
+    starEdgeMat.opacity = Math.min(1, starMat.opacity * 1.6);
     // 먼지는 흩어지면서 가라앉는다. 위로만 보내면 연기가 된다.
     for (const m of dust) {
       const d = m.userData.dir;
@@ -550,6 +574,7 @@ export function createImpact(scene) {
     ringEdge.visible = false;
     veil.visible = false;
     star.visible = false;
+    starEdge.visible = false;
     wordMesh.visible = false;
     lead.visible = false;
     leadEdge.visible = false;
@@ -560,6 +585,7 @@ export function createImpact(scene) {
     ringEdgeMat.opacity = 0;
     veilMat.opacity = 0;
     starMat.opacity = 0;
+    starEdgeMat.opacity = 0;
     wordMat.opacity = 0;
     leadMat.opacity = 0;
     leadEdgeMat.opacity = 0;
@@ -578,6 +604,7 @@ export function createImpact(scene) {
     ringEdge.visible = flash.visible;
     veil.visible = live;
     star.visible = bodyLive;
+    starEdge.visible = bodyLive;
     // 글자는 본체보다 오래 산다. 뒤따르는 소리가 본체가 꺼진 뒤에 뜨기 때문이다.
     wordMesh.visible = live && Boolean(wordMat.map);
     // 꼬리는 글자에 딸린 층이다. 글자가 꺼진 프레임에 꼬리만 남으면 차분이 거짓말을 한다.
