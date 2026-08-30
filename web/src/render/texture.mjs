@@ -364,15 +364,20 @@ const WIN_KIND = [
   { seed: 0x40b8e1, stepY: 17, stepX: 16, skip: 0.29, balcony: 0.70, wide: 2.2 }
 ];
 
-export function windowTex(variant = 0) {
+// salt는 동 번호다. 다섯 종을 열네 동이 나눠 쓰면 세 번째 동부터 창 배치가 그대로 되돌아온다.
+// 구조(층 간격, 난간, 창 폭)는 종이 정하고, 어느 칸이 비고 어느 집이 커튼을 쳤는지는 동마다 따로 굴린다.
+// 64px 한 장이 열네 장으로 늘 뿐이라 값은 무시할 수준이다.
+export function windowTex(variant = 0, salt = 0) {
   const k = WIN_KIND[variant % WIN_KIND.length];
-  return memo('window:' + (variant % WIN_KIND.length), () => {
+  return memo('window:' + (variant % WIN_KIND.length) + ':' + salt, () => {
     const S = 64;
     const cv = canvas(S);
     const c = cv.getContext('2d');
     c.fillStyle = '#ffffff';
     c.fillRect(0, 0, S, S);
-    const r = rng(k.seed);
+    // 씨앗에 동 번호를 섞는다. 이걸 빼면 salt가 memo 키만 늘리고 그림은 다섯 장 그대로다.
+    // 7919는 서로 다른 종의 씨앗끼리 겹치지 않게 벌려두려고 고른 소수다.
+    const r = rng(k.seed + salt * 7919);
     // 창을 잘게 찍으면 저해상도로 줄어드는 화면에서 한 픽셀도 안 남는다.
     // 크게 찍고 대신 몇 칸을 비운다. 창이 한 칸도 안 빠지면 격자무늬 벽지다.
     // 칸마다 따로 흔들면 창이 줄을 잃고 벽에 뚝뚝 흔어진 얼룩이 된다.
@@ -413,13 +418,13 @@ export function windowTex(variant = 0) {
 
 // 건물 한 동의 창문. 층 간격은 실제 층고에서 나온다.
 // 박스 UV는 면마다 0~1이라 배율을 고정하면 넓은 동일수록 창이 옆으로 늘어난다.
-// 텍스처 자체는 다섯 장뿐이고, 동마다 배율만 다른 사본을 준다.
+// 종은 다섯이고 그 안에서 동마다 창 배치를 따로 굴린다. 배율은 그 위에 얹는다.
 // 3.1과 3.6은 실제 층고에 맞지만 화면에서는 창 한 칸이 포스트잇만 해졌다.
 // 멀리 있는 건물은 실치수가 아니라 보이는 크기로 정해야 한다.
 const FLOOR_M = 2.3;
 const BAY_M = 2.5;
-export function windowTexFor(variant, w, h) {
-  const t = windowTex(variant).clone();
+export function windowTexFor(variant, w, h, salt = 0) {
+  const t = windowTex(variant, salt).clone();
   t.needsUpdate = true;
   t.repeat.set(Math.max(1, Math.round(w / BAY_M)), Math.max(1, Math.round(h / FLOOR_M)));
   return t;

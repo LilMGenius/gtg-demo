@@ -386,7 +386,7 @@ export function buildPitch(scene) {
     const h = 4.5 + rnd() * 7.5;
     const kind = Math.floor(rnd() * 5);
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 3), new THREE.MeshLambertMaterial({
-      color: wallColor(kind + i), map: windowTexFor(kind, w, h)
+      color: wallColor(kind + i), map: windowTexFor(kind, w, h, i)
     }));
     b.position.set(cursor + w / 2, h / 2, 38 + rnd() * 7);
     // 0.02는 정렬된 것과 구분이 안 됐고 0.14는 건물이 쓰러지는 것으로 읽혔다.
@@ -402,7 +402,7 @@ export function buildPitch(scene) {
   // 구운 GLB가 서면 위에서 세운 fallback은 버려진다. 화면에 실제로 서는 건 이쪽이다.
   // 창 무늬도 벽색도 동마다 갈라야 열네 동이 열네 동으로 읽힌다.
   loadDecor(scene, 'skyline', skyline, 0.18, (c, nth) => new THREE.MeshLambertMaterial({
-    color: wallColor(nth), map: windowTex(nth)
+    color: wallColor(nth), map: windowTex(nth, nth)
   }));
 
   return { ground, box, bar, net: back, netZ: -NET_D, drift: dome.material.uniforms.drift };
