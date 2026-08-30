@@ -83,7 +83,14 @@ export function meshPanel(w, h, cell, color, opacity, sag = 0, fadeFloor = false
     for (let i = 0; i < a.length; i += 3) {
       const dx = base[i] - px;
       const dy = base[i + 1] - py;
-      a[i + 2] = base[i + 2] + amp * Math.exp(-(dx * dx + dy * dy) / r2);
+      const f = Math.exp(-(dx * dx + dy * dy) / r2);
+      a[i + 2] = base[i + 2] + amp * f;
+      // z 밀림은 카메라 시선축이다. 화면에서는 그 자리가 조금 커지는 것으로만 나타나고,
+      // 정지 프레임에서는 밀린 적 없는 그물과 구별되지 않는다. 실은 늘어나지 않으니
+      // 뒤로 밀린 만큼 주변 실이 중심으로 빨려들어야 격자 자체가 일그러진다.
+      const pull = Math.abs(amp) * 0.8 * f;
+      a[i] = base[i] - dx * pull;
+      a[i + 1] = base[i + 1] - dy * pull;
     }
     attr.needsUpdate = true;
     // 밀린 실이 안 보이면 밀린 적 없는 것과 같다. 공이 정착하는 높이는 바닥 페이드가
