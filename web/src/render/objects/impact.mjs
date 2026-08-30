@@ -207,7 +207,9 @@ export function createImpact(scene) {
       wordMat.needsUpdate = true;
       // 같은 각도로 매번 뜨면 도장찍기로 읽힌다. 매번 달리 기울인다.
       wordSpin = (Math.random() - 0.5) * 0.52;
-      wordSide = (Math.random() - 0.5) * 0.7;
+      // 글자를 머리 위로 피하면 접촉점과 100px 넘게 벌어져 자막으로 읽힌다.
+      // 얼굴은 옆으로 비켜서 피한다. 좌우로 확실히 밀어내고 높이는 접점 곁에 둔다.
+      wordSide = (Math.random() < 0.5 ? -1 : 1) * (0.66 + Math.random() * 0.22);
     }
   }
 
@@ -286,7 +288,7 @@ export function createImpact(scene) {
     // 튀어나왔다가 제자리로 주저앉는다. 선형으로 키우면 풍선처럼 보인다.
     if (wordMesh.visible) {
       const pop = u < 0.24 ? (u / 0.24) * 1.3 : 1.3 - (u - 0.24) / 0.76 * 0.3;
-      wordMesh.position.set(at.x + wordSide, at.y + 0.75 + u * 0.42, at.z);
+      wordMesh.position.set(at.x + wordSide, at.y + 0.28 + u * 0.24, at.z);
       wordMesh.quaternion.copy(camera.quaternion);
       wordMesh.rotateZ(wordSpin);
       wordMesh.scale.setScalar(pop * (0.7 + power * 0.35));
