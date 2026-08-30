@@ -50,7 +50,13 @@ function starGeo(list) {
   for (let i = 0; i < list.length; i += 1) {
     const a = list[i];
     const len = 0.78 + ((i * 0.37 + a * 0.21) % 1) * 0.46;
-    pts.push(Math.cos(a) * 0.35, Math.sin(a) * 0.35, 0, Math.cos(a) * len, Math.sin(a) * len, 0);
+    // 1픽셀 선은 흙 운동장 위에서 사라진다. 안쪽이 두껍고 끝이 뾰족한 삼각형이라야 잉크로 읽힌다.
+    const w = 0.042 + ((i * 0.61 + a * 0.33) % 1) * 0.03;
+    const px = -Math.sin(a) * w;
+    const py = Math.cos(a) * w;
+    const bx = Math.cos(a) * 0.35;
+    const by = Math.sin(a) * 0.35;
+    pts.push(bx + px, by + py, 0, bx - px, by - py, 0, Math.cos(a) * len, Math.sin(a) * len, 0);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
@@ -112,8 +118,9 @@ export function createImpact(scene) {
   ring.userData.probeIgnore = true;
   scene.add(ring);
 
-  const starMat = new THREE.LineBasicMaterial({ color: 0xfffbe8, transparent: true, opacity: 0 });
-  const star = new THREE.LineSegments(starGeo(SPOKES), starMat);
+  const starMat = new THREE.MeshBasicMaterial({ color: 0xfffbe8, transparent: true, opacity: 0, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+  const star = new THREE.Mesh(starGeo(SPOKES), starMat);
+  star.renderOrder = 8;
   star.visible = false;
   star.userData.probeIgnore = true;
   scene.add(star);
@@ -191,7 +198,7 @@ export function createImpact(scene) {
     flashMat.color.setHex(tone.c);
     ringMat.color.setHex(tone.ring);
     starMat.color.setHex(tone.c);
-    star.geometry.setDrawRange(0, tone.spokes * 2);
+    star.geometry.setDrawRange(0, tone.spokes * 3);
     flash.visible = !hidden;
     ring.visible = !hidden;
     veil.visible = !hidden;
