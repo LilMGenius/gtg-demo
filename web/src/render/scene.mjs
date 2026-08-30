@@ -346,6 +346,10 @@ export function createScene(canvas) {
   // 발자국만 한 원판은 다리 뒤에 그대로 숨는다. 몸 밖으로 치마처럼 삐져나와야 접지가 보인다.
   const keeperShadow = blob(0.55);
   const kickerShadow = blob(0.36);
+  // 골반 높이의 기준선. 서 있을 때 값을 그대로 쓰므로 키를 바꿔 끼워도 따라온다.
+  let pelvisRest = 0;
+  const hipA = new THREE.Vector3();
+  const hipB = new THREE.Vector3();
   // 행인도 그림자가 있어야 땅을 딘는다. 말걸기 연출은 행인을 앞줄로 데려오므로 더 눈에 띄다.
   const passerShadows = passers.map(() => blob(0.28));
 
@@ -1118,10 +1122,22 @@ export function createScene(canvas) {
     else if (titleMode) applyFace(0.92, 'grin', 1);
     else applyFace(0, 'rest', 1);
     kicker.position.y += -footY(kicker);
-    // 루트 피벗이 발밑이라 몸이 누우면 몸통은 옆으로 나가는데 그림자는 발밑에 남았다.
-    // 회전으로 옮겨간 몸통 중심만큼 그림자를 같이 끌고 간다. 0.72는 화면에서 잰 중심 높이다.
-    const leanX = -Math.sin(keeper.rotation.z) * 0.72;
-    keeperShadow.position.set(keeper.position.x + leanX, 0.03, keeper.position.z);
+    // 루트 피벗은 발밑이라 몸이 누우면 몸통만 옆으로 나간다. 사인 근사는 그 자리를 눈대중으로 옮겼다.
+    // 골반은 리그에 실재하는 점이다. 양 고관절의 월드 중점을 재면 눕든 뜨든 몸의 중심이 그대로 나온다.
+    keeper.updateMatrixWorld(true);
+    keeper.userData.joints.hipL.getWorldPosition(hipA);
+    keeper.userData.joints.hipR.getWorldPosition(hipB);
+    const pelvisY = (hipA.y + hipB.y) * 0.5;
+    // 서 있는 프레임의 값을 그대로 기준선으로 쓴다. 프레임당 수렴은 정지 프레임 두 장을 갈라놓는다.
+    if (!tail && !cue) pelvisRest = pelvisY;
+    keeperShadow.position.set((hipA.x + hipB.x) * 0.5, 0.03, (hipA.z + hipB.z) * 0.5);
+    // 뜬 높이만큼 그늘이 작고 옅어져야 몸이 공중에 있는 것으로 읽힌다.
+    // 눕는 각만 보던 이전 식은 다이빙으로 몸이 떠도 농도가 그대로라 바닥에 붙어 보였다.
+    const rise = Math.max(0, pelvisY - pelvisRest);
+    const shrink = Math.max(0.45, 1 - rise * 0.30);
+    keeperShadow.scale.setScalar(shrink);
+    keeperShadow.material.opacity = 0.72 * shrink;
+    keeperShadow.children[0].material.opacity = 0.86 * shrink;
     // 행인은 판정과 무관하게 계속 걷는다. 멈춘 배경은 그림이고 움직이는 배경은 장소다.
     for (const [i, p] of passers.entries()) {
       // 반짝임은 돌면서 커졌다 작아진다. 고정된 마름모는 머리에 박힌 장식으로 읽힌다.
@@ -1152,7 +1168,6 @@ export function createScene(canvas) {
       // 세계시간이 멈춘 첫 프레임이 그 한 걸음을 따라잡아 정지 프레임 두 장이 갈린다.
       passerShadows[i].position.set(p.position.x, 0.03, p.position.z);
     }
-    keeperShadow.scale.setScalar(1 + Math.abs(Math.sin(keeper.rotation.z)) * 0.8);
     kickerShadow.position.set(kicker.position.x, 0.03, kicker.position.z);
     // 잔상은 지나온 자리를 따라간다. 매 프레임 전부 옮기면 공이 여덟 개인 것으로 읽힌다.
     // 세계시간이 멈추면 잔상도 그 프레임의 모습 그대로 서 있어야 한다.
