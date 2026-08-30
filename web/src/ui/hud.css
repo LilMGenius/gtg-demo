@@ -105,21 +105,27 @@ body.playing #hud{opacity:1}
   padding-bottom:calc(clamp(24px,3.4vh,38px) + env(safe-area-inset-bottom))}
 .zone+.zone::before{content:'';position:absolute;left:0;top:18%;bottom:18%;
   width:2px;background:#ffffff14}
-/* 세 화살표는 같은 자로 그은 셰브런이 아니다. 기울기와 획 굵기를 버튼마다 어긋내면
-   손으로 세 번 그린 자국으로 읽힌다. 같은 각·같은 굵기는 앱 아이콘으로 읽혔다. */
+/* 화살표는 화면의 나머지와 같은 격자 위에 있어야 한다. 부드러운 벡터 셰브런은
+   흙과 그물이 도트인 화면에서 혼자 네이티브 해상도로 떠 보였다. 3px 블록 계단 +
+   타이틀 버튼과 같은 판때기로 바꾼다. 기울기는 버튼마다 어긋낸다. */
 .zone{--tw:0deg}
 .zone:nth-child(1){--tw:-1.5deg}
 .zone:nth-child(2){--tw:.8deg}
 .zone:nth-child(3){--tw:-2deg}
 .zone svg{width:clamp(34px,4.1vw,50px);height:clamp(34px,4.1vw,50px);
-  stroke-width:4.5;color:#f6efdc;transition:color .12s,transform .12s;
-  transform:rotate(var(--tw));
-  filter:drop-shadow(2px 3px 0 var(--edge)) drop-shadow(-2px 0 0 var(--edge))
-         drop-shadow(0 -2px 0 var(--edge)) drop-shadow(2px 0 0 var(--edge))}
-.zone:nth-child(2) svg{stroke-width:5.2}
-.zone:nth-child(3) svg{stroke-width:4.1}
-.zone:active svg{color:#ffd83d;transform:rotate(var(--tw)) scale(1.18) translateY(3px)}
-.zone:disabled svg{color:#ffffff1f}
+  color:#f6efdc;transition:color .12s,transform .12s,box-shadow .12s;
+  transform:rotate(var(--tw));shape-rendering:crispEdges;
+  padding:7px;background:var(--panel);
+  border:var(--line) solid var(--edge);
+  box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel)}
+/* 판때기 그림자 길이를 셋 다 다르게 준다. 같은 길이면 세 장이 한 번에 찍힌 스티커가 된다. */
+.zone:nth-child(2) svg{box-shadow:4px 7px 0 var(--edge), var(--bevel)}
+.zone:nth-child(3) svg{box-shadow:7px 4px 0 var(--edge), var(--bevel)}
+.zone:active svg{color:#ffd83d;background:#2a3520;
+  transform:rotate(var(--tw)) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
+/* 12% 흰색은 판때기가 어두워지면서 글리프가 통째로 사라졌다. 대기 상태도 화살표는
+   읽혀야 하고, 꺼졌다는 신호는 밝기 차이로 충분하다. */
+.zone:disabled svg{color:#f6efdc5c}
 .zone:disabled{cursor:default}
 
 /* 컨트롤 세 개는 크로스바 위 하늘 띠에 쌓는다. 기둥 아래끝 206px, 크로스바 325px.
