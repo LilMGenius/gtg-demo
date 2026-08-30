@@ -1134,7 +1134,7 @@ export function createScene(canvas) {
         tail.netDone = true;
         // 그물은 울리지 않는다. 마른 마찰 한 겹과 짧은 저역이 전부다.
         sfx.place();
-        netAmp = 0.4;
+        netAmp = 0.55;
         netT = 0;
         netX = ball.position.x;
         netY = ball.position.y - R_H / 2;
@@ -1324,11 +1324,15 @@ export function createScene(canvas) {
       camera.rotateZ(k);
       if (dutchLeft <= 0) dutch = 0;
     }
-    if (netAmp > 0.002) {
+    if (netAmp > 0.012) {
       netT += dt;
-      netAmp *= Math.exp(-dt * 5.2);
-      // 밀렸다가 되튄다. 진동수가 낮으면 천이 아니라 젤리다.
-      pitch.net.userData.punch(netX, netY, -netAmp * Math.cos(netT * 19));
+      // 천은 두 시계로 움직인다. 떨림은 빨리 죽고, 밀린 배는 천천히 돌아온다.
+      // 하나로 묶어 순수 사인만 쓰면 반주기마다 정확히 원위치를 지나가고,
+      // 그 순간을 찍은 정지 프레임에서는 그물이 아예 안 밀린 것으로 읽힌다.
+      // 실측: talked가 320ms에 27px였다가 크리틱이 보는 520ms에 0.30px였다.
+      netAmp *= Math.exp(-dt * 1.5);
+      const ring = Math.cos(netT * 13) * Math.exp(-netT * 4.4);
+      pitch.net.userData.punch(netX, netY, -netAmp * (0.7 + 0.3 * ring));
     } else if (netAmp !== 0) {
       netAmp = 0;
       pitch.net.userData.punch(0, 0, 0);
