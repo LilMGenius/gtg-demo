@@ -19,6 +19,11 @@ html,body{height:100%;background:#0d110c;overflow:hidden;
 button{font-family:inherit;cursor:pointer}
 #stage{position:fixed;inset:0;width:100%;height:100%;display:block}
 
+/* CSS 애니메이션은 실시간 시계로 돈다. 세계시계를 세워도 혼자 계속 가서
+   정지 프레임 두 장이 달라진다. 화면 전체를 덮는 #flash 한 장이 밝기를
+   한 칸 밀면 포스터라이즈가 그 한 칸을 화면 삼분의 일로 키운다. */
+body.frozen *,body.frozen *::before,body.frozen *::after{animation-play-state:paused!important}
+
 #hud{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .3s}
 body.playing #hud{opacity:1}
 

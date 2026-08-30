@@ -78,6 +78,9 @@ export function createImpact(scene) {
   let life = 0;
   let power = 1;
   const at = new THREE.Vector3();
+  // 계측이 임팩트를 뺀 같은 프레임을 찍을 수 있어야 한다.
+  // 안 그러면 화면에 남은 화소가 임팩트인지 뒤의 골대인지 말할 수 없다.
+  let hidden = false;
 
   // 사건이 일어난 좌표를 받는다. 세기는 사건의 무게다.
   // 0.34초는 사람 눈에 번짝이고 정지 프레임에는 거의 안 잡힌다. 0.55가 읽힌다.
@@ -87,10 +90,10 @@ export function createImpact(scene) {
     power = strength;
     life = 0.55;
     t = 0;
-    star.visible = true;
+    star.visible = !hidden;
     star.position.copy(at);
-    for (const m of dust) { m.visible = true; m.position.copy(at); }
-    wordMesh.visible = !!word;
+    for (const m of dust) { m.visible = !hidden; m.position.copy(at); }
+    wordMesh.visible = Boolean(word) && !hidden;
     if (word) {
       if (!texCache.has(word)) texCache.set(word, wordTex(word));
       wordMat.map = texCache.get(word);
@@ -135,5 +138,27 @@ export function createImpact(scene) {
     }
   }
 
-  return { burst, update };
+  function hide(on) {
+    hidden = Boolean(on);
+    const live = !hidden && life > 0;
+    star.visible = live;
+    wordMesh.visible = live && Boolean(wordMat.map);
+    for (const m of dust) m.visible = live;
+    return hidden;
+  }
+
+  // 선언된 수명과 화면에 남은 밝기는 다른 주장이다. 둘 다 적어야 캡처 순간이 피크였는지 갈린다.
+  function state() {
+    return {
+      life,
+      u: life > 0 ? Math.min(1, t / life) : 1,
+      star: starMat.opacity,
+      dust: dustMat.opacity,
+      word: wordMat.opacity,
+      shown: dust.filter((m) => m.visible).length + (star.visible ? 1 : 0),
+      hidden
+    };
+  }
+
+  return { burst, update, hide, state };
 }

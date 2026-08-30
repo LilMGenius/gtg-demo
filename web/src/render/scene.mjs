@@ -141,6 +141,8 @@ export function createScene(canvas) {
   // 계측용 정지. 세계시간만 멈추고 렌더는 계속 돈다.
   // 렌더까지 멈추면 대조군이 화면 갱신 자체를 못 보므로 계기의 잡음 바닥을 재지 못한다.
   let frozen = false;
+  // 정지 중 화면이 바뀌면 렌더 프레임 수를 같이 봐야 프레임 단위 누적인지 가려진다.
+  let frames = 0;
   // 세계시계 위의 타이머. setTimeout은 정지 중에도 깨어나 DOM을 다시 그리므로
   // 연출과 자막은 실시간이 아니라 이 목록으로 예약한다.
   const timers = new Map();
@@ -370,6 +372,10 @@ export function createScene(canvas) {
   let shakeAmp = 0;
   let shakeLeft = 0;
   let shakeSpan = 1;
+  // 사건 하나가 화면을 얼마나 밀었고 공을 얼마나 찌그러뜨렸는지의 최고값.
+  // 계측이 폴링으로 잡으면 피크는 프레임 사이로 빠져나간다. 그리는 쪽이 적어야 한다.
+  let camOffPeak = 0;
+  let squashPeak = 0;
   // 더치 앵글. 카메라 위치를 옮기면 골대 프레이밍 측정이 통째로 흔들린다.
   // 렌즈만 기울이면 프레임 안의 것들은 그대로 있고 화면만 비뚤어진다. 게이트가 재는 축을 안 건드린다.
   // 0.04는 모니터가 삐뚤어진 줄 알았고 0.28은 골대 모서리가 프레임을 나갔다.
@@ -480,6 +486,10 @@ export function createScene(canvas) {
   // 순간 전환은 사람이 아니라 슬라이드로 읽힌다.
   const poseNow = { keeper: POSES.ready, kicker: POSES.windup };
   const actor = { keeper: null, kicker: null };
+  // 프레임당 상수 비율은 세계시간이 멈춰도 목표를 향해 계속 간다.
+  // 정지 프레임 두 장을 비교하는 계측이 그 수렴을 잡음 바닥으로 읽는다(계측: 306185화소).
+  // 60fps에서의 비율을 dt로 환산하면 dt가 0일 때 0이 되고 프레임률이 흔들려도 도착 속도가 같다.
+  const damp = (rate) => 1 - Math.pow(1 - rate, stepDt * 60);
   function drive(key, target, rate) {
     // 프레임당 상수 비율로 당기면 세계시간이 멈춰도 포즈가 목표를 향해 계속 간다.
     // 정지 프레임 두 장을 비교하는 계측이 그 수렴을 잡음 바닥으로 읽었다.
@@ -668,6 +678,8 @@ export function createScene(canvas) {
     };
     if (HIT[kind]) stopLeft = HIT[kind];
     const s = SHK[kind];
+    camOffPeak = 0;
+    squashPeak = 0;
     if (s) shake(s[0], s[1]);
     // 실점은 화면이 한 번 하얗게 튄 다음 색이 빠진다. 결과를 글자로만 알리면 글자를 안 읽는다.
     if (CONCEDE.has(kind)) flash(kind);
@@ -704,6 +716,7 @@ export function createScene(canvas) {
     let dt = Math.min(0.05, Math.max(0, real - realLast));
     realLast = real;
     if (frozen) dt = 0;
+    frames += 1;
     if (stopLeft > 0) {
       stopLeft -= dt;
       dt *= HIT_SCALE;
@@ -875,12 +888,12 @@ export function createScene(canvas) {
             // 장갑 중심에 공 중심을 맞추면 공이 손 안으로 파묻힌다. 공 반경만큼 카메라 쪽으로 내놓는다.
             ball.position.set(lerp(tail.from.x, gw.x, grab), lerp(tail.from.y, gw.y, grab), lerp(tail.from.z, gw.z - BALL_R, grab));
           }
-          keeper.rotation.z = lerp(keeper.rotation.z, 0, 0.08);
+          keeper.rotation.z = lerp(keeper.rotation.z, 0, damp(0.08));
           break;
         case 'carriedIn': {
           // 막았는데 같이 넘어간다. 공과 몸이 한 덩어리로 골망까지 간다.
           keeper.position.z = lerp(KEEPER_Z, -0.35, e);
-          keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.35, 0.08);
+          keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.35, damp(0.08));
           hover = 0.06;
           // 공을 키퍼 좌표에서 띄우면 엎드린 몸 밖, 하필이면 부츠 옆 땅에 놓인다.
           // 그러면 안고 넘어간 것이 아니라 발치에 공이 굴러온 것으로 읽힌다.
@@ -948,7 +961,7 @@ export function createScene(canvas) {
           ball.position.set(lerp(tail.from.x, tail.from.x + (tail.kx >= 0 ? 1.5 : -1.5), e), 0.14 + Math.abs(Math.sin(u * 9)) * 0.5 * (1 - u), lerp(tail.from.z, 3.2, e));
           break;
         case 'downed': {
-          keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.5, 0.06);
+          keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.5, damp(0.06));
           hover = 0.04;
           // 공이 몸과 상관없는 자리로 혼자 굴러갔다. 자막은 깔렸다는데 공은 반대편 허공을 지나갔다.
           // 경로의 중간 지점을 쓰러진 몸에 묶는다. 몸 위를 타고 넘어가야 한 사건으로 읽힌다.
@@ -976,7 +989,7 @@ export function createScene(canvas) {
         case 'charge':
           // 잡고 나서 드리블하러 나간다. 공이 발 앞에서 튄다.
           // 다이빙에서 넘어온 기울기가 남으면 달려 나가는 게 아니라 자빠지는 것으로 읽힌다.
-          keeper.rotation.z = lerp(keeper.rotation.z, 0, 0.62);
+          keeper.rotation.z = lerp(keeper.rotation.z, 0, damp(0.62));
           // z=6.5까지 보내면 키퍼가 골대 그물 너머 원경에 파묻히고 공이 몇 픽셀로 줄어든다.
           // 나갔다는 사실은 페널티 박스를 벗어나는 것으로 이미 읽힌다. 근경에 세운다.
           keeper.position.z = lerp(KEEPER_Z, CHARGE_Z, e);
@@ -986,14 +999,14 @@ export function createScene(canvas) {
           break;
         case 'beat':
           keeper.position.z = lerp(CHARGE_Z, CHARGE_Z + 5.2, e);
-          keeper.rotation.z = lerp(keeper.rotation.z, Math.sin(u * 16) * 0.12, 0.34);
+          keeper.rotation.z = lerp(keeper.rotation.z, Math.sin(u * 16) * 0.12, damp(0.34));
           ball.position.set(keeper.position.x, 0.14, keeper.position.z + 0.7);
           kicker.rotation.z = lerp(0, 1.3, e);
           break;
         case 'lost':
           // 뺏겼다. 키퍼는 저기 나가 있고 골대가 비어 있다.
           ball.position.set(lerp(tail.from.x, kicker.position.x, e), 0.14, lerp(tail.from.z, kicker.position.z + 0.5, e));
-          keeper.rotation.z = lerp(keeper.rotation.z, 1.2, 0.06);
+          keeper.rotation.z = lerp(keeper.rotation.z, 1.2, damp(0.06));
           break;
         case 'skied':
           // 올라갔다가 다시 내려온다. 프레임을 나가면 하늘로 넘겼다는 결과가 안 보인다.
@@ -1197,8 +1210,11 @@ export function createScene(canvas) {
       // 감쇠 없이 흔들면 끝날 때 뚝 끊긴다. 남은 시간에 비례해 잦아든다.
       const k = shakeAmp * Math.max(0, shakeLeft / shakeSpan);
       // 사인 두 개를 정수비로 겹치면 규칙적인 원운동이 되고 카메라가 도는 것으로 읽힌다.
-      camera.position.x += Math.sin(vnow * 61) * k;
-      camera.position.y += Math.sin(vnow * 47 + 1.7) * k * 0.8;
+      const sx = Math.sin(vnow * 61) * k;
+      const sy = Math.sin(vnow * 47 + 1.7) * k * 0.8;
+      camera.position.x += sx;
+      camera.position.y += sy;
+      camOffPeak = Math.max(camOffPeak, Math.hypot(sx, sy));
       if (shakeLeft <= 0) shakeAmp = 0;
     }
     camera.lookAt(camLook);
@@ -1226,6 +1242,7 @@ export function createScene(canvas) {
       pitch.net.userData.punch(0, 0, 0);
     }
     impact.update(dt, camera);
+    squashPeak = Math.max(squashPeak, Math.abs(ball.scale.x / Math.max(0.001, ball.scale.y) - 1));
     if (cue) { ballProbe.sample(); stageProbe.sample(); }
     renderer.setRenderTarget(rt);
     renderer.render(scene, camera);
@@ -1246,7 +1263,15 @@ export function createScene(canvas) {
 
   // 사건이 없을 때 화면이 정말 멈추는지를 계측이 확인할 수 있어야 한다.
   // 게임은 사건 사이에도 계속 진행하므로, 대기 시간만으로는 정지 상태를 만들 수 없다.
-  window.__freeze = (on) => { frozen = Boolean(on); return frozen; };
+  window.__freeze = (on) => {
+    frozen = Boolean(on);
+    document.body.classList.toggle('frozen', frozen);
+    return frozen;
+  };
+
+  // 프리즈 중에 카메라가 움직이면 세계시계가 새는 것인지 카메라 경로만 새는 것인지
+  // 화면으로는 구분이 안 된다. 렌더 쪽 시간 변수를 그대로 내보낸다.
+  window.__camDbg = () => ({ vnow, camEvLeft, shakeLeft, dutchLeft, stopLeft, fovBase, fov: camera.fov, frozen, frames });
 
   // 표정을 바꾸는 코드가 돌았다는 것과 표정이 화면에 있다는 것은 다른 주장이다.
   // 뒤통수를 향한 머리에 하트 눈을 넣어도 관객이 보는 것은 검은 반구다.
@@ -1334,6 +1359,19 @@ export function createScene(canvas) {
     lit: ghosts.filter((g) => g.userData.lit).length,
     opacity: ghostAlpha
   });
+
+  // 임팩트 프레임은 선언으로 증명되지 않는다. 세계시계가 실제로 늦었는지,
+  // 렌즈가 밀렸는지, 공이 찌그러졌는지를 사건마다 최고값으로 적는다.
+  window.__impactVis = () => ({
+    stop: stopLeft,
+    shake: shakeLeft,
+    camOff: camOffPeak,
+    squash: squashPeak,
+    ...impact.state()
+  });
+
+  // 임팩트를 뺀 같은 프레임. 차분이 임팩트의 화소다.
+  window.__impactHide = (on) => impact.hide(on);
 
   renderer.setAnimationLoop(frame);
 
