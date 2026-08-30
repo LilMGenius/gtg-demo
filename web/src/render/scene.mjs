@@ -554,6 +554,9 @@ export function createScene(canvas) {
   let tail = null;
   // 고개가 돌아가는 속도. 사건과 함께 즉시 최대로 돌면 목이 끊긴 것으로 보인다.
   let tailRamp = 0;
+  // 손으로 잡는 사건만 램프를 즉발로 돌린다. 접촉이 순간이라 반응 포즈가 늦으면
+  // 충돌 정지 프레임에서 공이 장갑이 아니라 얼굴에 붙어 보인다.
+  const INSTANT = new Set(['catch', 'save']);
   // 떨어져 나간 장갑. 키퍼 그룹에 달린 채로 카메라 쪽으로 날아가면 키퍼가 프레임을 나간 것으로 측정된다.
   let loose = null;
   const heartMat = new THREE.MeshBasicMaterial({ color: 0xff3f6d });
@@ -895,7 +898,9 @@ export function createScene(canvas) {
     if (tail) {
       const u = Math.min(1, (vnow - tail.t0) / 0.8);
       const e = ease(u);
-      tailRamp = ease(Math.min(1, u * 2.5));
+      // 잡는 사건은 접촉이 순간이다. 정지 프레임은 충돌 직후 22ms에서 잡히는데
+      // 0.32초 램프로는 그때 포즈가 아직 대기 자세라 손이 아니라 얼굴에 공이 붙어 보인다.
+      tailRamp = ease(Math.min(1, u * (INSTANT.has(tail.kind) ? 40 : 2.5)));
       // 공이 붙는 자리는 선언이 아니라 장갑의 실제 월드 좌표다.
       // 키퍼 좌표에 상수를 더하면 몸이 기울어 있을 때 공이 장갑 옆 허공에 뜬다.
       const gloveWorld = (sgn) => {
@@ -946,7 +951,9 @@ export function createScene(canvas) {
             const gw = gloveWorld(Math.sign(tail.kx || 1));
             // 0.8초에 걸쳐 붙이면 대부분의 프레임에서 공이 장갑에서 떨어져 있다.
             // 잡는 것은 순간이다. 손이 닿는 구간은 130ms 안에 끝나고 나머지 시간은 붙은 채로 간다.
-            const grab = ease(Math.min(1, u * 6));
+            // 6배는 130ms다. 충돌 정지 프레임은 22ms에서 잡히므로 그 프레임에서 공이 아직
+            // 비행 종료점, 즉 얼굴 높이에 있다. 포즈 램프와 같은 속도로 붙여야 손이 접촉점이 된다.
+            const grab = ease(Math.min(1, u * 30));
             // 장갑 중심에 공 중심을 맞추면 공이 손 안으로 파묻힌다. 공 반경만큼 카메라 쪽으로 내놓는다.
             ball.position.set(lerp(tail.from.x, gw.x, grab), lerp(tail.from.y, gw.y, grab), lerp(tail.from.z, gw.z - BALL_R, grab));
           }
