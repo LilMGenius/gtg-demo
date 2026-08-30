@@ -9,7 +9,7 @@ import {
   flat, flatVertex, BALL_R, VIEW_X, KICKER_OFF, BALL_PAST, REST_Z, REST_Y,
   R_HALF_W, R_H, SX, SY, lerp, ease
 } from './units.mjs';
-import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, setPose } from './objects/actors.mjs';
+import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, pushPose, setPose } from './objects/actors.mjs';
 import { buildPitch, buildPassers } from './objects/pitch.mjs';
 import { createImpact } from './objects/impact.mjs';
 import { jitterMesh, addOutline, blobGeo, ballGeo } from './handmade.mjs';
@@ -170,6 +170,8 @@ export function createScene(canvas) {
     for (const [, fn] of due) fn();
   }
   let kickPop = 0;
+  // 키퍼가 사건에 닿는 순간의 눌림. 키커의 kickPop과 같은 장치이고 대상만 다르다.
+  let keeperPop = 0;
   // 0.30은 슬로모션으로 읽혔고 0.02는 프레임이 멈춘 것으로 읽혔다. 0.08이 걸리는 느낌이다.
   const HIT_SCALE = 0.08;
 
@@ -956,6 +958,26 @@ export function createScene(canvas) {
         talked: POSES.swoon, distracted: POSES.swoon, openGoalScored: POSES.faceplant
       };
       kp = TAIL_POSE[tail.kind] ?? kp;
+      // 사건이 최종 포즈 한 장으로 스냅된다. 예비도 잔여도 없어서 정지 프레임의 몸은
+      // 사건을 겪은 것이 아니라 그 자세로 놓여 있는 것으로 읽힌다. pose-gate는 최종 포즈끼리의
+      // 거리만 재므로 이 결함을 못 잡는다. 포즈 표를 사건 수만큼 늘리지 않고,
+      // 사건 직전 포즈와 최종 포즈를 잇는 선을 양쪽으로 늘려 세 키를 유도한다.
+      if (!tail.base) tail.base = poseNow.keeper;
+      // 손으로 잡는 사건은 접촉이 이미 지나 있어 예비를 넣을 자리가 없다. 넣으면 공이 늦게 붙는다.
+      const ANT = INSTANT.has(tail.kind) ? 0 : 0.075;
+      const tt = vnow - tail.t0;
+      if (tt < ANT) {
+        // 예비. 최종의 반대쪽으로 밀면 몸이 반동을 먹고 나서 넘어간 것으로 읽힌다.
+        kp = pushPose(kp, tail.base, 1.22);
+      } else {
+        // 잔여. 최종을 넘겼다가 감쇠 진동으로 되돌아온다. 진동이 빨리 죽으면
+        // 크리틱이 보는 520ms 프레임이 다시 마네킹이라 주기를 0.84초로 늘려 잡았다.
+        const ft = tt - ANT;
+        const w = Math.cos(ft * 7.5) * Math.exp(-ft * 1.3);
+        kp = pushPose(tail.base, kp, 1 + 0.34 * w);
+        // 닿는 순간 몸이 눌린다. 없으면 충돌이 포즈 교체로만 나타난다.
+        if (!tail.squashed) { tail.squashed = true; keeperPop = 0.09; }
+      }
       // 몸이 바닥에 닿는 순간 한 번만 흙을 판다. 매 프레임 칠하면 자국이 아니라 진흙탕이 된다.
       // 자국은 몸통이 아니라 뻗은 팔이 닿는 자리에 남는다. 장갑의 실제 좌표로 찍어야
       // 왼쪽으로 뛴 구와 오른쪽으로 뛴 구가 땅에서 다른 자리로 갈린다.
@@ -1228,6 +1250,10 @@ export function createScene(canvas) {
     kickPop = Math.max(0, kickPop - dt);
     const kpop = 1 + (kickPop > 0 ? Math.sin((kickPop / 0.07) * Math.PI) * 0.15 : 0);
     kicker.scale.setScalar(kpop);
+    // 눌림은 부피를 유지해야 몸집이 변한 것으로 보이지 않는다. 눌린 만큼 옆으로 퍼진다.
+    keeperPop = Math.max(0, keeperPop - dt);
+    const kep = keeperPop > 0 ? Math.sin((keeperPop / 0.09) * Math.PI) : 0;
+    keeper.scale.set(1 + kep * 0.22, 1 - kep * 0.16, 1 + kep * 0.22);
     // 접지는 선언이 아니라 측정이다. 몸의 실제 최저점을 재서 원하는 높이에 맞춘다.
     keeper.position.y += hover - footY(keeper);
     // drive()가 목을 덮어쓰고, 위치 보정 전 월드행렬은 낡았다. 둘이 끝난 뒤에 고개를 돌린다.
@@ -1634,6 +1660,8 @@ export function createScene(canvas) {
     stopLeft = 0;
     kickPop = 0;
     kicker.scale.setScalar(1);
+    keeperPop = 0;
+    keeper.scale.setScalar(1);
     shakeLeft = 0;
     shakeAmp = 0;
     dutchLeft = 0;

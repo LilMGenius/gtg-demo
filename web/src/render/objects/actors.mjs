@@ -228,6 +228,18 @@ export function lerpPose(a, b, t) {
   return out;
 }
 
+// 두 포즈를 잇는 선을 양쪽으로 늘린다. t가 0 미만이면 b의 반대쪽, 1을 넘으면 b 너머다.
+// 예비와 잔여 동작은 새 데이터가 아니라 이 선의 바깥 구간이다. 사건마다 선이 다르므로
+// 유도된 키도 사건마다 다르고, 포즈 표를 사건 수만큼 늘리지 않아도 된다.
+export function pushPose(a, b, t) {
+  const out = {};
+  for (const j of JOINTS) {
+    const x = a[j], y = b[j];
+    out[j] = [x[0] + (y[0] - x[0]) * t, x[1] + (y[1] - x[1]) * t, x[2] + (y[2] - x[2]) * t];
+  }
+  return out;
+}
+
 // 포즈를 뼈대에 얹는다. 정지 프레임은 만들지 않는다.
 // 흔들림이 0이면 어떤 포즈든 마네킹으로 읽힌다.
 export function setPose(g, pose, time = 0) {
