@@ -499,12 +499,19 @@ export function createScene(canvas) {
     camEvLeft = e.dur;
     camEvSpan = e.dur;
   }
-  // 들어갈 때 빠르고 나올 때 느리다. 선형으로 넣으면 밀려나는 것으로 읽히고 펀치가 안 된다.
-  // 시작과 끝이 정확히 0이라 사건이 끝나면 프레이밍이 원래 자리로 돌아온다.
+  // 부풀었다 꺼지는 곡선은 사건 프레임마다 화각이 달랐다. 같은 사건의 접촉 프레임과 520ms 프레임이
+  // 통째로 다른 장면으로 읽힌 원인이다. 렌즈는 한 번 붙고 그 자리를 지키다가 늦게 풀린다.
+  // 0.05초는 서너 프레임이라 순간이동이 아니라 컷으로 읽히고, 그 뒤 정지 프레임은 전부 같은 구도다.
+  // 끝값이 정확히 0이라 사건이 끝나면 프레이밍이 원래 자리로 돌아온다. decal 게이트가 이걸 본다.
+  const CAM_IN = 0.05;
   function camEvAmount() {
     if (camEvLeft <= 0) return 0;
-    const t = 1 - camEvLeft / camEvSpan;
-    return Math.sin(Math.PI * Math.pow(t, 0.55));
+    const gone = camEvSpan - camEvLeft;
+    if (gone < CAM_IN) return gone / CAM_IN;
+    // 푸는 구간은 사건 길이의 3분의 1이다. 더 짧으면 렌즈가 튕겨 돌아온 것으로 보인다.
+    const out = camEvSpan * 0.34;
+    if (camEvLeft > out) return 1;
+    return Math.sin((Math.PI * 0.5 * camEvLeft) / out);
   }
   const camLook = new THREE.Vector3();
 
