@@ -259,20 +259,25 @@ export function createScene(canvas) {
   // 잔상. 공 한 개만 그리면 빠른 공과 느린 공이 같은 그림이 된다.
   // 공이 카메라를 향해 오므로 지나온 자리는 화면에서 공 뒤에 그대로 숨는다.
   // 그래서 원근 축소를 거리비로 되돌리고 거기서 더 키운다. 꼬리가 아니라 공을 감싸는 링으로 남는다.
-  // 지오메트리와 재질은 한 벌만 쓴다. 잔상이 프로그램을 하나 더 만들면 드로우콜 예산이 먼저 죽는다.
+  // 지오메트리는 한 벌, 재질은 여덟 벌이다. 같은 셰이더를 복제하면 three가 프로그램을 재사용하므로
+  // 늘어나는 것은 유니폼뿐이다. 앞뒤 밝기가 같으면 여덟 장이 한 덩어리로 뭉쳐 꼬리가 아니라 얼룩이 된다.
   const GHOSTS = 8;
   const ghostGeo = new THREE.IcosahedronGeometry(BALL_R, 0);
   // 흰 잔상은 흰 공 뒤에서도 흙 배경 위에서도 안 보였다. 정지 화면에서 공이 서 있는지 날아오는지 안 읽혔다.
   // 만화가 속도를 그리는 색은 흰색이 아니다. 노란 링이라야 갈색 흙 위에서 남는다.
   const ghostMat = new THREE.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0.2, depthWrite: false });
+  // 머리는 진하고 꼬리로 갈수록 옅다. 만화 속도선이 방향을 말하는 방식이 이것이다.
+  const ghostFade = (i) => 1 - (i / GHOSTS) * 0.82;
   const ghosts = [];
   for (let i = 0; i < GHOSTS; i++) {
-    const g = new THREE.Mesh(ghostGeo, ghostMat);
+    const g = new THREE.Mesh(ghostGeo, ghostMat.clone());
     g.visible = false;
     g.userData.probeIgnore = true;
     scene.add(g);
     ghosts.push(g);
   }
+  // 진단과 게이트가 읽는 머릿값. 개별 재질은 여기에 ghostFade를 곱한 결과다.
+  let ghostAlpha = 0;
   const trail = [];
   // 잔상을 지나온 거리로 놓으므로 자취는 프레임 수가 아니라 길이를 담아야 한다.
   // 느린 킥에서도 꼬리 끝까지 닿으려면 1.5초치가 필요하다.
@@ -1144,17 +1149,18 @@ export function createScene(canvas) {
           // 그 링은 꼬리가 아니라 공에 낀 빛무리로 읽혔다. 그래서 축소를 그대로 둔다.
           // 뒤 잔상은 멀어진 만큼 작아지고, 줄어드는 구슬 줄이 곧 날아온 방향을 가리킨다.
           // 공에 만화 배율이 걸리면 잔상도 같이 걸어야 꼬리가 공과 같은 굵기에서 시작한다.
-          g.scale.setScalar(ballGain * (1 - i * 0.05));
+          g.scale.setScalar(ballGain * (1 - i * 0.03));
         }
       }
-      // 재질이 한 벌이라 투명도는 한 번만 정한다. 개별로 주려면 재질이 여덟 벌 필요하고 그건 예산 밖이다.
       // 0.2는 흙 위에서 사라졌다. 그렇다고 상수로 올리면 굴러오는 공에도 속도선이 붙어 늘 빠른 것으로 읽힌다.
       // 이번 프레임에 공이 간 거리로 정한다. 느리면 링이 없고 빠르면 진해진다.
       const step = trail.length > 1 ? trail[0].distanceTo(trail[1]) : 0;
       // 킥 직후에는 꼬리가 없다. 그런데도 링을 그리면 같은 자리에 여덟 장이 겹쳐
       // 발치에 노란 덩어리가 붙는다. 꼬리가 길어진 다음에만 켜다.
       const grown = trail.length >= GHOSTS * 2;
-      ghostMat.opacity = grown ? Math.min(0.42, Math.max(0, (step - 0.04) * 4.2)) : 0;
+      // 0.42로는 3배 확대해야 꼬리가 보였다. 머리를 0.72까지 올리고 뒤로 갈수록 ghostFade로 뺀다.
+      ghostAlpha = grown ? Math.min(0.72, Math.max(0, (step - 0.04) * 4.2)) : 0;
+      for (let i = 0; i < GHOSTS; i++) ghosts[i].material.opacity = ghostAlpha * ghostFade(i);
     } else if ((!cue || tail) && ghosts[0].visible) {
       for (const g of ghosts) { g.visible = false; g.userData.lit = false; }
     }
@@ -1292,7 +1298,7 @@ export function createScene(canvas) {
     const br = screenR(ball.position, BALL_R * ball.scale.x);
     let ringPx = 0;
     for (const g of ghosts) {
-      if (!g.visible || ghostMat.opacity <= 0) continue;
+      if (!g.visible || g.material.opacity <= 0) continue;
       const gc = toScreen(g.position);
       const gr = screenR(g.position, BALL_R * g.scale.x);
       ringPx = Math.max(ringPx, Math.hypot(gc[0] - bc[0], gc[1] - bc[1]) + gr);
@@ -1302,7 +1308,7 @@ export function createScene(canvas) {
       z: ball.position.z,
       trail: trail.length,
       step: trail.length > 1 ? trail[0].distanceTo(trail[1]) : 0,
-      opacity: ghostMat.opacity,
+      opacity: ghostAlpha,
       shown: ghosts.filter((g) => g.visible).length,
       px,
       ballPx: br * 2,
@@ -1326,7 +1332,7 @@ export function createScene(canvas) {
     ball: ball.visible,
     shown: ghosts.filter((g) => g.visible).length,
     lit: ghosts.filter((g) => g.userData.lit).length,
-    opacity: ghostMat.opacity
+    opacity: ghostAlpha
   });
 
   renderer.setAnimationLoop(frame);
