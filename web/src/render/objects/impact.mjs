@@ -57,6 +57,19 @@ function starGeo(list) {
   return g;
 }
 
+// 선방과 실점과 장갑 이탈이 같은 흰 얼룩으로 터지면, 크기만 다른 같은 스티커 세 장이 된다.
+// 색과 바퀴살 개수를 사건마다 갈라 두면 정지 프레임 한 장으로도 무슨 일이 났는지 갈린다.
+const TONE = {
+  save: { c: 0xdff1ff, ring: 0xbfe4ff, spokes: 8 },
+  catch: { c: 0xffffff, ring: 0xdfe8ff, spokes: 6 },
+  gloveGone: { c: 0xffef9a, ring: 0xffd23f, spokes: 7 },
+  carriedIn: { c: 0xffd7c4, ring: 0xff8f5a, spokes: 5 },
+  spill: { c: 0xf2ffe0, ring: 0xc4e77a, spokes: 4 },
+  downed: { c: 0xffd0d0, ring: 0xff5f52, spokes: 8 },
+  net: { c: 0xf6f1ff, ring: 0xb59cff, spokes: 6 },
+};
+const TONE_DEFAULT = { c: 0xfffdf0, ring: 0xffffff, spokes: 8 };
+
 
 // 만화 효과음. 캔버스에 글자를 그려 텍스처로 쓴다.
 // 사건이 뭐였는지를 그림만으로 읽히게 하는 가장 싸고 확실한 방법이 이것이다.
@@ -167,11 +180,17 @@ export function createImpact(scene) {
   // 0.34초는 사람 눈에 번짝이고 정지 프레임에는 거의 안 잡힌다. 0.55가 읽힌다.
   // 0.9를 써 보니 다음 구의 배치까지 글자가 남아 화면이 지저분해졌다.
   // 수명 셋 중 가장 긴 잔막이 전체 수명을 정한다.
-  function burst(pos, strength = 1, word = '') {
+  function burst(pos, strength = 1, word = '', kind = '') {
     at.copy(pos);
     power = strength;
     life = D_VEIL;
     t = 0;
+    // 색은 사건이 정한다. 이름이 표에 없으면 예전 흰 얼룩 그대로다.
+    const tone = TONE[kind] || TONE_DEFAULT;
+    flashMat.color.setHex(tone.c);
+    ringMat.color.setHex(tone.ring);
+    starMat.color.setHex(tone.c);
+    star.geometry.setDrawRange(0, tone.spokes * 2);
     flash.visible = !hidden;
     ring.visible = !hidden;
     veil.visible = !hidden;

@@ -714,9 +714,9 @@ export function createScene(canvas) {
     }
     // 손이 닿은 사건만 터진다. 다만 선언 순간에는 아직 안 닿았으므로 여기서는 예약만 한다.
     if (BURST[kind]) {
-      pendingBurst = { power: BURST[kind], word: WORD[kind] || '', at: 'glove' };
+      pendingBurst = { power: BURST[kind], word: WORD[kind] || '', at: 'glove', kind };
     } else if (CALL[kind]) {
-      pendingBurst = { power: 0.3, word: CALL[kind], at: 'ball' };
+      pendingBurst = { power: 0.3, word: CALL[kind], at: 'ball', kind };
     }
     // 웃겨야 하는 사건에만 렌즈를 기울인다. 선방까지 기울이면 매 구 화면이 비뚤어져 기울기가 안 읽힌다.
     const TILT = { gloveGone: 0.13, carriedIn: -0.14, downed: 0.15, talked: -0.11, distracted: 0.1, beat: -0.12, lost: 0.12 };
@@ -1145,13 +1145,13 @@ export function createScene(canvas) {
           if (u > 0.28) {
             // 공 바로 위에 얹었더니 글자가 키퍼 얼굴을 덮었다. 표정이 사라지면 사건의 절반이 없다.
             // 카메라는 +z를 보므로 +x가 화면 바깥쪽이다. 공보다 한 뼘 바깥, 머리 위로 올린다.
-            impact.burst(new THREE.Vector3(ball.position.x + 0.62, ball.position.y + 0.95, ball.position.z), pendingBurst.power, pendingBurst.word);
+            impact.burst(new THREE.Vector3(ball.position.x + 0.62, ball.position.y + 0.95, ball.position.z), pendingBurst.power, pendingBurst.word, pendingBurst.kind);
             pendingBurst = null;
           }
         } else {
           const gw = gloveWorld(Math.sign(tail.kx || 1));
           if (ball.position.distanceTo(gw) < 0.55 || u > 0.3) {
-            impact.burst(gw.clone().lerp(ball.position, 0.5), pendingBurst.power, pendingBurst.word);
+            impact.burst(gw.clone().lerp(ball.position, 0.5), pendingBurst.power, pendingBurst.word, pendingBurst.kind);
             pendingBurst = null;
           }
         }
@@ -1165,7 +1165,7 @@ export function createScene(canvas) {
         netT = 0;
         netX = ball.position.x;
         netY = ball.position.y - R_H / 2;
-        impact.burst(ball.position, 0.9, '출렁');
+        impact.burst(ball.position, 0.9, '출렁', 'net');
         shake(0.03, 0.22);
       }
       shadow.position.set(ball.position.x, 0.02, ball.position.z);
