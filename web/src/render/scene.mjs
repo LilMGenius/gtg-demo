@@ -961,7 +961,6 @@ export function createScene(canvas) {
     keeperShadow.position.set(keeper.position.x + leanX, 0.03, keeper.position.z);
     // 행인은 판정과 무관하게 계속 걷는다. 멈춘 배경은 그림이고 움직이는 배경은 장소다.
     for (const [i, p] of passers.entries()) {
-      passerShadows[i].position.set(p.position.x, 0.03, p.position.z);
       // 반짝임은 돌면서 커졌다 작아진다. 고정된 마름모는 머리에 박힌 장식으로 읽힌다.
       if (p.userData.spark) {
         p.userData.spark.rotation.y = vnow * 2.4;
@@ -973,19 +972,22 @@ export function createScene(canvas) {
         const w = ease(p.userData.gaze);
         p.position.set(lerp(-17, -11.5, w), 0, lerp(29, 18, w));
         p.rotation.z = Math.sin(vnow * 9) * 0.13;
-        continue;
+      } else {
+        // 프레임당 상수로 걸으면 세계시간이 멈춰도 행인만 계속 간다.
+        // 정지 프레임을 두 장 찍어 비교하는 계측이 그 걸음을 전부 잡음으로 읽는다.
+        p.position.x += p.userData.speed * dt;
+        // 되돌리는 자리가 화면 안이면 순간이동이 그대로 보인다.
+        // 행인이 서는 z에서 화면 반폭은 27.7m다. 26은 그 안이었다.
+        if (p.position.x > 34) {
+          p.position.x = -34;
+          // 같은 줄로 돌아오면 다섯이 영원히 같은 순서로 지나간다.
+          p.position.z = p.userData.homeZ + (p.userData.phase % 1) * 3.2 - 1.6;
+        }
+        p.rotation.z = Math.sin(vnow * 6 * p.userData.speed + p.userData.phase) * 0.06;
       }
-      // 프레임당 상수로 걸으면 세계시간이 멈춰도 행인만 계속 간다.
-      // 정지 프레임을 두 장 찍어 비교하는 계측이 그 걸음을 전부 잡음으로 읽는다.
-      p.position.x += p.userData.speed * dt;
-      // 되돌리는 자리가 화면 안이면 순간이동이 그대로 보인다.
-      // 행인이 서는 z에서 화면 반폭은 27.7m다. 26은 그 안이었다.
-      if (p.position.x > 34) {
-        p.position.x = -34;
-        // 같은 줄로 돌아오면 다섯이 영원히 같은 순서로 지나간다.
-        p.position.z = p.userData.homeZ + (p.userData.phase % 1) * 3.2 - 1.6;
-      }
-      p.rotation.z = Math.sin(vnow * 6 * p.userData.speed + p.userData.phase) * 0.06;
+      // 걸음보다 먼저 놓으면 그림자는 한 프레임 뒤처진 자리에 선다.
+      // 세계시간이 멈춘 첫 프레임이 그 한 걸음을 따라잡아 정지 프레임 두 장이 갈린다.
+      passerShadows[i].position.set(p.position.x, 0.03, p.position.z);
     }
     keeperShadow.scale.setScalar(1 + Math.abs(Math.sin(keeper.rotation.z)) * 0.8);
     kickerShadow.position.set(kicker.position.x, 0.03, kicker.position.z);
