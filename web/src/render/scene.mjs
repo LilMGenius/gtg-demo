@@ -822,6 +822,10 @@ export function createScene(canvas) {
     actor.kicker = kicker;
     // 이번 프레임에 무엇을 연기할지. 결과는 이미 확정됐고 여기서는 각도만 고른다.
     let kp = POSES.ready;
+    // 예비와 잔여를 섞으면 kp는 매 프레임 새 객체다. 표에 담긴 포즈와 같은 것인지 묻는 자리가
+    // 셋 있는데, 섞인 객체는 어느 집합에도 안 들어가 자국도 안 남고 잡히는 속도도 안 갈렸다.
+    // 섞기 전의 표준 포즈를 따로 들고 다닌다. 여기서 신원을 묻고, 몸에는 섞인 각도를 준다.
+    let kpId = POSES.ready;
     let kk = POSES.windup;
     // 발밑 높이는 상수로 못 낸다. 관절이 돌면 몸의 최저점이 매 프레임 바뀐다.
     // 원하는 높이를 여기 적고, 실제 접지는 프레임 끝에서 실측해서 맞춘다.
@@ -835,6 +839,7 @@ export function createScene(canvas) {
       const diveSide = Math.sign(VIEW_X * input.dive);
       const divePose = diveSide > 0 ? POSES.diveR : POSES.diveL;
       kp = t < runup ? POSES.brace : (input.dive === 0 ? POSES.brace : divePose);
+      kpId = kp;
       // 차는 동작은 네 구간이다. 달리기, 반대로 접는 예비, 임팩트, 끝까지 넘어가는 팔로스루.
       // 예비와 팔로스루를 뺀 발은 공을 차는 게 아니라 공 옆에 서 있는 것으로 읽힌다.
       const swing = t - runup;
@@ -965,6 +970,7 @@ export function createScene(canvas) {
         talked: POSES.swoon, distracted: POSES.swoon, openGoalScored: POSES.faceplant
       };
       kp = TAIL_POSE[tail.kind] ?? kp;
+      kpId = kp;
       // 사건이 최종 포즈 한 장으로 스냅된다. 예비도 잔여도 없어서 정지 프레임의 몸은
       // 사건을 겪은 것이 아니라 그 자세로 놓여 있는 것으로 읽힌다. pose-gate는 최종 포즈끼리의
       // 거리만 재므로 이 결함을 못 잡는다. 포즈 표를 사건 수만큼 늘리지 않고,
@@ -988,11 +994,11 @@ export function createScene(canvas) {
       // 몸이 바닥에 닿는 순간 한 번만 흙을 판다. 매 프레임 칠하면 자국이 아니라 진흙탕이 된다.
       // 자국은 몸통이 아니라 뻗은 팔이 닿는 자리에 남는다. 장갑의 실제 좌표로 찍어야
       // 왼쪽으로 뛴 구와 오른쪽으로 뛴 구가 땅에서 다른 자리로 갈린다.
-      if (!tail.scuffed && u > 0.45 && SCUFF_POSES.has(kp)) {
+      if (!tail.scuffed && u > 0.45 && SCUFF_POSES.has(kpId)) {
         tail.scuffed = true;
         const hit = gloveWorld(Math.sign(tail.kx || 1));
         pitch.box.userData.mark(hit.x, hit.z, Math.sign(tail.kx || 1) * 0.4, 0.62,
-          WRECK_POSES.has(kp) ? 1 : 0.7);
+          WRECK_POSES.has(kpId) ? 1 : 0.7);
       }
       // 키퍼만 사건마다 다르게 망가지고 키커는 매번 같은 준비 자세로 돌아갔다.
       // 정지 프레임 넷을 나란히 놓으면 키커가 복사 붙여넣기로 읽힌다. 결과를 키커도 안다.
@@ -1250,7 +1256,7 @@ export function createScene(canvas) {
       shadow.material.opacity = Math.max(0.06, 0.42 - lift2 * 0.14);
     }
     // 잡히는 속도는 사건마다 다르다. 자빠짐은 빠르고 회복은 느리다.
-    drive('keeper', kp, WRECK_POSES.has(kp) ? 0.22 : (SCRAMBLE_POSES.has(kp) ? 0.26 : 0.12));
+    drive('keeper', kp, WRECK_POSES.has(kpId) ? 0.22 : (SCRAMBLE_POSES.has(kpId) ? 0.26 : 0.12));
     // 예비는 느리게 잡혀야 버틴 것으로 보이고, 임팩트는 한 프레임에 가까워야 터진 것으로 보인다.
     drive('kicker', kk, kk === POSES.strike ? 0.62 : (kk === POSES.follow ? 0.24 : (kk === POSES.plant ? 0.16 : (kk === POSES.cheer ? 0.30 : 0.10))));
     // 닿는 순간에만 몸이 부풀어야 힘이 들어간 것으로 읽힌다. 길게 주면 몸집이 변한 것으로 보인다.
