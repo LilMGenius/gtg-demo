@@ -1121,17 +1121,18 @@ export function createScene(canvas) {
     keeperShadow.scale.setScalar(1 + Math.abs(Math.sin(keeper.rotation.z)) * 0.8);
     kickerShadow.position.set(kicker.position.x, 0.03, kicker.position.z);
     // 잔상은 지나온 자리를 따라간다. 매 프레임 전부 옮기면 공이 여덟 개인 것으로 읽힌다.
-    // 간격은 공의 겉보기 반지름에 매단다. 그래야 만화 배율이 커져도 꼬리가 같은 비율로 늘어난다.
     // 세계시간이 멈추면 잔상도 그 프레임의 모습 그대로 서 있어야 한다.
     // 갱신을 계속 돌리면 같은 자리가 거듭 쌓여 step이 0이 되고 링이 스스로 꺼진다.
     if (cue && !tail && dt > 0) {
       trail.unshift(ball.position.clone());
-      const SP = BALL_R * ballGain * 0.85;
-      // 프레임 간격으로 잔상을 놓으면 간격이 공의 속도를 그대로 따라간다.
-      // 빠른 킥에서는 두 장 사이가 공 지름보다 벌어져 꼬리가 끊기고, 떨어져 나온 노란 판은
-      // 속도선이 아니라 두 번째 공으로 읽힌다. 그래서 지나온 거리로 놓는다.
-      // 간격이 공 반지름보다 좁으면 이웃한 장이 겹쳐 하나의 줄기가 된다.
       if (trail.length > TRAIL_MAX) trail.length = TRAIL_MAX;
+      // 간격을 공 반지름에 고정하면 자취가 그보다 짧을 때 남는 장이 가장 오래된 점에 쌓인다.
+      // 실측: 여덟 장이 공 지름 41px 안에 전부 들어와 꼬리가 아니라 공에 낀 후광으로 읽혔다.
+      // 그래서 지금까지 날아온 길이를 여덟 등분해 놓는다. 자취가 자라면 꼬리도 같이 자란다.
+      // 바닥은 공 반지름이다. 킥 직후 자취가 한 뼘일 때 여덟 장이 다시 한 점에 겹치는 것을 막는다.
+      let flown = 0;
+      for (let k = 1; k < trail.length; k++) flown += trail[k - 1].distanceTo(trail[k]);
+      const SP = Math.max(BALL_R * ballGain * 0.85, flown / GHOSTS);
       for (let i = 0; i < GHOSTS; i++) {
         const p = trailPoint((i + 1) * SP);
         const g = ghosts[i];
@@ -1139,16 +1140,11 @@ export function createScene(canvas) {
         g.userData.lit = Boolean(p);
         if (p) {
           g.position.copy(p);
-          // 화면상 크기 = 실제 크기 / 카메라 거리. 거리비를 곱하면 뒤 잔상도 공과 같은 크기로 보인다.
-          const dg = g.position.distanceTo(CAM_BASE);
-          const db = Math.max(0.01, ball.position.distanceTo(CAM_BASE));
-          // 거리비는 원근 축소를 정확히 되돌린다. 그래서 여기서 더 곱하지 않으면 잔상의 화면 반지름은
-          // 공과 같고, 공이 카메라를 향해 올 때 잔상은 공 실루엣 안에 통째로 갇힌다.
-          // 옆으로 휜 킥만 꼬리가 보이고 정면으로 온 킥은 서 있는 공과 같은 그림이 된다.
-          // 뒤로 갈수록 화면 반지름을 키워 공을 감싸는 링으로 남긴다. 링은 공 뒤에서 커지므로
-          // 옆에 붙은 두 번째 공이 아니라 충격파로 읽힌다. 끝 장이 공 반지름의 1.8배다.
-          // 공에 만화 배율이 걸리면 잔상도 같이 걸어야 한다. 안 걸면 링이 공 안으로 다시 들어간다.
-          g.scale.setScalar((dg / db) * (1 + i * 0.115) * ballGain);
+          // 원근 축소를 거리비로 되돌린 뒤 더 키우면 여덟 장이 공을 감싼 링이 된다.
+          // 그 링은 꼬리가 아니라 공에 낀 빛무리로 읽혔다. 그래서 축소를 그대로 둔다.
+          // 뒤 잔상은 멀어진 만큼 작아지고, 줄어드는 구슬 줄이 곧 날아온 방향을 가리킨다.
+          // 공에 만화 배율이 걸리면 잔상도 같이 걸어야 꼬리가 공과 같은 굵기에서 시작한다.
+          g.scale.setScalar(ballGain * (1 - i * 0.05));
         }
       }
       // 재질이 한 벌이라 투명도는 한 번만 정한다. 개별로 주려면 재질이 여덟 벌 필요하고 그건 예산 밖이다.
