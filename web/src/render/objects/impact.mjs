@@ -8,10 +8,7 @@ const D_FLASH = 0.07;
 const D_BODY = 0.55;
 const D_VEIL = 1.05;
 
-// 방사형 흰 선. 만화가 충격을 그리는 방법이 이것이다.
-// 셰이더가 필요 없다. 원점에서 뻗은 선분을 카메라 쪽으로 돌려세우면 된다.
-// 선을 원점에서 시작하면 가운데가 뭉쳐 별이 아니라 점이 된다. 안쪽 반경을 띄운다.
-// 각도를 균등하게 놓으면 바퀴살이 되어 가짜로 읽힌다. 각도와 길이를 둘 다 흩는다.
+// 파편이 튀는 방향. 균등한 각으로 놓으면 부채가 되므로 미리 흩어 고정한 각 여덟 개를 쓴다.
 const SPOKES = [0.14, 0.92, 1.68, 2.51, 3.29, 4.05, 4.61, 5.55];
 // 완전한 원 셋이 같은 중심에 겹치면 폭발이 아니라 과녁으로 읽힌다. 손그림 잉크는 원을 못 그린다.
 // 반지름을 각도마다 두 주기로 흔들어 테두리를 삐뚤게 만든다. seed가 층마다 다른 얼룩을 준다.
@@ -45,36 +42,107 @@ function blobGeo(seed, seg, wob, inner) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   return g;
 }
-function starGeo(list) {
+// 값은 좌표에서만 나온다. 프레임마다 다시 뽑으면 정지 프레임이 매번 달라져 계측이 못 쓴다.
+function rnd(i, k) {
+  const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+  return v - Math.floor(v);
+}
+// 뻗는 별. 길이 편차를 두 배 넘게 벌려야 자로 그린 바퀴살에서 벗어난다.
+function spikeGeo(n, seed) {
   const pts = [];
-  for (let i = 0; i < list.length; i += 1) {
-    const a = list[i];
-    const len = 0.78 + ((i * 0.37 + a * 0.21) % 1) * 0.46;
+  for (let i = 0; i < n; i += 1) {
+    const a = (i / n) * Math.PI * 2 + (rnd(i, seed) - 0.5) * 0.62;
+    const len = 0.58 + rnd(i, seed + 3) * 1.02;
     // 1픽셀 선은 흙 운동장 위에서 사라진다. 안쪽이 두껍고 끝이 뾰족한 삼각형이라야 잉크로 읽힌다.
-    const w = 0.042 + ((i * 0.61 + a * 0.33) % 1) * 0.03;
+    const w = 0.046 + rnd(i, seed + 7) * 0.042;
     const px = -Math.sin(a) * w;
     const py = Math.cos(a) * w;
-    const bx = Math.cos(a) * 0.35;
-    const by = Math.sin(a) * 0.35;
+    const bx = Math.cos(a) * 0.32;
+    const by = Math.sin(a) * 0.32;
     pts.push(bx + px, by + py, 0, bx - px, by - py, 0, Math.cos(a) * len, Math.sin(a) * len, 0);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
   return g;
 }
+// 톱니 왕관. 안쪽이 닫힌 띠라서 뻗는 별과 실루엣이 겹치지 않는다. 무언가에 먹힌 사건 쪽에 쓴다.
+function zigGeo(n, seed) {
+  const pts = [];
+  // 톱니는 면이라 같은 반지름에서도 뻗는 별보다 화면을 몇 배 더 덮는다.
+  // 중심까지 채우면 터지는 지점의 공이 100프레임 넘게 가려지므로, 가운데를 비운 띠로 만든다.
+  // 구멍 반지름 0.4는 배율 1.2를 곱해도 공 반지름 0.14보다 크니 공이 항상 뚫고 보인다.
+  const inner = 0.4;
+  const band = 0.6;
+  for (let i = 0; i < n; i += 1) {
+    const a0 = (i / n) * Math.PI * 2;
+    const a1 = ((i + 1) / n) * Math.PI * 2;
+    const am = (a0 + a1) * 0.5;
+    const tip = 0.86 + rnd(i, seed) * 0.34;
+    const i0 = inner * (0.82 + rnd(i, seed + 5) * 0.36);
+    const i1 = inner * (0.82 + rnd(i + 1, seed + 5) * 0.36);
+    const x0 = Math.cos(a0) * i0;
+    const y0 = Math.sin(a0) * i0;
+    const x1 = Math.cos(a1) * i1;
+    const y1 = Math.sin(a1) * i1;
+    const bx0 = Math.cos(a0) * band;
+    const by0 = Math.sin(a0) * band;
+    const bx1 = Math.cos(a1) * band;
+    const by1 = Math.sin(a1) * band;
+    pts.push(bx0, by0, 0, bx1, by1, 0, Math.cos(am) * tip, Math.sin(am) * tip, 0);
+    // 띠가 끊기면 톱니가 낱개로 흩어진다. 안쪽 테두리와 바깥 테두리를 이어야 한 덩어리 링이 된다.
+    pts.push(x0, y0, 0, bx0, by0, 0, bx1, by1, 0);
+    pts.push(x0, y0, 0, bx1, by1, 0, x1, y1, 0);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  return g;
+}
+// 흩어진 쐐기. 중심이 비어 있어 무언가가 떨어져 나간 사건에 붙는다.
+function shardGeo(n, seed) {
+  const pts = [];
+  for (let i = 0; i < n; i += 1) {
+    const a = (i / n) * Math.PI * 2 + (rnd(i, seed + 1) - 0.5) * 0.8;
+    const d = 0.42 + rnd(i, seed + 2) * 0.52;
+    const len = 0.3 + rnd(i, seed + 4) * 0.36;
+    const w = 0.09 + rnd(i, seed + 6) * 0.08;
+    const cx = Math.cos(a) * d;
+    const cy = Math.sin(a) * d;
+    const ux = Math.cos(a);
+    const uy = Math.sin(a);
+    const px = -uy * w;
+    const py = ux * w;
+    pts.push(cx - ux * len * 0.5 + px, cy - uy * len * 0.5 + py, 0, cx - ux * len * 0.5 - px, cy - uy * len * 0.5 - py, 0, cx + ux * len * 0.5, cy + uy * len * 0.5, 0);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  return g;
+}
+// 형태를 매 사건마다 새로 만들면 GPU 버퍼가 계속 늘어난다. 형태와 갈래 수 조합은 유한하니 캐시한다.
+const SHAPES = new Map();
+function shapeGeo(kindShape, n) {
+  const key = kindShape + n;
+  if (!SHAPES.has(key)) {
+    const seed = n * 1.7 + kindShape.length;
+    const g = kindShape === 'zig' ? zigGeo(n, seed) : kindShape === 'shard' ? shardGeo(n, seed) : spikeGeo(n, seed);
+    SHAPES.set(key, g);
+  }
+  return SHAPES.get(key);
+}
 
 // 선방과 실점과 장갑 이탈이 같은 흰 얼룩으로 터지면, 크기만 다른 같은 스티커 세 장이 된다.
 // 색과 바퀴살 개수를 사건마다 갈라 두면 정지 프레임 한 장으로도 무슨 일이 났는지 갈린다.
+// 색만 갈라 두면 정지 프레임에서 같은 스티커의 색 변주로 읽힌다. 실루엣까지 갈라야 사건이 구분된다.
+// 막아낸 사건은 뻗는 별, 먹힌 사건은 톱니, 무언가 떨어져 나간 사건은 흩어진 쐐기다.
 const TONE = {
-  save: { c: 0xdff1ff, ring: 0xbfe4ff, spokes: 8 },
-  catch: { c: 0xffffff, ring: 0xdfe8ff, spokes: 6 },
-  gloveGone: { c: 0xffef9a, ring: 0xffd23f, spokes: 7 },
-  carriedIn: { c: 0xffd7c4, ring: 0xff8f5a, spokes: 5 },
-  spill: { c: 0xf2ffe0, ring: 0xc4e77a, spokes: 4 },
-  downed: { c: 0xffd0d0, ring: 0xff5f52, spokes: 8 },
-  net: { c: 0xf6f1ff, ring: 0xb59cff, spokes: 6 },
+  save: { c: 0xdff1ff, ring: 0xbfe4ff, spokes: 8, shape: 'spike' },
+  catch: { c: 0xffffff, ring: 0xdfe8ff, spokes: 6, shape: 'spike' },
+  gloveGone: { c: 0xffef9a, ring: 0xffd23f, spokes: 7, shape: 'shard' },
+  carriedIn: { c: 0xffd7c4, ring: 0xff8f5a, spokes: 5, shape: 'zig' },
+  spill: { c: 0xf2ffe0, ring: 0xc4e77a, spokes: 5, shape: 'shard' },
+  downed: { c: 0xffd0d0, ring: 0xff5f52, spokes: 7, shape: 'zig' },
+  net: { c: 0xf6f1ff, ring: 0xb59cff, spokes: 6, shape: 'zig' },
 };
-const TONE_DEFAULT = { c: 0xfffdf0, ring: 0xffffff, spokes: 8 };
+const TONE_DEFAULT = { c: 0xfffdf0, ring: 0xffffff, spokes: 8, shape: 'spike' };
 
 
 // 만화 효과음. 캔버스에 글자를 그려 텍스처로 쓴다.
@@ -121,7 +189,7 @@ export function createImpact(scene) {
   // 별은 뻗은 길이가 키퍼 몸통을 넘는다. 깊이 검사를 끄면 몸 앞을 그대로 지나가서
   // 접점이 아니라 화면에 얹힌 스티커로 읽혔다. 깊이는 읽고 쓰지만 않는다.
   const starMat = new THREE.MeshBasicMaterial({ color: 0xfffbe8, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
-  const star = new THREE.Mesh(starGeo(SPOKES), starMat);
+  const star = new THREE.Mesh(shapeGeo('spike', 8), starMat);
   star.renderOrder = 8;
   star.visible = false;
   star.userData.probeIgnore = true;
@@ -200,7 +268,7 @@ export function createImpact(scene) {
     flashMat.color.setHex(tone.c);
     ringMat.color.setHex(tone.ring);
     starMat.color.setHex(tone.c);
-    star.geometry.setDrawRange(0, tone.spokes * 3);
+    star.geometry = shapeGeo(tone.shape, tone.spokes);
     flash.visible = !hidden;
     ring.visible = !hidden;
     veil.visible = !hidden;
@@ -265,8 +333,12 @@ export function createImpact(scene) {
       chipMat.opacity = 0;
     } else {
     // 별은 빠르게 커지고 빠르게 빠진다. 천천히 사라지면 충격이 아니라 후광이 된다.
-    star.scale.setScalar((0.9 + u * 1.15) * power);
+    // 크기를 연속으로 키우면 풍선처럼 부푼다. 손으로 그린 잉크는 프레임마다 튄다. 세 칸으로 끊는다.
+    const step = u < 0.2 ? 1.44 : u < 0.46 ? 0.96 : 1.2;
+    star.scale.setScalar(step * power);
     star.quaternion.copy(camera.quaternion);
+    // 같은 각으로 뜨면 형태를 갈라도 도장으로 읽힌다. 구마다 통째로 돌린다.
+    star.rotateZ(blobSpin * 1.7);
     starMat.opacity = (1 - u) * 0.9;
     // 먼지는 흩어지면서 가라앉는다. 위로만 보내면 연기가 된다.
     for (const m of dust) {
