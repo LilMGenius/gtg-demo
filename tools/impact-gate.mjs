@@ -184,12 +184,17 @@ try {
       // 셰이크와 찌그러짐의 최고값은 사건이 다 지나간 뒤에 읽어야 잘린 값이 아니다.
       await p.waitForTimeout(700);
       const vis = await p.evaluate(() => window.__impactVis());
+      // 강제 선언한 사건 뒤에 그 구의 진짜 사건이 따라오면 act가 최고값을 0으로 되돌린다.
+      // 계측: save만 cam과 squash가 동시에 0이고 나머지 셋은 정상이었다.
+      // 두 시점의 최고값을 취하면 덮이기 전 표본이 남는다.
+      const camOff = Math.max(vis.camOff, lateState.camOff);
+      const squash = Math.max(vis.squash, lateState.squash);
       row = { kind, peak: peak.n, late: late.n, noise: noise.n, stall: stall.ratio,
-        cam: vis.camOff, squash: vis.squash, u: live.u, lateU: lateState.u };
+        cam: camOff, squash, u: live.u, lateU: lateState.u };
       rows.push(row);
       console.log(kind + " peakPx=" + peak.n + " latePx=" + late.n + " noise=" + noise.n
-        + " stall=" + stall.ratio.toFixed(3) + " cam=" + vis.camOff.toFixed(4)
-        + " squash=" + vis.squash.toFixed(3) + " u=" + live.u.toFixed(2) + " lateU=" + lateState.u.toFixed(2));
+        + " stall=" + stall.ratio.toFixed(3) + " cam=" + camOff.toFixed(4)
+        + " squash=" + squash.toFixed(3) + " u=" + live.u.toFixed(2) + " lateU=" + lateState.u.toFixed(2));
       if (peak.n < BAR_PEAK || late.n < BAR_LATE || noise.n >= BAR_NOISE) dump(kind, peakShots);
       if (noise.n >= BAR_NOISE) {
         console.log("  cam0=" + JSON.stringify(peakShots.c0) + " cam1=" + JSON.stringify(peakShots.c1));
