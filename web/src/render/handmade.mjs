@@ -108,6 +108,8 @@ export function seeded(seed) {
 // 배율로 주면 굵기가 물체 크기에 비례한다. 1.04는 골대 기둥에서 3mm였고 화면에 아무것도 안 나왔다.
 // 굵기를 미터로 받아 바운딩 반경으로 나눈다. 큰 물체든 작은 물체든 같은 펜으로 그은 선이 된다.
 const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0x14100c, side: THREE.BackSide, fog: false });
+// 씬 전체가 한 벌을 쓴다. 이 표시가 있어야 전경만 따로 칠하려는 쪽이 복제할 자리를 안다.
+OUTLINE_MAT.userData.shared = true;
 
 export function addOutline(mesh, width = 0.035) {
   if (mesh.userData.outlined) return null;

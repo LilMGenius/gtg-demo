@@ -26,6 +26,8 @@ const SCUFF_POSES = new Set([POSES.faceplant, POSES.sprawlR, POSES.sprawlL, POSE
 export function createScene(canvas) {
   const sfx = mountSfx();
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  // 알파를 전경 마스크로 쓴다. 아무것도 그려지지 않은 화소가 0이면 전경으로 읽힌다.
+  renderer.setClearAlpha(1);
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 
   const scene = new THREE.Scene();
@@ -54,16 +56,32 @@ export function createScene(canvas) {
   // 색을 몇 단으로 끊는다. 그라데이션이 남아 있으면 3D 렌더링이고, 끊기면 그림이다.
   // 10단은 원본과 같았고 4단은 얼굴과 유니폼이 한 색이 됐다.
   const postMat = new THREE.ShaderMaterial({
-    uniforms: { tDiffuse: { value: rt.texture }, steps: { value: 7.0 }, texel: { value: new THREE.Vector2(1 / 683, 1 / RT_H) } },
+    // 배경과 인물에 같은 자를 대면 화면이 한 겹 필터로 읽힌다. 배경은 더 잘게 끊어 물러나고,
+    // 인물은 굵게 끊어 색면이 남는다. 알파 채널이 둘을 가르는 마스크다.
+    uniforms: { tDiffuse: { value: rt.texture }, steps: { value: 9.0 }, stepsFg: { value: 5.0 }, texel: { value: new THREE.Vector2(1 / 683, 1 / RT_H) } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
     fragmentShader: [
-      'uniform sampler2D tDiffuse; uniform float steps; uniform vec2 texel; varying vec2 vUv;',
+      'uniform sampler2D tDiffuse; uniform float steps; uniform float stepsFg; uniform vec2 texel; varying vec2 vUv;',
       'void main(){',
       // 색수차는 뺀다. 골포스트처럼 밝고 가는 세로선 옆에서는 폭을 아무리 줄여도
       // 채널이 한 텍셀 갈리는 순간 빨강과 청록 테두리가 서고, 그게 렌즈가 아니라
       // 인코딩이 깨진 화면으로 읽혔다. 저해상도와 계단은 이미 포스터라이즈가 말한다.
       '  vec2 d0 = vUv - 0.5;',
-      '  vec3 c = texture2D(tDiffuse, vUv).rgb;',
+      '  vec4 src = texture2D(tDiffuse, vUv);',
+      '  vec3 c = src.rgb;',
+      // 전경 재질만 알파 0.25로 그린다. 나머지는 1.0이다. 임계 0.6은 그림자(0.62)가 겹친
+      // 최악의 경우까지 계산해서 고른 값이다. 배경 위 그림자는 0.76으로 배경에 남고,
+      // 전경 위 그림자는 0.48로 전경에 남는다.
+      '  float fg = 1.0 - step(0.6, src.a);',
+      // 이웃 네 텍셀 중 하나라도 전경이면 배경 쪽 화소에 잉크선이 선다. 인물 바깥에만 서므로
+      // 얼굴 안쪽 디테일을 먹지 않는다. 패스를 하나 더 그리지 않고 실루엣을 얻는 방법이다.
+      '  float a1 = texture2D(tDiffuse, vUv + vec2(texel.x, 0.0)).a;',
+      '  float a2 = texture2D(tDiffuse, vUv - vec2(texel.x, 0.0)).a;',
+      '  float a3 = texture2D(tDiffuse, vUv + vec2(0.0, texel.y)).a;',
+      '  float a4 = texture2D(tDiffuse, vUv - vec2(0.0, texel.y)).a;',
+      '  float nb = 1.0 - step(0.6, min(min(a1, a2), min(a3, a4)));',
+      '  float edge = clamp(nb - fg, 0.0, 1.0);',
+      '  float st = mix(steps, stepsFg, fg);',
       // 색을 끊기 전에 잡음을 섞는다. 끊고 나서 섞으면 계단 위에 모래를 뿌린 것으로 보인다.
       // 잡음의 좌표는 화면 픽셀이 아니라 렌더타깃 텍셀이다. gl_FragCoord로 뽑으면 덩어리
       // 픽셀 하나 안에서 값이 서너 번 갈려 저해상도 질감이 깨지고 벽이 반짝인다.
@@ -85,12 +103,16 @@ export function createScene(canvas) {
       '  float e = pow(max(l, 0.0), 0.4545);',
       // floor만 쓰면 화면 전체가 어두워진다. 반 칸 올려 원래 밝기를 지킨다.
       // 음수 칸은 막는다. 한 칸 아래는 어두운 색이 아니라 색이 뒤집힌 값이다.
-      '  float qe = (max(floor((e + (n - 0.5) / steps * 0.34) * steps), 0.0) + 0.5) / steps;',
+      // 디더는 배경에서 질감이고 인물 위에서는 때다. 인물 쪽 세기를 낮춘다.
+      '  float qe = (max(floor((e + (n - 0.5) / st * mix(0.34, 0.12, fg)) * st), 0.0) + 0.5) / st;',
       '  float ql = pow(qe, 2.2);',
       // 나누는 밝기는 잡음을 타지 않은 원래 값이다. 잡음 섞인 값으로 나누면 색비가 픽셀마다 흔들린다.
       '  c *= ql / max(l, 0.001);',
+      // 잉크선은 양자화 뒤, sRGB 인코딩 전에 곱한다. 인코딩 뒤에 곱하면 선이 회색으로 뜬다.
+      '  c *= mix(1.0, 0.22, edge);',
       // 주사선. 한 줄 걸러 살짝 어둡게. 0.02는 안 보였고 0.11은 낮 경기가 밤이 됐다.
-      '  c *= 1.0 - step(0.5, fract(gl_FragCoord.y * 0.5)) * 0.055;',
+      // 인물 위를 같은 세기로 지나가면 얼굴에 줄무늬가 앉는다.
+      '  c *= 1.0 - step(0.5, fract(gl_FragCoord.y * 0.5)) * 0.055 * (1.0 - fg * 0.6);',
       // 비네트. 가장자리만 살짝. 0.5는 경기장 절반이 그늘로 들어갔다.
       '  c *= 1.0 - dot(d0, d0) * 0.22;',
       // 마지막에 sRGB로 인코딩한다. 커스텀 ShaderMaterial에는 three가 출력 변환을 붙여주지 않는다.
@@ -168,6 +190,42 @@ export function createScene(canvas) {
   const passers = buildPassers(scene);
   const impact = createImpact(scene);
 
+  // 전경 표시는 색이 아니라 알파다. 후처리가 이 값으로 인물과 배경을 갈라 다른 자를 댄다.
+  const FG_A = 0.25;
+  let fgOutline = null;
+  const tagFg = (mat) => {
+    if (mat.userData.fg) return mat;
+    mat.userData.fg = true;
+    mat.onBeforeCompile = (sh) => {
+      const src = sh.fragmentShader;
+      const i = src.lastIndexOf('}');
+      if (i < 0) throw new Error('fg tag: no main close');
+      sh.fragmentShader = src.slice(0, i) + '  gl_FragColor.a = ' + FG_A.toFixed(2) + ';' + String.fromCharCode(10) + src.slice(i);
+    };
+    // 이 키가 없으면 three가 같은 계열의 프로그램을 재사용하고 패치가 통째로 사라진다.
+    mat.customProgramCacheKey = () => 'fg';
+    mat.needsUpdate = true;
+    return mat;
+  };
+  const markForeground = (root) => {
+    root.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      // 외곽선은 씬 전체가 한 벌을 공유한다. 여기서 칠하면 배경 외곽선까지 전경이 된다.
+      // clone은 userData는 복사하지만 onBeforeCompile은 복사하지 않으므로 복제 직후 다시 태그한다.
+      if (o.material.userData.shared) {
+        if (!fgOutline) {
+          fgOutline = o.material.clone();
+          fgOutline.userData.shared = false;
+          tagFg(fgOutline);
+        }
+        o.material = fgOutline;
+        return;
+      }
+      o.material = tagFg(o.material);
+    });
+  };
+  for (const p of passers) markForeground(p);
+
   const ball = new THREE.Mesh(ballGeo(BALL_R), flatVertex(0xfdfdf6));
   // 흰 공이 밝은 하늘 앞을 지나면 사라진다. 외곽선 하나가 그걸 끝낸다.
   jitterMesh(ball, 0.006, 5);
@@ -181,6 +239,10 @@ export function createScene(canvas) {
   // 외곽선 재질은 씬 전체가 한 벌을 공유하므로 공 것만 따로 떼어야 한 개만 끌 수 있다.
   const ballOutline = ball.children.find((c) => c.userData.isOutline);
   if (ballOutline) ballOutline.material = ballOutline.material.clone();
+  // 공 외곽선은 깊이 검사를 따로 끄려고 이미 복제해 뒀다. 공유본 표시를 지워야
+  // 전경 칠하기가 이것을 공유 외곽선으로 되돌리지 않는다.
+  if (ballOutline) ballOutline.material.userData.shared = false;
+  markForeground(ball);
   const OVERLAY_Z = 2;
   let overlay = false;
   const setOverlay = (on) => {
@@ -261,9 +323,11 @@ export function createScene(canvas) {
 
   const kicker = buildKicker();
   scene.add(kicker);
+  markForeground(kicker);
 
   let keeper = buildKeeper(188, 84);
   scene.add(keeper);
+  markForeground(keeper);
 
   function setKeeper(k) {
     // 벗겨진 장갑은 장면에 붙어 있다. 키퍼를 다시 짓기 전에 치워야
@@ -272,6 +336,7 @@ export function createScene(canvas) {
     scene.remove(keeper);
     keeper = buildKeeper(k.height, k.weight);
     scene.add(keeper);
+    markForeground(keeper);
   }
 
   // 화면 흔들림. 카메라 본체를 흔들면 골대 프레이밍과 키퍼 접지 측정이 같이 흔들린다.
