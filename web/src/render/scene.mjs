@@ -112,6 +112,8 @@ export function createScene(canvas) {
   let sceneCalls = 0;
   let sceneTris = 0;
   let vnow = 0;
+  // drive()는 frame() 밖에 있어 이번 프레임의 dt를 직접 못 본다. 여기에 실어 보낸다.
+  let stepDt = 0;
   let realLast = performance.now() / 1000;
   let stopLeft = 0;
   // 계측용 정지. 세계시간만 멈추고 렌더는 계속 돈다.
@@ -349,7 +351,10 @@ export function createScene(canvas) {
   const poseNow = { keeper: POSES.ready, kicker: POSES.windup };
   const actor = { keeper: null, kicker: null };
   function drive(key, target, rate) {
-    poseNow[key] = lerpPose(poseNow[key], target, rate);
+    // 프레임당 상수 비율로 당기면 세계시간이 멈춰도 포즈가 목표를 향해 계속 간다.
+    // 정지 프레임 두 장을 비교하는 계측이 그 수렴을 잡음 바닥으로 읽었다.
+    // 감쇠를 dt로 환산하면 dt가 0일 때 0이 되고, 프레임률이 흔들려도 같은 속도로 도착한다.
+    poseNow[key] = lerpPose(poseNow[key], target, 1 - Math.pow(1 - rate, stepDt * 60));
     setPose(actor[key], poseNow[key], vnow);
   }
 
@@ -574,6 +579,7 @@ export function createScene(canvas) {
       dt *= HIT_SCALE;
     }
     vnow += dt;
+    stepDt = dt;
     actor.keeper = keeper;
     actor.kicker = kicker;
     // 이번 프레임에 무엇을 연기할지. 결과는 이미 확정됐고 여기서는 각도만 고른다.
