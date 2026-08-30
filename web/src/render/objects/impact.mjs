@@ -105,7 +105,8 @@ export function createImpact(scene) {
 
   // 충격파 고리. 바깥으로만 밀린다. 고리가 완전히 닫히면 도넛으로 읽히므로 두께를 얇게 둔다.
   const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
-  const ring = new THREE.Mesh(blobGeo(4.2, 20, 0.24, 0.74), ringMat);
+  // 색이 사건마다 갈리고 나니 두꺼운 띠가 가산 합성으로 키퍼를 통째로 물들였다. 띠를 테두리까지 좁힌다.
+  const ring = new THREE.Mesh(blobGeo(4.2, 20, 0.24, 0.87), ringMat);
   ring.visible = false;
   ring.renderOrder = 8;
   ring.userData.probeIgnore = true;
@@ -228,13 +229,14 @@ export function createImpact(scene) {
       flash.quaternion.copy(camera.quaternion);
       flash.rotateZ(blobSpin);
       flash.scale.setScalar((0.3 + uf * 0.12) * power);
-      flashMat.opacity = Math.pow(f, 0.55) * 0.7;
+      // 0.7은 포스터라이즈를 거치면 키퍼 얼굴까지 한 색으로 뭉갠다. 접점이 밝되 몸이 남는 값이 이것이다.
+      flashMat.opacity = Math.pow(f, 0.55) * 0.44;
       ring.position.copy(at);
       ring.quaternion.copy(camera.quaternion);
       // 층마다 각을 어긋내지 않으면 삐뚠 테두리끼리 겹쳐 다시 매끈한 원이 된다.
       ring.rotateZ(blobSpin + 1.9);
       ring.scale.setScalar((0.46 + uf * 0.72) * power);
-      ringMat.opacity = Math.pow(f, 1.5) * 0.85;
+      ringMat.opacity = Math.pow(f, 1.5) * 0.62;
     } else if (flash.visible) {
       flash.visible = false;
       ring.visible = false;
