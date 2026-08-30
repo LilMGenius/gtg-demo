@@ -1,35 +1,101 @@
 import { chromium } from "playwright";
 
-// 날아오는 공이 읽히는지 재는 자. 화소가 있느냐(shot-gate)도, 정지한 공의 실루엣이 서느냐(read-gate)도 아니다.
-// 카메라가 공의 진행축 위에 서 있으므로 비행은 화면에서 크기 변화로만 나타난다.
-// 그 크기가 프레임 폭의 1퍼센트대에 머물면 관객은 공이 오는 것을 못 보고, 그 안에 넣은 잔상도 같이 죽는다.
-// 바: 비행 중 공의 최소 지름 30px, 잔상은 비행 프레임 전부에서 여덟 장 전부 켜짐,
-//     잔상 링이 공 반지름의 1.5배 밖까지 나감.
-// 대조군: 비행이 아닐 때 같은 자를 대면 링이 0으로 무너져야 한다. 통과하면 자가 고장난 것이다.
+// 날아오는 공과 그 잔상이 화면에 남는지 화소로 재는 자.
+// 앞선 판은 __flightVis가 돌려주는 씬 그래프 값만 읽었다. 투영 크기 33.8px, 잔상 여덟 장 전부 켜짐,
+// 링 비율 3.94로 통과했는데 같은 시점 스크린샷에는 공도 꼬리도 없었다. 선언 상태를 건강검진으로 읽은 것이다.
+// 그래서 잰다: 세계시간을 멈춘 같은 프레임을 세 번 그린다. 원본, 잔상만 뺀 것, 공까지 뺀 것.
+// 차분이 무엇의 화소인지 그때서야 말할 수 있다. 공 = B-C, 잔상 = A-B.
+// 바: 비행 중 공 지름 30px, 잔상 화소 200개, 잔상이 공 반지름의 1.5배 밖까지 나감.
+// 대조군 둘. 같은 프레임을 두 번 그린 잡음 바닥이 50화소 미만이어야 자가 예민한 것이고,
+// 비행이 아닐 때 잔상 화소가 0이면서 공 화소는 남아야 자가 잔상만 골라 보는 것이다.
+
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const URL = "http://127.0.0.1:10310/web/index.html?seed=" + (process.argv[2] || 7);
 const W = 1280;
 const H = 720;
-const ROUNDS = 6;
-const GHOSTS = 8;
+const ROUNDS = 4;
 const BAR_BALL = 30;
 const BAR_RATIO = 1.5;
-const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
+const BAR_TRAIL = 200;
+const BAR_NOISE = 50;
+const LUM = 12;
+const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 170000);
 t.unref();
 
-const sampleFlight = () => new Promise((res) => {
-  const out = [];
+// 비행이 무르익은 프레임에서 멈춘다. 킥 직후는 꼬리가 아직 안 자랐고 발밑 프레임은 이동이 없다.
+const waitFlight = () => new Promise((res) => {
   const t0 = performance.now();
   const tick = () => {
-    out.push(window.__flightVis());
-    if (performance.now() - t0 < 2600) requestAnimationFrame(tick); else res(out);
+    const r = window.__flightVis();
+    if (r.cue && r.step > 0.05 && r.trail >= 16 && r.z < 8) { window.__freeze(true); res(r); return; }
+    if (performance.now() - t0 > 3000) { res(null); return; }
+    requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
 });
 
-const median = (a) => {
-  const s = a.slice().sort((p, q) => p - q);
-  return s.length ? s[s.length >> 1] : 0;
+// 페이지 안에서 두 장을 디코드하고 밝기가 갈린 화소를 모은다.
+async function diff([A, B, lum]) {
+  const read = async (b64) => {
+    const im = new Image();
+    im.src = "data:image/png;base64," + b64;
+    await im.decode();
+    const cv = document.createElement("canvas");
+    cv.width = im.width; cv.height = im.height;
+    cv.getContext("2d").drawImage(im, 0, 0);
+    return cv.getContext("2d").getImageData(0, 0, im.width, im.height);
+  };
+  const a = await read(A);
+  const b = await read(B);
+  const px = [];
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (let y = 0; y < a.height; y += 1) {
+    for (let x = 0; x < a.width; x += 1) {
+      const i = (y * a.width + x) * 4;
+      const d = Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) + Math.abs(a.data[i + 2] - b.data[i + 2]);
+      if (d < lum * 3) continue;
+      px.push(x, y);
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+  }
+  return { n: px.length / 2, px, x0, x1, y0, y1 };
+}
+
+// HUD는 찍지 않는다. flash, stamp, caption은 CSS 시간으로 움직이므로 __freeze가 못 세운다.
+// 전체 페이지를 찍으면 같은 프레임 두 장 사이에 수천 화소가 갈리고, 그 잡음이 공보다 크다.
+// 공과 잔상은 캔버스 안에만 있으므로 측정면은 캔버스다.
+const shots = async (p) => {
+  const cv = p.locator("#stage");
+  const shot = async () => (await cv.screenshot({ type: "png" })).toString("base64");
+  const a = await shot();
+  await p.evaluate(() => window.__flightHide("ghosts"));
+  await p.waitForTimeout(120);
+  const b = await shot();
+  await p.evaluate(() => window.__flightHide("both"));
+  await p.waitForTimeout(120);
+  const c = await shot();
+  await p.evaluate(() => window.__flightHide("none"));
+  await p.waitForTimeout(120);
+  const a2 = await shot();
+  return { a, b, c, a2 };
+};
+
+const measure = async (p, s) => {
+  const ball = await p.evaluate(diff, [s.b, s.c, LUM]);
+  const trail = await p.evaluate(diff, [s.a, s.b, LUM]);
+  const noise = await p.evaluate(diff, [s.a, s.a2, LUM]);
+  const dia = ball.n ? Math.max(ball.x1 - ball.x0, ball.y1 - ball.y0) + 1 : 0;
+  const cx = (ball.x0 + ball.x1) / 2;
+  const cy = (ball.y0 + ball.y1) / 2;
+  let ring = 0;
+  for (let i = 0; i < trail.px.length; i += 2) {
+    const d = Math.hypot(trail.px[i] - cx, trail.px[i + 1] - cy);
+    if (d > ring) ring = d;
+  }
+  return { ballN: ball.n, dia, trailN: trail.n, ring, noise: noise.n };
 };
 
 let br;
@@ -45,48 +111,47 @@ try {
   await p.click("#go", { force: true });
   await p.waitForTimeout(1800);
 
-  const ballPx = [];
-  const ratios = [];
-  let frames = 0;
-  let lit = 0;
+  const rows = [];
   for (let i = 0; i < ROUNDS; i += 1) {
     await p.keyboard.press(i % 2 ? "ArrowRight" : "ArrowLeft");
-    const rows = await p.evaluate(sampleFlight);
-    // 실제로 공이 이동한 프레임만 비행이다. 발밑에 서 있는 프레임을 섞으면 최솟값이 그 자리에서 결정된다.
-    const fly = rows.filter((r) => r.cue && r.step > 0.05);
-    if (fly.length < 10) { console.log("skip round " + i + " flyFrames=" + fly.length); await p.waitForTimeout(2600); continue; }
-    frames += fly.length;
-    lit += fly.filter((r) => r.opacity > 0 && r.shown === GHOSTS).length;
-    for (const r of fly) {
-      ballPx.push(r.ballPx);
-      ratios.push(r.ringPx / Math.max(1e-6, r.ballPx * 0.5));
-    }
-    console.log("round " + i + " fly=" + fly.length
-      + " ballPx " + Math.min(...fly.map((r) => r.ballPx)).toFixed(1) + ".." + Math.max(...fly.map((r) => r.ballPx)).toFixed(1)
-      + " ratio=" + median(fly.map((r) => r.ringPx / Math.max(1e-6, r.ballPx * 0.5))).toFixed(2)
-      + " shown=" + median(fly.map((r) => r.shown)));
+    const hit = await p.evaluate(waitFlight);
+    if (!hit) { console.log("skip round " + i + " no flight frame"); await p.waitForTimeout(2600); continue; }
+    // 차분은 base64 문자열만 보므로 세계를 세워둘 이유가 없다.
+    // 정지를 measure까지 끌면 한 라운드가 수 초 멈추고 다음 킥 주기를 통째로 놓친다.
+    const s = await shots(p);
+    await p.evaluate(() => window.__freeze(false));
+    const m = await measure(p, s);
+    rows.push(m);
+    console.log("round " + i + " ballPx=" + m.ballN + " dia=" + m.dia + " trailPx=" + m.trailN
+      + " ring=" + m.ring.toFixed(1) + " ratio=" + (m.ring / Math.max(1, m.dia / 2)).toFixed(2) + " noise=" + m.noise);
     await p.waitForTimeout(2600);
   }
+  if (!rows.length) { console.log("INSTRUMENT DEAD: no flight frames"); process.exit(1); }
 
-  if (!frames) { console.log("INSTRUMENT DEAD: no flight frames"); process.exit(1); }
+  // 대조군. 비행이 끝난 정지 상태에 같은 자를 댄다.
+  await p.waitForTimeout(1200);
+  await p.evaluate(() => window.__freeze(true));
+  const idleShots = await shots(p);
+  await p.evaluate(() => window.__freeze(false));
+  const idle = await measure(p, idleShots);
 
-  // 대조군. 비행이 끝난 정지 상태에서 같은 자를 댄다.
-  await p.waitForTimeout(600);
-  const idle = await p.evaluate(() => window.__flightVis());
-
-  const minBall = Math.min(...ballPx);
-  const ratio = median(ratios);
-  const litRate = lit / frames;
-  console.log("MIN_BALL " + minBall.toFixed(1) + "px (bar " + BAR_BALL + ")");
-  console.log("RING_RATIO " + ratio.toFixed(2) + " (bar " + BAR_RATIO + ")");
-  console.log("TRAIL_LIT " + (litRate * 100).toFixed(1) + "% of " + frames + " flight frames (bar 100%)");
-  console.log("CONTROL idle ring=" + idle.ringPx.toFixed(2) + " opacity=" + idle.opacity.toFixed(2));
+  const minDia = Math.min(...rows.map((r) => r.dia));
+  const minTrail = Math.min(...rows.map((r) => r.trailN));
+  const minRatio = Math.min(...rows.map((r) => r.ring / Math.max(1, r.dia / 2)));
+  const maxNoise = Math.max(...rows.map((r) => r.noise), idle.noise);
+  console.log("MIN_DIA " + minDia + "px (bar " + BAR_BALL + ")");
+  console.log("MIN_TRAIL " + minTrail + "px (bar " + BAR_TRAIL + ")");
+  console.log("MIN_RATIO " + minRatio.toFixed(2) + " (bar " + BAR_RATIO + ")");
+  console.log("NOISE " + maxNoise + " (bar <" + BAR_NOISE + ")");
+  console.log("CONTROL idle trailPx=" + idle.trailN + " ballPx=" + idle.ballN);
   console.log("ERRORS " + errs.length);
 
-  if (idle.ringPx > 0.01 || idle.opacity > 0) { console.log("INSTRUMENT DEAD: control lit"); process.exit(1); }
-  if (minBall < BAR_BALL) fail += 1;
-  if (ratio < BAR_RATIO) fail += 1;
-  if (litRate < 1) fail += 1;
+  if (maxNoise >= BAR_NOISE) { console.log("INSTRUMENT DEAD: noise floor"); process.exit(1); }
+  if (idle.trailN > 0) { console.log("INSTRUMENT DEAD: control trail lit"); process.exit(1); }
+  if (idle.ballN === 0) { console.log("INSTRUMENT DEAD: control ball invisible to diff"); process.exit(1); }
+  if (minDia < BAR_BALL) fail += 1;
+  if (minTrail < BAR_TRAIL) fail += 1;
+  if (minRatio < BAR_RATIO) fail += 1;
   if (errs.length) fail += 1;
   console.log(fail ? "FAIL" : "PASS");
 } finally {
