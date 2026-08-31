@@ -118,30 +118,34 @@ try {
   await p.setViewportSize({ width: 1280, height: 720 });
   await p.waitForTimeout(400);
 
-  // 성장 카드. 세 장이 한 줄로 뷰포트 안에 들어와야 한다.
-  await p.evaluate(() => {
-    const o = document.getElementById("offer");
-    if (o.hidden) {
-      o.hidden = false;
-      o.innerHTML = '<h4>\uc131\uc7a5</h4><div class="row">' +
-        '<button>\ub2e4\uc774\ube59<em>+1</em></button>' +
-        '<button>\ud578\ub4e4\ub9c1<em>+1</em></button>' +
-        '<button>\uce68\ucc29\uc131<em>+1</em></button></div>';
-    }
-  });
+  // 훈련장. 축의 출처는 파운더 요구 변경이다. 레벨업 즉시 선택을 버리고 포인트를 적립해
+  // 훈련장에서 쓰기로 했으니, 재는 것은 카드 세 장이 한 줄인지가 아니라 실제 버튼으로 열었을 때
+  // 성장 가능한 열다섯 칸과 닫기가 전부 화면 안에 겹침 없이 놓이는지다.
+  await p.click("#gymBtn");
   await p.waitForTimeout(300);
-  const cards = await p.evaluate(() => {
-    const bs = [...document.querySelectorAll("#offer button")];
-    const tops = new Set(bs.map((b) => Math.round(b.getBoundingClientRect().top)));
-    const inside = bs.every((b) => {
-      const r = b.getBoundingClientRect();
-      return r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
-    });
-    return { n: bs.length, rows: tops.size, inside };
+  const gym = await p.evaluate(() => {
+    const fits = (r) => r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
+    const bs = [...document.querySelectorAll("#gym .row button")];
+    const rs = bs.map((b) => b.getBoundingClientRect());
+    const hit = [];
+    for (let i = 0; i < rs.length; i += 1) {
+      for (let j = i + 1; j < rs.length; j += 1) {
+        const w = Math.min(rs[i].right, rs[j].right) - Math.max(rs[i].left, rs[j].left);
+        const h = Math.min(rs[i].bottom, rs[j].bottom) - Math.max(rs[i].top, rs[j].top);
+        // 2px는 손그림 테두리 반올림 여유다. 그 아래는 겹침이 아니라 렌더 오차다.
+        if (w > 2 && h > 2) hit.push(i + "x" + j);
+      }
+    }
+    const close = document.querySelector("#gym .close");
+    return { n: bs.length, inside: rs.every(fits), hit: hit.length,
+      closeIn: Boolean(close) && fits(close.getBoundingClientRect()) };
   });
-  check("offer:three-cards-one-row-in-viewport",
-    cards.n === 3 && cards.rows === 1 && cards.inside,
-    JSON.stringify(cards));
+  check("gym:fifteen-stats-and-close-inside-viewport-without-overlap",
+    gym.n === 15 && gym.inside && gym.hit === 0 && gym.closeIn,
+    JSON.stringify(gym));
+  // 아이콘 축은 훈련장 뒤 화면을 찍는다. 덮개를 걷지 않으면 그 축이 훈련장을 잰다.
+  await p.click("#gym .close");
+  await p.waitForTimeout(250);
 
   // 아이콘 축. 출처는 파운더 요구다. 나가기 글자가 게임 종료로 읽혀 아이콘으로 바꿨고,
   // 아이콘은 DOM에 있는 것으로는 부족하고 화면에 찍혀 있어야 요구가 충족된다.

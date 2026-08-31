@@ -61,18 +61,6 @@ const waitFlight = (z) => new Promise((res) => {
   requestAnimationFrame(tick);
 });
 
-// 성장 카드가 떠 있으면 킥이 영원히 안 온다. 카드를 한 장 골라 닫고 다음 세트를 연다.
-const clearOffer = async (p) => {
-  const shown = await p.evaluate(() => {
-    const box = document.getElementById("offer");
-    return Boolean(box && !box.hidden && box.querySelector("button"));
-  });
-  if (!shown) return false;
-  await p.click("#offer button", { force: true });
-  await p.waitForTimeout(700);
-  return true;
-};
-
 // 페이지 안에서 두 장을 디코드하고 밝기가 갈린 화소를 모은다.
 async function diff([A, B, lum]) {
   const read = async (b64) => {
@@ -173,10 +161,8 @@ try {
   const rows = [];
   for (let i = 0; i < ROUNDS; i += 1) {
     let m = null;
-    // 세트가 끝나면 성장 카드가 떠 킥이 멈춘다. 카드를 닫기 전까지는 기다려도 큐가 안 온다.
-    // 앞선 판은 그 라운드를 건너뛰고 표본을 셋으로 줄였다. 표본을 줄이는 것은 바를 내리는 것과 같다.
+    // 세트 사이에는 쉬는 시간만 있고 화면을 막는 것이 없다. 큐는 기다리면 온다.
     for (let a = 0; a < 3 && !m; a += 1) {
-      await clearOffer(p);
       const armed = await p.evaluate(waitCue);
       if (!armed) { console.log("round " + i + " retry " + a + ": no kick within 14s"); continue; }
       await p.keyboard.press(i % 2 ? "ArrowRight" : "ArrowLeft");

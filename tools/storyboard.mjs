@@ -48,26 +48,11 @@ try {
     try { await cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }); } catch { /* 페이지가 닫힐 때 난다 */ }
   });
 
-  // 성장 오버레이는 모달이다. 열리면 눌러주기 전까지 게임이 멈춘다.
-  await p.evaluate(() => {
-    window.__offerHold = 700;
-    let shownAt = 0;
-    setInterval(() => {
-      const box = document.getElementById('offer');
-      if (!box || box.hidden) { shownAt = 0; return; }
-      if (!shownAt) shownAt = Date.now();
-      if (Date.now() - shownAt < window.__offerHold) return;
-      const btn = box.querySelector('button');
-      if (btn) { btn.click(); shownAt = 0; }
-    }, 220);
-  });
-  const offerUp = () => p.evaluate(() => {
-    const box = document.getElementById('offer');
-    return Boolean(box) && !box.hidden;
-  });
-  const holdOffer = (ms) => p.evaluate((v) => { window.__offerHold = v; }, ms);
-  const awaitOffer = async (limit) => {
-    for (let i = 0; i < limit / 250; i++) { if (await offerUp()) return true; await wait(250); }
+  // 훈련장은 손으로 여는 패널이다. 저절로 뜨지 않으니 여는 시점을 하네스가 고른다.
+  const openGym = () => p.click('#gymBtn', { force: true });
+  const shutGym = () => p.evaluate(() => { const c = document.querySelector('#gym .close'); if (c) c.click(); });
+  const awaitPoints = async (limit) => {
+    for (let i = 0; i < limit / 250; i++) { if (await p.evaluate(() => window.__points()) > 0) return true; await wait(250); }
     return false;
   };
 
@@ -89,16 +74,15 @@ try {
     mark('shot' + (i + 1));
   }
 
-  // 3장. 키운다. 다섯 개가 끝나면 성장 선택이 저절로 열린다.
-  await holdOffer(999999);
-  await awaitOffer(24000);
+  // 3장. 키운다. 판이 닫히면 훈련 포인트가 쌓이고 그때 훈련장을 연다.
+  await awaitPoints(24000);
+  await openGym();
   mark('grow');
   await wait(9000);
 
-  // 성장 오버레이는 모달이다. 열려 있는 동안은 판이 안 굴러간다.
-  // 닫고 사건을 보여주면 그 사이에 다음 판이 끝나면서 모달이 또 열려 장면을 자른다.
-  // 열어둔 채 화면에서만 숨긴다. 판은 멈춰 있고 연출만 돌아간다.
-  await p.evaluate(() => { document.getElementById('offer').style.visibility = 'hidden'; });
+  // 사건 연출은 다음 구가 덮어쓴다. 훈련장을 닫고 판 자체를 세운 뒤 연출만 돌린다.
+  await shutGym();
+  await p.evaluate(() => window.__lockRound());
   await wait(600);
 
   // 4장. 병맛 사건. 한 장면씩 불러서 충분히 보여준다.
@@ -109,9 +93,8 @@ try {
     await wait(5200);
   }
 
-  await p.evaluate(() => { document.getElementById('offer').style.visibility = ''; });
+  await p.evaluate(() => window.__resumeRound());
   await wait(900);
-  await holdOffer(700);
   await wait(2000);
 
   // 5장. 두 번째 판. 키운 뒤의 화면을 한 번 더 보여준다.
@@ -122,11 +105,11 @@ try {
     await wait(2600);
     mark('p2shot' + (i + 1));
   }
-  await holdOffer(999999);
-  await awaitOffer(24000);
+  await awaitPoints(24000);
+  await openGym();
   mark('grow2');
   await wait(6000);
-  await holdOffer(700);
+  await shutGym();
   await wait(2000);
 
   // 6장. 맡긴다. 자동이 실제로 막는 장면이 들어가야 한다.

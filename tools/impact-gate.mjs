@@ -45,18 +45,6 @@ const waitCue = () => new Promise((res) => {
   requestAnimationFrame(tick);
 });
 
-// 성장 카드가 떠 있으면 다음 킥이 영원히 안 온다.
-const clearOffer = async (p) => {
-  const shown = await p.evaluate(() => {
-    const box = document.getElementById("offer");
-    return Boolean(box && !box.hidden && box.querySelector("button"));
-  });
-  if (!shown) return false;
-  await p.click("#offer button", { force: true });
-  await p.waitForTimeout(700);
-  return true;
-};
-
 // 히트스톱 구간의 세계시계와 실시간을 같이 적는다. 페이지 안에서 재야 왕복 지연이 안 섞인다.
 // 사건 선언 직후 90ms 동안 세계가 얼마나 갔는지가 정지의 증거다.
 const measureStall = (ms) => new Promise((res) => {
@@ -160,7 +148,6 @@ try {
   for (const kind of KINDS) {
     let row = null;
     for (let a = 0; a < 3 && !row; a += 1) {
-      await clearOffer(p);
       const armed = await p.evaluate(waitCue);
       if (!armed) { console.log(kind + " retry " + a + ": no kick within 14s"); continue; }
       await p.keyboard.press("ArrowLeft");

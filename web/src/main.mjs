@@ -46,6 +46,8 @@ window.__now = () => stage.now();
 // 실측: aimX 2.1을 넣었는데 비행 궤적이 aimX 0.72로 읽혔다.
 // 'demo'는 commit이 요구하는 'wait'가 아니므로 그 경로가 통째로 막힌다.
 window.__lockRound = () => { stage.cancel(timer); state.phase = 'demo'; return state.phase; };
+// 잠근 판을 다시 굴린다. 하네스가 연출 구간을 끼워 넣고 이어서 촬영하려면 되돌릴 길이 있어야 한다.
+window.__resumeRound = () => { state.phase = 'idle'; nextSet(); return state.phase; };
 // 불러오기는 판이 시작되기 전에 끝난다. 첨 판을 기다려 그리면 그 사이에 숫자가 없다.
 
 // 손가락 셋. 방향과 타이밍과 나갈지 여부.
