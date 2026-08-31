@@ -9,7 +9,12 @@ import { writeFileSync } from "node:fs";
 // 바: 비행 중 공 지름 30px, 잔상 화소 200개, 잔상이 공 반지름의 1.5배 밖까지 나감.
 // 반지름만 보는 바는 뭉친 후광을 통과시킨다. 실측: 고스트 간격 18px에 공 지름 34px이라
 // 고스트가 앞 고스트를 반지름만큼 덮어 링 반지름 53px 안에 여덟 장이 전부 뭉쳤는데 비율 3.1로 통과했다.
-// 그래서 뻗은 길이를 따로 잰다: reach = 링/지름이 2.0 이상, 공 지름 밖에 놓인 잔상 화소가 120개 이상.
+// 그래서 뻗은 길이를 따로 잰다. 단, 자의 분자와 분모는 같은 것에서 와야 한다.
+// 앞선 판의 reach는 화소 링을 실측 지름으로 나눴는데, 실측 지름은 카툰 아웃라인과 디더로 부푼
+// 실루엣이라 선언 34px이 41px로 잡힌다. 분모가 20% 커진 자에 기하 천장 아래로 둔 바를 얹으면
+// 만족 불가능한 축이 된다. 실측: 정면 킥의 기하 천장 1.86, 꼬리 알파 페이드 0.75, 결과 1.39 대 바 1.5.
+// 그래서 둘로 쪼갠다. span = 선언 링 / 선언 경로(자취 최고령점까지의 화면 거리)로 리본이 지나온 길을
+// 실제로 걸치는지 보고, paint = 화소 링 / 선언 링으로 그 리본이 화소로 칠해졌는지 본다.
 // 대조군 둘. 같은 프레임을 두 번 그린 잡음 바닥이 50화소 미만이어야 자가 예민한 것이고,
 // 비행이 아닐 때 잔상 화소가 0이면서 공 화소는 남아야 자가 잔상만 골라 보는 것이다.
 
@@ -20,11 +25,14 @@ const H = 720;
 const ROUNDS = 4;
 const BAR_BALL = 30;
 const BAR_RATIO = 1.5;
-// 가장 뒤 잔상은 지금까지 날아온 거리 전부를 되짚어 킥 지점에 놓인다. 그보다 더 뻗은 꼬리는
-// 킥 이전 구간을 지어낸 것이므로 거짓이다. 그래서 reach의 천장은 공에서 발끝까지의 화면 거리다.
-// 실측 네 라운드: 1.68(가장 정면), 3.37, 7.48, 6.85. 정면 킥에서 1.68이 기하학적 최대다.
-// 바는 그 아래 1.5로 둔다. 뭉친 후광은 0.66에서 1.00 사이였으므로 원래 잡으려던 형태는 그대로 걸린다.
-const BAR_REACH = 1.5;
+// 리본이 경로를 걸치는 비율. 실측 네 라운드 1.04 1.08 1.04 1.04. 1을 넘는 것은 링에 꼬리 반지름이
+// 더해지기 때문이다. SP 바닥이 무너져 리본이 공 주위로 뭉치면 이 값이 0으로 내려간다. 바는 0.9.
+const BAR_SPAN = 0.9;
+// 선언된 리본이 화소로 남은 비율. 꼬리 알파 페이드가 뒤쪽을 지우므로 1이 될 수 없다.
+// 실측 0.70 0.75 0.88 0.88. 바는 가장 낮은 값 아래 0.6.
+const BAR_PAINT = 0.6;
+// 공 실루엣 밖에 놓인 잔상 화소. 단위는 선언 지름이다. 실측 지름으로 재면 아웃라인 팽창분만큼
+// 반경이 넓어져 개수가 깎인다.
 const BAR_FAR = 120;
 // 어느 프레임에서 재느냐가 바보다 먼저다. z<8은 공이 발을 떠난 지 반 미터인 지점이라
 // 꼬리가 지나온 길이 자체가 없고, 그 구간의 이동은 카메라 축과 거의 나란해서
@@ -125,7 +133,7 @@ const dump = (tag, s) => {
   console.log("  state " + s.st.map((x) => "b" + (x.ball ? 1 : 0) + "/s" + x.shown + "/l" + x.lit + "/o" + x.opacity.toFixed(2)).join(" "));
 };
 
-const measure = async (p, s) => {
+const measure = async (p, s, declDia) => {
   const ball = await p.evaluate(diff, [s.b, s.c, LUM]);
   const trail = await p.evaluate(diff, [s.a, s.b, LUM]);
   const noise = await p.evaluate(diff, [s.a, s.a2, LUM]);
@@ -137,7 +145,7 @@ const measure = async (p, s) => {
   for (let i = 0; i < trail.px.length; i += 2) {
     const d = Math.hypot(trail.px[i] - cx, trail.px[i + 1] - cy);
     if (d > ring) ring = d;
-    if (dia && d > dia) far += 1;
+    if (declDia && d > declDia) far += 1;
   }
   return { ballN: ball.n, dia, trailN: trail.n, ring, far, noise: noise.n,
     bx0: ball.x0, bx1: ball.x1, by0: ball.y0, by1: ball.y1,
@@ -172,13 +180,18 @@ try {
       // 정지를 measure까지 끌면 한 라운드가 수 초 멈추고 다음 킥 주기를 통째로 놓친다.
       const s = await shots(p);
       await p.evaluate(() => window.__freeze(false));
-      m = await measure(p, s);
+      m = await measure(p, s, hit.ballPx);
+      m.declRing = hit.ringPx;
+      m.pathPx = hit.pathPx;
       rows.push(m);
       console.log("round " + i + " ballPx=" + m.ballN + " dia=" + m.dia + " trailPx=" + m.trailN
         + " ring=" + m.ring.toFixed(1) + " ratio=" + (m.ring / Math.max(1, m.dia / 2)).toFixed(2) + " noise=" + m.noise);
       // 통과 못 한 라운드는 눈으로 볼 수 있어야 고칠 대상이 정해진다.
       // 선언 지름과 실측 지름을 같이 적어야 공이 작은 것인지 가려진 것인지 갈린다.
       console.log("  decl dia=" + hit.ballPx.toFixed(1) + "px z=" + hit.z.toFixed(2)
+        + " declRing=" + hit.ringPx.toFixed(1) + " pathPx=" + hit.pathPx.toFixed(1)
+        + " span=" + (hit.ringPx / Math.max(1, hit.pathPx)).toFixed(2)
+        + " paint=" + (m.ring / Math.max(1, hit.ringPx)).toFixed(2)
         + " bbox " + m.bx0 + ".." + m.bx1 + "," + m.by0 + ".." + m.by1);
       if (m.dia < BAR_BALL) {
         dump("fail" + i, s);
@@ -205,13 +218,15 @@ try {
   const minDia = Math.min(...rows.map((r) => r.dia));
   const minTrail = Math.min(...rows.map((r) => r.trailN));
   const minRatio = Math.min(...rows.map((r) => r.ring / Math.max(1, r.dia / 2)));
-  const minReach = Math.min(...rows.map((r) => r.ring / Math.max(1, r.dia)));
+  const minSpan = Math.min(...rows.map((r) => r.declRing / Math.max(1, r.pathPx)));
+  const minPaint = Math.min(...rows.map((r) => r.ring / Math.max(1, r.declRing)));
   const minFar = Math.min(...rows.map((r) => r.far));
   const maxNoise = Math.max(...rows.map((r) => r.noise), idle.noise);
   console.log("MIN_DIA " + minDia + "px (bar " + BAR_BALL + ")");
   console.log("MIN_TRAIL " + minTrail + "px (bar " + BAR_TRAIL + ")");
   console.log("MIN_RATIO " + minRatio.toFixed(2) + " (bar " + BAR_RATIO + ")");
-  console.log("MIN_REACH " + minReach.toFixed(2) + " (bar " + BAR_REACH + ")");
+  console.log("MIN_SPAN " + minSpan.toFixed(2) + " (bar " + BAR_SPAN + ")");
+  console.log("MIN_PAINT " + minPaint.toFixed(2) + " (bar " + BAR_PAINT + ")");
   console.log("MIN_FAR " + minFar + "px (bar " + BAR_FAR + ")");
   console.log("NOISE " + maxNoise + " (bar <" + BAR_NOISE + ")");
   console.log("CONTROL idle trailPx=" + idle.trailN + " ballPx=" + idle.ballN);
@@ -223,7 +238,8 @@ try {
   if (minDia < BAR_BALL) fail += 1;
   if (minTrail < BAR_TRAIL) fail += 1;
   if (minRatio < BAR_RATIO) fail += 1;
-  if (minReach < BAR_REACH) fail += 1;
+  if (minSpan < BAR_SPAN) fail += 1;
+  if (minPaint < BAR_PAINT) fail += 1;
   if (minFar < BAR_FAR) fail += 1;
   if (errs.length) fail += 1;
   console.log(fail ? "FAIL" : "PASS");

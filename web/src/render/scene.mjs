@@ -1768,6 +1768,14 @@ export function createScene(canvas) {
       const gr = screenR(ribTail, BALL_R * ballGain * RIB_W(GHOSTS - 1));
       ringPx = Math.hypot(gc[0] - bc[0], gc[1] - bc[1]) + gr;
     }
+    // 리본이 걸친 화면 길이와 공이 실제로 지나온 화면 길이는 다른 주장이다.
+    // 자취의 최고령점까지가 경로의 상한이므로, 리본을 이것으로 나눠야
+    // 리본이 짧아진 것인지 경로 자체가 짧은 것인지 갈린다.
+    let pathPx = 0;
+    if (trail.length > 1) {
+      const tc = toScreen(trail[trail.length - 1]);
+      pathPx = Math.hypot(tc[0] - bc[0], tc[1] - bc[1]);
+    }
     return {
       cue: Boolean(cue && !tail),
       z: ball.position.z,
@@ -1777,7 +1785,8 @@ export function createScene(canvas) {
       shown: ribbon.visible ? GHOSTS : 0,
       px,
       ballPx: br * 2,
-      ringPx
+      ringPx,
+      pathPx
     };
   };
 
