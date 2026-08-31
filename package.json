@@ -15,6 +15,7 @@
     "gate:shot": "node tools/shot-gate.mjs",
     "gate:sfx": "node tools/sfx-gate.mjs",
     "gate:perf": "node tools/perf-gate.mjs",
+    "gate:version": "node tools/version-gate.mjs",
     "test": "node --test test/contract.test.mjs"
   },
   "devDependencies": {
