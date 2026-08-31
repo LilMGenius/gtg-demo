@@ -1,7 +1,7 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
 import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain } from '../../src/chain.mjs';
-import { CAUSE_LABEL, GROWABLE } from '../../src/ledger.mjs';
-import { KEEPERS, keeperCost } from '../../src/roster.mjs';
+import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
+import { KEEPERS, keeperCost, TRAITS } from '../../src/roster.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
@@ -425,6 +425,43 @@ function closeGram() {
   el('gram').hidden = true;
 }
 
+// 히든 둘은 숫자가 아니라 문구로 뜬다. 숫자를 걸면 훈련장에서 올릴 수 있는 칸으로 읽힌다.
+const HIDDEN_LABEL = { consistency: '기복', professionalism: '프로의식' };
+// 기본값이 5다. 5를 가운데로 두고 위아래 두 칸씩 벌려야 평범한 선수가 평범하게 읽힌다.
+function hiddenBand(key, v) {
+  if (key === 'consistency') return v >= 8 ? '한결같다' : v >= 6 ? '기복이 적다' : v >= 4 ? '들쭉날쭉하다' : '오늘 뭐가 나올지 모른다';
+  return v >= 8 ? '훈련을 거르지 않는다' : v >= 6 ? '성실하다' : v >= 4 ? '적당히 한다' : '훈련장을 싫어한다';
+}
+
+// 내 정보. 오른쪽 기둥이 찼으므로 좌상단 레벨 칩이 진입이다.
+function renderMe() {
+  const box = el('me');
+  const k = state.keeper;
+  const name = k.name || '무명';
+  const grid = GROWABLE.map((s) => {
+    const v = k[s];
+    // 10은 성장 상한이다. 훈련장과 같은 기준이어야 두 창이 어긋나지 않는다.
+    return '<span class="' + (v >= 10 ? 'max' : '') + '">' + CAUSE_LABEL[s] + '<b>' + (v >= 10 ? 'MAX' : v) + '</b></span>';
+  }).join('');
+  const traits = (k.traits && k.traits.length)
+    ? k.traits.map((t) => '<div class="note"><b>' + t + '</b><i>' + (TRAITS[t] ? TRAITS[t].note : '') + '</i></div>').join('')
+    : '<div class="note dim"><span>달린 특성이 없다. 명단에서 데려오면 붙어 온다</span></div>';
+  const hidden = HIDDEN.map((h) => '<div class="note"><b>' + HIDDEN_LABEL[h] + '</b><i>' + hiddenBand(h, k[h]) + '</i></div>').join('');
+  box.innerHTML = '<h4>' + name + '<small>Lv ' + k.level + ' · ' + k.height + 'cm · ' + k.weight + 'kg</small></h4>'
+    + '<div class="card"><div class="grid">' + grid + '</div>' + traits + hidden + '</div>'
+    + '<button class="close">닫기</button>';
+  box.querySelector('.close').onclick = closeMe;
+}
+
+function openMe() {
+  el('me').hidden = false;
+  renderMe();
+}
+
+function closeMe() {
+  el('me').hidden = true;
+}
+
 for (const b of document.querySelectorAll('.zone')) {
   b.onpointerdown = () => {
     if (state.phase === 'caption') return state.skip && state.skip();
@@ -450,10 +487,15 @@ el('gramBtn').onpointerdown = (e) => {
   e.stopPropagation();
   if (el('gram').hidden) openGram(); else closeGram();
 };
+el('lv').onpointerdown = (e) => {
+  e.stopPropagation();
+  if (el('me').hidden) openMe(); else closeMe();
+};
 // 진단용. __pick은 화소 피킹이 이미 쓴다.
 window.__squad = () => ({ squad: state.squad.map((k) => k.name), pick: state.pick, coin: state.wallet.coin });
 window.__roster = (open) => { if (open) openRoster(); else closeRoster(); };
 window.__gram = (open) => { if (open) openGram(); else closeGram(); };
+window.__me = (open) => { if (open) openMe(); else closeMe(); };
 
 // 소리. 끌 수 없는 소리는 소리가 아니라 사고다.
 // 음소거는 음량을 건드리지 않는다. 둘을 섞어버리면 한 번 누른 사람은 다시 켜도 무음으로 남는다.
