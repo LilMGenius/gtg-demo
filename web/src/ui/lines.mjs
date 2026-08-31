@@ -233,3 +233,29 @@ export function eventLine(e, rng, last, ctx) {
 }
 
 export const LINE_POOL = Object.keys(POOLS).reduce((n, k) => n + POOLS[k].length, 0);
+
+// 아웃문그램 게시물. 키퍼 계정이 한 구가 끝날 때마다 한 장 올린다.
+// 먹힌 구에도 글이 올라가야 계정이 성적표가 아니라 사람처럼 읽힌다.
+const POSTS = {
+  saved: [
+    '{n} 막았다. 손이 먼저 기억한다',
+    '오늘 {n} 못 넣었대요',
+    '{n}전 하이라이트. 편집 안 한 원본입니다',
+    '{n} 상대 클린시트. 장갑값 했다'
+  ],
+  conceded: [
+    '{n}한테 먹혔다. 조명이 어두웠다',
+    '{n} 각도가 좀 반칙 아닌가요',
+    '{n} 골. 잔디 상태 다들 보셨죠',
+    '{n}전 복기 중. 어깨가 안 따라왔다'
+  ]
+};
+
+export { POSTS };
+export const POST_POOL = POSTS.saved.length + POSTS.conceded.length;
+
+// 뽑은 문장은 게시물에 박아 저장한다. 열 때마다 다시 뽑으면 과거 글이 매번 바뀐다.
+export function postLine(name, conceded, rng) {
+  const pool = POSTS[conceded ? 'conceded' : 'saved'];
+  return pool[Math.floor(rng() * pool.length) % pool.length].replace('{n}', name);
+}

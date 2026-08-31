@@ -20,10 +20,11 @@ export function load() {
 // 사라지면 방치형이 아니라 자리를 지키는 게임이 된다.
 // 지갑은 두 갈래가 한 덩어리로 나가고 들어온다. 한 갈래만 쓰면 나머지가 다음 저장에서 지워진다.
 // 보유 목록과 지금 뛰는 자리를 같이 넘긴다. keeper 칸은 구버전 저장을 읽는 쪽을 위해 남긴다.
-export function save(squad, pick, auto, fans, points, wallet) {
+// 게시물도 같이 내보낸다. 저장에 안 실으면 다음 방문에 계정이 빈 채로 열린다.
+export function save(squad, pick, auto, fans, points, wallet, posts) {
   try {
     const i = Number(pick) || 0;
-    localStorage.setItem(KEY, JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, at: Date.now() }));
+    localStorage.setItem(KEY, JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], at: Date.now() }));
   } catch {
     // 사파리 프라이빗 모드는 쓰기를 막는다. 저장이 안 되는 것과 게임이 죽는 것은 다른 일이다.
   }
