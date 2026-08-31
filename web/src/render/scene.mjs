@@ -198,6 +198,9 @@ export function createScene(canvas) {
   const impact = createImpact(scene);
 
   // 전경 표시는 색이 아니라 알파다. 후처리가 이 값으로 인물과 배경을 갈라 다른 자를 댄다.
+  // material.opacity는 이 알파가 아니다. 아래 tagFg는 프래그먼트 셰이더 끝에 gl_FragColor.a를
+  // 직접 심으므로, JS에서 읽은 opacity가 1이어도 후처리가 보는 알파는 0.25다. 재질 재고를
+  // opacity로 조사하면 전경 전체가 배경으로 잘못 읽힌다(부츠 축에서 두 랩을 태웠다).
   const FG_A = 0.25;
   let fgOutline = null;
   const tagFg = (mat) => {
