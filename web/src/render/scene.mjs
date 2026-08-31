@@ -1007,7 +1007,11 @@ export function createScene(canvas) {
           keeper.position.z = lerp(KEEPER_Z, KEEPER_Z + input.advance, ease(Math.min(1, dp * 1.4)));
           // 관절이 뻗는 방향을 이미 보여주므로 몸통 회전은 거들기만 한다.
           keeper.rotation.z = lerp(0, VIEW_X * -input.dive * 0.86, ease(dp));
-          hover = Math.sin(ease(dp) * Math.PI) * (input.dive === 0 ? 0.05 : 0.40);
+          // 온전한 반원 호는 정점이 dp 0.5, 즉 비행의 63% 지점에 온다. 공이 골라인에 닿는 순간
+          // 키퍼는 이미 내려와 있었다(실측 정점 y 0.34 at bz 3.4, 판정 순간 y 0.06).
+          // 0.62를 곱해 호를 잘라내면 정점이 dp 0.81로 밀리고 dp 1에서도 94%가 남는다.
+          // 남은 높이는 꼬리 포즈가 hover 0.06으로 스냅하며 떨어뜨린다. 그 낙차가 착지다.
+          hover = Math.sin(ease(dp) * Math.PI * 0.62) * (input.dive === 0 ? 0.05 : 0.40);
         }
 
         if (p >= 1 && !cue.ended && t - runup > flight + 0.9) {
