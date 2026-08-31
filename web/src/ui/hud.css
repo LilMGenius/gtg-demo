@@ -30,8 +30,8 @@ body.playing #hud{opacity:1}
 /* 상단 좌측. 네 항목을 한 줄에 늘어놓으면 라벨 없는 덩어리 넷이 되어 어디를 봐야 할지가 없다.
    위칸은 지금 이 판이 어떻게 굴러가는지(레벨, 구 결과), 아래칸은 판 밖에서 쌓이는 값이다. */
 #top{position:absolute;top:calc(12px + env(safe-area-inset-top));left:var(--pad-l);
-  display:grid;grid-template-columns:auto auto;
-  grid-template-areas:"lv pips" "form fans";
+  display:grid;grid-template-columns:auto auto auto;
+  grid-template-areas:"lv pips pips" "form fans purse";
   align-items:center;justify-items:start;column-gap:11px;row-gap:2px;
   padding:4px 13px 5px;
   background:var(--panel);border:var(--line) solid var(--edge);
@@ -41,10 +41,17 @@ body.playing #hud{opacity:1}
   color:#ffd83d;line-height:1.05}
 /* 아래칸 두 값은 같은 등급이다. 굵기나 투명도가 갈리면 하나가 더 중요해 보인다.
    대신 세로 선 하나로 서로 다른 것을 재는 값임을 표시한다. */
-#form,#fans{font-size:12px;font-weight:800;opacity:.72;letter-spacing:.02em;line-height:1.15}
+#form,#fans,#purse{font-size:12px;font-weight:800;opacity:.72;letter-spacing:.02em;line-height:1.15}
 #form{grid-area:form}
 #fans{grid-area:fans;padding-left:11px;border-left:2px solid #ffffff24;margin-left:-11px}
 #fans b{font-weight:800;font-style:normal;opacity:1;color:#ffd83d}
+/* 지갑도 판 밖에서 쌓이는 값이라 팔로워와 같은 등급으로 둔다.
+   코인과 캐시는 같은 칸에 나란히 선다. 두 갈래라는 사실이 화면에서도 한 번에 읽혀야
+   상점이 열렸을 때 어느 잔고로 사는지가 새 정보가 되지 않는다. */
+#purse{grid-area:purse;padding-left:11px;border-left:2px solid #ffffff24;margin-left:-11px}
+#purse b{font-weight:800;font-style:normal;opacity:1;color:#ffd83d}
+/* 캐시는 결제로만 들어온다. 시간으로 버는 코인과 색이 같으면 둘이 한 갈래로 읽힌다. */
+#purse i{font-style:normal;font-weight:800;opacity:1;color:#7fe3ff}
 #pips{grid-area:pips;display:flex;gap:6px}
 /* 미결 구는 아직 안 굴린 주사위다. #ffffff26은 패널 바닥과 붙어 다섯 칸이 세 칸으로 읽혔다. */
 #pips i{width:9px;height:9px;background:#ffffff4d;display:block;border:2px solid var(--edge);

@@ -7,6 +7,7 @@ import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine } from './ui/lines.mjs';
 import { load, save, offlineGain } from './state/save.mjs';
+import { coinGain, readWallet } from './state/wallet.mjs';
 
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
@@ -34,7 +35,11 @@ const state = { keeper: Object.assign(newKeeper(), saved?.keeper || null), shots
 state.points = (Number(saved?.points) || 0) + (saved ? offlineGain(saved.at, Date.now()) : 0);
 // 아웃문그램 팔로워. 의사소통과 악동이 여기서 값을 낸다.
 state.fans = Number(saved?.fans) || 0;
+// 지갑은 두 갈래로 읽는다. 이전 배포본 저장에는 지갑이 없고, 그때 둘 다 0에서 시작한다.
+state.wallet = readWallet(saved?.wallet);
 window.__points = () => state.points;
+// 두 갈래가 각각 어떻게 움직였는지 게이트가 직접 읽어야 한다. 화면 글자는 증거가 아니다.
+window.__wallet = () => state.wallet;
 // 사고 연출은 확률로만 나오므로 계측기가 불러낼 수 있어야 한다. 판정은 안 바뀐다.
 window.__act = (kind) => stage.act(kind);
 // 선언값은 증거가 아니다. 게이트가 실제 파형을 재려면 발화를 불러낼 수 있어야 한다.
@@ -75,6 +80,9 @@ function pips() {
   }).join('');
   el('lv').textContent = 'Lv ' + state.keeper.level;
   el('fans').innerHTML = '아웃문그램 <b>' + state.fans.toLocaleString() + '</b>';
+  // 코인과 캐시를 같은 줄에 붙여 둔다. 잔고가 하나로 보이면 상점에서 무엇으로 사는지가 새 정보가 된다.
+  el('purse').innerHTML = '코인 <b>' + state.wallet.coin.toLocaleString() + '</b> 캐시 <i>'
+    + state.wallet.cash.toLocaleString() + '</i>';
   // 남은 훈련 횟수는 버튼 위에 붙는다. 열어봐야 아는 숫자는 방치형에서 안 열린다.
   const badge = el('gymDot');
   badge.textContent = state.points > 9 ? '9+' : String(state.points);
@@ -177,6 +185,8 @@ function rollCaptions(result) {
       // 팔로워는 구마다 오른다. 먹혀도 오르고, 막으면 더 오른다.
       const gain = followerGain(state.keeper, result);
       state.fans += gain;
+      // 코인은 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
+      state.wallet.coin += coinGain(result.conceded);
       pips();
       state.i += 1;
       restart(result);
@@ -221,7 +231,7 @@ function countdown(sec, label, then) {
 }
 
 function restart(result) {
-  save(state.keeper, state.auto, state.fans, state.points);
+  save(state.keeper, state.auto, state.fans, state.points, state.wallet);
   const hand = ballInHand(result);
   countdown(restartDelay(state.keeper, result), hand ? '공 던져주는 중' : '골킥 차주는 중', nextShot);
 }
@@ -235,7 +245,7 @@ function endSet() {
   // 자동 팝업이 없으므로 전 스탯 만렙이어도 다음 판이 그대로 온다.
   state.keeper.level += 1;
   state.points += 1;
-  save(state.keeper, state.auto, state.fans, state.points);
+  save(state.keeper, state.auto, state.fans, state.points, state.wallet);
   pips();
   timer = stage.after(0.9, () => countdown(setBreak(), '한숨 돌리는 중', nextSet));
 }
@@ -259,7 +269,7 @@ function renderGym() {
       // 프로의식은 히든이다. 숫자는 안 보이고 가끔 두 칸이 오른다.
       state.keeper[b.dataset.k] += growthGain(state.keeper, rng);
       state.points -= 1;
-      save(state.keeper, state.auto, state.fans, state.points);
+      save(state.keeper, state.auto, state.fans, state.points, state.wallet);
       stage.setKeeper(state.keeper);
       pips();
       renderGym();
@@ -287,7 +297,7 @@ autoBtn.classList.toggle('on', state.auto);
 autoBtn.onpointerdown = () => {
   state.auto = !state.auto;
   autoBtn.classList.toggle('on', state.auto);
-  save(state.keeper, state.auto, state.fans, state.points);
+  save(state.keeper, state.auto, state.fans, state.points, state.wallet);
 };
 el('gymBtn').onpointerdown = (e) => {
   e.stopPropagation();

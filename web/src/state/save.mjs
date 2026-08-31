@@ -16,9 +16,10 @@ export function load() {
 
 // 적립한 훈련 횟수도 같이 저장한다. 쓰지 않고 나간 포인트가 탭을 닫을 때
 // 사라지면 방치형이 아니라 자리를 지키는 게임이 된다.
-export function save(keeper, auto, fans, points) {
+// 지갑은 두 갈래가 한 덩어리로 나가고 들어온다. 한 갈래만 쓰면 나머지가 다음 저장에서 지워진다.
+export function save(keeper, auto, fans, points, wallet) {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ keeper, auto, fans, points, at: Date.now() }));
+    localStorage.setItem(KEY, JSON.stringify({ keeper, auto, fans, points, wallet, at: Date.now() }));
   } catch {
     // 사파리 프라이빗 모드는 쓰기를 막는다. 저장이 안 되는 것과 게임이 죽는 것은 다른 일이다.
   }
