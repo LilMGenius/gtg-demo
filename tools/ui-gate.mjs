@@ -14,6 +14,31 @@ function check(name, ok, detail) {
   (ok ? notes : fails).push(name + " " + detail);
 }
 
+// 버튼 두 장을 페이지 안 캔버스로 풀어 아이콘을 끈 프레임과의 휘도차를 센다.
+// 화소차 6 미만은 안티에일리어싱 잔파동과 구분되지 않으므로 세지 않는다.
+function inkDiff([a, b]) {
+  const load = (s) => new Promise((res) => {
+    const im = new Image();
+    im.onload = () => {
+      const cv = document.createElement("canvas");
+      cv.width = im.width; cv.height = im.height;
+      const g = cv.getContext("2d");
+      g.drawImage(im, 0, 0);
+      res(g.getImageData(0, 0, im.width, im.height));
+    };
+    im.src = "data:image/png;base64," + s;
+  });
+  return Promise.all([load(a), load(b)]).then(([A, Bb]) => {
+    const n = Math.min(A.data.length, Bb.data.length) >> 2;
+    const L = (d, i) => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    let hit = 0;
+    for (let i = 0; i < n; i += 1) {
+      if (Math.abs(L(A.data, i * 4) - L(Bb.data, i * 4)) >= 6) hit += 1;
+    }
+    return hit / n;
+  });
+}
+
 let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
@@ -117,6 +142,34 @@ try {
   check("offer:three-cards-one-row-in-viewport",
     cards.n === 3 && cards.rows === 1 && cards.inside,
     JSON.stringify(cards));
+
+  // 아이콘 축. 출처는 파운더 요구다. 나가기 글자가 게임 종료로 읽혀 아이콘으로 바꿨고,
+  // 아이콘은 DOM에 있는 것으로는 부족하고 화면에 찍혀 있어야 요구가 충족된다.
+  const ink = async (id) => {
+    const el = p.locator("#" + id);
+    const on = (await el.screenshot()).toString("base64");
+    await p.evaluate((q) => { document.querySelector(q).style.visibility = "hidden"; }, "#" + id + " svg");
+    const off = (await el.screenshot()).toString("base64");
+    await p.evaluate((q) => { document.querySelector(q).style.visibility = ""; }, "#" + id + " svg");
+    return p.evaluate(inkDiff, [on, off]);
+  };
+  // 8%. 66px 판때기에 3px 격자로 그린 두툼한 픽셀 아이콘은 15~25%대가 나온다.
+  // 8%는 그 아래 절반이라, 아이콘이 한 조각만 남아도 잡히는 자리다.
+  for (const id of ["out", "auto"]) {
+    const cover = await ink(id);
+    check("icon:" + id + "-drawn-over-8pct", cover >= 0.08, (cover * 100).toFixed(1) + "%");
+  }
+
+  // 글자가 남아 있으면 아이콘과 겹쳐 읽힌다. 이름은 aria-label이 맡는다.
+  const labels = await p.evaluate(() => ["out", "auto"].map((id) => {
+    const el = document.getElementById(id);
+    return id + ":" + JSON.stringify(el.textContent.trim()) + "/" + JSON.stringify(el.getAttribute("aria-label") || "");
+  }));
+  const labelOk = await p.evaluate(() => ["out", "auto"].every((id) => {
+    const el = document.getElementById(id);
+    return el.textContent.trim() === "" && (el.getAttribute("aria-label") || "").length > 0;
+  }));
+  check("icon:no-text-face-but-aria-label", labelOk, labels.join(" "));
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
 
