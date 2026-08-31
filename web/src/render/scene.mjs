@@ -180,6 +180,8 @@ export function createScene(canvas) {
   // 지점마다 손으로 다는 대신 add를 감싸는 이유는, 한 서브시스템이 최상위에 여러 개를
   // 흩뿌려도 누락 없이 전부 귀속되기 때문이다.
   let subTag = 'stage';
+  // stage 구간에서 add되는 것은 아래 조명 다섯뿐이고 __subs는 조명을 세지 않는다. 그래서
+  // __subs에 stage가 0인 것은 하네스 결함이 아니라 설계상 필연이고, stage 컷도 나오지 않는다.
   const rawAdd = scene.add.bind(scene);
   scene.add = (...objs) => {
     for (const o of objs) if (o.userData.sub === undefined) o.userData.sub = subTag;
