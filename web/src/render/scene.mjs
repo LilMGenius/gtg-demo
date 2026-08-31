@@ -1314,7 +1314,11 @@ export function createScene(canvas) {
           // 공은 아무도 안 막았으니 원래 속도로 들어가고, 느린 것은 홀린 사람 쪽이다.
           {
             const be = ease(Math.min(1, u * 1.9));
-            ball.position.set(lerp(tail.from.x, 0, be), lerp(tail.from.y, REST_Y, be), lerp(tail.from.z, REST_Z, be));
+            // x를 0으로 모으면 어디로 차 넣었든 공이 매번 골문 한가운데에서 멈춘다.
+            // 아무도 안 건드린 공이 옆으로 휘어 들어갈 이유가 없다. 노린 자리에 그대로 꽂힌다.
+            // 2.0은 골대 반폭 2.2에서 공 반지름 0.14와 그물 두께를 뺀 값이라 그물을 뚫지 않는다.
+            const inX = Math.max(-2.0, Math.min(2.0, tail.from.x));
+            ball.position.set(lerp(tail.from.x, inX, be), lerp(tail.from.y, REST_Y, be), lerp(tail.from.z, REST_Z, be));
           }
           break;
         }
