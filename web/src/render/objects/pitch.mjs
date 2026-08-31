@@ -361,6 +361,11 @@ export function buildPitch(scene) {
   const fence = meshPanel(58, 3.4, 0.55, 0x3f6b4a, 0.5, 0.18);
   fence.position.set(0, 1.7, 30);
   scene.add(fence);
+  // 타이틀 카메라는 키커 쪽에서 골대 너머(-z)를 본다. 도시가 +z에만 서 있으면
+  // 그쪽 지평선이 빈 청회색 띠가 된다. 경기 카메라는 +z를 보므로 이 사본은 절두체 밖이다.
+  const backFence = meshPanel(58, 3.4, 0.55, 0x3f6b4a, 0.5, 0.18);
+  backFence.position.set(0, 1.7, -30);
+  scene.add(backFence);
 
   // 건물 실루엣. 지평선 위가 비지 않게만 세운다. 디테일은 없다.
   // 구운 GLB가 오면 이걸 치우고 그 자리에 선다. 14개 드로우콜이 1개가 된다.
@@ -405,6 +410,12 @@ export function buildPitch(scene) {
     cursor += w + 0.4 + rnd() * 1.6;
   }
   scene.add(skyline);
+  // 지오메트리와 재질을 그대로 나눠 쓴다. 반 바퀴 돌리면 (x,z)가 뒤집혀 z가 -38~-45로 간다.
+  const backCity = skyline.clone();
+  backCity.rotation.y = Math.PI;
+  scene.add(backCity);
+  // GLB가 서면 이 사본도 GLB 사본으로 갈린다. loadDecor가 여기를 본다.
+  skyline.userData.mirror = backCity;
   // 라인은 흔들지 않는다. 바닥 선이 물결치면 거리를 못 읽는다. 건물만 흔든다.
   // 구운 GLB가 서면 위에서 세운 fallback은 버려진다. 화면에 실제로 서는 건 이쪽이다.
   // 창 무늬도 벽색도 동마다 갈라야 열네 동이 열네 동으로 읽힌다.

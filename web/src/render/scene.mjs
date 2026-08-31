@@ -1523,11 +1523,13 @@ export function createScene(canvas) {
     }
     camera.lookAt(camLook);
     if (titleMode) {
-      // 골대 옆 낮은 곳에서 천천히 돌린다. 정면 고정 샷은 스크린샷이지 타이틀이 아니다.
-      // 반경 9.5에 높이 2.0. 반경 5는 골대를 벗어나고 15는 선수가 점으로 작아졌다.
-      const a = vnow * 0.16 + 0.5;
-      camera.position.set(Math.sin(a) * 9.5, 2.0 + Math.sin(vnow * 0.4) * 0.35, 4.5 - Math.cos(a) * 9.5);
-      camera.lookAt(0, 1.5, 5.5);
+      // 한 바퀴 돌리면 궤도의 절반이 골대 뒤를 지나고, 그때 그물 격자가 키퍼 얼굴을 가로지른다.
+      // 원운동 대신 피치 쪽 앞 호만 좌우로 훑는다. 그물은 항상 키퍼 뒤에 남아 배경이 된다.
+      // 반경 5.4에 키퍼까지 약 6m. 9.5는 키퍼가 100px로 줄어 타이틀 주인공이 못 됐다.
+      const a = Math.PI + Math.sin(vnow * 0.13) * 0.7;
+      camera.position.set(Math.sin(a) * 5.4, 2.05 + Math.sin(vnow * 0.4) * 0.22, 1.6 - Math.cos(a) * 5.4);
+      // 제목이 화면 왼쪽을 쓴다. 시선을 왼쪽으로 밀어 키퍼를 오른쪽 빈 자리에 세운다.
+      camera.lookAt(-1.5, 1.45, 0.9);
     }
     if (dutchLeft > 0) {
       dutchLeft -= dt;

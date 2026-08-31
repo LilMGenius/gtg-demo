@@ -85,6 +85,16 @@ export function loadDecor(scene, name, fallback, jitter = 0, mat = null) {
       const root = gltf.scene;
       root.name = name;
       relight(root, jitter, mat);
+      // 뒤에 세운 사본은 fallback이 들고 있다. GLB가 서면 그 사본도 같이 갈아야
+      // 앞뒤 실루엣이 어긋나지 않는다.
+      const mirror = fallback && fallback.userData ? fallback.userData.mirror : null;
+      if (mirror) {
+        if (mirror.parent) mirror.parent.remove(mirror);
+        const back = root.clone();
+        back.name = name + '-back';
+        back.rotation.y = Math.PI;
+        scene.add(back);
+      }
       if (fallback && fallback.parent) fallback.parent.remove(fallback);
       scene.add(root);
     },
