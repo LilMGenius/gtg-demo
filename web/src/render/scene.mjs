@@ -333,7 +333,10 @@ export function createScene(canvas) {
   // 공 그림자. 공이 어디쯤인지 바닥이 알려주면 궤적을 놓치지 않는다.
   // 흙과 같은 갈색으로 칠한 그늘은 흙 얼룩 하나로 읽혔다. 바닥에는 이만큼 짙은 얼룩이 이미 널려 있다.
   // 그림자만 찬 색으로 빼면 같은 밝기라도 흙에서 떨어져 나온다. 만화가 그늘을 파랗게 칠하는 이유다.
-  const SHADOW_INK = 0x171326;
+  // 다만 찬 색과 보라는 다르다. 초록이 빨강 아래로 내려가면 그늘이 아니라 멍으로 읽힌다.
+  // 실측: 이전 값에서 발밑 코어가 (37,30,40), 흙 (120,95,55) 위에서 자주색 얼룩이었다.
+  // 18/26/46은 R < G < B를 지켜 같은 어둡기에서 색상만 파랑으로 돌린다.
+  const SHADOW_INK = 0x121a2e;
   const shadow = new THREE.Mesh(
     blobGeo(0.16, 0x4411a3),
     new THREE.MeshBasicMaterial({ color: SHADOW_INK, transparent: true, opacity: 0.62 })
