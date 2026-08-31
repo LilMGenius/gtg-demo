@@ -193,8 +193,20 @@ try {
   if (rows.length < KINDS.length) { console.log("INSTRUMENT DEAD: missing events"); process.exit(1); }
 
   // 대조군. 사건이 없는 정지 프레임에 같은 자를 댄다. 임팩트 화소는 0이어야 한다.
-  await p.waitForTimeout(1500);
-  await p.evaluate(() => window.__freeze(true));
+  // 고정 대기는 정지를 보장하지 않는다. 라운드가 계속 돌아 1500ms 뒤에도 다음 구의
+  // 버스트가 살아 있었고(계측: idle 차분 39243화소, 별과 자막이 그대로 떠 있었다),
+  // 대조군이 아니라 또 하나의 사건 표본을 찍고 있었다. 그러니 시계가 아니라
+  // 임팩트의 수명을 보고 멈춘다. life가 0인 프레임에서 그 자리에 정지를 건다.
+  const quiet = await p.evaluate(() => new Promise((res) => {
+    const t0 = performance.now();
+    const tick = () => {
+      if (window.__impactVis().life <= 0) { window.__freeze(true); res(true); return; }
+      if (performance.now() - t0 > 12000) { res(false); return; }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }));
+  if (!quiet) { console.log("INSTRUMENT DEAD: no quiet frame for control"); process.exit(1); }
   const idleShots = await shots(p);
   await p.evaluate(() => window.__freeze(false));
   const idle = await p.evaluate(diff, [idleShots.a, idleShots.b, LUM]);
