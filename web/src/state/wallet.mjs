@@ -11,10 +11,18 @@ export const COIN_SAVE = 12;
 // 방치형에서 멈춘 진행은 이탈이지 난이도가 아니다.
 export const COIN_CONCEDED = 4;
 
-// 이번 칸의 적립은 결과 두 갈래로만 갈린다. 키커 난이도에 비례시키는 것은 다음 칸이고,
-// 둘을 같이 열면 코인 잔고가 움직인 이유가 결과인지 난이도인지 안 갈린다.
-export function coinGain(conceded) {
-  return conceded ? COIN_CONCEDED : COIN_SAVE;
+// 유명한 키커 한 계단당 붙는 값. 로스터 fame은 1에서 10이므로 최상급 세이브는 30이고,
+// 무명 세이브 12의 두 배 반이다. 세 배를 넘기면 무명 구간을 건너뛰는 것이 최적이 되고,
+// 방치형에서 건너뛸 수 있는 구간은 콘텐츠가 아니라 대기시간이 된다.
+export const COIN_FAME_STEP = 2;
+
+// 어려운 키커일수록 막기는 어렵고 보상은 크다. 난이도는 세이브에만 붙는다.
+// 실점에도 붙이면 유명한 키커에게 일부러 먹히는 것이 최적 전략이 되고,
+// 그 순간 막는 행위가 게임에서 빠진다.
+export function coinGain(conceded, fame = 1) {
+  if (conceded) return COIN_CONCEDED;
+  const f = Number.isFinite(fame) ? Math.min(10, Math.max(1, Math.floor(fame))) : 1;
+  return COIN_SAVE + COIN_FAME_STEP * (f - 1);
 }
 
 export function newWallet() {

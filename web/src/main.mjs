@@ -186,7 +186,8 @@ function rollCaptions(result) {
       const gain = followerGain(state.keeper, result);
       state.fans += gain;
       // 코인은 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
-      state.wallet.coin += coinGain(result.conceded);
+      // 유명한 키커를 막을수록 더 들어온다. 팔로워와 같은 fame 값을 쓴다.
+      state.wallet.coin += coinGain(result.conceded, result.fame);
       pips();
       state.i += 1;
       restart(result);
