@@ -1856,6 +1856,13 @@ export function createScene(canvas) {
     return { amp: netAmp, maxDz, maxPx, moved };
   };
 
+  // 그물이 씬에 있다는 것과 관객이 그물을 본다는 것은 다른 주장이다.
+  // 가시성은 그물만 끈 같은 프레임과의 화소 차로만 잴 수 있다. 그 토글이 이것이다.
+  window.__netHide = (on) => {
+    pitch.net.visible = !on;
+    return pitch.net.visible;
+  };
+
   // 임팩트 프레임은 선언으로 증명되지 않는다. 세계시계가 실제로 늦었는지,
   // 렌즈가 밀렸는지, 공이 찌그러졌는지를 사건마다 최고값으로 적는다.
   window.__impactVis = () => ({
