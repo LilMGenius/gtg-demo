@@ -3,7 +3,7 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { GOAL_HALF_W, GOAL_H } from '../../../src/chain.mjs';
 import { mountSfx } from '../audio/sfx.mjs';
-import { createBallProbe } from '../diagnostics/ball-probe.mjs';
+import { createBallProbe, opaqueBlocker } from '../diagnostics/ball-probe.mjs';
 import { createStageProbe, goalFraming, footY, faceToCamera } from '../diagnostics/stage-probe.mjs';
 import {
   flat, flatVertex, BALL_R, VIEW_X, KICKER_OFF, BALL_PAST, REST_Z, REST_Y,
@@ -1640,6 +1640,44 @@ export function createScene(canvas) {
       v.push((w.x - root.x) / scale, (w.y - root.y) / scale, (w.z - root.z) / scale);
     }
     return { v, rz: keeper.rotation.z, pos: [root.x, root.y, root.z] };
+  };
+
+  // 포즈 게이트는 실루엣 분리도만 잰다. 사지가 화면을 차지하는지는 아무도 재지 않았다.
+  // 팔이 시선축과 나란하면 관절 월드 좌표는 멀쩡한데 화면에서는 한 점으로 줄어든다.
+  // 그래서 키퍼가 차지한 화면 칸을 격자로 되묻고, 그중 팔이 소유한 칸을 센다.
+  window.__limbVis = (n) => {
+    // 40x40이면 키퍼 폭 200px 기준 한 칸이 5px이다. 팔뚝 굵기가 그보다 두껍다.
+    const N = n || 40;
+    keeper.updateMatrixWorld(true);
+    camera.updateMatrixWorld();
+    const armSet = new Set();
+    for (const sh of keeper.userData.arms) sh.traverse((o) => { if (o.isMesh) armSet.add(o); });
+    const bodySet = new Set();
+    keeper.traverse((o) => { if (o.isMesh) bodySet.add(o); });
+    const box = new THREE.Box3().setFromObject(keeper);
+    const v = new THREE.Vector3();
+    let x0 = 1, x1 = -1, y0 = 1, y1 = -1;
+    for (let i = 0; i < 8; i++) {
+      v.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).project(camera);
+      x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x);
+      y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y);
+    }
+    const ray = new THREE.Raycaster();
+    ray.near = 0.01;
+    ray.far = 500;
+    let arm = 0;
+    let body = 0;
+    for (let iy = 0; iy < N; iy++) {
+      for (let ix = 0; ix < N; ix++) {
+        ray.setFromCamera({ x: x0 + (x1 - x0) * ((ix + 0.5) / N), y: y0 + (y1 - y0) * ((iy + 0.5) / N) }, camera);
+        const hit = ray.intersectObjects(scene.children, true).find((h) => opaqueBlocker(h.object));
+        if (!hit) continue;
+        if (armSet.has(hit.object)) arm += 1;
+        else if (bodySet.has(hit.object)) body += 1;
+      }
+    }
+    // 비율만 내면 몸이 줄어든 것과 팔이 커진 것이 같은 숫자가 된다. 원수를 같이 낸다.
+    return { arm, body, ratio: arm / Math.max(1, arm + body), cells: N * N };
   };
 
   window.__renderInfo = () => ({

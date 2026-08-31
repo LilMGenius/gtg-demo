@@ -4,7 +4,7 @@ import * as THREE from '../../vendor/three.module.min.js';
 
 // 가림 판정에서 빼는 것: 공 자신, 그림자, 그리고 빛을 통과시키는 표면.
 // 그물 너머의 공은 보인다. 기둥 뒤의 공은 안 보인다.
-function opaqueBlocker(o) {
+export function opaqueBlocker(o) {
   if (!o.isMesh || o.userData.probeIgnore) return false;
   const m = o.material;
   if (!m) return false;
