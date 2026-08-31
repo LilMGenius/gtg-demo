@@ -303,9 +303,11 @@ export function createImpact(scene) {
   // 삼각형 하나면 충분하다. 만화의 소리 꼬리는 밑변이 글자, 꼭짓점이 사건이다.
   const LEAD_W = 0.19;
   const LEAD_FAR = 0.8;
-  // 시작점을 거리 비율로 잡으면 사건이 사람일 때 꼭짓점이 몸 안에서 시작한다(실측: gloveGone,
-  // save 520ms 프레임에서 키퍼 머리가 꼬리에 통째로 덮임). 몸 반폭 밖에서 시작하되 밑변까지
-  // 최소 이만큼은 남겨야 삼각형이 선으로 뭉개지지 않는다.
+  // 꼭짓점은 주체 바로 옆에서 시작한다. 앵커 자체가 이미 머리나 공에서 밀려 나와 있으므로,
+  // 여기서 몸 반폭을 한 번 더 빼면 두 번 밀린다(실측: 꼭짓점이 머리에서 1.17 월드 떨어져
+  // 꼬리가 글자와 키퍼 어느 쪽에도 안 닿는 덩어리로 떴다). 짧게 띄우기만 한다.
+  const LEAD_NEAR = 0.18;
+  // 밑변까지 최소 이만큼은 남아야 삼각형이 선으로 뭉개지지 않는다.
   const LEAD_MIN_RUN = 0.12;
   // 외곽선은 글자와 같은 굵기로 읽혀야 한 세트가 된다. 무게중심에서 균일 확대한다.
   const LEAD_EDGE = 1.42;
@@ -549,15 +551,18 @@ export function createImpact(scene) {
       if (drawLead) {
         leadP.copy(leadR).multiplyScalar(-ldy / llen).addScaledVector(leadU, ldx / llen);
         const hw = LEAD_W * fit;
-        // 꼭짓점을 거리 비율로 잡으면 사건이 사람일 때 몸 안에서 시작한다. 밀어내는 양은 취향이
-        // 아니라 몸 반폭이다. 그래야 꼬리가 글자와 몸 사이 빈 자리에만 놓인다.
-        const near = Math.min(LEAD_FAR - LEAD_MIN_RUN, SUBJ_HALF / llen);
+        // 띄우는 양은 화면 거리가 아니라 월드 고정값이다. 비율로 잡으면 글자가 멀수록 꼭짓점도
+        // 같이 멀어져 꼬리가 주체를 놓친다.
+        const near = Math.min(LEAD_FAR - LEAD_MIN_RUN, LEAD_NEAR / llen);
+        // 밑변을 고정 비율로 두면 글자판 안으로 파고들어 검은 외곽선이 끝 글자를 덮는다.
+        // 글자 상자 앞에서 끊어야 꼬리가 주체와 글자 사이 빈 자리에만 놓인다.
+        const far = Math.min(LEAD_FAR, Math.max(near + LEAD_MIN_RUN, 1 - (WORD_W * fit * 0.42) / llen));
         const ax = at.x + leadD.x * near;
         const ay = at.y + leadD.y * near;
         const az = at.z + leadD.z * near;
-        const bx = at.x + leadD.x * LEAD_FAR;
-        const by = at.y + leadD.y * LEAD_FAR;
-        const bz = at.z + leadD.z * LEAD_FAR;
+        const bx = at.x + leadD.x * far;
+        const by = at.y + leadD.y * far;
+        const bz = at.z + leadD.z * far;
         const v = [ax, ay, az, bx + leadP.x * hw, by + leadP.y * hw, bz + leadP.z * hw, bx - leadP.x * hw, by - leadP.y * hw, bz - leadP.z * hw];
         const pa = leadGeo.attributes.position;
         const pe = leadEdgeGeo.attributes.position;
