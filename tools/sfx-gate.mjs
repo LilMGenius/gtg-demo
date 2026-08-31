@@ -160,6 +160,11 @@ try {
     check(name + ":stays-under-full-scale", x.peak > 0.02 && x.peak < 0.99, String(x.peak));
     // 접촉의 고역. 이게 없으면 몸만 남고 퍽 소리가 된다.
     check(name + ":attack-carries-a-contact-transient", x.attack.hi >= 0.05, x.attack.hi.toFixed(3));
+    // 유한하지 않은 샘플. 한 개만 있어도 그 뒤 버퍼가 통째로 죽는다. 파형 검사는 전부 통과하면서.
+    check(name + ":renders-only-finite-samples", x.nan === 0, String(x.nan));
+    // 직류 성분. 엔벌로프가 안 닫히면 파형이 0이 아닌 곳에 머물러 헤드룸만 먹고 안 들린다.
+    check(name + ":carries-no-dc-offset", Math.abs(x.dc) <= x.peak * 0.02,
+      x.dc + " vs peak " + x.peak);
   }
 
   // 몸. 차고 놓고 튀기는 것은 저역이 있어야 사물이다. 없으면 바람 소리다.

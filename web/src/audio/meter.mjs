@@ -169,9 +169,25 @@ export function harmonicity(peaks) {
   return far;
 }
 
+// 샘플 평균. 0에서 멀면 엔벌로프가 안 닫힌 것이다. 귀에는 안 들리고 믹스에서 헤드룸만 먹는다.
+export function dcOf(d) {
+  let s = 0;
+  for (let i = 0; i < d.length; i += 1) s += d[i];
+  return s / Math.max(1, d.length);
+}
+
+// 유한하지 않은 샘플의 개수. exponentialRamp 목표가 0이거나 0으로 나누면 여기서 잡힌다.
+export function nonFinite(d) {
+  let n = 0;
+  for (let i = 0; i < d.length; i += 1) if (!Number.isFinite(d[i])) n += 1;
+  return n;
+}
+
 export function measure(d) {
   return {
     peak: Number(peakOf(d).toFixed(4)),
+    dc: Number(dcOf(d).toFixed(5)),
+    nan: nonFinite(d),
     tailMs: tailMs(d),
     contacts: contacts(d),
     attack: bands(d, 0, 12),
