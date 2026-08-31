@@ -197,12 +197,17 @@ function countdown(sec, label, then) {
   // 공을 다시 세우는 몇 초가 통째로 무음이었다. 키퍼는 그동안 공을 바닥에 튀기고 있다.
   // 간격을 고정하면 메트로놈이 되어 사람 손이 아니라 기계로 들린다.
   let bounce = stage.now() + 0.38;
+  // 자막은 세로 flex다. 라벨과 숫자를 형제로 넣으면 두 칸으로 갈리고, column-reverse라
+  // 숫자가 실점 원인 배지 자리로 올라간다. 한 span 안에 넣어 한 줄로 붙인다.
+  // 구조는 한 번만 만들고 숫자만 간다. 매 틱 새 span이면 등장 애니메이션이 0.1초마다 다시 돈다.
+  el('caption').innerHTML = '<span>' + label + ' <b class="tick"></b></span>';
+  const tickEl = el('caption').querySelector('.tick');
   const tick = () => {
     const now = stage.now();
     const left = until - now;
     if (left <= 0) { el('caption').textContent = ''; then(); return; }
     if (now >= bounce && left > 0.45) { stage.sfx.dribble(); bounce = now + 0.62 + Math.random() * 0.36; }
-    el('caption').innerHTML = label + ' <b>' + left.toFixed(1) + 's</b>';
+    tickEl.textContent = left.toFixed(1) + 's';
     timer = stage.after(0.1, tick);
   };
   tick();
