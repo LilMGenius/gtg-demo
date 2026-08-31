@@ -186,7 +186,9 @@ body.playing #hud{opacity:1}
 /* 성장 선택. 가로라 세 장을 나란히 놓을 수 있다. */
 #offer{position:absolute;inset:0;pointer-events:auto;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
-  background:#080b07ef}
+/* ef(94%)는 뒤를 통째로 지웠다. 보상 화면이 게임에서 가장 어두운 화면이 되면 안 된다.
+   c4(77%)는 카드 테두리 대비를 지키면서 골대와 키퍼가 뒤에 남는 선이다. */
+  background:#080b07c4}
 #offer[hidden]{display:none}
 #offer h4{font-family:var(--disp);font-size:clamp(22px,3vw,32px);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
