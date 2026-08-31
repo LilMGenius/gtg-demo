@@ -16,6 +16,9 @@ const ROWSTEP = 24;
 const HALF = 10;
 const MIN_SHARE = 0.02;
 const MERGE = 3;
+// 표본에서 골라인 석회를 뺀다. stripe 깊이 0.12에 지터 최대 1.25배면 반폭 0.075,
+// 표본창 +-10px는 화면 하단에서 월드 약 0.17. 합 0.25 안쪽은 흙이 아니라 페인트다.
+const LINE_Z = 0.25;
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);
 t.unref();
 
@@ -30,7 +33,7 @@ function ownGrid([cs, rs, w, h]) {
     const line = [];
     for (const x of cs) {
       const p = window.__pick((x / w) * 2 - 1, -((y / h) * 2 - 1));
-      line.push(p ? p.name : "sky");
+      line.push(p ? [p.name, p.world[2]] : ["sky", 0]);
     }
     out.push(line);
   }
@@ -102,10 +105,12 @@ try {
   const shot = (await p.screenshot()).toString("base64");
 
   const tally = {};
-  for (const line of owners) for (const n of line) tally[n] = (tally[n] || 0) + 1;
+  for (const line of owners) for (const e of line) tally[e[0]] = (tally[e[0]] || 0) + 1;
   const target = Object.entries(tally).sort((a, b) => b[1] - a[1])[0][0];
+  // 임자 이름만으로는 못 거른다. 석회 stripe는 probeIgnore라 __pick이 그 밑의 흙을 돌려준다.
+  const isDirt = (e) => e[0] === target && Math.abs(e[1]) > LINE_Z;
 
-  const owned = rows.map((_, r) => owners[r].filter((n) => n === target).length);
+  const owned = rows.map((_, r) => owners[r].filter(isDirt).length);
   const lo = owned.findIndex((c) => c > 0);
   let hi = owned.length - 1;
   while (hi >= 0 && owned[hi] === 0) hi -= 1;
@@ -114,7 +119,7 @@ try {
     const out = [];
     for (let r = from; r < to; r += 1) {
       for (let c = 0; c < cols.length; c += 1) {
-        if (owners[r][c] === target) out.push([cols[c], rows[r]]);
+        if (isDirt(owners[r][c])) out.push([cols[c], rows[r]]);
       }
     }
     return out;
