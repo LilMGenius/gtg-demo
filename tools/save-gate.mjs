@@ -91,6 +91,9 @@ try {
   await p.waitForTimeout(900);
   const maxedPoints = await p.evaluate(() => window.__points());
   check('maxed:points-were-actually-queued', maxedPoints === 12, String(maxedPoints));
+  // 타이틀이 화면을 덮고 있는 동안은 HUD 버튼을 눌러도 타이틀이 받는다. 먼저 들어가야 한다.
+  await p.click('#go', { force: true });
+  await p.waitForTimeout(900);
   // 열자마자 아무것도 못 고르는 상태여야 정상이다. 칸은 열다섯 그대로고 전부 잠긴다.
   await p.click('#gymBtn', { force: true });
   await p.waitForTimeout(300);
@@ -107,8 +110,6 @@ try {
   const kept = await p.evaluate(() => window.__points());
   check('maxed:a-dead-panel-does-not-eat-points', kept === 12, String(kept));
   // 진짜 문턱은 진행이다. 만렙 저장으로도 구가 실제로 굴러가야 한다.
-  await p.click('#go', { force: true });
-  await p.waitForTimeout(900);
   await p.click('#auto', { force: true });
   let moved = false, samples = 0, lastSeen = '';
   const first = await p.evaluate(() => document.getElementById('caption').textContent);
