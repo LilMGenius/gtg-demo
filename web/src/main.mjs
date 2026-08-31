@@ -4,6 +4,7 @@ import { CAUSE_LABEL } from '../../src/ledger.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
+import { aimLine } from './ui/callout.mjs';
 import { load, save, offlineGain } from './state/save.mjs';
 
 const el = (id) => document.getElementById(id);
@@ -50,6 +51,8 @@ window.__lockRound = () => { stage.cancel(timer); state.phase = 'demo'; return s
 let pressAt = 0;
 let advance = 0;
 let timer = 0;
+// 직전 예고 한 줄만 기억한다. 사람이 반복을 느끼는 단위가 직전 한 구다.
+let lastAim = null;
 
 function say(line, cause) {
   // 매 줄이 새 요소여야 등장 애니메이션이 다시 돈다. 같은 노드에 글자만 갈면 조용히 바뀐다.
@@ -122,7 +125,8 @@ function nextShot() {
   beatStart(shot);
   stage.reset();
   pressAt = performance.now() + shot.flight * 1000 * 0.72;
-  say(shot.kicker.name + ', 슛 준비합니다.', null);
+  lastAim = aimLine(shot.kicker, rng, lastAim);
+  say(lastAim, null);
   // 창이 닫히면 손가락 대신 자동 입력이 친다. 늦은 만큼은 스탯이 아니라 손가락 탓이다.
   stage.cancel(timer);
   // 자동은 손가락만 대신한다. 공은 같은 시간을 날고 대기시간은 그대로다.
