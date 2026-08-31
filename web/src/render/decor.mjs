@@ -85,6 +85,10 @@ export function loadDecor(scene, name, fallback, jitter = 0, mat = null) {
       const root = gltf.scene;
       root.name = name;
       relight(root, jitter, mat);
+      // 이 적재는 씬이 다 선 한참 뒤에 끝난다. 그때 서브시스템 라벨은 이미 다른 것을 가리키고
+      // 있으므로 add에 맡기면 장식이 엉뚱한 주체로 묶인다. 실제로 운동장 선과 스카이라인이
+      // 키퍼로 묶여 키퍼만 남긴 컷에 도시가 같이 섰다. 대신할 대상이 달고 있던 라벨을 물려받는다.
+      const sub = fallback && fallback.userData ? fallback.userData.sub : undefined;
       // 뒤에 세운 사본은 fallback이 들고 있다. GLB가 서면 그 사본도 같이 갈아야
       // 앞뒤 실루엣이 어긋나지 않는다.
       const mirror = fallback && fallback.userData ? fallback.userData.mirror : null;
@@ -93,9 +97,11 @@ export function loadDecor(scene, name, fallback, jitter = 0, mat = null) {
         const back = root.clone();
         back.name = name + '-back';
         back.rotation.y = Math.PI;
+        if (sub !== undefined) back.userData.sub = sub;
         scene.add(back);
       }
       if (fallback && fallback.parent) fallback.parent.remove(fallback);
+      if (sub !== undefined) root.userData.sub = sub;
       scene.add(root);
     },
     undefined,
