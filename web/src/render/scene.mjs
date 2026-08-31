@@ -1353,7 +1353,9 @@ export function createScene(canvas) {
         netAmp = cue ? 0.34 + 0.52 * cue.force : 0.55;
         netT = 0;
         netX = ball.position.x;
-        netY = ball.position.y - R_H / 2;
+        // 패널 원점으로 내린다. R_H/2를 빼면 0.39만큼 아래를 밀어, 낮은 슛은
+        // 밀리는 자리가 패널 밑단 밖으로 나가 그물이 아예 안 움직인 것으로 보였다.
+        netY = ball.position.y - pitch.netY0;
         impact.burst(ball.position, 0.9, '출렁', 'net', '펄럭');
         shake(0.03, 0.22);
       }

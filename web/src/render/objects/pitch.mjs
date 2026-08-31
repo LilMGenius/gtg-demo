@@ -453,7 +453,9 @@ export function buildPitch(scene) {
     color: wallColor(nth), map: windowTex(nth, nth)
   }));
 
-  return { ground, box, bar, net: back, netZ: -NET_D, drift: dome.material.uniforms.drift };
+  // punch는 패널의 로컬 좌표로 민다. 뒷그물 원점은 바닥이 아니라 BACK_H/2 + NET_LIFT다.
+  // 이 값을 밖에서 짐작하면 밀리는 자리가 공이 지나간 자리와 어긋난다.
+  return { ground, box, bar, net: back, netZ: -NET_D, netY0: BACK_H / 2 + NET_LIFT, drift: dome.material.uniforms.drift };
 }
 
 // 행인. 펜스 너머를 지나간다. 아무도 없는 운동장은 연습장이지 경기장이 아니다.
