@@ -82,6 +82,24 @@ function say(line, cause) {
     + '<span>' + line + '</span>';
 }
 
+/* 상단 세 칸은 문장이 아니라 값이다. '아웃문그램 1,200'처럼 이름을 매번 읽히면
+   글자 폭이 숫자를 밀어내고, 한 판에 수십 번 지나가는 자리라 이름은 첫 회에만 새 정보다.
+   3px 격자 픽셀 SVG는 #pad와 우측 기둥이 이미 쓰는 관례라 손그림 톤이 안 갈린다. */
+const G = (t, body) => '<svg viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges"'
+  + ' role="img" aria-label="' + t + '"><title>' + t + '</title>' + body + '</svg>';
+const R = (x, y, w, h) => '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '"/>';
+// 팔로워. 이름 대신 사람 하나를 세운다. Outmoongram이라는 이름은 관리창 안에서만 쓴다.
+const IC_FANS = G('팔로워', R(9, 3, 6, 6) + R(6, 12, 12, 3) + R(3, 15, 18, 6));
+// 땀. 시간으로 버는 재화라 땀방울이다. 뾰족한 위와 둥근 아래라 별 실루엣과 안 겹친다.
+const IC_SWEAT = G('땀', R(10.5, 3, 3, 3) + R(7.5, 6, 9, 3) + R(6, 9, 12, 3) + R(4.5, 12, 15, 3)
+  + R(4.5, 15, 15, 3) + R(6, 18, 12, 3) + R(7.5, 21, 9, 3));
+// 스폰. 결제로만 들어오는 재화다. 별은 어느 게임에서든 유료 갈래로 읽힌다.
+const IC_SPON = G('스폰', R(10.5, 3, 3, 3) + R(9, 6, 6, 3) + R(0, 9, 24, 3) + R(4.5, 12, 15, 3)
+  + R(6, 15, 12, 3) + R(4.5, 18, 6, 3) + R(13.5, 18, 6, 3));
+// 기복. 화살표 하나면 오늘 컨디션이 어느 쪽인지가 문장 없이 선다.
+const IC_UP = G('컨디션 좋음', R(10.5, 3, 3, 3) + R(7.5, 6, 9, 3) + R(4.5, 9, 15, 3) + R(9, 12, 6, 12));
+const IC_DOWN = G('컨디션 나쁨', R(9, 0, 6, 12) + R(4.5, 12, 15, 3) + R(7.5, 15, 9, 3) + R(10.5, 18, 3, 3));
+
 function pips() {
   el('pips').innerHTML = state.shots.map((_, i) => {
     const r = state.results[i];
@@ -90,10 +108,10 @@ function pips() {
     return '<i class=\"' + cls + '\"></i>';
   }).join('');
   el('lv').textContent = 'Lv ' + state.keeper.level;
-  el('fans').innerHTML = '아웃문그램 <b>' + state.fans.toLocaleString() + '</b>';
-  // 코인과 캐시를 같은 줄에 붙여 둔다. 잔고가 하나로 보이면 상점에서 무엇으로 사는지가 새 정보가 된다.
-  el('purse').innerHTML = '코인 <b>' + state.wallet.coin.toLocaleString() + '</b> 캐시 <i>'
-    + state.wallet.cash.toLocaleString() + '</i>';
+  el('fans').innerHTML = IC_FANS + '<b>' + state.fans.toLocaleString() + '</b>';
+  // 땀과 스폰을 같은 줄에 붙여 둔다. 잔고가 하나로 보이면 상점에서 무엇으로 사는지가 새 정보가 된다.
+  el('purse').innerHTML = IC_SWEAT + '<b>' + state.wallet.coin.toLocaleString() + '</b>'
+    + IC_SPON + '<i>' + state.wallet.cash.toLocaleString() + '</i>';
   // 남은 훈련 횟수는 버튼 위에 붙는다. 열어봐야 아는 숫자는 방치형에서 안 열린다.
   const badge = el('gymDot');
   badge.textContent = state.points > 9 ? '9+' : String(state.points);
@@ -109,7 +127,7 @@ function persist() {
   save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet);
 }
 
-// 이번 구에 들어온 코인을 잔고 옆에 한 번 띄운다.
+// 이번 구에 들어온 땀을 잔고 옆에 한 번 띄운다.
 // 총액만 갱신하면 유명한 키커를 막아 더 벌었다는 사실이 화면에 남지 않는다.
 // pips()가 지갑 칸을 통째로 다시 그리므로 반드시 그 뒤에 붙인다.
 function coinPop(n) {
@@ -154,7 +172,8 @@ function beatStop(byHand) {
 function nextSet() {
   // 기복은 판당 한 번 굴러서 그 판 내내 같은 값으로 선다.
   const form = rollForm(state.keeper, rng);
-  el('form').textContent = form > 0.4 ? '오늘 몸 좋다' : form < -0.4 ? '오늘 몸 무겁다' : '';
+  el('form').innerHTML = form > 0.4 ? '<span class="up">' + IC_UP + '</span>'
+    : form < -0.4 ? '<span class="dn">' + IC_DOWN + '</span>' : '';
   state.shots = buildSet(rng, state.keeper.level);
   state.i = 0;
   state.results = [];
@@ -216,7 +235,7 @@ function rollCaptions(result) {
       // 팔로워는 구마다 오른다. 먹혀도 오르고, 막으면 더 오른다.
       const gain = followerGain(state.keeper, result);
       state.fans += gain;
-      // 코인은 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
+      // 땀은 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
       // 유명한 키커를 막을수록 더 들어온다. 팔로워와 같은 fame 값을 쓴다.
       const coin = coinGain(result.conceded, result.fame);
       state.wallet.coin += coin;
@@ -339,7 +358,7 @@ function renderRoster() {
     } else if (owned) {
       tail = '교체';
     } else {
-      tail = cost + ' 코인';
+      tail = cost + ' 땀';
       off = state.wallet.coin < cost;
     }
     return '<button data-n="' + entry.name + '"' + cls + (off ? ' disabled' : '') + '>' + entry.name + '<em>' + tail + '</em></button>';

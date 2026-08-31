@@ -41,12 +41,18 @@ body.playing #hud{opacity:1}
   color:#ffd83d;line-height:1.05}
 /* 아래칸 두 값은 같은 등급이다. 굵기나 투명도가 갈리면 하나가 더 중요해 보인다.
    대신 세로 선 하나로 서로 다른 것을 재는 값임을 표시한다. */
-#form,#fans,#purse{font-size:12px;font-weight:800;opacity:.72;letter-spacing:.02em;line-height:1.15}
-#form{grid-area:form}
+#form,#fans,#purse{font-size:12px;font-weight:800;opacity:.72;letter-spacing:.02em;line-height:1.15;
+  display:flex;align-items:center;gap:4px}
+/* 13px. 12px 글자와 같은 줄에서 숫자보다 커지지 않는 최대치다. 더 키우면 아이콘이 값을 눌러 읽는다. */
+#form svg,#fans svg,#purse svg{width:13px;height:13px;display:block;flex:none}
+#form{grid-area:form;min-height:13px}
+/* 화살표는 방향만으로도 읽히지만 색이 없으면 좋은 날과 나쁜 날이 같은 무게로 지나간다. */
+#form .up{color:#4fd08a;opacity:1;display:block}
+#form .dn{color:var(--bad);opacity:1;display:block}
 #fans{grid-area:fans;padding-left:11px;border-left:2px solid #ffffff24;margin-left:-11px}
 #fans b{font-weight:800;font-style:normal;opacity:1;color:#ffd83d}
 /* 지갑도 판 밖에서 쌓이는 값이라 팔로워와 같은 등급으로 둔다.
-   코인과 캐시는 같은 칸에 나란히 선다. 두 갈래라는 사실이 화면에서도 한 번에 읽혀야
+   땀과 스폰은 같은 칸에 나란히 선다. 두 갈래라는 사실이 화면에서도 한 번에 읽혀야
    상점이 열렸을 때 어느 잔고로 사는지가 새 정보가 되지 않는다. */
 #purse{grid-area:purse;padding-left:11px;border-left:2px solid #ffffff24;margin-left:-11px;position:relative}
 #purse b{font-weight:800;font-style:normal;opacity:1;color:#ffd83d}
@@ -68,7 +74,7 @@ body.playing #hud{opacity:1}
   /* 60%까지 불투명하게 버틴다. 곧바로 흐려지기 시작하면 눈이 옮겨오기 전에 값이 지워진다. */
   60%{opacity:1;transform:translateY(-4px) scale(1)}
   100%{opacity:0;transform:translateY(-15px) scale(1)}}
-/* 캐시는 결제로만 들어온다. 시간으로 버는 코인과 색이 같으면 둘이 한 갈래로 읽힌다. */
+/* 스폰은 결제로만 들어온다. 시간으로 버는 땀과 색이 같으면 둘이 한 갈래로 읽힌다. */
 #purse i{font-style:normal;font-weight:800;opacity:1;color:#7fe3ff}
 #pips{grid-area:pips;display:flex;gap:6px}
 /* 미결 구는 아직 안 굴린 주사위다. #ffffff26은 패널 바닥과 붙어 다섯 칸이 세 칸으로 읽혔다. */
@@ -180,13 +186,13 @@ body.playing #hud{opacity:1}
 .zone:disabled svg{color:#f6efdc5c}
 .zone:disabled{cursor:default}
 
-/* 컨트롤 세 개는 크로스바 위 하늘 띠에 쌓는다. 기둥 아래끝 206px, 크로스바 325px.
+/* 오른쪽 기둥은 판을 굴리는 손에만 준다. 기둥 아래끝 234px, 크로스바 325px.
    화면 아래 오른쪽은 골포스트와 골문 구석이고, 그 구석에서 선방과 실점이 갈린다.
    쌓는 차례는 손이 가는 빈도다. 나가기가 맨 위에서 가장 컸을 때 화면에서 제일 굵은
    덩어리가 판을 뜨는 버튼이었다. */
-/* 돌진. 되돌릴 수 없는 한 번이라 맨 아래로 내리고 높이를 깎는다.
-   글자를 아이콘으로 바꿨다. 나가기는 판을 뜨는 버튼으로 읽혔다. */
-#out{position:absolute;right:var(--pad-r);top:calc(146px + env(safe-area-inset-top));
+/* 돌진. 되돌릴 수 없는 한 번이라 자동 아래에 두고 높이를 깎는다.
+   자동 66px 판때기 아래 90px에서 시작해 130px에 끝난다. */
+#out{position:absolute;right:var(--pad-r);top:calc(90px + env(safe-area-inset-top));
   pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(2deg);
@@ -195,8 +201,10 @@ body.playing #hud{opacity:1}
 #out svg{width:26px;height:26px}
 #out.on{background:#e0563f;color:#fff;box-shadow:var(--lift) var(--lift) 0 var(--edge)}
 
-/* 소리. 끌 수 없는 소리는 소리가 아니라 사고다. */
-#mute{position:absolute;right:var(--pad-r);top:calc(90px + env(safe-area-inset-top));
+/* 소리. 끌 수 없는 소리는 소리가 아니라 사고다. 판을 굴리는 버튼이 아니라 시스템
+   토글이라 오른쪽 기둥에서 뺀다. 왼쪽 위 #top은 58px에서 끝나고 자막은 폭이
+   좁혀져 좌측 84px를 비워두므로 68px에 놓아도 46px 판때기가 아무것도 안 가린다. */
+#mute{position:absolute;left:var(--pad-l);top:calc(68px + env(safe-area-inset-top));
   pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);color:var(--ink);
   transform:rotate(var(--tilt));box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel)}
@@ -216,9 +224,9 @@ body.playing #hud{opacity:1}
 #auto svg{width:38px;height:38px}
 #auto.on{background:#4fd08a;color:#0d110c;box-shadow:var(--lift) var(--lift) 0 var(--edge)}
 
-/* 훈련장 진입. 기둥 맨 아래 네 번째 칸. 돌진 40px 판때기 아래 194px에서 시작해
-   234px에 끝나고, 크로스바 325px보다 위라 여전히 하늘 띠 안이다. */
-#gymBtn{position:absolute;right:var(--pad-r);top:calc(194px + env(safe-area-inset-top));
+/* 훈련장 진입. 돌진 40px 판때기 아래 142px에서 시작해 182px에 끝나고,
+   크로스바 325px보다 위라 여전히 하늘 띠 안이다. */
+#gymBtn{position:absolute;right:var(--pad-r);top:calc(142px + env(safe-area-inset-top));
   pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(-1.4deg);
@@ -266,8 +274,8 @@ body.playing #hud{opacity:1}
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #gym .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 
-/* 선수단 진입. 훈련장 234px 아래 242px에서 시작해 282px에 끝난다. 크로스바 325px 위다. */
-#rosterBtn{position:absolute;right:var(--pad-r);top:calc(242px + env(safe-area-inset-top));
+/* 선수단 진입. 훈련장 182px 아래 194px에서 시작해 234px에 끝난다. 크로스바 325px 위다. */
+#rosterBtn{position:absolute;right:var(--pad-r);top:calc(194px + env(safe-area-inset-top));
   pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(1.1deg);
@@ -293,7 +301,7 @@ body.playing #hud{opacity:1}
 #roster .row button:nth-child(3n){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
 #roster .row button em{display:block;font-style:normal;font-size:12px;font-weight:700;
   color:var(--good);margin-top:3px}
-/* 지금 뛰는 자리와 코인이 모자란 카드. 눌러도 아무 일이 없다는 것이 먼저 보여야 한다. */
+/* 지금 뛰는 자리와 땀이 모자란 카드. 눌러도 아무 일이 없다는 것이 먼저 보여야 한다. */
 #roster .row button:disabled{color:#f6efdc5c;background:#141a12;cursor:default}
 #roster .row button:disabled em{color:#f6efdc44}
 /* 출전 중인 한 장은 죽은 카드와 다른 색이어야 한다. 둘 다 안 눌리기 때문이다. */
