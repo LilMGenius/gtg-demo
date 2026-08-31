@@ -1037,7 +1037,9 @@ export function createScene(canvas) {
         reboundMiss: bySide(POSES.sprawlR, POSES.sprawlL),
         charge: POSES.dribble, beat: POSES.stumble,
         lost: POSES.faceplant, skied: POSES.skyward,
-        talked: POSES.swoon, distracted: POSES.swoon, openGoalScored: POSES.faceplant
+        // faceplant를 lost와 나눠 쓰면 두 컷이 같은 그림이 된다. 나가 있는 몸이 골문을 돌아보는 자세여야
+        // 골대가 왜 비었는지가 자막 없이 읽힌다. despair는 키커 표에서만 쓰이므로 한 프레임에서 겹치지 않는다.
+        talked: POSES.swoon, distracted: POSES.swoon, openGoalScored: POSES.despair
       };
       kp = TAIL_POSE[tail.kind] ?? kp;
       kpId = kp;
@@ -1221,6 +1223,8 @@ export function createScene(canvas) {
           break;
         case 'lost':
           // 뺏겼다. 키퍼는 저기 나가 있고 골대가 비어 있다.
+          // 말로만 나가 있었다. z를 안 옮기면 몸은 골문 정중앙에 서 있어서 '비어 있다'가 화면에서 거짓말이 된다.
+          keeper.position.z = CHARGE_Z;
           ball.position.set(lerp(tail.from.x, kicker.position.x, e), 0.14, lerp(tail.from.z, kicker.position.z + 0.5, e));
           keeper.rotation.z = lerp(keeper.rotation.z, 1.2, damp(0.06));
           break;
@@ -1281,7 +1285,13 @@ export function createScene(canvas) {
           break;
         }
         case 'openGoalScored':
-          ball.position.set(lerp(tail.from.x, 0, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
+          // 이 사건은 charge에서 lost로 이어진 끝이다. 키퍼가 골문 앞에 있으면 원인이 화면에 없다.
+          keeper.position.z = CHARGE_Z;
+          // z만 밀면 원근상 실루엣이 여전히 골문 정중앙에 겹쳐 골문을 막고 선 것으로 읽힌다.
+          // 1.6은 골대 반폭 2.2의 안쪽이라 화면 밖으로 나가지 않으면서 골문 가운데가 뚫려 보인다.
+          keeper.position.x = Math.sign(tail.kx || 1) * 1.6;
+          // 굴려 넣은 공이다. REST_Y까지 띄우면 굴린 것이 아니라 꽂아 넣은 것으로 읽힌다. 지면에 붙인다.
+          ball.position.set(lerp(tail.from.x, 0, e), BALL_R, lerp(tail.from.z, REST_Z, e));
           break;
         default:
           break;
