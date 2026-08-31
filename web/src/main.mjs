@@ -238,8 +238,10 @@ function showOffer() {
       if (state.picks > 0) {
         state.picks -= 1;
         save(state.keeper, state.auto, state.fans);
-        showOffer();
-        return;
+        if (state.picks > 0) {
+          showOffer();
+          return;
+        }
       }
       nextSet();
     };
@@ -294,7 +296,6 @@ mountTitle(() => {
   stage.setKeeper(state.keeper);
   // 돌아오자마자 밀린 훈련부터 쓴다. 그 다음에 공이 날아온다.
   if (state.picks > 0) {
-    state.picks -= 1;
     showOffer();
     return;
   }
