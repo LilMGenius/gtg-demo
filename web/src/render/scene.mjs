@@ -745,6 +745,10 @@ export function createScene(canvas) {
       keeper.userData.bareHands[gi].visible = true;
     }
     tail = { kind, t0: vnow, from: ball.position.clone(), kx: keeper.position.x };
+    // 종점이 상수로 박히면 같은 사건이 매번 같은 자리에서 같은 속도로 끝난다.
+    // 두 번째부터는 결과만 남고 사건은 안 보인다. 판정 rng가 아니라 화면 전용 편차다.
+    // 폭은 좁게 둔다. 넓히면 매번 다른 게 아니라 매번 어긋난 것으로 읽힌다.
+    tail.vary = { a: Math.random(), b: Math.random(), c: Math.random() };
     // 장갑이 벗겨진 자리가 접촉점이다. 이 좌표를 여기서 잡아 두지 않으면
     // 뒤에서 장갑은 이미 공을 따라 움직이고 있어 손이 어디였는지 알 길이 없다.
     if (kind === 'gloveGone' && loose) tail.gw = loose.getWorldPosition(new THREE.Vector3());
@@ -1278,9 +1282,17 @@ export function createScene(canvas) {
           break;
         case 'talked': {
           // 입을 열었고 몸이 따라갔다. 공은 그대로 빈 골대로 들어간다.
-          const walk = Math.min(1, e * 1.5);
-          keeper.position.x = lerp(tail.kx, -2.4, walk);
-          keeper.position.z = lerp(KEEPER_Z, 3.1, walk);
+          const vy = tail.vary;
+          // 행인은 키퍼가 직전에 서 있던 쪽에서 걸어온다. 반대편에서 오면 키퍼가 막던 자세를
+          // 버리고 화면을 가로질러야 해서 방금 하던 동작과 끊긴다.
+          const side = tail.kx >= 0 ? 1 : -1;
+          // 걸음 속도까지 같으면 두 번째 재생부터는 같은 화면이 된다.
+          const walk = Math.min(1, e * (1.35 + vy.a * 0.4));
+          // 2.1~2.7은 골대 반폭 2.2 언저리라 키퍼가 골문을 비운 것이 화면에 남으면서 프레임을 안 벗어난다.
+          const endX = side * (2.1 + vy.b * 0.6);
+          const endZ = 2.9 + vy.c * 0.5;
+          keeper.position.x = lerp(tail.kx, endX, walk);
+          keeper.position.z = lerp(KEEPER_Z, endZ, walk);
           keeper.rotation.z = Math.sin(e * 12) * 0.09;
           {
             // 하트가 키퍼 머리 위로만 뜨니 크로스바를 넘어 하늘에 떠다니는 점 두 개로 보였다.
@@ -1300,16 +1312,17 @@ export function createScene(canvas) {
             // 한 걸음 더 벌리고, 서로 마주 보게 돌린다. 등을 돌린 채 하트만 뜨면 누구에게 반한 것인지 모른다.
             // z 4.9는 크로스바 선 위였다. 머리가 골대 가로대에 잘려 얼굴이 반만 남았다.
             // 카메라 쪽으로 당기면 가로대 아래로 내려오고 얼굴도 커진다. 키퍼(0.9)보다는 멀리 둔다.
-            passers[0].position.set(lerp(-11.5, -1.15, walk), 0, lerp(18, 3.3, walk));
+            passers[0].position.set(lerp(side * 11.5, endX + side * 1.25, walk), 0, lerp(18, endZ + 0.4, walk));
             // 카메라는 골대 뒤에서 +z를 본다. 이 각도가 음수면 행인은 렌즈에 등을 진다.
             // 얼굴을 붙여놓고도 화면에는 뒤통수만 남았다. 걸어오는 방향(2.44)에서
             // 키퍼 쪽(3.02)으로 틀어야 눈과 볼이 렌즈에 들어온다.
-            passers[0].rotation.y = lerp(2.44, 3.02, walk);
+            // 오른쪽에서 걸어오면 같은 각도가 그대로 뒤통수가 된다. 쪽을 따라 뒤집는다.
+            passers[0].rotation.y = lerp(-side * 2.44, -side * 3.02, walk);
             passers[0].rotation.z = Math.sin(e * 9) * 0.18;
           }
           // 카메라는 골대 뒤에서 +z를 본다. 키퍼가 그대로 서 있으면 뒤통수가 하트 눈을 가린다.
           // 한눈판 얼굴이 안 보이면 그 사건 자체가 화면에 없다.
-          keeper.rotation.y = lerp(0, 2.48, walk);
+          keeper.rotation.y = lerp(0, -side * 2.48, walk);
           // 키퍼가 걸어 나가는 속도로 공까지 굴리면 공이 골대 앞에 멈춰 선 채로 촬영된다.
           // 공은 아무도 안 막았으니 원래 속도로 들어가고, 느린 것은 홀린 사람 쪽이다.
           {
