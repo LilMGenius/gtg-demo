@@ -93,6 +93,21 @@ function setPad(on) {
   for (const b of document.querySelectorAll('.zone')) b.disabled = !on;
 }
 
+// 이번 구에 들어온 코인을 잔고 옆에 한 번 띄운다.
+// 총액만 갱신하면 유명한 키커를 막아 더 벌었다는 사실이 화면에 남지 않는다.
+// pips()가 지갑 칸을 통째로 다시 그리므로 반드시 그 뒤에 붙인다.
+function coinPop(n) {
+  const host = el('purse');
+  const old = host.querySelector('.pop');
+  if (old) old.remove();
+  const s = document.createElement('span');
+  s.className = 'pop';
+  s.textContent = '+' + n;
+  host.appendChild(s);
+  // 애니메이션이 끝난 노드를 남기면 다음 구의 등장이 이미 끝난 상태에서 시작한다.
+  s.addEventListener('animationend', () => s.remove());
+}
+
 // 타이밍 자. 맞는 구간의 자리와 폭은 그 구의 비행시간이 정한다.
 // 판정에 쓰는 값을 그대로 그리는 것이므로 여기서 새 규칙이 생기지 않는다.
 function beatStart(shot) {
@@ -187,8 +202,10 @@ function rollCaptions(result) {
       state.fans += gain;
       // 코인은 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
       // 유명한 키커를 막을수록 더 들어온다. 팔로워와 같은 fame 값을 쓴다.
-      state.wallet.coin += coinGain(result.conceded, result.fame);
+      const coin = coinGain(result.conceded, result.fame);
+      state.wallet.coin += coin;
       pips();
+      coinPop(coin);
       state.i += 1;
       restart(result);
       return;
