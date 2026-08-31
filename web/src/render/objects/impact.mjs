@@ -166,6 +166,15 @@ const TONE = {
   // 바퀴살 4개는 표 전체에서 가장 적다. 성기고 딱딱한 불꽃이 금속 접촉으로 읽힌다.
   // 낡은 철봉의 녹슨 놋쇠색을 테두리로 쓰면 하얀 선방 얼룩과 정지 프레임에서 갈린다.
   frame: { c: 0xfff6d8, ring: 0xf2b23a, spokes: 4, shape: 'shard' },
+  // 이 넷은 표에 없어서 흰 기본값으로 떨어졌다. 앵커가 키퍼 머리 위라 흰 크로스바와 겹쳐 화면에서 사라졌다.
+  // 청록은 갈색 흙의 보색이면서 흰 철봉과도 명도가 갈린다. 돌진은 성공도 실패도 아닌 능동이라 뻗는 별을 쓴다.
+  charge: { c: 0xd9fff2, ring: 0x2ec4a6, spokes: 6, shape: 'spike' },
+  // 제껴진 사건이라 먹힌 계열의 톱니를 쓴다. 바퀴살 9개는 표 전체에서 최다라 흐트러진 실루엣으로 읽힌다.
+  beat: { c: 0xffe2cf, ring: 0xff7a3d, spokes: 9, shape: 'zig' },
+  // 공이 떨어져 나간 사건이라 쐐기다. 보라는 남은 쐐기 셋(노랑 둘, 연두 하나)과 색으로 갈린다.
+  lost: { c: 0xefe0ff, ring: 0x8a5cff, spokes: 6, shape: 'shard' },
+  // 한눈팔다 먹힌 사건이라 톱니다. 분홍은 하트 연출과 같은 계열이라 원인이 색으로 읽힌다.
+  talked: { c: 0xffe0f4, ring: 0xff5fbf, spokes: 5, shape: 'zig' },
 };
 const TONE_DEFAULT = { c: 0xfffdf0, ring: 0xffffff, spokes: 8, shape: 'spike' };
 
