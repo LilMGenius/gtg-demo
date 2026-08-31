@@ -1394,7 +1394,8 @@ export function createScene(canvas) {
         // 패널 원점으로 내린다. R_H/2를 빼면 0.39만큼 아래를 밀어, 낮은 슛은
         // 밀리는 자리가 패널 밑단 밖으로 나가 그물이 아예 안 움직인 것으로 보였다.
         netY = ball.position.y - pitch.netY0;
-        impact.burst(ball.position, 0.9, '출렁', 'net', '펄럭');
+        // 키퍼를 넘겨 글자가 몸을 덮지 않게 한다. talked는 키퍼가 골대를 떠나 행인 쪽으로 걸어 나간다.
+        impact.burst(ball.position, 0.9, '출렁', 'net', '펄럭', 0, null, keeper.position);
         shake(0.03, 0.22);
       }
       shadow.position.set(ball.position.x, 0.02, ball.position.z);

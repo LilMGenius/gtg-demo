@@ -343,6 +343,9 @@ export function createImpact(scene) {
   // 얼룩을 매번 같은 각으로 띄우면 삐뚤어도 도장으로 읽힌다. 구마다 통째로 돌린다.
   let blobSpin = 0;
   let wordSide = 0;
+  // 글자가 피해야 할 주체의 세계 좌표. 없으면 중앙 바깥밀기 규칙만 쓴다.
+  const avoid = new THREE.Vector3();
+  let hasAvoid = false;
   // 뒤따르는 소리와 지금 몇 단째인지. 단이 바뀌면 글자만이 아니라 기울기와 자리도 바뀐다.
   let follow = '';
   let stage = 0;
@@ -364,7 +367,7 @@ export function createImpact(scene) {
   // 0.34초는 사람 눈에 번짝이고 정지 프레임에는 거의 안 잡힌다. 0.55가 읽힌다.
   // 0.9를 써 보니 다음 구의 배치까지 글자가 남아 화면이 지저분해졌다.
   // 수명 셋 중 가장 긴 잔막이 전체 수명을 정한다.
-  function burst(pos, strength = 1, word = '', kind = '', word2 = '', depth = 0, follow3d = null) {
+  function burst(pos, strength = 1, word = '', kind = '', word2 = '', depth = 0, follow3d = null, avoidPos = null) {
     // 발은 하나뿐이다. 공이 골망에 닿는 순간의 출렁임이 뒤늦게 터지면서, 아직 살아 있는
     // 사건의 발을 통째로 덮어썼다. 그러면 정지 프레임에 남는 그림은 개그가 아니라 그물이다.
     // 본체가 살아 있는 동안에는 더 가벼운 발이 끼어들지 못한다. 같은 무게면 나중 것이 이긴다.
@@ -409,6 +412,10 @@ export function createImpact(scene) {
       // 운이 나쁘면 주체 반대편으로 밀려 거리가 두 배가 된다(실측 gloveGone 338px).
       // 골대 중앙이 x=0이고 주체는 늘 그 근처에 있으므로, 중앙에서 바깥으로 밀면 어느 경우에도 몸을 안 덮는다.
       wordSide = at.x >= 0 ? 1 : -1;
+      // 그 전제는 주체가 중앙에 머물 때만 참이다. talked는 키퍼가 골대를 떠나 행인 쪽으로 걸어 나간다.
+      // 피할 주체를 받으면 어느 쪽으로 미는지는 화면을 보고 정한다. 그 판정은 update가 한다.
+      hasAvoid = !!avoidPos;
+      if (avoidPos) avoid.copy(avoidPos);
     }
   }
 
@@ -546,6 +553,22 @@ export function createImpact(scene) {
       // 밀어낸 자리가 화면 밖이면 사건 대신 잘린 글자가 남는다. 그때만 반대쪽으로 넘긴다.
       probe.set(atWord.x + side * push, atWord.y, atWord.z).project(camera);
       if (Math.abs(probe.x) > EDGE_NDC) side = -side;
+      // 주체가 글자 쪽에 서 있는지는 월드 거리로 못 잰다. 깊이가 다르면 월드로 2.4 떨어져도
+      // 화면에서는 겹친다(실측: talked 키퍼 z 3.1, 글자 z -1). 그래서 화면 좌표로 잰다.
+      if (hasAvoid) {
+        probe.copy(avoid).project(camera);
+        const avoidNdc = probe.x;
+        probe.set(atWord.x + side * push, atWord.y, atWord.z).project(camera);
+        const wordNdc = probe.x;
+        // 글자 반폭을 화면에서 잰다. 세계 반폭을 그대로 쓰면 깊이에 따라 값이 어긋난다.
+        probe.set(atWord.x + side * push + WORD_W * fit * 0.5, atWord.y, atWord.z).project(camera);
+        const halfNdc = Math.abs(probe.x - wordNdc);
+        // 0.06은 실측한 키퍼의 화면 반폭이다. talked 시점에 몸이 가로 70px을 차지했고
+        // 1280 폭에서 반폭 35px, NDC로 0.055다. 여기에 여유를 얹었다.
+        probe.set(atWord.x - side * push, atWord.y, atWord.z).project(camera);
+        const flipOk = Math.abs(probe.x) <= EDGE_NDC && Math.abs(probe.x - avoidNdc) > Math.abs(wordNdc - avoidNdc);
+        if (Math.abs(wordNdc - avoidNdc) < halfNdc + 0.06 && flipOk) side = -side;
+      }
       wordMesh.position.set(atWord.x + side * push, atWord.y + 0.28 + w * 0.24 + stage * 0.2, atWord.z);
       wordMesh.quaternion.copy(camera.quaternion);
       wordMesh.rotateZ(wordSpin);
