@@ -320,6 +320,65 @@ function closeGym() {
   el('gym').hidden = true;
 }
 
+// 선수단. 명단 전체를 걸어놓고 보유한 것만 뛸 수 있다.
+// 보유 판정은 이름으로 한다. 로스터 항목과 저장된 키퍼는 다른 객체이기 때문이다.
+function renderRoster() {
+  const box = el('roster');
+  const here = state.squad[state.pick];
+  const cards = KEEPERS.map((entry) => {
+    const owned = state.squad.some((k) => k.name === entry.name);
+    const now = here && here.name === entry.name;
+    const cost = keeperCost(entry);
+    let tail = '';
+    let off = false;
+    let cls = '';
+    if (now) {
+      tail = '출전 중';
+      off = true;
+      cls = ' class="here"';
+    } else if (owned) {
+      tail = '교체';
+    } else {
+      tail = cost + ' 코인';
+      off = state.wallet.coin < cost;
+    }
+    return '<button data-n="' + entry.name + '"' + cls + (off ? ' disabled' : '') + '>' + entry.name + '<em>' + tail + '</em></button>';
+  }).join('');
+  box.innerHTML = '<h4>선수단 · 보유 ' + state.squad.length + '명</h4><div class="row">' + cards + '</div><button class="close">닫기</button>';
+  box.querySelector('.close').onclick = closeRoster;
+  for (const b of box.querySelectorAll('.row button')) {
+    b.onclick = () => {
+      if (b.disabled) return;
+      const name = b.dataset.n;
+      let at = state.squad.findIndex((k) => k.name === name);
+      if (at < 0) {
+        const entry = KEEPERS.find((k) => k.name === name);
+        const cost = keeperCost(entry);
+        if (state.wallet.coin < cost) return;
+        state.wallet.coin -= cost;
+        state.squad.push(keeperFromRoster(entry));
+        at = state.squad.length - 1;
+      }
+      // 참조 재대입이다. 값을 복사하면 훈련이 보유 목록에 안 남는다.
+      state.pick = at;
+      state.keeper = state.squad[at];
+      stage.setKeeper(state.keeper);
+      persist();
+      pips();
+      renderRoster();
+    };
+  }
+}
+
+function openRoster() {
+  el('roster').hidden = false;
+  renderRoster();
+}
+
+function closeRoster() {
+  el('roster').hidden = true;
+}
+
 for (const b of document.querySelectorAll('.zone')) {
   b.onpointerdown = () => {
     if (state.phase === 'caption') return state.skip && state.skip();
@@ -337,6 +396,13 @@ el('gymBtn').onpointerdown = (e) => {
   e.stopPropagation();
   if (el('gym').hidden) openGym(); else closeGym();
 };
+el('rosterBtn').onpointerdown = (e) => {
+  e.stopPropagation();
+  if (el('roster').hidden) openRoster(); else closeRoster();
+};
+// 진단용. __pick은 화소 피킹이 이미 쓴다.
+window.__squad = () => ({ squad: state.squad.map((k) => k.name), pick: state.pick, coin: state.wallet.coin });
+window.__roster = (open) => { if (open) openRoster(); else closeRoster(); };
 
 // 소리. 끌 수 없는 소리는 소리가 아니라 사고다.
 // 음소거는 음량을 건드리지 않는다. 둘을 섞어버리면 한 번 누른 사람은 다시 켜도 무음으로 남는다.

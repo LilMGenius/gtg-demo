@@ -265,3 +265,44 @@ body.playing #hud{opacity:1}
   background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #gym .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
+
+/* 선수단 진입. 훈련장 234px 아래 242px에서 시작해 282px에 끝난다. 크로스바 325px 위다. */
+#rosterBtn{position:absolute;right:var(--pad-r);top:calc(242px + env(safe-area-inset-top));
+  pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
+  border:var(--line) solid var(--edge);background:var(--panel);
+  box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(1.1deg);
+  color:var(--dim)}
+#rosterBtn svg{width:26px;height:26px}
+#rosterBtn:active{transform:rotate(1.1deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
+
+/* 선수단. 명단이 길어 한 화면에 안 눕는다. 격자를 세로로 굴린다. */
+#roster{position:absolute;inset:0;pointer-events:auto;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  background:#080b07c4}
+#roster[hidden]{display:none}
+#roster h4{font-family:var(--disp);font-size:clamp(18px,2.4vw,26px);font-weight:400;
+  color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
+  text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
+#roster .row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;
+  width:min(94vw,940px);max-height:52vh;overflow-y:auto;padding:4px}
+#roster .row button{padding:9px 11px 11px;
+  border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
+  font-family:var(--disp);font-size:15px;font-weight:400;text-align:left;line-height:1.3;
+  box-shadow:6px 6px 0 var(--edge), var(--bevel);transition:transform .12s,box-shadow .12s}
+#roster .row button:nth-child(3n+1){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
+#roster .row button:nth-child(3n){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
+#roster .row button em{display:block;font-style:normal;font-size:12px;font-weight:700;
+  color:var(--good);margin-top:3px}
+/* 지금 뛰는 자리와 코인이 모자란 카드. 눌러도 아무 일이 없다는 것이 먼저 보여야 한다. */
+#roster .row button:disabled{color:#f6efdc5c;background:#141a12;cursor:default}
+#roster .row button:disabled em{color:#f6efdc44}
+/* 출전 중인 한 장은 죽은 카드와 다른 색이어야 한다. 둘 다 안 눌리기 때문이다. */
+#roster .row button.here{background:#2b3a22;color:var(--ink)}
+#roster .row button.here em{color:#ffd83d}
+#roster .row button:not(:disabled):hover{background:#25301f;transform:translateY(-4px);
+  box-shadow:8px 10px 0 var(--edge), var(--bevel)}
+#roster .row button:not(:disabled):active{transform:translateY(3px);box-shadow:2px 2px 0 var(--edge)}
+#roster .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
+  background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
+  box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
+#roster .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
