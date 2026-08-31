@@ -72,6 +72,33 @@ function clipper(ac, out) {
   return { head: w, tail: g };
 }
 
+// 다섯 소리가 전부 완전 건조하게 났다. 방음실에서 난 소리이지 운동장에서 난 소리가 아니다.
+// 되돌려주는 면은 철망 펜스가 아니라 그 뒤의 아파트 벽이다. 철망은 구멍이 손가락만 해서
+// 반사체가 아니라 산란체다. 펜스를 반사면으로 잡고 2.2kHz에서 자르자 게이트가 두 번 울었다.
+// 킥의 고역 비중이 0.331에서 0.286으로, 골대 중심주파수가 1960Hz에서 1794Hz로 내려갔다.
+// 콘크리트는 전대역을 그대로 돌려준다.
+//
+// 카메라 z=-5.1, 키커 z=10.5, 아파트 전면 z=38. 직접음 15.6m,
+// 벽을 맞고 오는 경로 27.5+43.1=70.6m. 차이 55m를 343m/s로 나누면 160ms 뒤 한 번 돌아온다.
+const WALL_DELAY = 0.16;
+// 20도 50% 습도에서 공기가 먹는 양은 4kHz에서 55m당 1dB, 8kHz에서 4dB다. 6kHz로 자르면 벽 소리만 저역 덩어리가 되어 직접음의 밝기를 깎는다.
+const WALL_LP = 10000;
+// 거리 제곱 감쇠로 15.6m 대 70.6m는 -13.1dB. 아파트 전면은 통유리 한 장이 아니라 베란다와 창이 파인 면이라 되돌아오는 양보다 흩어지는 양이 많다. 합쳐서 -18.4dB.
+const WALL_GAIN = 0.12;
+// 반사를 거는 것은 킥과 골대뿐이다. 놓기와 발소리는 피크가 0.1과 0.27이라
+// -18dB를 먹이면 되돌아오는 소리가 애초에 안 들린다. 그 세기로는 55m 밖 벽을 울리지 못한다.
+// 조용한 소리에 억지로 걸면 place의 꼬리만 길어진다.
+function wall(ac, src, out) {
+  const d = ac.createDelay(0.5);
+  d.delayTime.value = WALL_DELAY;
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = WALL_LP;
+  const g = ac.createGain();
+  g.gain.value = WALL_GAIN;
+  src.connect(d).connect(lp).connect(g).connect(out);
+}
+
 // 접촉의 순간. 짧고 높다.
 // 몸만 있으면 북이고, 이 몇 밀리초가 붙어야 무언가에 맞은 소리가 된다.
 // 측정이 잡아냈다. 어택 창의 고역 비중이 2%까지 내려가 있었고 그건 퍽 소리다.
@@ -113,15 +140,17 @@ function kick(ac, out, noise, t0, power = 0.6) {
   const lp = ac.createBiquadFilter();
   lp.type = 'lowpass';
   lp.frequency.setValueAtTime(1500 + p * 650, t0);
-  lp.frequency.exponentialRampToValueAtTime(680, t0 + 0.08);
+  lp.frequency.exponentialRampToValueAtTime(900, t0 + 0.08);
   lp.Q.value = 0.7;
   const hp = ac.createBiquadFilter();
   hp.type = 'highpass';
-  hp.frequency.value = 340;
+  hp.frequency.value = 460;
   const sg = ac.createGain();
   // 부드러운 킥과 강슛이 소프트클리퍼 안에서 같은 크기로 눌렸다.
   // 약한 쪽 바닥을 내려서 세기 차이를 다시 들리게 한다.
-  env(sg, 0.30 + p * 0.88, 0.09, t0);
+  // 게인을 1.45배로 올린 이유는 400Hz 미만 비중이 상한 0.70에 붙어 발화마다 넘나들었기 때문이다.
+  // 이 층은 hp460/lp900 사이라 전부 중역으로 들어가고, 저역 비율만 내린다.
+  env(sg, 0.44 + p * 1.25, 0.09, t0);
   skin.connect(lp).connect(hp).connect(sg).connect(out);
 
   // 접촉을 알리는 최소한만 남긴다. 여기를 키우면 가죽이 아니라 나무 소리가 된다.
@@ -245,6 +274,9 @@ export function buildSfx(name, ac, out, noise, t0, arg) {
   else if (name === 'place') place(ac, head, noise, t0);
   else if (name === 'step') step(ac, head, noise, t0, arg ?? false);
   else throw new Error('unknown sfx ' + name);
+  // 클리퍼 뒤에서 갈라낸다. 반사는 직접음이 눌린 다음의 파형을 그대로 되돌려준다.
+  // tail을 끊으면 이 갈래도 같이 끊어지므로 정리 경로는 그대로다.
+  if (name === 'kick' || name === 'post') wall(ac, clip.tail, out);
   return clip;
 }
 
