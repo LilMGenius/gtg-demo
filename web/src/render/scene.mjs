@@ -1295,10 +1295,18 @@ export function createScene(canvas) {
             // 공 바로 위에 얹었더니 글자가 키퍼 얼굴을 덮었다. 표정이 사라지면 사건의 절반이 없다.
             // 카메라는 +z를 보므로 +x가 화면 바깥쪽이다. 공보다 한 뼘 바깥, 머리 위로 올린다.
             // 주어가 키퍼인 사건은 키퍼 머리에 붙는다. 0.26은 머리 반지름 남짓이라 글자가 정수리에 겹치지 않는다.
+            // 머리 정중앙에 판을 세우면 머리와 두 팔이 판의 한가운데를 가려 좌우 조각만 남는다.
+            // 0.55는 어깨 반폭 남짓이다. 몸에 붙어 있으면서 판의 대부분이 허공으로 나온다.
+            // 부호는 키퍼의 x를 따른다. 글자도 같은 부호로 밀리므로 판과 글자가 한 덩어리로 읽힌다.
+            const headSide = keeper.position.x >= 0 ? 1 : -1;
             const anc = pendingBurst.at === 'head'
-              ? keeper.userData.head.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.26, 0))
+              ? keeper.userData.head.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(headSide * 0.55, 0.26, 0))
               : new THREE.Vector3(ball.position.x + 0.62, ball.position.y + 0.95, ball.position.z);
-            impact.burst(anc, pendingBurst.power, pendingBurst.word, pendingBurst.kind, pendingBurst.word2, burstDepth(anc.z));
+            // 머리는 몸에서 가장 앞선 점이다. 몸 전체 깊이만큼 밀면 판이 몸통 뒤로 들어가
+            // 실루엣 밖으로 삐져나온 가로 띠 한 줄만 남는다. 손 앵커와 같은 취급으로 머리 바로 뒤에 세운다.
+            // 0은 impact 쪽 하한 BEHIND(0.42)로 걷힌다. 머리 반지름 남짓이라 판이 얼굴에 얼룩지지 않는다.
+            const depth = pendingBurst.at === 'head' ? 0 : burstDepth(anc.z);
+            impact.burst(anc, pendingBurst.power, pendingBurst.word, pendingBurst.kind, pendingBurst.word2, depth);
             pendingBurst = null;
           }
         } else {
