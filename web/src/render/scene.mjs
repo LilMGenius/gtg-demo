@@ -1306,7 +1306,14 @@ export function createScene(canvas) {
             // 실루엣 밖으로 삐져나온 가로 띠 한 줄만 남는다. 손 앵커와 같은 취급으로 머리 바로 뒤에 세운다.
             // 0은 impact 쪽 하한 BEHIND(0.42)로 걷힌다. 머리 반지름 남짓이라 판이 얼굴에 얼룩지지 않는다.
             const depth = pendingBurst.at === 'head' ? 0 : burstDepth(anc.z);
-            impact.burst(anc, pendingBurst.power, pendingBurst.word, pendingBurst.kind, pendingBurst.word2, depth);
+            // 돌진 사건은 발화 후에도 키퍼가 +z로 계속 달린다. 좌표를 못 박으면 글자만 출발선에 남아
+            // 주어에서 2m 넘게 떨어진다(실측 2.08m). 글자와 꼬리만 머리를 따라가고 잔해는 자리에 남는다.
+            // headSide는 발화 시점 값으로 고정한다. 도중에 부호가 뒤집히면 글자가 한 프레임 만에 반대편으로 점프한다.
+            // 공 앵커는 따라가지 않는다. 공은 화면 밖으로 날아가므로 고정이 옳다.
+            const follow = pendingBurst.at === 'head'
+              ? (v) => { keeper.userData.head.getWorldPosition(v); v.x += headSide * 0.55; v.y += 0.26; }
+              : null;
+            impact.burst(anc, pendingBurst.power, pendingBurst.word, pendingBurst.kind, pendingBurst.word2, depth, follow);
             pendingBurst = null;
           }
         } else {

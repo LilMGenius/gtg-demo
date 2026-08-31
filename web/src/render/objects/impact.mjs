@@ -347,6 +347,11 @@ export function createImpact(scene) {
   // 이 발이 몸에서 얼마나 물러서야 하는지. 사건마다 몸의 깊이가 다르므로 발마다 다시 잡힌다.
   let behind = BEHIND;
   const at = new THREE.Vector3();
+  // 잔해는 사건이 일어난 자리에 남고, 글자는 사건을 저지른 몸을 따라간다.
+  // 하나로 묶었더니 돌진하는 키퍼가 발화 좌표를 2.08m 떠났고(실측 charge) 말풍선만 허공에 남았다.
+  const atWord = new THREE.Vector3();
+  // 주체를 매 프레임 다시 읽는 함수. 움직이지 않는 사건은 null이고 그때 글자는 at에 고정된다.
+  let track = null;
   // 계측이 임팩트를 뺀 같은 프레임을 찍을 수 있어야 한다.
   // 안 그러면 화면에 남은 화소가 임팩트인지 뒤의 골대인지 말할 수 없다.
   let hidden = false;
@@ -355,12 +360,14 @@ export function createImpact(scene) {
   // 0.34초는 사람 눈에 번짝이고 정지 프레임에는 거의 안 잡힌다. 0.55가 읽힌다.
   // 0.9를 써 보니 다음 구의 배치까지 글자가 남아 화면이 지저분해졌다.
   // 수명 셋 중 가장 긴 잔막이 전체 수명을 정한다.
-  function burst(pos, strength = 1, word = '', kind = '', word2 = '', depth = 0) {
+  function burst(pos, strength = 1, word = '', kind = '', word2 = '', depth = 0, follow3d = null) {
     // 발은 하나뿐이다. 공이 골망에 닿는 순간의 출렁임이 뒤늦게 터지면서, 아직 살아 있는
     // 사건의 발을 통째로 덮어썼다. 그러면 정지 프레임에 남는 그림은 개그가 아니라 그물이다.
     // 본체가 살아 있는 동안에는 더 가벼운 발이 끼어들지 못한다. 같은 무게면 나중 것이 이긴다.
     if (life > 0 && t < D_BODY && power > strength) return false;
     at.copy(pos);
+    atWord.copy(pos);
+    track = follow3d;
     power = strength;
     behind = Math.min(BEHIND_MAX, Math.max(BEHIND, depth));
     life = D_VEIL;
@@ -412,6 +419,9 @@ export function createImpact(scene) {
   function update(dt, camera) {
     if (life <= 0) return;
     t += dt;
+    // 주체가 움직이는 사건은 여기서 앵커를 다시 읽는다. 발화 프레임에 못 박으면
+    // 돌진이 끝날 무렵 말풍선이 주체를 놓치고 자막으로 읽힌다.
+    if (track) track(atWord);
     const uf = t / D_FLASH;
     const u = Math.min(1, t / D_BODY);
     const uv = t / D_VEIL;
@@ -524,15 +534,15 @@ export function createImpact(scene) {
       const base = stage === 0 ? 1.34 : 0.92;
       const pop = base * (w < 0.16 ? 1 : w < 0.36 ? 0.82 : 0.9);
       // 글자 크기는 화면이 정한다. 화면 폭의 사분의 일을 넘기면 글자가 장면이 되고 주체가 배경이 된다.
-      const span = worldSpanAt(camera, at);
+      const span = worldSpanAt(camera, atWord);
       const fit = Math.min(pop * (0.7 + power * 0.35), (span * MAX_WORD_FRAC) / WORD_W);
       // 미는 양은 취향이 아니라 계산이다. 글자 반폭에 몸통 반폭을 더해야 두 사각형이 안 겹친다.
       const push = WORD_W * fit * 0.5 + SUBJ_HALF;
       let side = Math.sign(wordSide) || 1;
       // 밀어낸 자리가 화면 밖이면 사건 대신 잘린 글자가 남는다. 그때만 반대쪽으로 넘긴다.
-      probe.set(at.x + side * push, at.y, at.z).project(camera);
+      probe.set(atWord.x + side * push, atWord.y, atWord.z).project(camera);
       if (Math.abs(probe.x) > EDGE_NDC) side = -side;
-      wordMesh.position.set(at.x + side * push, at.y + 0.28 + w * 0.24 + stage * 0.2, at.z);
+      wordMesh.position.set(atWord.x + side * push, atWord.y + 0.28 + w * 0.24 + stage * 0.2, atWord.z);
       wordMesh.quaternion.copy(camera.quaternion);
       wordMesh.rotateZ(wordSpin);
       wordMesh.scale.setScalar(fit);
@@ -540,7 +550,7 @@ export function createImpact(scene) {
       // 꼬리는 글자를 따라간다. 단이 바뀌어 글자가 반대쪽으로 넘어가도 다시 계산되므로 따로 뒤집지 않는다.
       leadR.setFromMatrixColumn(camera.matrixWorld, 0);
       leadU.setFromMatrixColumn(camera.matrixWorld, 1);
-      leadD.copy(wordMesh.position).sub(at);
+      leadD.copy(wordMesh.position).sub(atWord);
       const ldx = leadD.dot(leadR);
       const ldy = leadD.dot(leadU);
       const llen = Math.hypot(ldx, ldy);
@@ -557,12 +567,12 @@ export function createImpact(scene) {
         // 밑변을 고정 비율로 두면 글자판 안으로 파고들어 검은 외곽선이 끝 글자를 덮는다.
         // 글자 상자 앞에서 끊어야 꼬리가 주체와 글자 사이 빈 자리에만 놓인다.
         const far = Math.min(LEAD_FAR, Math.max(near + LEAD_MIN_RUN, 1 - (WORD_W * fit * 0.42) / llen));
-        const ax = at.x + leadD.x * near;
-        const ay = at.y + leadD.y * near;
-        const az = at.z + leadD.z * near;
-        const bx = at.x + leadD.x * far;
-        const by = at.y + leadD.y * far;
-        const bz = at.z + leadD.z * far;
+        const ax = atWord.x + leadD.x * near;
+        const ay = atWord.y + leadD.y * near;
+        const az = atWord.z + leadD.z * near;
+        const bx = atWord.x + leadD.x * far;
+        const by = atWord.y + leadD.y * far;
+        const bz = atWord.z + leadD.z * far;
         const v = [ax, ay, az, bx + leadP.x * hw, by + leadP.y * hw, bz + leadP.z * hw, bx - leadP.x * hw, by - leadP.y * hw, bz - leadP.z * hw];
         const pa = leadGeo.attributes.position;
         const pe = leadEdgeGeo.attributes.position;
@@ -586,6 +596,8 @@ export function createImpact(scene) {
   }
 
   function hideAll() {
+    // 끝난 발의 추적기를 남겨 두면 다음 발이 앞 사건의 몸을 따라간다.
+    track = null;
     flash.visible = false;
     ring.visible = false;
     ringEdge.visible = false;
