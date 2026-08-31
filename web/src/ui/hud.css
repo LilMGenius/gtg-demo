@@ -191,28 +191,52 @@ body.playing #hud{opacity:1}
 #auto svg{width:38px;height:38px}
 #auto.on{background:#4fd08a;color:#0d110c;box-shadow:var(--lift) var(--lift) 0 var(--edge)}
 
-/* 성장 선택. 가로라 세 장을 나란히 놓을 수 있다. */
-#offer{position:absolute;inset:0;pointer-events:auto;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+/* 훈련장 진입. 기둥 맨 아래 네 번째 칸. 돌진 40px 판때기 아래 194px에서 시작해
+   234px에 끝나고, 크로스바 325px보다 위라 여전히 하늘 띠 안이다. */
+#gymBtn{position:absolute;right:var(--pad-r);top:calc(194px + env(safe-area-inset-top));
+  pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
+  border:var(--line) solid var(--edge);background:var(--panel);
+  box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(-1.4deg);
+  color:var(--dim)}
+/* 26px. #out과 같은 40px 판때기라 여백도 같게 둔다. */
+#gymBtn svg{width:26px;height:26px}
+#gymBtn:active{transform:rotate(-1.4deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
+/* 밀린 훈련 배지. 판때기 밖 왼쪽 위로 빼야 덤벨 글리프를 안 가린다. */
+#gymDot{position:absolute;left:-9px;top:-9px;min-width:22px;height:22px;padding:0 4px;
+  display:grid;place-items:center;background:#e0563f;color:#fff;
+  border:3px solid var(--edge);font-family:var(--disp);font-size:13px;line-height:1}
+#gymDot[hidden]{display:none}
+
+/* 훈련장. 15칸이라 한 줄로는 안 눕는다. 5열 3행 격자로 놓는다. */
+#gym{position:absolute;inset:0;pointer-events:auto;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
 /* ef(94%)는 뒤를 통째로 지웠다. 보상 화면이 게임에서 가장 어두운 화면이 되면 안 된다.
    c4(77%)는 카드 테두리 대비를 지키면서 골대와 키퍼가 뒤에 남는 선이다. */
   background:#080b07c4}
-#offer[hidden]{display:none}
-#offer h4{font-family:var(--disp);font-size:clamp(22px,3vw,32px);font-weight:400;
+#gym[hidden]{display:none}
+#gym h4{font-family:var(--disp);font-size:clamp(18px,2.4vw,26px);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
   text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
-#offer .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;
-  padding:0 var(--pad-l)}
-#offer button{min-width:150px;padding:16px 22px 18px;
+#gym .row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;
+  width:min(94vw,940px)}
+#gym .row button{padding:9px 11px 11px;
   border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
-  font-family:var(--disp);font-size:19px;font-weight:400;text-align:left;line-height:1.4;
+  font-family:var(--disp);font-size:15px;font-weight:400;text-align:left;line-height:1.3;
   box-shadow:6px 6px 0 var(--edge), var(--bevel);transition:transform .12s,box-shadow .12s}
-/* 카드는 안 기울인다. 기울이면 세 장의 윗변이 어긋나고 한 줄 판정이 세 줄로 읽힌다.
+/* 카드는 안 기울인다. 기울이면 격자 윗변이 어긋나고 한 행이 세 행으로 읽힌다.
    손으로 그린 티는 그림자 길이를 장마다 다르게 줘서 낸다. */
-#offer button:nth-child(1){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
-#offer button:nth-child(3){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
-#offer button em{display:block;font-style:normal;font-size:13px;font-weight:700;
+#gym .row button:nth-child(3n+1){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
+#gym .row button:nth-child(3n){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
+#gym .row button em{display:block;font-style:normal;font-size:12px;font-weight:700;
   color:var(--good);margin-top:3px}
-#offer button:hover{background:#25301f;transform:translateY(-4px) rotate(0);
+/* 상한에 닿았거나 남은 훈련이 없는 칸. 눌러도 아무 일이 없다는 것이 먼저 보여야 한다. */
+#gym .row button:disabled{color:#f6efdc5c;background:#141a12;cursor:default}
+#gym .row button:disabled em{color:#f6efdc44}
+#gym .row button:not(:disabled):hover{background:#25301f;transform:translateY(-4px) rotate(0);
   box-shadow:8px 10px 0 var(--edge), var(--bevel)}
-#offer button:active{transform:translateY(3px) rotate(0);box-shadow:2px 2px 0 var(--edge)}
+#gym .row button:not(:disabled):active{transform:translateY(3px) rotate(0);box-shadow:2px 2px 0 var(--edge)}
+/* 닫기는 늘 보인다. 포인트가 0일 때 열면 나갈 길이 이것뿐이다. */
+#gym .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
+  background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
+  box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
+#gym .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}

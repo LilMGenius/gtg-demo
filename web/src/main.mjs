@@ -1,6 +1,6 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
-import { makeRng, buildSet, resolve, growthOffer, newKeeper, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain } from '../../src/chain.mjs';
-import { CAUSE_LABEL } from '../../src/ledger.mjs';
+import { makeRng, buildSet, resolve, newKeeper, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain } from '../../src/chain.mjs';
+import { CAUSE_LABEL, GROWABLE } from '../../src/ledger.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
@@ -28,12 +28,13 @@ window.__bgm = bgm;
 const seedParam = new URLSearchParams(location.search).get('seed');
 const rng = makeRng(seedParam === null ? ((Date.now() ^ 0x9e3779b9) >>> 0) : (Number(seedParam) >>> 0));
 const saved = load();
-const state = { keeper: Object.assign(newKeeper(), saved?.keeper || null), shots: [], i: 0, results: [], phase: 'idle', auto: Boolean(saved?.auto), picks: 0 };
+const state = { keeper: Object.assign(newKeeper(), saved?.keeper || null), shots: [], i: 0, results: [], phase: 'idle', auto: Boolean(saved?.auto), points: 0 };
 // 비운 시간은 훈련 선택권으로만 바뀌고, 그 선택은 손으로 한다.
-state.picks = saved ? offlineGain(saved.at, Date.now()) : 0;
+// 이전 배포본 세이브에는 points가 없다. 없으면 0으로 읽고 게임은 그대로 이어진다.
+state.points = (Number(saved?.points) || 0) + (saved ? offlineGain(saved.at, Date.now()) : 0);
 // 아웃문그램 팔로워. 의사소통과 악동이 여기서 값을 낸다.
 state.fans = Number(saved?.fans) || 0;
-window.__picks = () => state.picks;
+window.__points = () => state.points;
 // 사고 연출은 확률로만 나오므로 계측기가 불러낼 수 있어야 한다. 판정은 안 바뀐다.
 window.__act = (kind) => stage.act(kind);
 // 선언값은 증거가 아니다. 게이트가 실제 파형을 재려면 발화를 불러낼 수 있어야 한다.
@@ -72,6 +73,10 @@ function pips() {
   }).join('');
   el('lv').textContent = 'Lv ' + state.keeper.level;
   el('fans').innerHTML = '아웃문그램 <b>' + state.fans.toLocaleString() + '</b>';
+  // 남은 훈련 횟수는 버튼 위에 붙는다. 열어봐야 아는 숫자는 방치형에서 안 열린다.
+  const badge = el('gymDot');
+  badge.textContent = state.points > 9 ? '9+' : String(state.points);
+  badge.hidden = state.points <= 0;
 }
 
 function setPad(on) {
@@ -214,7 +219,7 @@ function countdown(sec, label, then) {
 }
 
 function restart(result) {
-  save(state.keeper, state.auto, state.fans);
+  save(state.keeper, state.auto, state.fans, state.points);
   const hand = ballInHand(result);
   countdown(restartDelay(state.keeper, result), hand ? '공 던져주는 중' : '골킥 차주는 중', nextShot);
 }
@@ -224,46 +229,49 @@ function endSet() {
   // 세트 사이에 다른 자막이 끼어도 사람은 이 줄만 이어서 기억한다. 직전 요약을 따로 들고 금지한다.
   lastSetEnd = setEndLine(5 - conceded, rng, lastSetEnd);
   say(lastSetEnd, null);
-  timer = stage.after(0.9, () => countdown(setBreak(), '한숨 돌리는 중', showOffer));
+  // 판이 끝나면 레벨이 오르고 훈련 한 번이 쌓인다. 쓰는 시점은 손이 정한다.
+  // 자동 팝업이 없으므로 전 스탯 만렙이어도 다음 판이 그대로 온다.
+  state.keeper.level += 1;
+  state.points += 1;
+  save(state.keeper, state.auto, state.fans, state.points);
+  pips();
+  timer = stage.after(0.9, () => countdown(setBreak(), '한숨 돌리는 중', nextSet));
 }
 
-function showOffer() {
-  const offer = growthOffer(rng, state.keeper);
-  // 전 스탯이 10이면 고를 카드가 없다. 빈 카드를 띄우면 닫을 버튼이 없어 게임이 그 자리에서 멈춘다.
-  if (!offer.length) {
-    state.picks = 0;
-    save(state.keeper, state.auto, state.fans);
-    el('offer').hidden = true;
-    say('더 올릴 데가 없다. 이미 다 찍었다', null);
-    nextSet();
-    return;
-  }
-  state.phase = 'offer';
-  const box = el('offer');
-  box.hidden = false;
-  const head = state.picks > 0 ? '자리 비운 사이 밀린 훈련 ' + state.picks + '회' : '뭘 올릴까';
-  box.innerHTML = '<h4>' + head + '</h4><div class=\"row\">' + offer.map((k) =>
-    '<button data-k=\"' + k + '\">' + CAUSE_LABEL[k] + '<em>' + state.keeper[k] + ' → ' + (state.keeper[k] + 1) + '</em></button>'
-  ).join('') + '</div>';
-  for (const b of box.querySelectorAll('button')) {
+// 훈련장. 열고 닫는 것은 손이고, 열려 있는 동안에도 판은 돈다.
+// 포인트가 0이어도 열린다. 그때는 내 스탯을 보는 창이다.
+function renderGym() {
+  const box = el('gym');
+  const head = state.points > 0 ? '훈련장 · 남은 훈련 ' + state.points + '회' : '훈련장 · 밀린 훈련 없다';
+  box.innerHTML = '<h4>' + head + '</h4><div class=\"row\">' + GROWABLE.map((k) => {
+    const v = state.keeper[k];
+    // 10은 성장 상한이다. 상한에 닿은 칸을 눌리게 두면 포인트만 사라진다.
+    const off = v >= 10 || state.points <= 0;
+    const tail = v >= 10 ? 'MAX' : v + ' → ' + (v + 1);
+    return '<button data-k=\"' + k + '\"' + (off ? ' disabled' : '') + '>' + CAUSE_LABEL[k] + '<em>' + tail + '</em></button>';
+  }).join('') + '</div><button class=\"close\">닫기</button>';
+  box.querySelector('.close').onclick = closeGym;
+  for (const b of box.querySelectorAll('.row button')) {
     b.onclick = () => {
+      if (b.disabled || state.points <= 0) return;
       // 프로의식은 히든이다. 숫자는 안 보이고 가끔 두 칸이 오른다.
       state.keeper[b.dataset.k] += growthGain(state.keeper, rng);
-      state.keeper.level += 1;
-      save(state.keeper, state.auto, state.fans);
-      box.hidden = true;
+      state.points -= 1;
+      save(state.keeper, state.auto, state.fans, state.points);
       stage.setKeeper(state.keeper);
-      if (state.picks > 0) {
-        state.picks -= 1;
-        save(state.keeper, state.auto, state.fans);
-        if (state.picks > 0) {
-          showOffer();
-          return;
-        }
-      }
-      nextSet();
+      pips();
+      renderGym();
     };
   }
+}
+
+function openGym() {
+  el('gym').hidden = false;
+  renderGym();
+}
+
+function closeGym() {
+  el('gym').hidden = true;
 }
 
 for (const b of document.querySelectorAll('.zone')) {
@@ -277,7 +285,11 @@ autoBtn.classList.toggle('on', state.auto);
 autoBtn.onpointerdown = () => {
   state.auto = !state.auto;
   autoBtn.classList.toggle('on', state.auto);
-  save(state.keeper, state.auto, state.fans);
+  save(state.keeper, state.auto, state.fans, state.points);
+};
+el('gymBtn').onpointerdown = (e) => {
+  e.stopPropagation();
+  if (el('gym').hidden) openGym(); else closeGym();
 };
 
 // 소리. 끌 수 없는 소리는 소리가 아니라 사고다.
@@ -312,10 +324,6 @@ pips();
 mountTitle(() => {
   stage.leaveTitle();
   stage.setKeeper(state.keeper);
-  // 돌아오자마자 밀린 훈련부터 쓴다. 그 다음에 공이 날아온다.
-  if (state.picks > 0) {
-    showOffer();
-    return;
-  }
+  // 밀린 훈련이 있어도 공부터 온다. 쓸지 말지는 훈련장 버튼이 들고 있다.
   nextSet();
 });
