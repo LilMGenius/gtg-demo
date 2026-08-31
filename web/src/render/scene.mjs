@@ -1338,13 +1338,22 @@ export function createScene(canvas) {
         case 'distracted': {
           // 카메라가 아니라 고개가 돌아간다. 머리가 돌아가 있는 동안 공은 그대로 지나간다.
           const head = keeper.userData.head;
-          showHearts(true, head.getWorldPosition(new THREE.Vector3()), e);
+          const vy = tail.vary;
+          // 고개 각도까지 상수면 한눈판 정도가 매번 똑같다. 홀린 깊이가 회차마다 달라야
+          // 같은 사건이 두 번째에도 사건으로 읽힌다. 0.86~1.06은 얼굴이 렌즈를 벗어나지 않는 폭이다.
+          tail.faceMul = 0.86 + vy.a * 0.2;
+          // 하트가 매번 같은 순간에 같은 위상으로 뜬다. 반한 타이밍을 조금 늦추거나 당긴다.
+          const he = Math.max(0, (e - vy.b * 0.14) / (1 - vy.b * 0.14));
+          showHearts(true, head.getWorldPosition(new THREE.Vector3()), he);
           // 키퍼는 고개만 돌리고 제자리에 선다. 종점이 x*1.3이면 실루엣 반폭(실측 0.72) 안이라
           // 공이 가슴을 뚫고 지나갔다. 실점 꼬리 여섯 중 이 하나만 520ms에 키퍼에 가려졌다.
           // 반폭 0.72에 공 반지름 0.14와 여유를 더한 1.05로 어깨 밖을 지나가게 한다.
           const side = Math.sign(tail.from.x || 1);
-          const outX = side * Math.max(Math.abs(tail.from.x) * 1.3, 1.05);
-          ball.position.set(lerp(tail.from.x, outX, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
+          // 1.3 고정이면 공이 매번 같은 자리로 빠진다. 1.05 하한은 어깨 밖 보장이라 그대로 둔다.
+          const outX = side * Math.max(Math.abs(tail.from.x) * (1.18 + vy.c * 0.28), 1.05);
+          // 지나가는 속도도 흔든다. 폭 0.9~1.14는 꼬리 길이 안에서 끝나는 범위다.
+          const be = Math.min(1, e * (0.9 + vy.a * 0.24));
+          ball.position.set(lerp(tail.from.x, outX, be), lerp(tail.from.y, REST_Y, be), lerp(tail.from.z, REST_Z, be));
           break;
         }
         case 'openGoalScored':
@@ -1439,7 +1448,8 @@ export function createScene(canvas) {
     // 접지는 선언이 아니라 측정이다. 몸의 실제 최저점을 재서 원하는 높이에 맞춘다.
     keeper.position.y += hover - footY(keeper);
     // drive()가 목을 덮어쓰고, 위치 보정 전 월드행렬은 낡았다. 둘이 끝난 뒤에 고개를 돌린다.
-    if (tail) applyFace(FACE_TURN[tail.kind] ?? 0.6, FACE_MOOD[tail.kind] ?? 'shock', tailRamp);
+    // 사건별 고개 각도는 상수다. 회차 편차가 필요한 사건만 자기 배율을 남긴다.
+    if (tail) applyFace((FACE_TURN[tail.kind] ?? 0.6) * (tail.faceMul ?? 1), FACE_MOOD[tail.kind] ?? 'shock', tailRamp);
     else if (titleMode) applyFace(0.92, 'grin', 1);
     else applyFace(0, 'rest', 1);
     kicker.position.y += -footY(kicker);
