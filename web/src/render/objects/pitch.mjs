@@ -243,55 +243,34 @@ export function buildPitch(scene) {
   // 밝은 회녹색 실을 그 위에 올리면 알파를 얼마로 하든 배경에 녹아 사라진다.
   // 실측: 그물이 밀리는 320ms 정지 프레임에서 뒷그물이 화면에 아예 없었고, 게이트만 통과했다.
   const NET_NEAR = 0x36423a;
-  // 동네 골대는 직육면체가 아니라 뒤로 갈수록 좁아지고 낮아지는 사다리꼴 상자다.
-  // 실측: 뒷틀을 앞골대와 같은 크기로 두면 뒷기둥 화면 좌표가 x -10, 1290으로 프레임(0~1280) 밖에 나가
-  // 골대가 닫히지 않고, 앞골대 머리에서 화면 밖으로 빠지는 흰 막대만 남았다.
-  // 카메라 z -5.1에서 뒷면(z -1.5)이 골라인(z 0)보다 가까워 거리비 0.706, 즉 같은 폭이라도 화면에서 더 벌어진다.
-  // 0.706으로 줄이면 앞기둥과 화면에서 겹쳐 관처럼 읽힌다. 0.62면 앞기둥 안쪽으로 들어와 상자가 뒤로 물러나 보인다.
-  const BACK_HW = R_HALF_W * 0.62;
-  const BACK_H = R_H * 0.62;
+  // 골대는 직육면체다. 뒷면은 앞골대와 같은 폭, 같은 높이다. 실제 골대가 그렇다.
+  // 카메라가 골대 뒤에 붙어 있으므로 뒷기둥은 원근으로 벌어져 화면 좌우로 나간다. 그것은 결함이 아니다.
+  // 그 이탈을 없애려고 뒷면을 좁히면 어떤 축구 골대도 갖지 않은 사각뿔 잘린 형상이 된다.
+  // 카메라를 물리거나 화각을 좁혀 해결하지도 않는다. 키커와 펜스가 같이 커지고 얻는 것이 없다.
+  const BACK_HW = R_HALF_W;
+  const BACK_H = R_H;
   // 카메라가 골대 뒤에 있어 그물은 화면에서 가장 앞에 온다. 그래서 처음엔 겨우 보일 만큼만 켰다.
   // 그 결과 골이 들어가도 무엇에 박혔는지 안 보였다. 0.34는 화면에서 안 읽혔고 0.8은 화면 전체가 방충망이 됐다.
   // 밝은 실을 촘촘히 치니 화면 앞 전체가 방안지가 됐다. 흙바닥과 키퍼가 격자에 갇혀
   // 병맛이 아니라 와이어프레임 디버그 화면으로 읽혔다.
   // 답은 더 지우는 게 아니라 뒤집는 것이다. 밝은 흙 위에 어두운 실을 성기게 친다.
   // 대비는 오히려 올라가서 골이 어디 박혔는지는 더 잘 읽히고, 격자는 시야를 덮지 않는다.
-  // 뒷면은 처음부터 작게 짠다. 지오메트리 후처리를 하면 안 된다.
+  // 뒷면 그물은 지오메트리 후처리를 하면 안 된다.
   // punch 클로저가 생성 시점의 로컬 정점 사본을 잡고 있어, 행렬을 먹인 뒤 punch가 한 번 걸리면
   // 그물이 통째로 원래 로컬 좌표로 튄다.
   const back = meshPanel(BACK_HW * 2, BACK_H, 0.36, NET_NEAR, 0.34, 0.22, true);
   back.position.set(0, BACK_H / 2 + NET_LIFT, -NET_D);
   scene.add(back);
-  // 사다리꼴은 아핀 변환이 아니다. 행렬로는 안 되고 정점마다 깊이에 따라 줄여야 한다.
-  // side와 roof는 punch가 걸리지 않으므로 월드 좌표로 구워 리매핑해도 안전하다.
-  const taper = (mesh) => {
-    mesh.updateMatrix();
-    mesh.geometry.applyMatrix4(mesh.matrix);
-    mesh.position.set(0, 0, 0);
-    mesh.rotation.set(0, 0, 0);
-    mesh.updateMatrix();
-    const p = mesh.geometry.attributes.position;
-    for (let i = 0; i < p.count; i++) {
-      // t 0 = 골라인, 1 = 그물 뒷면.
-      const t = Math.min(1, Math.max(0, -p.getZ(i) / NET_D));
-      p.setX(i, p.getX(i) * (1 + (BACK_HW / R_HALF_W - 1) * t));
-      p.setY(i, p.getY(i) * (1 + (BACK_H / R_H - 1) * t));
-    }
-    p.needsUpdate = true;
-    mesh.geometry.computeBoundingSphere();
-  };
   for (const sgn of [-1, 1]) {
     // 좌우 그물을 같은 밀도로 치면 골대가 공장에서 나온 물건이 된다. 한쪽이 더 삭았다.
     const side = meshPanel(NET_D, R_H, 0.24, NET_C, sgn < 0 ? 0.48 : 0.44, 0.06);
     side.rotation.y = Math.PI / 2;
     side.position.set(sgn * R_HALF_W, R_H / 2 + NET_LIFT, -NET_D / 2);
-    taper(side);
     scene.add(side);
   }
   const roof = meshPanel(R_HALF_W * 2, NET_D, 0.24, NET_C, 0.4, 0.10);
   roof.rotation.x = -Math.PI / 2;
   roof.position.set(0, R_H + NET_LIFT, -NET_D / 2);
-  taper(roof);
   scene.add(roof);
 
   // 뒷그물은 서 있는 평면인데 실 격자만 있으면 어느 쪽이 위인지 알려주는 것이 하나도 없다.
@@ -328,11 +307,10 @@ export function buildPitch(scene) {
       )
     );
   }
-  // 뒷 상단을 가로대로 잇지 않는다. 뒷면은 카메라와 골라인 사이라 그 자리의 쇠는 골 안의 공보다 앞에 온다.
-  // 실측: BACK_H를 낮춰 원거리 공 라인은 피했지만, 이번엔 gloveGone의 골인 공(z -0.94, ndc 0.32,-0.42)을
-  // 가려 goal 게이트가 떨어졌다. 높이를 어디에 두든 골 입구 안이면 언젠가 공을 가린다.
-  // 상자는 뒷기둥과 빗대와 좁아지는 그물이 이미 닫는다. 낡은 동네 골대의 뒷 상단도 원래 쇠가 아니라 그물이다.
-  //
+  // 뒷 상단 가로대. 상자를 닫는 네 번째 변이라 이것이 없으면 뒷면이 열린 ㄷ자로 읽힌다.
+  // 뒷면이 앞골대와 같은 높이라 이 쇠는 크로스바 높이에 온다. 골 안으로 들어온 공은 그보다 아래를 지나므로
+  // 카메라와 공 사이를 가로막지 않는다.
+  rails.push(railGeo(BACK_HW * 2, 'x').translate(0, BACK_H, -NET_D));
   // 그물 밑단이 묶이는 바닥 가로대. 화면 아래라 무엇도 가리지 않는다.
   rails.push(railGeo(BACK_HW * 2, 'x').translate(0, 0.05, -NET_D));
   // 0x5f6a5c는 흰 골대 옆에서 조명을 못 받은 물건으로 읽혔다. 같은 램버트 재질인데 색만 어두웠다.
