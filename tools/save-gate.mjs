@@ -82,8 +82,11 @@ try {
   // 강제 팝업을 훈련장 패널로 옮긴 뒤에도 같은 상황을 다시 잰다. 문턱은 그대로다.
   await p.evaluate(() => {
     const s = JSON.parse(localStorage.getItem('gtg.save.v1'));
-    for (const k of Object.keys(s.keeper)) if (k !== 'level' && Number.isFinite(s.keeper[k])) s.keeper[k] = 10;
-    s.keeper.level = 40;
+    // 저장의 정본은 보유 목록이고 keeper 칸은 구버전을 위한 사본이다. 정본을 올려야 만렙이 된다.
+    const head = Array.isArray(s.squad) ? s.squad[Number(s.pick) || 0] : s.keeper;
+    for (const k of Object.keys(head)) if (k !== 'level' && Number.isFinite(head[k])) head[k] = 10;
+    head.level = 40;
+    s.keeper = head;
     s.at = Date.now() - 90 * 24 * 3600 * 1000;
     localStorage.setItem('gtg.save.v1', JSON.stringify(s));
   });

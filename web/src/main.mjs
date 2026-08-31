@@ -1,12 +1,13 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
-import { makeRng, buildSet, resolve, newKeeper, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain } from '../../src/chain.mjs';
+import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE } from '../../src/ledger.mjs';
+import { KEEPERS, keeperCost } from '../../src/roster.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine } from './ui/lines.mjs';
-import { load, save, offlineGain } from './state/save.mjs';
+import { load, save, readSquad, offlineGain } from './state/save.mjs';
 import { coinGain, readWallet } from './state/wallet.mjs';
 
 const el = (id) => document.getElementById(id);
@@ -29,7 +30,17 @@ window.__bgm = bgm;
 const seedParam = new URLSearchParams(location.search).get('seed');
 const rng = makeRng(seedParam === null ? ((Date.now() ^ 0x9e3779b9) >>> 0) : (Number(seedParam) >>> 0));
 const saved = load();
-const state = { keeper: Object.assign(newKeeper(), saved?.keeper || null), shots: [], i: 0, results: [], phase: 'idle', auto: Boolean(saved?.auto), points: 0 };
+const restored = readSquad(saved);
+// 이전 배포본 저장에는 없던 칸이 있다. 신인 위에 덮어 읽어야 그 칸이 0이 아닌 3에서 시작한다.
+const squad = (restored.squad.length ? restored.squad : [null]).map((k) => {
+  const one = Object.assign(newKeeper(), k || null);
+  if (!one.name) one.name = '무명';
+  if (!Array.isArray(one.traits)) one.traits = [];
+  return one;
+});
+// state.keeper와 state.squad[state.pick]은 같은 객체다. 값을 복사하면 성장이 보유 목록에 안 남는다.
+const state = { squad, pick: Math.min(restored.pick, squad.length - 1), shots: [], i: 0, results: [], phase: 'idle', auto: Boolean(saved?.auto), points: 0 };
+state.keeper = state.squad[state.pick];
 // 비운 시간은 훈련 선택권으로만 바뀌고, 그 선택은 손으로 한다.
 // 이전 배포본 세이브에는 points가 없다. 없으면 0으로 읽고 게임은 그대로 이어진다.
 state.points = (Number(saved?.points) || 0) + (saved ? offlineGain(saved.at, Date.now()) : 0);
@@ -91,6 +102,11 @@ function pips() {
 
 function setPad(on) {
   for (const b of document.querySelectorAll('.zone')) b.disabled = !on;
+}
+
+// 저장은 항상 보유 목록 전체로 나간다. 뛰는 키퍼만 저장하면 나머지가 다음 저장에서 지워진다.
+function persist() {
+  save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet);
 }
 
 // 이번 구에 들어온 코인을 잔고 옆에 한 번 띄운다.
@@ -249,7 +265,7 @@ function countdown(sec, label, then) {
 }
 
 function restart(result) {
-  save(state.keeper, state.auto, state.fans, state.points, state.wallet);
+  persist();
   const hand = ballInHand(result);
   countdown(restartDelay(state.keeper, result), hand ? '공 던져주는 중' : '골킥 차주는 중', nextShot);
 }
@@ -263,7 +279,7 @@ function endSet() {
   // 자동 팝업이 없으므로 전 스탯 만렙이어도 다음 판이 그대로 온다.
   state.keeper.level += 1;
   state.points += 1;
-  save(state.keeper, state.auto, state.fans, state.points, state.wallet);
+  persist();
   pips();
   timer = stage.after(0.9, () => countdown(setBreak(), '한숨 돌리는 중', nextSet));
 }
@@ -287,7 +303,7 @@ function renderGym() {
       // 프로의식은 히든이다. 숫자는 안 보이고 가끔 두 칸이 오른다.
       state.keeper[b.dataset.k] += growthGain(state.keeper, rng);
       state.points -= 1;
-      save(state.keeper, state.auto, state.fans, state.points, state.wallet);
+      persist();
       stage.setKeeper(state.keeper);
       pips();
       renderGym();
@@ -315,7 +331,7 @@ autoBtn.classList.toggle('on', state.auto);
 autoBtn.onpointerdown = () => {
   state.auto = !state.auto;
   autoBtn.classList.toggle('on', state.auto);
-  save(state.keeper, state.auto, state.fans, state.points, state.wallet);
+  persist();
 };
 el('gymBtn').onpointerdown = (e) => {
   e.stopPropagation();

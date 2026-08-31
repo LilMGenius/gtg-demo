@@ -46,6 +46,21 @@ function keeperAt(stats, height, weight, consistency, professionalism) {
   return Object.assign({ height, weight, level: 1, consistency, professionalism, form: 0, streak: 0 }, stats);
 }
 
+// 명단의 한 줄을 플레이어가 쓰는 키퍼로 바꾼다.
+// 명단은 아홉 칸만 선언한다. 나머지 여섯 칸은 신인과 같은 3으로 채운다.
+// 3으로 채우는 이유는 영입한 키퍼가 훈련 대상 칸을 갖고 시작해야 만렙 데드락이 안 나기 때문이다.
+// 기복 5와 프로의식 5도 신인과 같다. 히든 차등은 아직 열지 않았다.
+const ROSTER_FILL = ['focus', 'composure', 'resilience', 'goalKick', 'throwing', 'communication'];
+
+export function keeperFromRoster(entry) {
+  const stats = { diving: entry.diving, handling: entry.handling, reflex: entry.reflex, offball: entry.offball, judgement: entry.judgement, agility: entry.agility, balance: entry.balance, strength: entry.strength, mischief: entry.mischief };
+  for (const f of ROSTER_FILL) stats[f] = 3;
+  const k = keeperAt(stats, entry.height, entry.weight, 5, 5);
+  k.name = entry.name;
+  k.traits = Array.isArray(entry.traits) ? entry.traits.slice() : [];
+  return k;
+}
+
 // 기복. 한 판이 시작할 때 한 번 굴러 그 판의 실효 칸을 흔든다.
 // 구마다 흔들면 같은 판 안에서 사람이 손을 고칠 수가 없다.
 export function rollForm(keeper, rng) {

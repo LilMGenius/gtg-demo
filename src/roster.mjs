@@ -137,6 +137,22 @@ export const KEEPERS = [
   { name: '동네형',     diving: 4,  handling: 4,  reflex: 4,  offball: 3, judgement: 3, agility: 4, balance: 4, strength: 5, mischief: 9, height: 174, weight: 88, fame: 1,  traits: [] }
 ];
 
+// 영입가. 실력 합과 유명세를 따로 센다.
+// 27은 아홉 칸이 전부 3일 때의 합이다. 바닥을 0원으로 두어야 최하위권이 초반에 손에 닿는다.
+// 18은 칸 하나의 값, 25는 fame 한 칸의 값이다. fame을 더 비싸게 둔 이유는
+// 못 막는데 유명한 키퍼가 이 게임의 웃음 담당이라 값이 실력만 따라가면 안 되기 때문이다.
+// 결과: 동네형 약 79, 쿠폰 약 1150. 세이브 한 번이 12코인이라 초반에는 최하위권만 산다.
+const COST_BASE = 27;
+const COST_PER_STAT = 18;
+const COST_PER_FAME = 25;
+const COST_STATS = ['diving', 'handling', 'reflex', 'offball', 'judgement', 'agility', 'balance', 'strength', 'mischief'];
+
+export function keeperCost(k) {
+  let sum = 0;
+  for (const s of COST_STATS) sum += Number(k[s]) || 0;
+  return Math.max(0, Math.round((sum - COST_BASE) * COST_PER_STAT + (Number(k.fame) || 0) * COST_PER_FAME));
+}
+
 // 특성은 파츠다. 쿨타임마다 확정 발동하고, 발동 순간 해당 칸을 최대치로 끌어올린다.
 // 확률을 높이는 것이 아니라 확률을 건너뛴다. 그래서 얻기가 어렵다.
 export const TRAITS = {
