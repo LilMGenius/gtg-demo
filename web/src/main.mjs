@@ -228,8 +228,17 @@ function endSet() {
 }
 
 function showOffer() {
-  state.phase = 'offer';
   const offer = growthOffer(rng, state.keeper);
+  // 전 스탯이 10이면 고를 카드가 없다. 빈 카드를 띄우면 닫을 버튼이 없어 게임이 그 자리에서 멈춘다.
+  if (!offer.length) {
+    state.picks = 0;
+    save(state.keeper, state.auto, state.fans);
+    el('offer').hidden = true;
+    say('더 올릴 데가 없다. 이미 다 찍었다', null);
+    nextSet();
+    return;
+  }
+  state.phase = 'offer';
   const box = el('offer');
   box.hidden = false;
   const head = state.picks > 0 ? '자리 비운 사이 밀린 훈련 ' + state.picks + '회' : '뭘 올릴까';
