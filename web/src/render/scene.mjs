@@ -1318,7 +1318,12 @@ export function createScene(canvas) {
           // 카메라가 아니라 고개가 돌아간다. 머리가 돌아가 있는 동안 공은 그대로 지나간다.
           const head = keeper.userData.head;
           showHearts(true, head.getWorldPosition(new THREE.Vector3()), e);
-          ball.position.set(lerp(tail.from.x, tail.from.x * 1.3, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
+          // 키퍼는 고개만 돌리고 제자리에 선다. 종점이 x*1.3이면 실루엣 반폭(실측 0.72) 안이라
+          // 공이 가슴을 뚫고 지나갔다. 실점 꼬리 여섯 중 이 하나만 520ms에 키퍼에 가려졌다.
+          // 반폭 0.72에 공 반지름 0.14와 여유를 더한 1.05로 어깨 밖을 지나가게 한다.
+          const side = Math.sign(tail.from.x || 1);
+          const outX = side * Math.max(Math.abs(tail.from.x) * 1.3, 1.05);
+          ball.position.set(lerp(tail.from.x, outX, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
           break;
         }
         case 'openGoalScored':
