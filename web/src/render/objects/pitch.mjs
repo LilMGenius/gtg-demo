@@ -60,12 +60,19 @@ export function meshPanel(w, h, cell, color, opacity, sag = 0, fadeFloor = false
     mat.opacity = 1;
     const cols = new Float32Array((pts.length / 3) * 4);
     baseA = new Float32Array(pts.length / 3);
+    // 격자로 읽히려면 두 축이 다 있어야 한다. 가로실만 지우면 남은 세로실은 흙 위에 드리운 몇 가닥이라
+    // 땅에 그린 모눈으로 읽히지 않는다. 아랫단을 통째로 지울 이유가 없다.
+    // 실측: 아랫단 42%를 다 지우니 정착한 공이 그물 밖 맨흙 위에 놓인 것으로 읽혔다.
+    // 세로실을 바닥까지 남기자 같은 프레임이 골문 안으로 읽혔고 격자는 돌아오지 않았다.
+    // 첫 루프가 세로실을 쌓으므로 그 구간의 좌표 개수가 경계다.
+    const vertFloats = (nx + 1) * seg * 6;
     for (let i = 0, k = 0; i < pts.length; i += 3, k += 4) {
       const u = Math.min(1, Math.max(0, (pts[i + 1] + h / 2) / h));
       // 위 3분의 1만 온전히 남긴다. 선형이면 중간 높이가 어중간하게 남아 격자가 그대로 읽힌다.
       const t = Math.min(1, Math.max(0, (u - 0.42) / 0.58));
-      cols[k] = 1; cols[k + 1] = 1; cols[k + 2] = 1; cols[k + 3] = t * t * opacity;
-      baseA[i / 3] = t * t * opacity;
+      const a = (i < vertFloats ? 1 : t * t) * opacity;
+      cols[k] = 1; cols[k + 1] = 1; cols[k + 2] = 1; cols[k + 3] = a;
+      baseA[i / 3] = a;
     }
     colAttr = new THREE.BufferAttribute(cols, 4);
     geo.setAttribute('color', colAttr);
