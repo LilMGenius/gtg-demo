@@ -72,6 +72,33 @@ function setPad(on) {
   for (const b of document.querySelectorAll('.zone')) b.disabled = !on;
 }
 
+// 타이밍 자. 맞는 구간의 자리와 폭은 그 구의 비행시간이 정한다.
+// 판정에 쓰는 값을 그대로 그리는 것이므로 여기서 새 규칙이 생기지 않는다.
+function beatStart(shot) {
+  const b = el('beat');
+  const span = shot.flight * 1000 + 900;
+  const center = (shot.flight * 720) / span;
+  const width = 240 / span;
+  b.hidden = false;
+  b.classList.remove('hit');
+  b.style.setProperty('--beat', span.toFixed(0) + 'ms');
+  const lane = b.querySelector('.lane');
+  lane.style.setProperty('--hot-l', ((center - width / 2) * 100).toFixed(2) + '%');
+  lane.style.setProperty('--hot-w', (width * 100).toFixed(2) + '%');
+  // 같은 노드에 시간만 갈면 애니메이션이 다시 돌지 않는다. 자막과 같은 이유다.
+  const run = document.createElement('i');
+  run.className = 'run';
+  lane.querySelector('.run').replaceWith(run);
+}
+
+// 손가락이 친 자리에 바늘을 세워둔다. 어디서 눌렀는지가 남아야 다음 구에서 고칠 데가 보인다.
+function beatStop(byHand) {
+  const b = el('beat');
+  if (!byHand) { b.hidden = true; return; }
+  b.classList.add('hit');
+  stage.after(0.8, () => { b.hidden = true; });
+}
+
 function nextSet() {
   // 기복은 판당 한 번 굴러서 그 판 내내 같은 값으로 선다.
   const form = rollForm(state.keeper, rng);
@@ -92,6 +119,7 @@ function nextShot() {
   // 자막 종료 시점의 pips()는 state.i가 오르기 전에 돌아서 마커가 한 칸 뒤에 남는다.
   pips();
   setPad(true);
+  beatStart(shot);
   stage.reset();
   pressAt = performance.now() + shot.flight * 1000 * 0.72;
   say(shot.kicker.name + ', 슛 준비합니다.', null);
@@ -107,6 +135,7 @@ function commit(dive) {
   state.phase = 'flying';
   stage.cancel(timer);
   setPad(false);
+  beatStop(dive !== null);
   const shot = state.shots[state.i];
   const input = dive === null
     ? autoInput(state.keeper, shot, rng)

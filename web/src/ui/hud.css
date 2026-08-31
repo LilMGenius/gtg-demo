@@ -99,6 +99,28 @@ body.playing #hud{opacity:1}
 
 /* 세 칸. 가로 화면 전체를 좌·중·우로 나눈 투명 탭 영역이다.
    버튼을 아래에 늘어놓으면 손가락이 골대를 가린다. */
+/* 타이밍 자. 조작법은 "타이밍이 전부다"라고 말하는데 화면에는 그 시계가 없었다.
+   errMs 하나가 판정에 들어가는 값이라 그 시계가 안 보이면 선방과 실점이
+   손가락 탓인지 스탯 탓인지 플레이어 쪽에서 구분할 근거가 없다.
+   판정은 안 바뀐다. 이미 있던 시간을 보이게만 한다. */
+#beat{position:absolute;left:50%;transform:translateX(-50%);
+  bottom:calc(clamp(24px,3.4vh,38px) + 72px + env(safe-area-inset-bottom));
+  pointer-events:none;width:min(392px,46vw)}
+#beat[hidden]{display:none}
+#beat .lane{position:relative;display:block;height:19px;overflow:hidden;
+  background:#161c14;border:var(--line) solid var(--edge);
+  box-shadow:5px 4px 0 var(--edge), var(--bevel);transform:rotate(-.9deg)}
+/* 맞는 구간. 폭과 자리는 그 구의 비행시간이 정하므로 JS가 변수로 준다. */
+#beat .hot{position:absolute;top:0;bottom:0;left:var(--hot-l,64%);width:var(--hot-w,12%);
+  background:#ffd83d;box-shadow:inset 0 0 0 2px #12160e33}
+/* 바늘. 세계시계가 멈추면 같이 멈춰야 정지 프레임 두 장이 같은 그림이 된다.
+   body.frozen의 animation-play-state가 그 정지를 맡는다. */
+#beat .run{position:absolute;top:-3px;bottom:-3px;left:0;width:5px;background:#f6efdc;
+  box-shadow:0 0 0 2px #12160e;animation:beatRun var(--beat,1.6s) linear forwards}
+@keyframes beatRun{from{left:0}to{left:calc(100% - 5px)}}
+/* 누른 순간 바늘이 선다. 어디서 눌렀는지가 남아야 다음 구에서 고칠 데가 보인다. */
+#beat.hit .run{animation-play-state:paused;background:#4fd08a}
+
 #pad{position:absolute;inset:0;display:flex;pointer-events:auto}
 .zone{flex:1;border:0;background:transparent;position:relative;
   display:flex;align-items:flex-end;justify-content:center;
