@@ -5,6 +5,7 @@ import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
+import { eventLine } from './ui/lines.mjs';
 import { load, save, offlineGain } from './state/save.mjs';
 
 const el = (id) => document.getElementById(id);
@@ -156,6 +157,10 @@ function commit(dive) {
 function rollCaptions(result) {
   const lines = result.events.slice();
   state.phase = 'caption';
+  // 같은 사건이 두 구 연속 같은 문장으로 나오면 굴림이 아니라 상수로 읽힌다.
+  let lastCap = null;
+  // reboundMiss는 누워서와 서서 두 자리에서 cause 없이 나온다. 문맥으로만 갈린다.
+  const ctx = { downed: false };
   const step = () => {
     const e = lines.shift();
     if (!e) {
@@ -168,7 +173,10 @@ function rollCaptions(result) {
       restart(result);
       return;
     }
-    say(e.line, e.cause);
+    const line = eventLine(e, rng, lastCap, ctx);
+    lastCap = line;
+    if (e.t === 'downed') ctx.downed = true;
+    say(line, e.cause);
     // 자막이 말한 사건을 화면도 같이 연기한다. 결과는 이미 확정됐고 여기서 바뀌지 않는다.
     if (e.t !== 'result') stage.act(e.t);
     stage.cancel(timer);
