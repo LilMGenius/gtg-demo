@@ -30,8 +30,11 @@ try {
   await p.waitForTimeout(1400);
 
   // 대조군. 같은 probeAt를 타야 한다. 다른 코드로 재면 게이트에 대해 아무것도 증명하지 못한다.
+  // 보이는 자리는 공이 실제로 굴러가는 높이에 둔다. y 1.0은 크로스바가 먹는 띠다.
+  // 실측: 카메라 (0,4.0,-6.2)에서 (0,1.0,6)으로 쏜 광선은 z=-0.04, y=2.49에서 bar에 맞는다.
+  // 같은 z에서 y 0.6과 1.4는 둘 다 보인다. 즉 가려지는 것은 공의 경로가 아니라 그 한 띠다.
   const ctrl = await p.evaluate(() => ({
-    front: window.__ballProbe.probeAt(0, 1.0, 6).visible,
+    front: window.__ballProbe.probeAt(0, 0.6, 6).visible,
     behind: window.__ballProbe.probeAt(0, 3.3, -9).visible,
     far: window.__ballProbe.probeAt(-40, 1.0, 6).visible,
     under: window.__ballProbe.probeAt(0, -3.0, 6).visible,
