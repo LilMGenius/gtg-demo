@@ -437,7 +437,9 @@ function buildBody(o) {
     kn.add(shin);
     // 축구화가 없으면 다리가 잘린 막대로 끝난다. 발은 실루엣에서 가장 아래에 있고 제일 먼저 보인다.
     if (o.bootLen) {
-      const boot = new THREE.Mesh(new THREE.BoxGeometry(o.legR * 1.5, o.legR * 0.9, o.bootLen), flat(0x14100c));
+      // 포스트 렌더타깃이 8비트 선형이라 이보다 어두우면 세 채널이 각기 다른 정수로 반올림돼 색비가 깨진다.
+      // 0x14100c는 화면에 (41,2,2) 순적색으로 나왔고, 0x2a241c부터 (26,17,17) 가죽 갈색이 보존된다.
+      const boot = new THREE.Mesh(new THREE.BoxGeometry(o.legR * 1.5, o.legR * 0.9, o.bootLen), flat(0x2a241c));
       boot.name = tag;
       jitterMesh(boot, 0.016, side < 0 ? 51 : 52);
       // 발끝은 얼굴이 보는 쪽으로 나간다. 뒤꿈치는 발목 밑에 남긴다.
