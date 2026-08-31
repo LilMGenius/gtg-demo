@@ -1,5 +1,5 @@
 import { makeRng, buildSet, resolve, keeperAtLevel, autoInput, rollForm } from "../src/chain.mjs";
-import { POOLS, KEYLESS, lineKey, eventLine, LINE_POOL } from "../web/src/ui/lines.mjs";
+import { POOLS, KEYLESS, lineKey, eventLine, LINE_POOL, SET_END, SET_END_POOL, setEndLine } from "../web/src/ui/lines.mjs";
 
 // 결과 자막 게이트. 사건마다 문장이 하나뿐이라 방치형에서 로그처럼 읽히던 것을 고친 뒤,
 // 그 수리가 실제 판정이 뱉는 사건 전부에 닿는지를 시뮬레이션으로 다시 잰다.
@@ -77,6 +77,33 @@ for (let i = 0; i < 4000; i++) {
   if (a === b) naive++;
 }
 check(naive > 0, "control:unguarded-draw-does-repeat", naive);
+
+// 세트 요약. 사건 자막을 다 굴려도 이 한 줄이 상수면 플레이어가 매 세트 같은 문장을 본다.
+check(SET_END_POOL >= 3, "setend:three-lines", SET_END_POOL);
+// 숫자를 잃은 틀은 성적을 안 알려 준다. 치환 자리가 빠지면 조용히 같은 문장이 된다.
+const noSlot = SET_END.filter((s) => !s.includes("{n}"));
+check(noSlot.length === 0, "setend:every-line-carries-the-count", noSlot.length ? noSlot.join(",") : SET_END_POOL);
+
+// 실전 순서 그대로 잰다. 막은 개수는 세트마다 바뀌므로 틀이 같아도 문장은 달라진다.
+const setRng = makeRng(0x5e7e);
+let setRepeat = 0;
+const setSeen = new Set();
+let lastSet = null;
+for (let i = 0; i < 4000; i++) {
+  const saved = Math.floor(setRng() * 6);
+  const line = setEndLine(saved, setRng, lastSet);
+  if (lastSet !== null && line === lastSet) setRepeat++;
+  setSeen.add(line.replace(/[0-5]/, "{n}"));
+  lastSet = line;
+}
+check(setRepeat === 0, "setend:never-repeats-back-to-back", setRepeat);
+check(setSeen.size === SET_END_POOL, "setend:whole-pool-is-reachable", setSeen.size + "/" + SET_END_POOL);
+
+// 대조군. 금지를 빼면 같은 개수에서 같은 문장이 실제로 연달아 나온다.
+const setRng2 = makeRng(11);
+let setNaive = 0;
+for (let i = 0; i < 4000; i++) if (setEndLine(3, setRng2, null) === setEndLine(3, setRng2, null)) setNaive++;
+check(setNaive > 0, "control:unguarded-setend-does-repeat", setNaive);
 
 console.log("lines " + (ok ? "PASS " + LINE_POOL : "FAIL"));
 process.exit(ok ? 0 : 1);

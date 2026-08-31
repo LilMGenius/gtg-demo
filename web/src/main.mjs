@@ -5,7 +5,7 @@ import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
-import { eventLine } from './ui/lines.mjs';
+import { eventLine, setEndLine } from './ui/lines.mjs';
 import { load, save, offlineGain } from './state/save.mjs';
 
 const el = (id) => document.getElementById(id);
@@ -54,6 +54,8 @@ let advance = 0;
 let timer = 0;
 // 직전 예고 한 줄만 기억한다. 사람이 반복을 느끼는 단위가 직전 한 구다.
 let lastAim = null;
+// 세트 요약은 몇 분에 한 번 나온다. 그 사이 자막이 다 지나가도 사람은 이 줄끼리만 비교한다.
+let lastSetEnd = null;
 
 function say(line, cause) {
   // 매 줄이 새 요소여야 등장 애니메이션이 다시 돈다. 같은 노드에 글자만 갈면 조용히 바뀐다.
@@ -214,7 +216,9 @@ function restart(result) {
 
 function endSet() {
   const conceded = state.results.filter(Boolean).length;
-  say('슛 다섯 개 중 ' + (5 - conceded) + '개 막았습니다.', null);
+  // 세트 사이에 다른 자막이 끼어도 사람은 이 줄만 이어서 기억한다. 직전 요약을 따로 들고 금지한다.
+  lastSetEnd = setEndLine(5 - conceded, rng, lastSetEnd);
+  say(lastSetEnd, null);
   timer = stage.after(0.9, () => countdown(setBreak(), '한숨 돌리는 중', showOffer));
 }
 

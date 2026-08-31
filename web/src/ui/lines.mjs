@@ -190,6 +190,28 @@ const POOLS = {
 
 export { POOLS };
 
+// 세트 요약. 사건 풀과 달리 이 줄은 매 세트 끝에 반드시 한 번 나오는 유일한 자막이라
+// 한 문장이면 방치형에서 가장 먼저 상수로 읽힌다. {n}은 막아낸 개수다.
+// 판정이 뱉는 사건이 아니라 루프의 주기라 POOLS 밖에 둔다. 도달성 검사 대상이 다르다.
+const SET_END = [
+  '슛 다섯 개 중 {n}개 막았습니다.',
+  '다섯 개 중 {n}개를 막고 한 세트 끝났습니다.',
+  '이번 세트 성적은 다섯 개 중 {n}개입니다.',
+  '다섯 번 서서 {n}번 막아냈습니다.'
+];
+
+export { SET_END };
+export const SET_END_POOL = SET_END.length;
+
+// eventLine과 같은 계약이다. 뽑기 전에 숫자를 넣어 두고 완성된 문장으로 직전 줄을 금지한다.
+// 템플릿 단계에서 금지하면 개수가 바뀐 같은 틀이 다른 줄로 보여 중복이 새어 나간다.
+export function setEndLine(saved, rng, last) {
+  const all = SET_END.map((s) => s.replace('{n}', String(saved)));
+  const fresh = all.filter((s) => s !== last);
+  const pick = fresh.length ? fresh : all;
+  return pick[Math.floor(rng() * pick.length) % pick.length];
+}
+
 // result는 판정 라벨이지 대사가 아니다. 실점과 세이브라는 두 글자는 흔들리면 안 된다.
 export const KEYLESS = ['result'];
 
