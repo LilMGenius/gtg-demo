@@ -60,22 +60,30 @@ async function lumaOf([b64, picks, half]) {
   return out;
 }
 
-// 휘도 목록에서 단의 개수를 센다. 드문 화소는 버리고, 붙어 있는 값은 한 단으로 묶는다.
-// 이렇게 하지 않으면 디더가 만든 한 칸짜리 흔들림이 단으로 잘못 세어진다.
+// 휘도 목록에서 단의 개수를 센다. 붙어 있는 값을 먼저 한 덩이로 묶고, 그 덩이의 지분으로 거른다.
+// 순서가 중요하다. 낱값 지분으로 먼저 거르면 디더로 넓게 퍼진 단은 낱값마다 문턱 아래로
+// 떨어져 통째로 사라지고, 반대로 한 단의 디더 양끝(120과 124처럼 MERGE보다 벌어진 짝)은
+// 서로 다른 두 단으로 세어진다. 묶고 나서 재면 둘 다 사라진다.
 function bands(vals) {
   if (!vals.length) return { n: 0, levels: [] };
   const hist = new Map();
   for (const v of vals) hist.set(v, (hist.get(v) || 0) + 1);
-  const keep = [...hist.entries()]
-    .filter(([, c]) => c / vals.length >= MIN_SHARE)
-    .map(([v]) => v)
-    .sort((a, b) => a - b);
-  const levels = [];
-  for (const v of keep) {
-    if (levels.length && v - levels[levels.length - 1] <= MERGE) continue;
-    levels.push(v);
+  const keys = [...hist.keys()].sort((a, b) => a - b);
+  const clusters = [];
+  let cur = null;
+  for (const v of keys) {
+    const c = hist.get(v);
+    if (cur && v - cur.last <= MERGE) {
+      cur.sum += c;
+      cur.last = v;
+      if (c > cur.peakC) { cur.peakC = c; cur.peak = v; }
+    } else {
+      cur = { sum: c, last: v, peak: v, peakC: c };
+      clusters.push(cur);
+    }
   }
-  return { n: levels.length, levels };
+  const kept = clusters.filter((c) => c.sum / vals.length >= MIN_SHARE);
+  return { n: kept.length, levels: kept.map((c) => c.peak) };
 }
 
 let br;
