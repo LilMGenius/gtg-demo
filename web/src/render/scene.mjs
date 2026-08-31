@@ -175,6 +175,17 @@ export function createScene(canvas) {
   // 0.30은 슬로모션으로 읽혔고 0.02는 프레임이 멈춘 것으로 읽혔다. 0.08이 걸리는 느낌이다.
   const HIT_SCALE = 0.08;
 
+  // 격리 프리뷰. 겹친 한 장에서 결함을 고르면 파편을 그물로, 다리를 팔로 읽는다. 서브시스템
+  // 하나만 남긴 화면이 그 오탐을 원천에서 없앤다. 라벨은 add 시점의 subTag로 붙는다. 태그를
+  // 지점마다 손으로 다는 대신 add를 감싸는 이유는, 한 서브시스템이 최상위에 여러 개를
+  // 흩뿌려도 누락 없이 전부 귀속되기 때문이다.
+  let subTag = 'stage';
+  const rawAdd = scene.add.bind(scene);
+  scene.add = (...objs) => {
+    for (const o of objs) if (o.userData.sub === undefined) o.userData.sub = subTag;
+    return rawAdd(...objs);
+  };
+
   // 암빛을 한 덩어리로 뿌리면 모든 면이 같은 밝기로 서고, 입체는 색칠한 오려붙이기가 된다.
   // 키·필·림을 나누고 바닥 반사를 따로 준다. 전체 노출은 그대로 두고 방향만 쪼갠다.
   scene.add(new THREE.AmbientLight(0xd8e6dc, 0.62));
@@ -193,9 +204,13 @@ export function createScene(canvas) {
   rim.position.set(2, 6, 12);
   scene.add(rim);
 
+  subTag = 'pitch';
   const pitch = buildPitch(scene);
+  subTag = 'passers';
   const passers = buildPassers(scene);
+  subTag = 'impact';
   const impact = createImpact(scene);
+  subTag = 'ball';
 
   // 전경 표시는 색이 아니라 알파다. 후처리가 이 값으로 인물과 배경을 갈라 다른 자를 댄다.
   // material.opacity는 이 알파가 아니다. 아래 tagFg는 프래그먼트 셰이더 끝에 gl_FragColor.a를
@@ -367,6 +382,8 @@ export function createScene(canvas) {
     m.add(core);
     m.rotation.x = -Math.PI / 2;
     m.userData.probeIgnore = true;
+    // 그림자는 공·배우·행인이 각자 부르지만 축으로는 하나다. 호출자 라벨을 따르면 흩어진다.
+    m.userData.sub = 'shadow';
     scene.add(m);
     return m;
   };
@@ -385,10 +402,12 @@ export function createScene(canvas) {
   const passerShadows = passers.map(() => blob(0.28));
 
   const kicker = buildKicker();
+  subTag = 'kicker';
   scene.add(kicker);
   markForeground(kicker);
 
   let keeper = buildKeeper(188, 84);
+  subTag = 'keeper';
   scene.add(keeper);
   markForeground(keeper);
 
@@ -398,6 +417,7 @@ export function createScene(canvas) {
     if (loose) { scene.remove(loose); loose = null; }
     scene.remove(keeper);
     keeper = buildKeeper(k.height, k.weight);
+    keeper.userData.sub = 'keeper';
     scene.add(keeper);
     markForeground(keeper);
   }
@@ -650,6 +670,7 @@ export function createScene(canvas) {
     h.add(edge);
     h.visible = false;
     h.userData.probeIgnore = true;
+    h.userData.sub = 'fx';
     scene.add(h);
     hearts.push(h);
   }
@@ -1610,6 +1631,30 @@ export function createScene(canvas) {
   // 포스트 패스 한 장이 아니라 세계 패스를 보고한다. 예산은 세계가 쓴다.
   // 화면에 실제로 선 것을 이름으로 세는 진단구. 코드를 읽어 추측하면 없는 GridHelper를 찾게 된다.
   window.__sceneRoot = () => scene;
+
+  // 서브시스템 재고. 이름을 모르면 격리도 못 한다.
+  window.__subs = () => {
+    const m = {};
+    for (const c of scene.children) {
+      if (c.isLight) continue;
+      const s = c.userData.sub || 'stage';
+      m[s] = (m[s] || 0) + 1;
+    }
+    return m;
+  };
+
+  // 하나만 남긴다. 인자가 없으면 전부 되돌린다. 조명은 끄지 않는다. 끄면 남긴 것도 검게 나와
+  // 격리의 목적인 육안 판정 자체가 불가능해진다.
+  window.__solo = (name) => {
+    for (const c of scene.children) {
+      if (c.isLight) continue;
+      // 원래 가시성을 한 번만 기억한다. 두 번 덮으면 숨겨진 채로 태어난 것들이 복원 때 켜진다.
+      if (c.userData.soloWas === undefined) c.userData.soloWas = c.visible;
+      c.visible = name ? (c.userData.sub || 'stage') === name : c.userData.soloWas;
+      if (!name) delete c.userData.soloWas;
+    }
+    return window.__subs();
+  };
 
   // 사건이 없을 때 화면이 정말 멈추는지를 계측이 확인할 수 있어야 한다.
   // 게임은 사건 사이에도 계속 진행하므로, 대기 시간만으로는 정지 상태를 만들 수 없다.
