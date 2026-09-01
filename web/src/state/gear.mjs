@@ -24,8 +24,19 @@ export const BOOTS = [
 
 export const MAX_STUD = BOOTS.length - 1;
 
+// 유니폼 선반. 손도 발도 아니라 몸이고, 깎는 것은 정면 강슛에 같이 밀려 들어가는 사고다.
+// 값 기준은 앞의 둘과 같다. 첫 칸은 카드깡 380 땀보다 싸고 마지막 칸은 그보다 비싸다.
+export const KITS = [
+  { pads: 0, name: '아빠 옷장 면티', cost: 0, note: '아무것도 안 샀을 때 입고 있는 것' },
+  { pads: 1, name: '학교 체육복 상의', cost: 150, note: '적어도 땀은 먹는다' },
+  { pads: 2, name: '조기회 단체복', cost: 370, note: '등에 동네 철물점 이름이 박혀 있다' },
+  { pads: 3, name: '패드 박은 골키퍼 저지', cost: 850, note: '어깨에 스펀지가 들었다. 밀려도 덜 밀린다' }
+];
+
+export const MAX_KIT = KITS.length - 1;
+
 export function newGear() {
-  return { grip: 0, studs: 0 };
+  return { grip: 0, studs: 0, pads: 0 };
 }
 
 // 이전 배포본 저장에는 장비 칸이 없다. 없으면 0번 장갑에서 시작한다.
@@ -35,6 +46,7 @@ export function readGear(raw) {
   if (!raw || typeof raw !== 'object') return g;
   if (Number.isFinite(raw.grip)) g.grip = Math.min(MAX_GRIP, Math.max(0, Math.floor(raw.grip)));
   if (Number.isFinite(raw.studs)) g.studs = Math.min(MAX_STUD, Math.max(0, Math.floor(raw.studs)));
+  if (Number.isFinite(raw.pads)) g.pads = Math.min(MAX_KIT, Math.max(0, Math.floor(raw.pads)));
   return g;
 }
 
@@ -44,4 +56,8 @@ export function gloveAt(grip) {
 
 export function bootAt(studs) {
   return BOOTS[Math.min(MAX_STUD, Math.max(0, Math.floor(Number(studs) || 0)))];
+}
+
+export function kitAt(pads) {
+  return KITS[Math.min(MAX_KIT, Math.max(0, Math.floor(Number(pads) || 0)))];
 }

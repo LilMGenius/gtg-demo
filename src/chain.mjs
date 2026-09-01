@@ -29,6 +29,9 @@ const GRIP_SPILL = 5;
 // 축구화 등급 한 칸이 깎는 출발 지연 ms. 민첩성 한 칸이 12ms를 깎으므로 한 칸은 그보다 작다.
 // 세 칸을 다 신어도 21ms라 민첩성 두 칸에 못 미친다. 장비는 스탯 위에 얇게만 얹는다.
 const STUD_MS = 7;
+// 유니폼 등급 한 칸이 깎는 정면 강슛 동반 실점 확률. 맷집 한 칸이 4.4를 깎으므로 한 칸은 그보다 작다.
+// 세 칸을 다 입어도 9라 맷집 세 칸 13.2에 못 미친다. 장비는 스탯 위에 얇게만 얹는다.
+const KIT_CARRY = 3;
 const WIN0 = 70;
 const STREAK_K = 6.0;
 
@@ -382,7 +385,9 @@ export function resolve(input) {
   state.stage = 2;
   // 정면 강슛은 몸으로 받는다. 질량이 버티는 자리는 여기다. 옆으로 날아간 몸에는 버틸 질량이 없다.
   const brace = shot.course === "정면" ? (keeper.weight - 84) * W_BRACE : 0;
-  const carryP = shot.strong ? Math.max(0, 40 - keeper.strength * 4.4 - brace) : 0;
+  // 유니폼 등급. 장갑과 같은 이유로 선반 밖의 값은 잘라 넣는다.
+  const pads = Math.min(3, Math.max(0, Math.floor(Number(input.pads) || 0)));
+  const carryP = shot.strong ? Math.max(0, 40 - keeper.strength * 4.4 - brace - pads * KIT_CARRY) : 0;
   // 장갑 등급. 선반은 0에서 3까지이고 그 밖의 값은 저장이 오염된 것이므로 잘라 넣는다.
   const grip = Math.min(3, Math.max(0, Math.floor(Number(input.grip) || 0)));
   const gloveP = keeper.handling <= 4 ? Math.max(0, (5 - keeper.handling) * 7 - grip * GRIP_TEAR) : 0;
