@@ -35,6 +35,11 @@ const KIT_CARRY = 3;
 // 양말 등급 한 칸이 깎는 착지 실패 확률. 밸런스 한 칸이 14를 깎으므로 한 칸은 그보다 작다.
 // 세 칸을 다 신어도 24라 밸런스 세 칸 42에 못 미친다. 장비는 스탯 위에 얇게만 얹는다.
 const SOCK_LAND = 8;
+// 골대 등급 한 칸이 흘린 공을 그물이 먹어 리바운드 국면 자체를 없애는 확률.
+// 같은 축의 스탯은 반응속도다. 반응속도 한 칸은 리바운드 창을 4.5 넓혀 실점을 2.25 깎는다.
+// 그물 먹힘은 눕든 안 눕든 앞에서 한 번에 막으므로 실효가 더 크다. 그래서 등급당 3으로 낮춰 잡았다.
+// 세 칸을 다 사도 9고, 흘린 뒤 실점률을 곱하면 실효 5 남짓이라 반응속도 세 칸 6.75에 못 미친다.
+const NET_EAT = 3;
 const WIN0 = 70;
 const STREAK_K = 6.0;
 
@@ -410,6 +415,13 @@ export function resolve(input) {
 
     // 3단 리바운드. 착지에 실패했으면 두 번째 창이 아예 없다.
     state.stage = 3;
+    // 골대 등급. 앞의 넷과 같은 이유로 선반 밖의 값은 잘라 넣는다.
+    // 그물이 먼저 공을 먹으면 눕고 못 일어나는 갈래까지 통째로 사라진다.
+    const frame = Math.min(3, Math.max(0, Math.floor(Number(input.frame) || 0)));
+    if (frame > 0 && roll(frame * NET_EAT)) {
+      say("reboundMiss", "흘린 공을 그물이 그대로 먹었습니다. 세이브입니다.", null);
+      return done(false, null);
+    }
     // 양말 등급. 앞의 셋과 같은 이유로 선반 밖의 값은 잘라 넣는다.
     const socks = Math.min(3, Math.max(0, Math.floor(Number(input.socks) || 0)));
     const landing = Math.max(0, (10 - keeper.balance) * 14 + keeper.diving * 2 - socks * SOCK_LAND);
