@@ -1293,13 +1293,22 @@ export function createScene(canvas) {
           ball.position.set(lerp(tail.from.x, kicker.position.x, e), 0.14, lerp(tail.from.z, kicker.position.z + 0.5, e));
           keeper.rotation.z = lerp(keeper.rotation.z, 1.2, damp(0.06));
           break;
-        case 'skied':
+        case 'skied': {
           // 올라갔다가 다시 내려온다. 프레임을 나가면 하늘로 넘겼다는 결과가 안 보인다.
           // 바 위로 넘어 골대 옆으로 떨어진다.
           // 카메라가 골대 뒤에서 내려다보므로 그대로 올리면 크로스바가 공을 가린다.
           // 올라가기 전에 먼저 포스트 밖으로 빼낸다.
-          ball.position.set(lerp(tail.from.x, 2.45, Math.min(1, e * 2.4)), lerp(tail.from.y, REST_Y, Math.min(1, e * 1.6)) + Math.sin(e * Math.PI) * 1.5, lerp(tail.from.z, -1.2, Math.min(1, e * 3.2)));
+          // 넘어가는 쪽은 키커가 노린 쪽이다. 상수로 두면 왼쪽으로 찬 공이 매번 오른쪽 하늘로 뜬다.
+          const side = Math.sign(tail.aimX || 1);
+          // 2.3~2.75는 포스트 바깥이면서 프레임 안이다. 정점 높이도 회차마다 달라야
+          // 같은 포물선이 반복 재생되는 것으로 안 읽힌다.
+          ball.position.set(
+            lerp(tail.from.x, side * (2.3 + tail.vary.b * 0.45), Math.min(1, e * 2.4)),
+            lerp(tail.from.y, REST_Y, Math.min(1, e * 1.6)) + Math.sin(e * Math.PI) * (1.35 + tail.vary.a * 0.35),
+            lerp(tail.from.z, -1.2, Math.min(1, e * 3.2))
+          );
           break;
+        }
         case 'talked': {
           // 입을 열었고 몸이 따라갔다. 공은 그대로 빈 골대로 들어간다.
           const vy = tail.vary;
