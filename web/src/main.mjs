@@ -11,6 +11,7 @@ import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs
 import { coinGain, readWallet } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
+import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
 
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
@@ -58,11 +59,15 @@ state.record = readRecord(saved);
 state.gear = readGear(saved?.gear);
 // 봇. 시간제 크레딧이라 남은 밀리초가 저장에 남는다.
 state.bot = readBot(saved?.bot);
+// 버프. 시간이 아니라 구로 닳는다. 탭을 닫아도 남은 구는 그대로 이어진다.
+state.buff = readBuff(saved?.buff);
 // 크레딧 없이 켜진 자동은 공짜 봇이다. 저장에서 올라온 자동은 크레딧이 있을 때만 산다.
 if (state.bot.ms <= 0) state.auto = false;
 window.__points = () => state.points;
 // 두 갈래가 각각 어떻게 움직였는지 게이트가 직접 읽어야 한다. 화면 글자는 증거가 아니다.
 window.__wallet = () => state.wallet;
+// 버프가 몇 구 남아 판정에 들어갔는지도 상태로 재야 한다. 배지 숫자는 증거가 아니다.
+window.__buff = () => state.buff;
 // 장비가 판정에 실제로 들어갔는지는 화면 글자가 아니라 상태로 재야 한다.
 window.__gear = () => state.gear;
 // 봇이 실제로 섰는지는 자막이 아니라 상태로만 확인된다.
@@ -115,6 +120,9 @@ const IC_SPON = G('스폰', R(10.5, 3, 3, 3) + R(9, 6, 6, 3) + R(0, 9, 24, 3) + 
 // 기복. 화살표 하나면 오늘 컨디션이 어느 쪽인지가 문장 없이 선다.
 const IC_UP = G('컨디션 좋음', R(10.5, 3, 3, 3) + R(7.5, 6, 9, 3) + R(4.5, 9, 15, 3) + R(9, 12, 6, 12));
 const IC_DOWN = G('컨디션 나쁨', R(9, 0, 6, 12) + R(4.5, 12, 15, 3) + R(7.5, 15, 9, 3) + R(10.5, 18, 3, 3));
+// 버프. 목이 좁고 배가 넓은 병 하나면 마시는 물건인 것이 문장 없이 선다.
+const IC_BUFF = G('버프', R(9, 0, 6, 3) + R(9, 3, 6, 3) + R(6, 6, 12, 3) + R(4.5, 9, 15, 12)
+  + R(6, 21, 12, 3));
 
 function pips() {
   el('pips').innerHTML = state.shots.map((_, i) => {
@@ -127,7 +135,9 @@ function pips() {
   el('fans').innerHTML = IC_FANS + '<b>' + state.fans.toLocaleString() + '</b>';
   // 땀과 스폰을 같은 줄에 붙여 둔다. 잔고가 하나로 보이면 상점에서 무엇으로 사는지가 새 정보가 된다.
   el('purse').innerHTML = IC_SWEAT + '<b>' + state.wallet.coin.toLocaleString() + '</b>'
-    + IC_SPON + '<i>' + state.wallet.cash.toLocaleString() + '</i>';
+    + IC_SPON + '<i>' + state.wallet.cash.toLocaleString() + '</i>'
+    // 남은 버프 구도 같은 줄에 붙는다. 몇 구 뒤에 꺼지는지를 상점을 열어야 알면 계획이 안 선다.
+    + (state.buff.shots > 0 ? IC_BUFF + '<u>' + state.buff.shots + '</u>' : '');
   // 남은 훈련 횟수는 버튼 위에 붙는다. 열어봐야 아는 숫자는 방치형에서 안 열린다.
   const badge = el('gymDot');
   badge.textContent = state.points > 9 ? '9+' : String(state.points);
@@ -145,7 +155,7 @@ function setPad(on) {
 
 // 저장은 항상 보유 목록 전체로 나간다. 뛰는 키퍼만 저장하면 나머지가 다음 저장에서 지워진다.
 function persist() {
-  save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot);
+  save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff);
 }
 
 // 봇 크레딧은 실시간으로 줄어든다. 구 수로 세면 탭을 열어두고 안 누르는 쪽이 이득이 된다.
@@ -260,11 +270,13 @@ function commit(dive) {
   const ran = dive === null && state.auto && state.bot.ms > 0;
   state.botRan = ran;
   botTick();
+  // 버프는 실제로 굴린 구에서만 닳는다. 시간으로 닳으면 상점에 둔 채로 증발한다.
+  state.buff = spendBuff(state.buff);
   const input = dive === null
     ? autoInput(ran ? botKeeper(state.keeper, state.bot) : state.keeper, shot, rng)
     : { dive, errMs: performance.now() - pressAt, advance, auto: false };
   stage.diving = state.keeper.diving;
-  const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads, socks: state.gear.socks, frame: state.gear.frame });
+  const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads, socks: state.gear.socks, frame: state.gear.frame, focusAid: state.buff.kind === 'tonic' ? 0.5 : 1, rosin: state.buff.kind === 'rosin' });
   state.results[state.i] = result.conceded;
   // 판정 결과에는 키커 이름이 없다. 장부는 이 자리에서만 이름을 알 수 있다.
   tally(shot.kicker.name, result.conceded);
@@ -287,7 +299,7 @@ function rollCaptions(result) {
       state.skip = null;
       // 팔로워는 구마다 오른다. 먹혀도 오르고, 막으면 더 오른다.
       // 봇이 뛴 구는 사고가 안 나서 아무도 안 본다. 성장은 남고 화제만 안 남는다.
-      const gain = state.botRan ? 0 : followerGain(state.keeper, result, state.gear.city, lookBoost(state.gear));
+      const gain = state.botRan ? 0 : followerGain(state.keeper, result, state.gear.city, lookBoost(state.gear), state.buff.kind === 'hype' ? 1.5 : 1);
       state.fans += gain;
       // 땀은 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
       // 유명한 키커를 막을수록 더 들어온다. 팔로워와 같은 fame 값을 쓴다.
@@ -676,6 +688,49 @@ function bindBot(box) {
   }
 }
 
+// 버프 선반. 소모형이라 SHELVES 한 덩어리에 안 들어간다. 봇과 같은 이유로 별도 렌더러다.
+function buffShelf() {
+  const cur = state.buff;
+  const rows = BUFFS.map((b) => {
+    let label = b.cost + ' 땀 · ' + b.shots + '구';
+    let off = false;
+    if (state.wallet.coin < b.cost) {
+      // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
+      label = '땀 ' + (b.cost - state.wallet.coin) + ' 모자라다';
+      off = true;
+    } else if (cur.shots > 0 && cur.kind === b.kind) {
+      label = '남은 ' + cur.shots + '구에 ' + b.shots + '구 더';
+      // 상한에 닿으면 산 구가 그대로 버려진다. 사기 전에 알아야 한다.
+      if (cur.shots >= BUFF_CAP) { label = '더 못 담는다'; off = true; }
+    } else if (cur.shots > 0) {
+      // 슬롯이 하나라 다른 종류를 사면 지금 것이 덮인다. 산 사람은 그걸 산 줄 모른다.
+      label = buffAt(cur.kind).name + '가 아직 ' + cur.shots + '구 남았다';
+      off = true;
+    }
+    return '<div class="card gear"><b>' + b.name + '</b><em>' + b.note + '</em>'
+      + '<button class="buy" data-buff="' + b.kind + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
+  });
+  return '<h4>버프</h4><span class="got">시간이 아니라 구로 닳는다. 한 번에 한 종류만 든다</span>' + rows.join('');
+}
+
+function bindBuff(box) {
+  for (const b of box.querySelectorAll('.buy[data-buff]')) {
+    b.onclick = () => {
+      if (b.disabled) return;
+      const spec = buffAt(b.dataset.buff);
+      if (!spec || state.wallet.coin < spec.cost) return;
+      const next = addBuff(state.buff, spec.kind);
+      // 다른 종류가 살아 있으면 addBuff가 원본을 그대로 돌려준다. 그때 값을 치르면 땀만 사라진다.
+      if (next === state.buff) return;
+      state.wallet.coin -= spec.cost;
+      state.buff = next;
+      persist();
+      pips();
+      renderShop();
+    };
+  }
+}
+
 function renderShop() {
   const box = el('shop');
   const pool = KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name));
@@ -691,14 +746,16 @@ function renderShop() {
     + '<button class="tab" data-tab="hair"' + (shopTab === 'hair' ? ' aria-current="true"' : '') + '>머리</button>'
     + '<button class="tab" data-tab="ink"' + (shopTab === 'ink' ? ' aria-current="true"' : '') + '>타투</button>'
     + '<button class="tab" data-tab="bot"' + (shopTab === 'bot' ? ' aria-current="true"' : '') + '>봇</button>'
+    + '<button class="tab" data-tab="buff"' + (shopTab === 'buff' ? ' aria-current="true"' : '') + '>버프</button>'
     + '</div>';
-  box.innerHTML = tabs + (SHELVES[shopTab] ? gearShelf(shopTab) : shopTab === 'bot' ? botShelf() : pullShelf(pool)) + '<button class="close">닫기</button>';
+  box.innerHTML = tabs + (SHELVES[shopTab] ? gearShelf(shopTab) : shopTab === 'bot' ? botShelf() : shopTab === 'buff' ? buffShelf() : pullShelf(pool)) + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeShop;
   for (const t of box.querySelectorAll('.tab')) {
     t.onclick = () => { shopTab = t.dataset.tab; renderShop(); };
   }
   if (SHELVES[shopTab]) return bindGear(box);
   if (shopTab === 'bot') return bindBot(box);
+  if (shopTab === 'buff') return bindBuff(box);
   const buy = box.querySelector('.buy');
   buy.onclick = () => {
     if (buy.disabled) return;

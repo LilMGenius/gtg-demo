@@ -85,6 +85,9 @@ body.playing #hud{opacity:1}
   100%{opacity:0;transform:translateY(-15px) scale(1)}}
 /* 스폰은 결제로만 들어온다. 시간으로 버는 땀과 색이 같으면 둘이 한 갈래로 읽힌다. */
 #purse i{font-style:normal;font-weight:800;opacity:1;color:#7fe3ff}
+/* 버프 잔량은 벌어 둔 값이 아니라 줄어드는 값이다. 땀 노랑과 스폰 하늘색 사이에 없는
+   연두를 써야 세 번째 칸이 잔고의 일종으로 안 읽힌다. u 기본 밑줄은 지운다. */
+#purse u{text-decoration:none;font-weight:800;opacity:1;color:#9be86a}
 #pips{grid-area:pips;display:flex;gap:6px}
 /* 미결 구는 아직 안 굴린 주사위다. #ffffff26은 패널 바닥과 붙어 다섯 칸이 세 칸으로 읽혔다. */
 #pips i{width:9px;height:9px;background:#ffffff4d;display:block;border:2px solid var(--edge);
