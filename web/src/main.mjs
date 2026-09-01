@@ -12,7 +12,7 @@ import { coinGain, readWallet } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
-import { readRapport, addRapport, rapportGazeAid, rapportBoost } from './state/rapport.mjs';
+import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost } from './state/rapport.mjs';
 
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
@@ -521,6 +521,31 @@ function recordRows() {
   return '<div class="note"><b>상대 전적</b><i>막은 수 - 먹힌 수</i></div><div class="log">' + rows + '</div>';
 }
 
+// 아는 얼굴. 라포는 이미 판정과 팔로워에 붙는데 화면 어디에도 없어서 플레이어가 늘어난 줄을 몰랐다.
+function rapportRows() {
+  const keys = Object.keys(state.rapport || {});
+  const head = '<div class="note"><b>아는 얼굴</b><i>말 섞은 만큼 한눈을 덜 판다</i></div>';
+  if (!keys.length) return head + '<div class="note dim"><span>아직 얼굴을 튼 사람이 없다</span></div>';
+  // 많이 마주친 순. 같으면 키 순이라 같은 동네가 흩어지지 않는다.
+  keys.sort((a, b) => (state.rapport[b] - state.rapport[a]) || a.localeCompare(b));
+  const rows = keys.map((key) => {
+    const part = key.split(':');
+    const city = Number(part[0]);
+    const passer = Number(part[1]);
+    const n = rapportCount(state.rapport, city, passer);
+    const tier = rapportTier(state.rapport, city, passer);
+    // 수치는 상수를 다시 적지 않고 판정에 들어가는 함수에서 되뽑는다. 두 자리가 어긋날 여지를 없앤다.
+    const aid = Math.round((1 - rapportGazeAid(state.rapport, city, passer)) * 100);
+    const fans = Math.round((rapportBoost(state.rapport, city, passer) - 1) * 100);
+    // 0번 행인은 어느 등급에서도 안 숨는 미인이다. 나머지는 번호로 구분한다.
+    const who = passer === 0 ? '미인' : '행인 ' + passer;
+    const face = tier > 0 ? tier + '단계' : '얼굴만 익었다';
+    return '<div class="note"><b>' + cityAt(city).name + ' · ' + who + '</b><i>말 섞은 횟수 ' + n
+      + ' · ' + face + ' · 한눈팔기 ' + aid + '% 감소 · 팔로워 +' + fans + '%</i></div>';
+  }).join('');
+  return head + rows;
+}
+
 function renderMe() {
   const box = el('me');
   const k = state.keeper;
@@ -535,7 +560,7 @@ function renderMe() {
     : '<div class="note dim"><span>달린 특성이 없다. 명단에서 데려오면 붙어 온다</span></div>';
   const hidden = HIDDEN.map((h) => '<div class="note"><b>' + HIDDEN_LABEL[h] + '</b><i>' + hiddenBand(h, k[h]) + '</i></div>').join('');
   box.innerHTML = '<h4>' + name + '<small>Lv ' + k.level + ' · ' + k.height + 'cm · ' + k.weight + 'kg</small></h4>'
-    + '<div class="card"><div class="grid">' + grid + '</div>' + traits + hidden + recordRows() + '</div>'
+    + '<div class="card"><div class="grid">' + grid + '</div>' + traits + hidden + rapportRows() + recordRows() + '</div>'
     + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeMe;
 }
