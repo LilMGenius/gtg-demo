@@ -244,10 +244,11 @@ body.playing #hud{opacity:1}
 #gymBtn svg{width:26px;height:26px}
 #gymBtn:active{transform:rotate(-1.4deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 /* 밀린 훈련 배지. 판때기 밖 왼쪽 위로 빼야 덤벨 글리프를 안 가린다. */
-#gymDot{position:absolute;left:-9px;top:-9px;min-width:22px;height:22px;padding:0 4px;
+/* 자동 배지도 같은 자리를 쓴다. #auto도 absolute라 기준점이 같다. */
+#gymDot,#autoDot{position:absolute;left:-9px;top:-9px;min-width:22px;height:22px;padding:0 4px;
   display:grid;place-items:center;background:#e0563f;color:#fff;
   border:3px solid var(--edge);font-family:var(--disp);font-size:13px;line-height:1}
-#gymDot[hidden]{display:none}
+#gymDot[hidden],#autoDot[hidden]{display:none}
 
 /* 훈련장. 15칸이라 한 줄로는 안 눕는다. 5열 3행 격자로 놓는다. */
 #gym{position:absolute;inset:0;pointer-events:auto;

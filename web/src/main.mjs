@@ -9,6 +9,7 @@ import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
 import { coinGain, readWallet } from './state/wallet.mjs';
+import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt } from './state/gear.mjs';
 
 const el = (id) => document.getElementById(id);
@@ -55,11 +56,17 @@ state.wallet = readWallet(saved?.wallet);
 state.record = readRecord(saved);
 // 장비. 상점에서 산 장갑 등급이 여기 남고 판정식에 그대로 들어간다.
 state.gear = readGear(saved?.gear);
+// 봇. 시간제 크레딧이라 남은 밀리초가 저장에 남는다.
+state.bot = readBot(saved?.bot);
+// 크레딧 없이 켜진 자동은 공짜 봇이다. 저장에서 올라온 자동은 크레딧이 있을 때만 산다.
+if (state.bot.ms <= 0) state.auto = false;
 window.__points = () => state.points;
 // 두 갈래가 각각 어떻게 움직였는지 게이트가 직접 읽어야 한다. 화면 글자는 증거가 아니다.
 window.__wallet = () => state.wallet;
 // 장비가 판정에 실제로 들어갔는지는 화면 글자가 아니라 상태로 재야 한다.
 window.__gear = () => state.gear;
+// 봇이 실제로 섰는지는 자막이 아니라 상태로만 확인된다.
+window.__bot = () => state.bot;
 // 사고 연출은 확률로만 나오므로 계측기가 불러낼 수 있어야 한다. 판정은 안 바뀐다.
 window.__act = (kind) => stage.act(kind);
 // 선언값은 증거가 아니다. 게이트가 실제 파형을 재려면 발화를 불러낼 수 있어야 한다.
@@ -125,6 +132,11 @@ function pips() {
   const badge = el('gymDot');
   badge.textContent = state.points > 9 ? '9+' : String(state.points);
   badge.hidden = state.points <= 0;
+  // 봇에 남은 분도 버튼 위에 붙는다. 언제 꺼지는지를 상점을 열어야 알면 방치형에서 안 열린다.
+  const clone = el('autoDot');
+  const left = Math.ceil(state.bot.ms / 60000);
+  clone.textContent = left > 9 ? '9+' : String(left);
+  clone.hidden = left <= 0;
 }
 
 function setPad(on) {
@@ -133,7 +145,24 @@ function setPad(on) {
 
 // 저장은 항상 보유 목록 전체로 나간다. 뛰는 키퍼만 저장하면 나머지가 다음 저장에서 지워진다.
 function persist() {
-  save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear);
+  save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot);
+}
+
+// 봇 크레딧은 실시간으로 줄어든다. 구 수로 세면 탭을 열어두고 안 누르는 쪽이 이득이 된다.
+let botStamp = performance.now();
+function botTick() {
+  const now = performance.now();
+  const dt = now - botStamp;
+  botStamp = now;
+  if (!state.auto || state.bot.ms <= 0) return;
+  state.bot.ms = Math.max(0, state.bot.ms - dt);
+  if (state.bot.ms > 0) return;
+  // 크레딧이 끝나면 자동도 같이 꺼진다. 켜둔 채로 두면 봇 없는 자동이 공짜가 된다.
+  state.bot.tier = 0;
+  state.auto = false;
+  autoBtn.classList.remove('on');
+  persist();
+  pips();
 }
 
 // 한 구가 끝날 때마다 그 키커 칸에 한 줄을 더한다.
@@ -227,8 +256,12 @@ function commit(dive) {
   setPad(false);
   beatStop(dive !== null);
   const shot = state.shots[state.i];
+  // 봇이 섰는지는 크레딧을 깎기 전에 정한다. 깎고 나서 재면 마지막 구가 사람으로 잡힌다.
+  const ran = dive === null && state.auto && state.bot.ms > 0;
+  state.botRan = ran;
+  botTick();
   const input = dive === null
-    ? autoInput(state.keeper, shot, rng)
+    ? autoInput(ran ? botKeeper(state.keeper, state.bot) : state.keeper, shot, rng)
     : { dive, errMs: performance.now() - pressAt, advance, auto: false };
   stage.diving = state.keeper.diving;
   const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads, socks: state.gear.socks, frame: state.gear.frame });
@@ -253,7 +286,8 @@ function rollCaptions(result) {
     if (!e) {
       state.skip = null;
       // 팔로워는 구마다 오른다. 먹혀도 오르고, 막으면 더 오른다.
-      const gain = followerGain(state.keeper, result, state.gear.city);
+      // 봇이 뛴 구는 사고가 안 나서 아무도 안 본다. 성장은 남고 화제만 안 남는다.
+      const gain = state.botRan ? 0 : followerGain(state.keeper, result, state.gear.city);
       state.fans += gain;
       // 땀은 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
       // 유명한 키커를 막을수록 더 들어온다. 팔로워와 같은 fame 값을 쓴다.
@@ -597,6 +631,47 @@ function pullShelf(pool) {
     + '</div>';
 }
 
+// 봇은 소모형이라 SHELVES에 못 넣는다. 등급을 갖는 게 아니라 분을 갖는다.
+function botShelf() {
+  const cur = state.bot;
+  const left = Math.ceil(cur.ms / 60000);
+  const rows = BOTS.map((b) => {
+    let label = b.cost + ' 땀 · ' + b.minutes + '분';
+    let off = false;
+    if (state.wallet.coin < b.cost) {
+      // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
+      label = '땀 ' + (b.cost - state.wallet.coin) + ' 모자라다';
+      off = true;
+    } else if (cur.ms > 0 && b.tier === cur.tier) {
+      label = '남은 ' + left + '분에 ' + b.minutes + '분 더';
+    } else if (cur.ms > 0 && b.tier < cur.tier) {
+      // 더 좋은 클론이 서 있는데 싼 걸 사면 등급이 내려간다. 산 사람은 그걸 산 줄 모른다.
+      label = '더 좋은 클론이 남아 있다';
+      off = true;
+    }
+    return '<div class="card gear"><b>' + b.name + '</b><em>' + b.note + '</em>'
+      + '<button class="buy" data-bot="' + b.tier + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
+  });
+  return '<h4>봇</h4><span class="got">봇이 뛴 구는 팔로워가 안 붙는다</span>' + rows.join('');
+}
+
+function bindBot(box) {
+  for (const b of box.querySelectorAll('.buy[data-bot]')) {
+    b.onclick = () => {
+      if (b.disabled) return;
+      const spec = botAt(b.dataset.bot);
+      if (!spec || state.wallet.coin < spec.cost) return;
+      state.wallet.coin -= spec.cost;
+      state.bot.tier = spec.tier;
+      // 6시간 상한. 무한 적립이면 방치가 아니라 영구 봇이 된다.
+      state.bot.ms = Math.min(BOT_CAP, state.bot.ms + spec.minutes * 60000);
+      persist();
+      pips();
+      renderShop();
+    };
+  }
+}
+
 function renderShop() {
   const box = el('shop');
   const pool = KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name));
@@ -609,13 +684,15 @@ function renderShop() {
     + '<button class="tab" data-tab="sock"' + (shopTab === 'sock' ? ' aria-current="true"' : '') + '>양말</button>'
     + '<button class="tab" data-tab="frame"' + (shopTab === 'frame' ? ' aria-current="true"' : '') + '>골대</button>'
     + '<button class="tab" data-tab="city"' + (shopTab === 'city' ? ' aria-current="true"' : '') + '>동네</button>'
+    + '<button class="tab" data-tab="bot"' + (shopTab === 'bot' ? ' aria-current="true"' : '') + '>봇</button>'
     + '</div>';
-  box.innerHTML = tabs + (SHELVES[shopTab] ? gearShelf(shopTab) : pullShelf(pool)) + '<button class="close">닫기</button>';
+  box.innerHTML = tabs + (SHELVES[shopTab] ? gearShelf(shopTab) : shopTab === 'bot' ? botShelf() : pullShelf(pool)) + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeShop;
   for (const t of box.querySelectorAll('.tab')) {
     t.onclick = () => { shopTab = t.dataset.tab; renderShop(); };
   }
   if (SHELVES[shopTab]) return bindGear(box);
+  if (shopTab === 'bot') return bindBot(box);
   const buy = box.querySelector('.buy');
   buy.onclick = () => {
     if (buy.disabled) return;
@@ -655,7 +732,15 @@ for (const b of document.querySelectorAll('.zone')) {
 const autoBtn = el('auto');
 autoBtn.classList.toggle('on', state.auto);
 autoBtn.onpointerdown = () => {
+  // 크레딧이 없으면 켜지지 않는다. 대신 어디서 사는지를 연다.
+  if (!state.auto && state.bot.ms <= 0) {
+    shopTab = 'bot';
+    openShop();
+    return;
+  }
   state.auto = !state.auto;
+  // 켠 순간부터 재야 한다. 꺼져 있던 시간까지 차감되면 산 분이 사라진다.
+  if (state.auto) botStamp = performance.now();
   autoBtn.classList.toggle('on', state.auto);
   persist();
 };

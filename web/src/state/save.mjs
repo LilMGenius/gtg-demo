@@ -23,10 +23,11 @@ export function load() {
 // 게시물도 같이 내보낸다. 저장에 안 실으면 다음 방문에 계정이 빈 채로 열린다.
 // 상대 전적도 같이 나간다. 탭을 닫을 때마다 지워지면 누구한테 약한지가 영영 안 쌓인다.
 // 장비도 같이 나간다. 산 장갑이 탭을 닫을 때 벗겨지면 상점에서 쓴 땀이 사라진다.
-export function save(squad, pick, auto, fans, points, wallet, posts, record, gear) {
+// 봇 크레딧도 같이 나간다. 산 분이 탭을 닫을 때 사라지면 자동이 공짜로 돌아간 것과 같아진다.
+export function save(squad, pick, auto, fans, points, wallet, posts, record, gear, bot) {
   try {
     const i = Number(pick) || 0;
-    localStorage.setItem(KEY, JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], record: record || {}, gear: gear || {}, at: Date.now() }));
+    localStorage.setItem(KEY, JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], record: record || {}, gear: gear || {}, bot: bot || {}, at: Date.now() }));
   } catch {
     // 사파리 프라이빗 모드는 쓰기를 막는다. 저장이 안 되는 것과 게임이 죽는 것은 다른 일이다.
   }
