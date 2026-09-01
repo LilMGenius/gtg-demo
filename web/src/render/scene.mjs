@@ -1246,12 +1246,28 @@ export function createScene(canvas) {
           );
           break;
         }
-        case 'rebound':
-          ball.position.set(lerp(tail.from.x, 0.6, e), lerp(tail.from.y, REST_Y, e), lerp(tail.from.z, REST_Z, e));
+        case 'rebound': {
+          // 종점이 상수 0.6이면 어느 코너로 찼든 튄 공이 매번 같은 자리에 선다.
+          // 튀어나온 공은 접촉한 쪽에 남는다. 방향은 키커가 노린 좌표에서 온다.
+          const vy = tail.vary;
+          const side = Math.sign(tail.aimX || 1);
+          // 0.45~1.15는 골문 안쪽이라 리바운드가 골대 앞에 남는 것이 화면에 보이고,
+          // 넓히면 튄 게 아니라 옆으로 흘러난 것으로 읽힌다.
+          const endX = side * (0.45 + vy.b * 0.7);
+          // 튀는 높이도 회차마다 다르다. 같은 높이로 두 번 튀면 애니메이션 반복으로 읽힌다.
+          const hop = Math.sin(Math.min(1, u / 0.8) * Math.PI) * (0.18 + vy.a * 0.16) * (1 - e);
+          ball.position.set(lerp(tail.from.x, endX, e), lerp(tail.from.y, REST_Y, e) + hop, lerp(tail.from.z, REST_Z, e));
           break;
+        }
         case 'reboundMiss':
           // 튀어나간 공이 골대 옆으로 흘러난다. 프레임 밖으로 보내면 어디로 갔는지 안 보인다.
-          ball.position.set(lerp(tail.from.x, tail.kx >= 0 ? 2.9 : -2.9, e), 0.14 + Math.abs(Math.sin(u * 8)) * 0.45 * (1 - u), lerp(tail.from.z, 3.2, e));
+          // 2.55~3.05는 포스트 바깥이면서 프레임 안이다. 튕김 주기도 회차마다 어긋나야
+          // 같은 사건이 두 번 나왔을 때 재생된 영상으로 읽히지 않는다.
+          ball.position.set(
+            lerp(tail.from.x, (tail.kx >= 0 ? 1 : -1) * (2.55 + tail.vary.b * 0.5), e),
+            0.14 + Math.abs(Math.sin(u * (7 + tail.vary.a * 2.5))) * 0.45 * (1 - u),
+            lerp(tail.from.z, 3.0 + tail.vary.c * 0.5, e)
+          );
           break;
         case 'charge':
           // 잡고 나서 드리블하러 나간다. 공이 발 앞에서 튄다.
