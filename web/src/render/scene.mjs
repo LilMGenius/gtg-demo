@@ -1976,6 +1976,8 @@ export function createScene(canvas) {
 
   // 임팩트를 뺀 같은 프레임. 차분이 임팩트의 화소다.
   window.__impactHide = (on) => impact.hide(on);
+  // 층 단위 소거 없이는 게이트가 임팩트 전체만 지목한다. 범인 층은 그 안에 숨는다.
+  window.__impactMute = (names) => impact.mute(names);
 
   // 화면 화소로 재려면 월드 좌표를 실제 카메라로 투영해야 한다. 월드 변위는 화소를 말해주지 않는다.
   window.__proj = (x, y, z) => {

@@ -649,6 +649,27 @@ export function createImpact(scene) {
     chipMat.opacity = 0;
   }
 
+  // 층마다 가림 기여도가 다르므로 한 층씩 빼면서 재야 진짜 범인이 남는다.
+  // 전부 끄고 재는 것은 임팩트가 있냐 없냐만 말하고 어느 층이냐는 말하지 않는다.
+  let muted = new Set();
+  function mute(names) {
+    muted = new Set(Array.isArray(names) ? names : []);
+    hide(hidden);
+    return [...muted];
+  }
+
+  function applyMute() {
+    if (muted.size === 0) return;
+    if (muted.has('flash')) flash.visible = false;
+    if (muted.has('ring')) { ring.visible = false; ringEdge.visible = false; }
+    if (muted.has('veil')) veil.visible = false;
+    if (muted.has('star')) { star.visible = false; starEdge.visible = false; }
+    if (muted.has('word')) wordMesh.visible = false;
+    if (muted.has('lead')) { lead.visible = false; leadEdge.visible = false; }
+    if (muted.has('dust')) for (const m of dust) m.visible = false;
+    if (muted.has('chip')) for (const m of chips) m.visible = false;
+  }
+
   // 층마다 수명이 다르므로 되켤 때 일괄로 켜면 죽은 층이 되살아난다.
   // 그 한 층이 차분에 섞이면 잡음 바닥이 임팩트 화소로 계산된다.
   function hide(on) {
@@ -668,6 +689,7 @@ export function createImpact(scene) {
     leadEdge.visible = lead.visible;
     for (const m of dust) m.visible = bodyLive;
     for (const m of chips) m.visible = bodyLive;
+    applyMute();
     return hidden;
   }
 
@@ -696,5 +718,5 @@ export function createImpact(scene) {
     };
   }
 
-  return { burst, update, hide, state };
+  return { burst, update, hide, mute, state };
 }
