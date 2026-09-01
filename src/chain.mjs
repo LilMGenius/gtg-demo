@@ -166,7 +166,14 @@ export function buildSet(rng, level = 5, city = 0) {
     }
     // 눈에 띄는 행인이 지나가는 구. 행인은 늘 걷고 있지만 고개가 돌아갈 만한 건 가끔이다.
     // 여기서 매 구 굴려야 같은 맵을 돌아도 언제 걸릴지 모른다.
-    const gaze = pct(rng, gazeChance);
+    const gazeRoll = rng() * 100;
+    const gaze = gazeRoll < gazeChance;
+    // 누구를 봤는가. 새 롤을 넣으면 이후 모든 구의 난수가 밀려 shot/band/save/pose가 통째로 흔들린다.
+    // gaze가 이미 소비한 값을 재사용하면 스트림이 그대로다. gaze가 참인 구에서 gazeRoll은
+    // [0, gazeChance)에 균등하므로 등분하면 인덱스도 균등하다.
+    // 인원은 화면의 PASSER_BASE 5 + STEP 2 * 등급과 같아야 안 보이는 사람에게 라포가 붙지 않는다.
+    const passerCount = 5 + 2 * clamp(city, 0, 3);
+    const passer = gaze ? Math.min(passerCount - 1, Math.floor((gazeRoll / gazeChance) * passerCount)) : -1;
     // 휘어들어오는 공. 마커가 서준 자리에서 끝에 빗나간다.
     // 배치를 맞춘 키퍼를 저격하는 항이므로 키커 칸이 소유한다.
     const bend = pct(rng, 8 + k.curve * 3.4) ? 0.02 + k.curve * 0.028 : 0;
@@ -174,7 +181,7 @@ export function buildSet(rng, level = 5, city = 0) {
     // 칩은 세게 차는 공이 아니다. 둘이 같이 서면 몸싸움 롤과 칩 롤이 한 구에 겹쳐 상한을 넘긴다.
     const strong = chip ? false : pct(rng, 20 + k.power * 6);
     shots.push({
-      index: i, kicker: k, aimX, aimY, forced, strong, chip, gaze, bend,
+      index: i, kicker: k, aimX, aimY, forced, strong, chip, gaze, passer, bend,
       side: aimX < -0.55 ? -1 : aimX > 0.55 ? 1 : 0,
       course: courseOf(aimX, aimY),
       // 슛파워가 시간을 줄인다. 판정 창을 직접 압박하는 항이다.
@@ -345,7 +352,10 @@ export function resolve(input) {
   // 같은 단계의 사고는 롤 하나를 구간으로 나눠 가른다. 새 롤을 뒤면 한 구가 일곱 번 굴러간다.
   // focusAid는 자양강장제다. 1이면 없는 것과 같다. 새 롤이 아니라 이미 있는 구간의 폭만 줄인다.
   const focusAid = Math.min(1, Math.max(0.5, Number(input.focusAid) || 1));
-  const gazeP = shot.gaze ? Math.max(0, (10 - keeper.focus) * 2.6) * focusAid : 0;
+  // 라포는 판정 밖에서 gazeP만 좁힌다. 눈이 익은 사람 앞에서는 덜 흔들린다.
+  // talkP는 안 건드린다. 라포를 올리는 사건이 talked라, 그 문을 좁히면 축이 스스로를 닫는다.
+  const gazeAid = Math.min(1, Math.max(0.7, Number(input.gazeAid) || 1));
+  const gazeP = shot.gaze ? Math.max(0, (10 - keeper.focus) * 2.6) * focusAid * gazeAid : 0;
   // 말 걸기. 의사소통이 여는 사고다. 눈으로 따라가는 것과 입을 여는 것은 다른 사건이다.
   // 팔로워를 버는 칸이 같은 자리에서 골을 먹인다. 이 칸이 양날인 이유가 그것이다.
   // 같은 약이 이 구간도 줄인다. talked가 줄면 followerGain의 flair 2.2배가 같이 사라져 교환이 된다.
@@ -498,7 +508,7 @@ export function restartDelay(keeper, result) {
 // 판 사이 대기는 회복이다. 스태미너와 호흡력은 잠겨 있어 지금은 상수로 선다.
 // 동네 등급은 소문의 배율이다. 사람이 많은 곳에서 막을수록 더 퍼진다.
 // look은 외형 선반 승수다. 판정에는 안 들어가고 소문에만 붙는다.
-export function followerGain(keeper, result, city = 0, look = 1, boost = 1) {
+export function followerGain(keeper, result, city = 0, look = 1, boost = 1, rapport = 1) {
   const saved = !result.conceded;
   const flair = result.events.some((e) => e.t === "beat" || e.t === "charge" || e.t === "talked");
   const base = saved ? 40 : 8;
@@ -507,7 +517,7 @@ export function followerGain(keeper, result, city = 0, look = 1, boost = 1) {
   // 등급당 12%. 3등급이 +36%인데, 같은 등급이 올린 실점 위험을 팔로워로 되사는 값이다.
   const crowd = 1 + 0.12 * clamp(city, 0, 3);
   // boost는 바이럴 떡밥이다. 판정 밖 축이라 스킨 1.30, 관중 1.36과 곱셈 인자가 따로 선다.
-  return Math.round((base + talk + fame) * (flair ? 2.2 : 1) * crowd * clamp(look, 1, 1.3) * clamp(boost, 1, 1.6));
+  return Math.round((base + talk + fame) * (flair ? 2.2 : 1) * crowd * clamp(look, 1, 1.3) * clamp(boost, 1, 1.6) * clamp(rapport, 1, 1.25));
 }
 
 export function setBreak() {
