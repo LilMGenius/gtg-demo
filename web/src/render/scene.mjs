@@ -209,7 +209,16 @@ export function createScene(canvas) {
   subTag = 'pitch';
   const pitch = buildPitch(scene);
   subTag = 'passers';
-  const passers = buildPassers(scene);
+  // 동네 등급이 오르면 행인이 늘어난다. 최대 인원으로 한 번 짓고 초과분을 숨기는 이유는,
+  // 등급마다 다시 지으면 0번(미인 행인) 좌표가 새로 뽑혀 연출 기준선이 흔들리기 때문이다.
+  const PASSER_BASE = 5;   // 뒷산 공터. 원래 인원
+  const PASSER_STEP = 2;   // 등급당 두 명. 한 명은 안 읽히고 세 명은 화면이 막힌다
+  const PASSER_MAX = PASSER_BASE + PASSER_STEP * 3;
+  // 등급이 오를수록 하늘이 탁해진다. 사람이 많은 동네일수록 공기가 나쁘다는 한 줄 연출
+  const SKY = [0x86aecb, 0x8fb2c9, 0x9ab3c2, 0xa8b4ba];
+  const HAZE = [0x9dbdd4, 0xa6c0cf, 0xb0c2c9, 0xbcc5c4];
+  let passerCount = PASSER_BASE;
+  const passers = buildPassers(scene, PASSER_MAX);
   subTag = 'impact';
   const impact = createImpact(scene);
   subTag = 'ball';
@@ -412,6 +421,20 @@ export function createScene(canvas) {
   subTag = 'keeper';
   scene.add(keeper);
   markForeground(keeper);
+
+  // 동네 등급은 버프가 아니라 교환이다. 배경이 바뀌는 것은 화면이고, 확률은 chain이 쥔다.
+  function setCity(city) {
+    const c = Math.max(0, Math.min(3, city | 0));
+    passerCount = PASSER_BASE + PASSER_STEP * c;
+    for (let i = 0; i < passers.length; i += 1) {
+      // 0번은 미인 행인이라 연출이 직접 지목한다. 어떤 등급에서도 숨기지 않는다.
+      const on = i === 0 || i < passerCount;
+      passers[i].visible = on;
+      passerShadows[i].visible = on;
+    }
+    scene.background.setHex(SKY[c]);
+    scene.fog.color.setHex(HAZE[c]);
+  }
 
   function setKeeper(k) {
     // 벗겨진 장갑은 장면에 붙어 있다. 키퍼를 다시 짓기 전에 치워야
@@ -1523,6 +1546,7 @@ export function createScene(canvas) {
     keeperShadow.children[0].material.opacity = 0.86 * shrink;
     // 행인은 판정과 무관하게 계속 걷는다. 멈춘 배경은 그림이고 움직이는 배경은 장소다.
     for (const [i, p] of passers.entries()) {
+      if (i >= passerCount && i !== 0) continue;
       // 반짝임은 돌면서 커졌다 작아진다. 고정된 마름모는 머리에 박힌 장식으로 읽힌다.
       if (p.userData.spark) {
         p.userData.spark.rotation.y = vnow * 2.4;
@@ -2077,7 +2101,7 @@ export function createScene(canvas) {
     renderer.setRenderTarget(null);
     return { off, on };
   }
-  return { play, act, reset, setKeeper, sfx, ballProbe, stageProbe, goalFrame, shadowRect, shadowPair,
+  return { play, act, reset, setKeeper, setCity, sfx, ballProbe, stageProbe, goalFrame, shadowRect, shadowPair,
     ballPos: () => ({ x: ball.position.x, y: ball.position.y, z: ball.position.z }),
     // 세계시계. 히트스톱과 정지가 여기서 멈추므로, 화면에 숫자를 쓰는 쪽은 실시간 대신 이걸 읽는다.
     now: () => vnow,

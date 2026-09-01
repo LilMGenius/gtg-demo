@@ -450,7 +450,7 @@ export function buildPitch(scene) {
 
 // 행인. 펜스 너머를 지나간다. 아무도 없는 운동장은 연습장이지 경기장이 아니다.
 // 집중력 스탯이 여기에 걸린다. 지금은 걷기만 한다.
-export function buildPassers(scene) {
+export function buildPassers(scene, count = 5) {
   // 전원 같은 캡슐에 색만 다르면 색칠한 볼링핀 다섯 개다.
   // 키와 폭을 흩고, 다리를 따로 달고, 0번만 실루엣을 다르게 준다.
   // 집중력 판정이 지목하는 미인 행인이 0번이고, 그 하나는 멀리서도 구분돼야 한다.
@@ -460,7 +460,9 @@ export function buildPassers(scene) {
   // 키커에도 다른 행인에도 없는 색을 준다.
   const shirt = [0xf2e9ff, 0x4a72c4, 0xe0a23c, 0x7a4fb0, 0x3fa37a];
   const rnd = seeded(0x9a55e7);
-  for (let i = 0; i < 5; i += 1) {
+  for (let i = 0; i < count; i += 1) {
+    // 동네 등급이 올라가면 인원이 늘어난다. 색은 다섯 개뿐이라 감아 쓴다.
+    const tint = shirt[i % shirt.length];
     const g = new THREE.Group();
     // 0.85~1.20은 원경에서 화소 몇 개 차이라 다섯이 같은 키로 읽혔다. 폭을 넓힌다.
     const tall = 0.76 + rnd() * 0.54;
@@ -474,7 +476,7 @@ export function buildPassers(scene) {
     const armParts = [torsoGeo];
     // 팔이 셔츠와 같은 색이면 흰 몸통에 흰 팔이 묻혀 사각형 한 장으로 읽힌다.
     // 메시를 나누면 드로우콜이 열 개 붙으므로 정점색으로만 가른다.
-    const armColors = [shirt[i]];
+    const armColors = [tint];
     for (const s of [-1, 1]) {
       const a = new THREE.CapsuleGeometry(0.072, armLen, 3, 5);
       // 캡슐은 중앙이 원점이다. 그대로 돌리면 어깨가 아니라 팔 한가운데가 축이 된다.
@@ -562,7 +564,10 @@ export function buildPassers(scene) {
     // 깊이까지 흩어야 원근이 크기를 갈라 준다. 한 줄에 세우면 키만 다른 같은 인형이다.
     // 0번은 한눈팔기 연출에서 골대 앞까지 걸어오므로 거리 밴드를 그대로 둔다.
     const z = i === 0 ? 31.6 + rnd() * 1.8 : 26.8 + rnd() * 12.4;
-    g.position.set(-25 + i * 9.5 + (rnd() - 0.5) * 9.8, 0, z);
+    // 9.5씩 밀면 여섯 번째부터 화면 오른쪽 되돌림 지점(42) 밖에서 태어난다.
+    // 걷는 구간 [-42, 42]로 감아 넣는다. 다섯까지는 감기지 않아 좌표가 그대로다.
+    const raw = -25 + i * 9.5 + (rnd() - 0.5) * 9.8;
+    g.position.set(((raw + 42) % 84 + 84) % 84 - 42, 0, z);
     g.userData.speed = 1.15 + rnd() * 1.3;
     g.userData.phase = rnd() * Math.PI * 2;
     g.userData.homeZ = g.position.z;

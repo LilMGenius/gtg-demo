@@ -57,8 +57,21 @@ export const GOALS = [
 
 export const MAX_FRAME = GOALS.length - 1;
 
+// 동네 선반. 이건 버프가 아니라 교환이다. 사람이 많은 동네일수록 눈에 띄는 행인이 자주 지나가고,
+// 그래서 한눈파는 구가 늘어난다. 대신 그 동네에서 막으면 소문이 더 빨리 퍼져 팔로워가 더 붙는다.
+// 순수 상승이 아니므로 장비 한 칸이 스탯 한 칸을 넘지 않는다는 자와 부딪히지 않는다.
+// 값 기준은 앞의 다섯과 같다. 첫 칸은 카드깡 380 땀보다 싸고 마지막 칸은 그보다 비싸다.
+export const CITIES = [
+  { city: 0, name: '동네 뒷산 공터', cost: 0, note: '아무것도 안 샀을 때 서 있는 곳. 지나가는 사람이 거의 없다' },
+  { city: 1, name: '학교 앞 흙 운동장', cost: 145, note: '하교 시간에 사람이 지나간다. 가끔 고개가 돌아간다' },
+  { city: 2, name: '역세권 풋살장', cost: 385, note: '유동인구가 많다. 막으면 소문이 빨리 난다' },
+  { city: 3, name: '번화가 한복판 코트', cost: 860, note: '사방이 사람이다. 팔로워도 실점도 같이 는다' }
+];
+
+export const MAX_CITY = CITIES.length - 1;
+
 export function newGear() {
-  return { grip: 0, studs: 0, pads: 0, socks: 0, frame: 0 };
+  return { grip: 0, studs: 0, pads: 0, socks: 0, frame: 0, city: 0 };
 }
 
 // 이전 배포본 저장에는 장비 칸이 없다. 없으면 0번 장갑에서 시작한다.
@@ -71,6 +84,7 @@ export function readGear(raw) {
   if (Number.isFinite(raw.pads)) g.pads = Math.min(MAX_KIT, Math.max(0, Math.floor(raw.pads)));
   if (Number.isFinite(raw.socks)) g.socks = Math.min(MAX_SOCK, Math.max(0, Math.floor(raw.socks)));
   if (Number.isFinite(raw.frame)) g.frame = Math.min(MAX_FRAME, Math.max(0, Math.floor(raw.frame)));
+  if (Number.isFinite(raw.city)) g.city = Math.min(MAX_CITY, Math.max(0, Math.floor(raw.city)));
   return g;
 }
 
@@ -92,4 +106,8 @@ export function sockAt(socks) {
 
 export function frameAt(frame) {
   return GOALS[Math.min(MAX_FRAME, Math.max(0, Math.floor(Number(frame) || 0)))];
+}
+
+export function cityAt(city) {
+  return CITIES[Math.min(MAX_CITY, Math.max(0, Math.floor(Number(city) || 0)))];
 }

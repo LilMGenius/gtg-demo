@@ -141,7 +141,11 @@ function courseOf(aimX, aimY) {
 }
 
 // 한 판은 슛 다섯 개. 앞 두 개는 판독을 가르치고 마지막 한 개는 나가지 않으면 못 막는다.
-export function buildSet(rng, level = 5) {
+// 동네 등급은 슛을 바꾸지 않는다. 바꾸는 것은 눈에 띄는 행인이 지나갈 확률 하나뿐이다.
+export function buildSet(rng, level = 5, city = 0) {
+  // 등급당 6%p. 0등급 30에서 3등급 48로, 한 판 다섯 구 중 한 구 반이 두 구 반이 되는 폭이다.
+  // 이보다 크면 동네를 사는 순간 실점이 스탯보다 동네로 갈리고, 이보다 작으면 산 걸 못 느낀다.
+  const gazeChance = 30 + 6 * clamp(city, 0, 3);
   const shots = [];
   for (let i = 0; i < 5; i++) {
     const k = scaleKicker(KICKERS[Math.floor(rng() * KICKERS.length)], level);
@@ -162,7 +166,7 @@ export function buildSet(rng, level = 5) {
     }
     // 눈에 띄는 행인이 지나가는 구. 행인은 늘 걷고 있지만 고개가 돌아갈 만한 건 가끔이다.
     // 여기서 매 구 굴려야 같은 맵을 돌아도 언제 걸릴지 모른다.
-    const gaze = pct(rng, 30);
+    const gaze = pct(rng, gazeChance);
     // 휘어들어오는 공. 마커가 서준 자리에서 끝에 빗나간다.
     // 배치를 맞춘 키퍼를 저격하는 항이므로 키커 칸이 소유한다.
     const bend = pct(rng, 8 + k.curve * 3.4) ? 0.02 + k.curve * 0.028 : 0;
@@ -487,13 +491,16 @@ export function restartDelay(keeper, result) {
 }
 
 // 판 사이 대기는 회복이다. 스태미너와 호흡력은 잠겨 있어 지금은 상수로 선다.
-export function followerGain(keeper, result) {
+// 동네 등급은 소문의 배율이다. 사람이 많은 곳에서 막을수록 더 퍼진다.
+export function followerGain(keeper, result, city = 0) {
   const saved = !result.conceded;
   const flair = result.events.some((e) => e.t === "beat" || e.t === "charge" || e.t === "talked");
   const base = saved ? 40 : 8;
   const talk = 6 * clamp(keeper.communication, 1, 10) + 3 * clamp(keeper.mischief, 1, 10);
   const fame = clamp(result.fame || 1, 1, 10) * (saved ? 9 : 2);
-  return Math.round((base + talk + fame) * (flair ? 2.2 : 1));
+  // 등급당 12%. 3등급이 +36%인데, 같은 등급이 올린 실점 위험을 팔로워로 되사는 값이다.
+  const crowd = 1 + 0.12 * clamp(city, 0, 3);
+  return Math.round((base + talk + fame) * (flair ? 2.2 : 1) * crowd);
 }
 
 export function setBreak() {
