@@ -21,6 +21,11 @@ const W_FRONT = 0.003; // 정면 실루엣. 무거울수록 몸에 맞는 폭이
 const W_MOVE = 1.2;    // 무게가 기동에 더하는 지연 ms/kg
 const H_LOW = 3.6;     // 큰 키가 낮은 공에 몸을 접는 데 드는 지연 ms/cm
 const W_BRACE = 0.45;  // 정면 강슛을 버티는 질량
+// 장갑 등급 한 칸이 깎는 값. 벗겨지는 사고 쪽 4, 흘리는 쪽 5다.
+// 핸들링 한 칸이 흘림에서 6을 깎으므로 장갑 한 칸은 스탯 한 칸보다 작다.
+// 장비가 스탯보다 크면 훈련이 장식이 된다.
+const GRIP_TEAR = 4;
+const GRIP_SPILL = 5;
 const WIN0 = 70;
 const STREAK_K = 6.0;
 
@@ -371,8 +376,10 @@ export function resolve(input) {
   // 정면 강슛은 몸으로 받는다. 질량이 버티는 자리는 여기다. 옆으로 날아간 몸에는 버틸 질량이 없다.
   const brace = shot.course === "정면" ? (keeper.weight - 84) * W_BRACE : 0;
   const carryP = shot.strong ? Math.max(0, 40 - keeper.strength * 4.4 - brace) : 0;
-  const gloveP = keeper.handling <= 4 ? (5 - keeper.handling) * 7 : 0;
-  const spillP = Math.max(0, 100 - (34 + keeper.handling * 6 + LOCKED.punching * -4));
+  // 장갑 등급. 선반은 0에서 3까지이고 그 밖의 값은 저장이 오염된 것이므로 잘라 넣는다.
+  const grip = Math.min(3, Math.max(0, Math.floor(Number(input.grip) || 0)));
+  const gloveP = keeper.handling <= 4 ? Math.max(0, (5 - keeper.handling) * 7 - grip * GRIP_TEAR) : 0;
+  const spillP = Math.max(0, 100 - (34 + keeper.handling * 6 + grip * GRIP_SPILL + LOCKED.punching * -4));
   const d2 = draw();
   if (d2 < carryP) {
     say("carriedIn", "막았는데 몸이 공과 같이 골라인을 넘었습니다.", "strength");

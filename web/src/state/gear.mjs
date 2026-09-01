@@ -1,0 +1,31 @@
+// 장비. 스탯은 훈련으로만 오르고 장비는 그 위에 얇게 얹는다.
+// 장비 한 칸이 스탯 한 칸보다 크면 훈련이 장식이 되고, 훈련이 장식인 방치형에는 남는 축이 없다.
+
+// 장갑 선반. 0번은 파는 물건이 아니라 아무것도 안 산 사람이 이미 끼고 있는 것이다.
+// 값은 카드깡 380 땀을 기준으로 잡았다. 첫 칸은 그보다 싸야 처음 지르는 자리가 되고,
+// 마지막 칸은 그보다 비싸야 카드깡이 선반에서 밀려나지 않는다.
+export const GLOVES = [
+  { grip: 0, name: '장터 목장갑', cost: 0, note: '아무것도 안 샀을 때 끼고 있는 것' },
+  { grip: 1, name: '고무코팅 목장갑', cost: 140, note: '젖은 공을 한 번은 붙잡는다' },
+  { grip: 2, name: '송진 범벅 장갑', cost: 360, note: '손에서 공이 잘 안 떨어진다' },
+  { grip: 3, name: '문어 빨판 장갑', cost: 820, note: '안 떨어진다. 벗겨지지도 않는다' }
+];
+
+export const MAX_GRIP = GLOVES.length - 1;
+
+export function newGear() {
+  return { grip: 0 };
+}
+
+// 이전 배포본 저장에는 장비 칸이 없다. 없으면 0번 장갑에서 시작한다.
+// 선반 밖의 값은 버린다. 저장에 들어온 숫자를 그대로 믿으면 판정식이 오염된다.
+export function readGear(raw) {
+  const g = newGear();
+  if (!raw || typeof raw !== 'object') return g;
+  if (Number.isFinite(raw.grip)) g.grip = Math.min(MAX_GRIP, Math.max(0, Math.floor(raw.grip)));
+  return g;
+}
+
+export function gloveAt(grip) {
+  return GLOVES[Math.min(MAX_GRIP, Math.max(0, Math.floor(Number(grip) || 0)))];
+}

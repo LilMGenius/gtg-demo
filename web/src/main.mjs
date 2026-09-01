@@ -9,6 +9,7 @@ import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
 import { coinGain, readWallet } from './state/wallet.mjs';
+import { GLOVES, MAX_GRIP, readGear, gloveAt } from './state/gear.mjs';
 
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
@@ -52,9 +53,13 @@ state.posts = Array.isArray(saved?.posts) ? saved.posts.slice(-12) : [];
 state.wallet = readWallet(saved?.wallet);
 // 상대 전적. 키커 이름을 열쇠로 막은 수와 먹힌 수를 따로 센다.
 state.record = readRecord(saved);
+// 장비. 상점에서 산 장갑 등급이 여기 남고 판정식에 그대로 들어간다.
+state.gear = readGear(saved?.gear);
 window.__points = () => state.points;
 // 두 갈래가 각각 어떻게 움직였는지 게이트가 직접 읽어야 한다. 화면 글자는 증거가 아니다.
 window.__wallet = () => state.wallet;
+// 장비가 판정에 실제로 들어갔는지는 화면 글자가 아니라 상태로 재야 한다.
+window.__gear = () => state.gear;
 // 사고 연출은 확률로만 나오므로 계측기가 불러낼 수 있어야 한다. 판정은 안 바뀐다.
 window.__act = (kind) => stage.act(kind);
 // 선언값은 증거가 아니다. 게이트가 실제 파형을 재려면 발화를 불러낼 수 있어야 한다.
@@ -128,7 +133,7 @@ function setPad(on) {
 
 // 저장은 항상 보유 목록 전체로 나간다. 뛰는 키퍼만 저장하면 나머지가 다음 저장에서 지워진다.
 function persist() {
-  save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record);
+  save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear);
 }
 
 // 한 구가 끝날 때마다 그 키커 칸에 한 줄을 더한다.
@@ -226,7 +231,7 @@ function commit(dive) {
     ? autoInput(state.keeper, shot, rng)
     : { dive, errMs: performance.now() - pressAt, advance, auto: false };
   stage.diving = state.keeper.diving;
-  const result = resolve({ keeper: state.keeper, shot, rng, input });
+  const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip });
   state.results[state.i] = result.conceded;
   // 판정 결과에는 키커 이름이 없다. 장부는 이 자리에서만 이름을 알 수 있다.
   tally(shot.kicker.name, result.conceded);
@@ -492,10 +497,14 @@ function closeMe() {
   el('me').hidden = true;
 }
 
-// 상점. 첫 선반은 카드깡 하나다. 지목 구매는 값을 알고 이름을 사는 축이고
-// 이쪽은 값을 알고 이름을 모르는 축이라 두 축이 겹치지 않는다.
+// 상점. 선반은 카드깡과 장비 둘이다. 지목 구매는 값을 알고 이름을 사는 축이고
+// 카드깡은 값을 알고 이름을 모르는 축이라 두 축이 겹치지 않는다.
+// 장비는 이름도 값도 아는 대신 스탯 위에 얇게만 얹는 축이다.
 // 결과 한 줄은 state에 넣지 않는다. 저장에 남을 값이 아니라 이 패널이 열려 있는 동안만 쓰는 글자다.
 let lastPull = '';
+
+// 지금 보고 있는 선반. lastPull과 같이 패널 수명만 사는 값이라 저장에 싣지 않는다.
+let shopTab = 'pull';
 
 // 확률은 명단이 아니라 지금 남은 풀에서 다시 센다. 뽑을수록 남은 풀이 바뀌므로
 // 고정 문구를 걸면 뒤로 갈수록 화면이 거짓말을 한다.
@@ -513,9 +522,45 @@ function shopOdds(pool) {
   return '명성 10 ' + (top / total * 100).toFixed(1) + '% · 명성 9 이상 ' + (high / total * 100).toFixed(1) + '%';
 }
 
-function renderShop() {
-  const box = el('shop');
-  const pool = KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name));
+// 장갑 선반. 산 등급은 판정식의 gloveP와 spillP로 바로 들어간다.
+function gloveShelf() {
+  const rows = GLOVES.map((g) => {
+    let label = g.cost + ' 땀';
+    let off = false;
+    if (g.grip === state.gear.grip) {
+      label = '끼는 중';
+      off = true;
+    } else if (g.grip < state.gear.grip) {
+      label = '지난 장갑';
+      off = true;
+    } else if (state.wallet.coin < g.cost) {
+      // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
+      label = '땀 ' + (g.cost - state.wallet.coin) + ' 모자라다';
+      off = true;
+    }
+    return '<div class="card gear"><b>' + g.name + '</b><em>' + g.note + '</em>'
+      + '<button class="buy" data-grip="' + g.grip + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
+  });
+  const top = state.gear.grip >= MAX_GRIP ? '<span class="got">' + gloveAt(MAX_GRIP).name + '까지 갔다. 더 살 게 없다</span>' : '';
+  return '<h4>장비</h4>' + rows.join('') + top;
+}
+
+function bindGloves(box) {
+  for (const b of box.querySelectorAll('.buy[data-grip]')) {
+    b.onclick = () => {
+      if (b.disabled) return;
+      const g = gloveAt(b.dataset.grip);
+      if (state.wallet.coin < g.cost) return;
+      state.wallet.coin -= g.cost;
+      state.gear.grip = g.grip;
+      persist();
+      pips();
+      renderShop();
+    };
+  }
+}
+
+function pullShelf(pool) {
   const short = PULL_COST - state.wallet.coin;
   let label = PULL_COST + ' 땀 · 한 장';
   let off = false;
@@ -529,11 +574,25 @@ function renderShop() {
   }
   const odds = pool.length ? '<em>' + shopOdds(pool) + '<br>남은 카드 ' + pool.length + '장</em>' : '';
   const got = lastPull ? '<span class="got">' + lastPull + '</span>' : '';
-  box.innerHTML = '<h4>카드깡</h4><div class="card">아직 없는 키퍼 중 한 장이 나온다. 한 장에 <b>'
+  return '<h4>카드깡</h4><div class="card">아직 없는 키퍼 중 한 장이 나온다. 한 장에 <b>'
     + PULL_COST + ' 땀</b>' + odds
     + '<button class="buy"' + (off ? ' disabled' : '') + '>' + label + '</button>' + got
-    + '</div><button class="close">닫기</button>';
+    + '</div>';
+}
+
+function renderShop() {
+  const box = el('shop');
+  const pool = KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name));
+  const tabs = '<div class="tabs">'
+    + '<button class="tab" data-tab="pull"' + (shopTab === 'pull' ? ' aria-current="true"' : '') + '>카드깡</button>'
+    + '<button class="tab" data-tab="gear"' + (shopTab === 'gear' ? ' aria-current="true"' : '') + '>장비</button>'
+    + '</div>';
+  box.innerHTML = tabs + (shopTab === 'gear' ? gloveShelf() : pullShelf(pool)) + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeShop;
+  for (const t of box.querySelectorAll('.tab')) {
+    t.onclick = () => { shopTab = t.dataset.tab; renderShop(); };
+  }
+  if (shopTab === 'gear') return bindGloves(box);
   const buy = box.querySelector('.buy');
   buy.onclick = () => {
     if (buy.disabled) return;
@@ -560,6 +619,8 @@ function closeShop() {
   el('shop').hidden = true;
   // 지난번 결과를 들고 다시 열면 방금 뽑은 것처럼 읽힌다.
   lastPull = '';
+  // 선반도 처음 자리로 돌린다. 닫을 때 보던 탭이 남으면 다음에 연 사람이 카드깡을 못 찾는다.
+  shopTab = 'pull';
 }
 
 for (const b of document.querySelectorAll('.zone')) {
