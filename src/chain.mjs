@@ -343,10 +343,13 @@ export function resolve(input) {
   const diveP = centerish && inp.dive !== 0 ? Math.max(0, keeper.diving * 4.2 - keeper.judgement * 3.4) : 0;
   // 한눈팔기. 행인이 지나가는 구에서만 열리고 집중력이 소유한다.
   // 같은 단계의 사고는 롤 하나를 구간으로 나눠 가른다. 새 롤을 뒤면 한 구가 일곱 번 굴러간다.
-  const gazeP = shot.gaze ? Math.max(0, (10 - keeper.focus) * 2.6) : 0;
+  // focusAid는 자양강장제다. 1이면 없는 것과 같다. 새 롤이 아니라 이미 있는 구간의 폭만 줄인다.
+  const focusAid = Math.min(1, Math.max(0.5, Number(input.focusAid) || 1));
+  const gazeP = shot.gaze ? Math.max(0, (10 - keeper.focus) * 2.6) * focusAid : 0;
   // 말 걸기. 의사소통이 여는 사고다. 눈으로 따라가는 것과 입을 여는 것은 다른 사건이다.
   // 팔로워를 버는 칸이 같은 자리에서 골을 먹인다. 이 칸이 양날인 이유가 그것이다.
-  const talkP = shot.gaze ? Math.max(0, keeper.communication * keeper.mischief * 0.55) : 0;
+  // 같은 약이 이 구간도 줄인다. talked가 줄면 followerGain의 flair 2.2배가 같이 사라져 교환이 된다.
+  const talkP = shot.gaze ? Math.max(0, keeper.communication * keeper.mischief * 0.55) * focusAid : 0;
   if (overP > 0 || diveP > 0 || gazeP > 0 || talkP > 0) {
     const d = draw();
     if (d < overP) {
@@ -402,8 +405,10 @@ export function resolve(input) {
   const carryP = shot.strong ? Math.max(0, 40 - keeper.strength * 4.4 - brace - pads * KIT_CARRY) : 0;
   // 장갑 등급. 선반은 0에서 3까지이고 그 밖의 값은 저장이 오염된 것이므로 잘라 넣는다.
   const grip = Math.min(3, Math.max(0, Math.floor(Number(input.grip) || 0)));
-  const gloveP = keeper.handling <= 4 ? Math.max(0, (5 - keeper.handling) * 7 - grip * GRIP_TEAR) : 0;
-  const spillP = Math.max(0, 100 - (34 + keeper.handling * 6 + grip * GRIP_SPILL + LOCKED.punching * -4));
+  // 송진은 저장 정제 뒤에 더한다. 3등급 장갑을 이미 산 사람도 한 등급분 이득이어야 한다.
+  const rosin = input.rosin ? 1 : 0;
+  const gloveP = keeper.handling <= 4 ? Math.max(0, (5 - keeper.handling) * 7 - (grip + rosin) * GRIP_TEAR) : 0;
+  const spillP = Math.max(0, 100 - (34 + keeper.handling * 6 + (grip + rosin) * GRIP_SPILL + LOCKED.punching * -4));
   const d2 = draw();
   if (d2 < carryP) {
     say("carriedIn", "막았는데 몸이 공과 같이 골라인을 넘었습니다.", "strength");
@@ -493,7 +498,7 @@ export function restartDelay(keeper, result) {
 // 판 사이 대기는 회복이다. 스태미너와 호흡력은 잠겨 있어 지금은 상수로 선다.
 // 동네 등급은 소문의 배율이다. 사람이 많은 곳에서 막을수록 더 퍼진다.
 // look은 외형 선반 승수다. 판정에는 안 들어가고 소문에만 붙는다.
-export function followerGain(keeper, result, city = 0, look = 1) {
+export function followerGain(keeper, result, city = 0, look = 1, boost = 1) {
   const saved = !result.conceded;
   const flair = result.events.some((e) => e.t === "beat" || e.t === "charge" || e.t === "talked");
   const base = saved ? 40 : 8;
@@ -501,7 +506,8 @@ export function followerGain(keeper, result, city = 0, look = 1) {
   const fame = clamp(result.fame || 1, 1, 10) * (saved ? 9 : 2);
   // 등급당 12%. 3등급이 +36%인데, 같은 등급이 올린 실점 위험을 팔로워로 되사는 값이다.
   const crowd = 1 + 0.12 * clamp(city, 0, 3);
-  return Math.round((base + talk + fame) * (flair ? 2.2 : 1) * crowd * clamp(look, 1, 1.3));
+  // boost는 바이럴 떡밥이다. 판정 밖 축이라 스킨 1.30, 관중 1.36과 곱셈 인자가 따로 선다.
+  return Math.round((base + talk + fame) * (flair ? 2.2 : 1) * crowd * clamp(look, 1, 1.3) * clamp(boost, 1, 1.6));
 }
 
 export function setBreak() {
