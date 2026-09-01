@@ -8,7 +8,7 @@ import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
-import { coinGain, readWallet } from './state/wallet.mjs';
+import { coinGain, readWallet, COIN_DRILL } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
@@ -384,15 +384,32 @@ function endSet() {
 // 포인트가 0이어도 열린다. 그때는 내 스탯을 보는 창이다.
 function renderGym() {
   const box = el('gym');
+  // 성장 칸이 전부 상한이면 훈련은 더 쌓여도 쓸 곳이 없다. 그때만 환전 줄이 열린다.
+  const maxed = GROWABLE.every((k) => state.keeper[k] >= 10);
   const head = state.points > 0 ? '훈련장 · 남은 훈련 ' + state.points + '회' : '훈련장 · 밀린 훈련 없다';
-  box.innerHTML = '<h4>' + head + '</h4><div class=\"row\">' + GROWABLE.map((k) => {
+  // 못 누르는 버튼도 사유를 글자로 들고 있다. 빈 자리는 왜 못 쓰는지를 말하지 않는다.
+  const swap = maxed
+    ? '<button class="swap"' + (state.points <= 0 ? ' disabled' : '') + '>'
+      + (state.points > 0 ? '남은 훈련 ' + state.points + '회를 땀 ' + state.points * COIN_DRILL + '으로' : '바꿀 훈련이 없다')
+      + '</button>'
+    : '';
+  box.innerHTML = '<h4>' + head + '</h4><div class="row">' + GROWABLE.map((k) => {
     const v = state.keeper[k];
     // 10은 성장 상한이다. 상한에 닿은 칸을 눌리게 두면 포인트만 사라진다.
     const off = v >= 10 || state.points <= 0;
     const tail = v >= 10 ? 'MAX' : v + ' → ' + (v + 1);
-    return '<button data-k=\"' + k + '\"' + (off ? ' disabled' : '') + '>' + CAUSE_LABEL[k] + '<em>' + tail + '</em></button>';
-  }).join('') + '</div><button class=\"close\">닫기</button>';
+    return '<button data-k="' + k + '"' + (off ? ' disabled' : '') + '>' + CAUSE_LABEL[k] + '<em>' + tail + '</em></button>';
+  }).join('') + '</div>' + swap + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeGym;
+  const sw = box.querySelector('.swap');
+  if (sw) sw.onclick = () => {
+    if (state.points <= 0) return;
+    state.wallet.coin += state.points * COIN_DRILL;
+    state.points = 0;
+    persist();
+    pips();
+    renderGym();
+  };
   for (const b of box.querySelectorAll('.row button')) {
     b.onclick = () => {
       if (b.disabled || state.points <= 0) return;

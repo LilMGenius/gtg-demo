@@ -281,6 +281,12 @@ body.playing #hud{opacity:1}
 #gym .row button:not(:disabled):hover{background:#25301f;transform:translateY(-4px) rotate(0);
   box-shadow:8px 10px 0 var(--edge), var(--bevel)}
 #gym .row button:not(:disabled):active{transform:translateY(3px) rotate(0);box-shadow:2px 2px 0 var(--edge)}
+/* 환전 줄. 성장 칸이 전부 상한일 때만 붙는다. 닫기와 같은 모양이면 어느 쪽이 본 행동인지 안 읽혀서 금색으로 뗀다. */
+#gym .swap{padding:10px 30px 12px;border:var(--line) solid var(--edge);
+  background:#2b2412;color:#ffd83d;font-family:var(--disp);font-size:17px;
+  box-shadow:6px 6px 0 var(--edge), var(--bevel);transform:rotate(-1deg)}
+#gym .swap:disabled{background:#141a12;color:#f6efdc5c;cursor:default}
+#gym .swap:not(:disabled):active{transform:rotate(-1deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 /* 닫기는 늘 보인다. 포인트가 0일 때 열면 나갈 길이 이것뿐이다. */
 #gym .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
   background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
