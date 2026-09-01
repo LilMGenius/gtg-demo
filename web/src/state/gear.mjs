@@ -13,8 +13,19 @@ export const GLOVES = [
 
 export const MAX_GRIP = GLOVES.length - 1;
 
+// 축구화 선반. 손이 아니라 발이고, 깎는 것은 반경이 아니라 출발이다.
+// 장갑과 같은 값 기준을 쓴다. 첫 칸은 카드깡 380 땀보다 싸고 마지막 칸은 그보다 비싸다.
+export const BOOTS = [
+  { studs: 0, name: '학교 앞 실내화', cost: 0, note: '아무것도 안 샀을 때 신고 있는 것' },
+  { studs: 1, name: '바닥 닳은 조기축구화', cost: 160, note: '그래도 미끄러지지는 않는다' },
+  { studs: 2, name: '스터드 여섯 개 축구화', cost: 400, note: '흙을 물고 첫 발이 빨리 뜬다' },
+  { studs: 3, name: '육상용 스파이크', cost: 880, note: '축구화는 아니다. 제일 빨리 뜬다' }
+];
+
+export const MAX_STUD = BOOTS.length - 1;
+
 export function newGear() {
-  return { grip: 0 };
+  return { grip: 0, studs: 0 };
 }
 
 // 이전 배포본 저장에는 장비 칸이 없다. 없으면 0번 장갑에서 시작한다.
@@ -23,9 +34,14 @@ export function readGear(raw) {
   const g = newGear();
   if (!raw || typeof raw !== 'object') return g;
   if (Number.isFinite(raw.grip)) g.grip = Math.min(MAX_GRIP, Math.max(0, Math.floor(raw.grip)));
+  if (Number.isFinite(raw.studs)) g.studs = Math.min(MAX_STUD, Math.max(0, Math.floor(raw.studs)));
   return g;
 }
 
 export function gloveAt(grip) {
   return GLOVES[Math.min(MAX_GRIP, Math.max(0, Math.floor(Number(grip) || 0)))];
+}
+
+export function bootAt(studs) {
+  return BOOTS[Math.min(MAX_STUD, Math.max(0, Math.floor(Number(studs) || 0)))];
 }

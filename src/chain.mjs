@@ -26,6 +26,9 @@ const W_BRACE = 0.45;  // 정면 강슛을 버티는 질량
 // 장비가 스탯보다 크면 훈련이 장식이 된다.
 const GRIP_TEAR = 4;
 const GRIP_SPILL = 5;
+// 축구화 등급 한 칸이 깎는 출발 지연 ms. 민첩성 한 칸이 12ms를 깎으므로 한 칸은 그보다 작다.
+// 세 칸을 다 신어도 21ms라 민첩성 두 칸에 못 미친다. 장비는 스탯 위에 얇게만 얹는다.
+const STUD_MS = 7;
 const WIN0 = 70;
 const STREAK_K = 6.0;
 
@@ -213,6 +216,8 @@ function contactMargin(keeper, shot, input, over) {
   if (shot.course !== "정면") moveDelay += (keeper.weight - 84) * W_MOVE;
   // 큰 키는 낮은 공까지 몸을 접어 내리는 데 시간이 더 든다.
   if (shot.course === "하단") moveDelay += (keeper.height - 188) * H_LOW;
+  // 축구화. 흙을 무는 만큼 첫 발이 빨리 뜬다. 선반 밖의 값은 저장이 오염된 것이므로 잘라 넣는다.
+  moveDelay -= Math.min(3, Math.max(0, Math.floor(Number(input.studs) || 0))) * STUD_MS;
 
   const reactBudget = (flight - markerAt) * 1000;
   const slack = windowMs + reactBudget - moveDelay - Math.abs(input.errMs);
@@ -296,7 +301,9 @@ export function resolve(input) {
   const shot = input.shot;
   const rng = input.rng;
   const raw = input.input || autoInput(keeper, shot, rng);
-  const inp = Object.assign({}, raw, { dirQuality: dirQualityOf(raw.dive, shot) });
+  // 축구화는 손가락이 만든 값이 아니라 신고 나온 값이다. 프로브 전체가 같은 값을 쓰므로
+  // 원인 귀속에서 이 항은 상쇄되고, 장비가 실점 원인으로 잡히는 일은 없다.
+  const inp = Object.assign({}, raw, { dirQuality: dirQualityOf(raw.dive, shot), studs: input.studs });
 
   const events = [];
   const state = { stage: 1, rolls: 0 };

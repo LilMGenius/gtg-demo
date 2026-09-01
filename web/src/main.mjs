@@ -9,7 +9,7 @@ import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
 import { coinGain, readWallet } from './state/wallet.mjs';
-import { GLOVES, MAX_GRIP, readGear, gloveAt } from './state/gear.mjs';
+import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, readGear, gloveAt, bootAt } from './state/gear.mjs';
 
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
@@ -231,7 +231,7 @@ function commit(dive) {
     ? autoInput(state.keeper, shot, rng)
     : { dive, errMs: performance.now() - pressAt, advance, auto: false };
   stage.diving = state.keeper.diving;
-  const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip });
+  const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs });
   state.results[state.i] = result.conceded;
   // 판정 결과에는 키커 이름이 없다. 장부는 이 자리에서만 이름을 알 수 있다.
   tally(shot.kicker.name, result.conceded);
@@ -522,16 +522,26 @@ function shopOdds(pool) {
   return '명성 10 ' + (top / total * 100).toFixed(1) + '% · 명성 9 이상 ' + (high / total * 100).toFixed(1) + '%';
 }
 
-// 장갑 선반. 산 등급은 판정식의 gloveP와 spillP로 바로 들어간다.
-function gloveShelf() {
-  const rows = GLOVES.map((g) => {
+// 장비 칸 둘의 규칙이 같으므로 선반도 하나로 둔다. 선반을 칸마다 복제하면
+// 버튼 글자 규칙이 한쪽에서만 바뀌어 같은 상점 안에서 말이 갈린다.
+// 장갑은 손이라 판정식의 gloveP와 spillP로, 축구화는 발이라 출발 지연으로 들어간다.
+const SHELVES = {
+  glove: { head: '장갑', list: GLOVES, field: 'grip', worn: '끼는 중', past: '지난 장갑', top: MAX_GRIP, at: gloveAt },
+  boot: { head: '축구화', list: BOOTS, field: 'studs', worn: '신는 중', past: '지난 축구화', top: MAX_STUD, at: bootAt }
+};
+
+function gearShelf(kind) {
+  const s = SHELVES[kind];
+  const have = state.gear[s.field];
+  const rows = s.list.map((g) => {
+    const rank = g[s.field];
     let label = g.cost + ' 땀';
     let off = false;
-    if (g.grip === state.gear.grip) {
-      label = '끼는 중';
+    if (rank === have) {
+      label = s.worn;
       off = true;
-    } else if (g.grip < state.gear.grip) {
-      label = '지난 장갑';
+    } else if (rank < have) {
+      label = s.past;
       off = true;
     } else if (state.wallet.coin < g.cost) {
       // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
@@ -539,20 +549,21 @@ function gloveShelf() {
       off = true;
     }
     return '<div class="card gear"><b>' + g.name + '</b><em>' + g.note + '</em>'
-      + '<button class="buy" data-grip="' + g.grip + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
+      + '<button class="buy" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
   });
-  const top = state.gear.grip >= MAX_GRIP ? '<span class="got">' + gloveAt(MAX_GRIP).name + '까지 갔다. 더 살 게 없다</span>' : '';
-  return '<h4>장비</h4>' + rows.join('') + top;
+  const top = have >= s.top ? '<span class="got">' + s.at(s.top).name + '까지 갔다. 더 살 게 없다</span>' : '';
+  return '<h4>' + s.head + '</h4>' + rows.join('') + top;
 }
 
-function bindGloves(box) {
-  for (const b of box.querySelectorAll('.buy[data-grip]')) {
+function bindGear(box) {
+  for (const b of box.querySelectorAll('.buy[data-rank]')) {
     b.onclick = () => {
       if (b.disabled) return;
-      const g = gloveAt(b.dataset.grip);
+      const s = SHELVES[b.dataset.kind];
+      const g = s.at(b.dataset.rank);
       if (state.wallet.coin < g.cost) return;
       state.wallet.coin -= g.cost;
-      state.gear.grip = g.grip;
+      state.gear[s.field] = g[s.field];
       persist();
       pips();
       renderShop();
@@ -583,16 +594,18 @@ function pullShelf(pool) {
 function renderShop() {
   const box = el('shop');
   const pool = KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name));
+  // 장비를 한 탭에 몰면 카드가 여덟 장이라 720p에서 닫기 버튼이 화면 밖으로 밀린다.
   const tabs = '<div class="tabs">'
     + '<button class="tab" data-tab="pull"' + (shopTab === 'pull' ? ' aria-current="true"' : '') + '>카드깡</button>'
-    + '<button class="tab" data-tab="gear"' + (shopTab === 'gear' ? ' aria-current="true"' : '') + '>장비</button>'
+    + '<button class="tab" data-tab="glove"' + (shopTab === 'glove' ? ' aria-current="true"' : '') + '>장갑</button>'
+    + '<button class="tab" data-tab="boot"' + (shopTab === 'boot' ? ' aria-current="true"' : '') + '>축구화</button>'
     + '</div>';
-  box.innerHTML = tabs + (shopTab === 'gear' ? gloveShelf() : pullShelf(pool)) + '<button class="close">닫기</button>';
+  box.innerHTML = tabs + (SHELVES[shopTab] ? gearShelf(shopTab) : pullShelf(pool)) + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeShop;
   for (const t of box.querySelectorAll('.tab')) {
     t.onclick = () => { shopTab = t.dataset.tab; renderShop(); };
   }
-  if (shopTab === 'gear') return bindGloves(box);
+  if (SHELVES[shopTab]) return bindGear(box);
   const buy = box.querySelector('.buy');
   buy.onclick = () => {
     if (buy.disabled) return;

@@ -408,7 +408,7 @@ body.playing #hud{opacity:1}
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #me .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 
-/* 상점. 선반은 카드깡과 장비 둘이고, 여는 탭은 전부 동작한다. 빈 탭은 선반이 아니라 광고다. */
+/* 상점. 선반은 카드깡과 장비 칸들이고, 여는 탭은 전부 동작한다. 빈 탭은 선반이 아니라 광고다. */
 #shop{position:absolute;inset:0;pointer-events:auto;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
   background:#080b07c4}
@@ -421,7 +421,7 @@ body.playing #hud{opacity:1}
 #shop .tab{padding:7px 20px 9px;border:var(--line) solid var(--edge);
   background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;font-weight:400;
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(-.8deg)}
-#shop .tab:nth-child(2){transform:rotate(1deg)}
+#shop .tab:nth-child(2n){transform:rotate(1deg)}
 #shop .tab[aria-current]{background:#2b3a22;color:#ffd83d}
 #shop .tab:active{box-shadow:1px 1px 0 var(--edge)}
 #shop .card{width:min(88vw,430px);padding:15px 18px 17px;text-align:center;
@@ -432,7 +432,7 @@ body.playing #hud{opacity:1}
 /* 확률과 남은 장수는 값을 치르기 전에 읽혀야 한다. 뽑고 나서 아는 확률은 안내가 아니다. */
 #shop .card em{display:block;font-style:normal;font-size:12px;font-weight:700;
   color:var(--dim);margin-top:7px;line-height:1.5}
-/* 장갑은 네 장이 한 화면에 같이 서야 등급 차이가 읽힌다. 720p에서 탭과 닫기까지 들어가려면
+/* 장비 한 칸은 네 장이 한 화면에 같이 서야 등급 차이가 읽힌다. 720p에서 탭과 닫기까지 들어가려면
    카드 한 장이 120px 아래여야 해서 카드깡 한 장보다 여백을 좁게 준다. */
 #shop .card.gear{padding:10px 14px 12px}
 #shop .card.gear em{margin-top:5px}
