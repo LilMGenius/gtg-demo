@@ -60,7 +60,10 @@ body.playing #hud{opacity:1}
 /* 지갑도 판 밖에서 쌓이는 값이라 팔로워와 같은 등급으로 둔다.
    땀과 스폰은 같은 칸에 나란히 선다. 두 갈래라는 사실이 화면에서도 한 번에 읽혀야
    상점이 열렸을 때 어느 잔고로 사는지가 새 정보가 되지 않는다. */
-#purse{grid-area:purse;padding-left:11px;border-left:2px solid #ffffff24;margin-left:-11px;position:relative}
+/* 지갑 칩이 상점 입구다. 오른쪽 기둥 298~338px는 크로스바 325px를 넘어 여섯 번째 버튼이 안 들어간다.
+   무엇으로 사는지를 보여주는 칸을 눌러 사는 곳으로 가는 것은 새로 배울 것이 없다. */
+#purse{grid-area:purse;padding-left:11px;border-left:2px solid #ffffff24;margin-left:-11px;position:relative;
+  pointer-events:auto;cursor:pointer}
 #purse b{font-weight:800;font-style:normal;opacity:1;color:#ffd83d}
 /* 잔고만 움직이면 유명한 키커를 막아 더 벌었다는 사실이 화면에 없다. 사람은 총액의 차분을 안 센다.
    한 구에 들어온 값을 그 자리에서 한 번 띄운다. 12와 30은 글자 수부터 달라 옆에 안 놓고도 갈린다. */
@@ -404,3 +407,33 @@ body.playing #hud{opacity:1}
   background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #me .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
+
+/* 상점. 첫 선반은 카드깡 하나다. 준비 중이라 적힌 빈 탭은 선반이 아니라 광고다. */
+#shop{position:absolute;inset:0;pointer-events:auto;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  background:#080b07c4}
+#shop[hidden]{display:none}
+#shop h4{font-family:var(--disp);font-size:clamp(18px,2.4vw,26px);font-weight:400;
+  color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
+  text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
+#shop .card{width:min(88vw,430px);padding:15px 18px 17px;text-align:center;
+  border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
+  font-family:var(--disp);font-size:16px;font-weight:400;line-height:1.45;
+  box-shadow:6px 6px 0 var(--edge), var(--bevel);transform:rotate(-.6deg)}
+#shop .card b{color:#ffd83d;font-weight:400}
+/* 확률과 남은 장수는 값을 치르기 전에 읽혀야 한다. 뽑고 나서 아는 확률은 안내가 아니다. */
+#shop .card em{display:block;font-style:normal;font-size:12px;font-weight:700;
+  color:var(--dim);margin-top:7px;line-height:1.5}
+#shop .buy{width:100%;margin-top:13px;padding:10px 0 12px;
+  border:var(--line) solid var(--edge);background:#2b3a22;color:var(--ink);
+  font-family:var(--disp);font-size:18px;font-weight:400;
+  box-shadow:6px 6px 0 var(--edge), var(--bevel);transition:transform .12s,box-shadow .12s}
+#shop .buy:not(:disabled):hover{transform:translateY(-4px);box-shadow:8px 10px 0 var(--edge), var(--bevel)}
+#shop .buy:not(:disabled):active{transform:translateY(3px);box-shadow:2px 2px 0 var(--edge)}
+/* 못 누르는 이유는 버튼 글자 자체가 말한다. 회색만으로는 왜 죽었는지가 안 남는다. */
+#shop .buy:disabled{background:#141a12;color:#f6efdc5c;cursor:default}
+#shop .got{display:block;margin-top:11px;font-size:15px;color:var(--good)}
+#shop .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
+  background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
+  box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
+#shop .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}

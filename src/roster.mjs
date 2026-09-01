@@ -153,6 +153,32 @@ export function keeperCost(k) {
   return Math.max(0, Math.round((sum - COST_BASE) * COST_PER_STAT + (Number(k.fame) || 0) * COST_PER_FAME));
 }
 
+// 카드깡 한 장 값. 명단에서 가장 싼 지목 구매가 402 땀이라 그보다 낮게 둔다.
+// 무작위 한 장이 이름을 찍는 것보다 비싸면 뽑을 이유가 사라진다.
+export const PULL_COST = 380;
+
+// fame 역가중. 유명한 키퍼일수록 드물게 나온다.
+// (11 - fame)^2이면 fame 10은 fame 6보다 25배 귀하고, 실제 명단 기준 fame 10이 뽑힐 확률은 1.4%다.
+// 선형 역가중은 6과 10의 차이가 1.7배에 그쳐 뽑기라는 느낌이 서지 않는다.
+export function pullWeight(k) {
+  const f = Number(k.fame) || 0;
+  return Math.pow(11 - f, 2);
+}
+
+// 미보유 풀에서 한 장. 풀이 비면 null을 돌려주고, 부르는 쪽이 값을 깎기 전에 그것을 본다.
+// 값만 깎고 아무것도 주지 않는 경로는 만렙 훈련 데드락과 같은 결함이다.
+export function pullFrom(pool, rand) {
+  if (!pool.length) return null;
+  let total = 0;
+  for (const k of pool) total += pullWeight(k);
+  let roll = rand() * total;
+  for (const k of pool) {
+    roll -= pullWeight(k);
+    if (roll <= 0) return k;
+  }
+  return pool[pool.length - 1];
+}
+
 // 특성은 파츠다. 쿨타임마다 확정 발동하고, 발동 순간 해당 칸을 최대치로 끌어올린다.
 // 확률을 높이는 것이 아니라 확률을 건너뛴다. 그래서 얻기가 어렵다.
 export const TRAITS = {

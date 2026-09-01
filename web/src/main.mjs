@@ -1,7 +1,7 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
 import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
-import { KEEPERS, keeperCost, TRAITS } from '../../src/roster.mjs';
+import { KEEPERS, keeperCost, TRAITS, PULL_COST, pullWeight, pullFrom } from '../../src/roster.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
@@ -492,6 +492,76 @@ function closeMe() {
   el('me').hidden = true;
 }
 
+// 상점. 첫 선반은 카드깡 하나다. 지목 구매는 값을 알고 이름을 사는 축이고
+// 이쪽은 값을 알고 이름을 모르는 축이라 두 축이 겹치지 않는다.
+// 결과 한 줄은 state에 넣지 않는다. 저장에 남을 값이 아니라 이 패널이 열려 있는 동안만 쓰는 글자다.
+let lastPull = '';
+
+// 확률은 명단이 아니라 지금 남은 풀에서 다시 센다. 뽑을수록 남은 풀이 바뀌므로
+// 고정 문구를 걸면 뒤로 갈수록 화면이 거짓말을 한다.
+function shopOdds(pool) {
+  let total = 0;
+  let top = 0;
+  let high = 0;
+  for (const k of pool) {
+    const w = pullWeight(k);
+    total += w;
+    if (k.fame >= 10) top += w;
+    if (k.fame >= 9) high += w;
+  }
+  if (!total) return '';
+  return '명성 10 ' + (top / total * 100).toFixed(1) + '% · 명성 9 이상 ' + (high / total * 100).toFixed(1) + '%';
+}
+
+function renderShop() {
+  const box = el('shop');
+  const pool = KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name));
+  const short = PULL_COST - state.wallet.coin;
+  let label = PULL_COST + ' 땀 · 한 장';
+  let off = false;
+  // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 값이 모자란 것인지 살 것이 없는 것인지 모른다.
+  if (!pool.length) {
+    label = '명단을 다 모았다';
+    off = true;
+  } else if (short > 0) {
+    label = '땀 ' + short + ' 모자라다';
+    off = true;
+  }
+  const odds = pool.length ? '<em>' + shopOdds(pool) + '<br>남은 카드 ' + pool.length + '장</em>' : '';
+  const got = lastPull ? '<span class="got">' + lastPull + '</span>' : '';
+  box.innerHTML = '<h4>카드깡</h4><div class="card">아직 없는 키퍼 중 한 장이 나온다. 한 장에 <b>'
+    + PULL_COST + ' 땀</b>' + odds
+    + '<button class="buy"' + (off ? ' disabled' : '') + '>' + label + '</button>' + got
+    + '</div><button class="close">닫기</button>';
+  box.querySelector('.close').onclick = closeShop;
+  const buy = box.querySelector('.buy');
+  buy.onclick = () => {
+    if (buy.disabled) return;
+    // 값을 깎기 전에 뽑는다. 빈 풀에 값만 치르는 경로는 만렙 훈련 데드락과 같은 결함이다.
+    const pick = pullFrom(pool, Math.random);
+    if (!pick) return;
+    state.wallet.coin -= PULL_COST;
+    state.squad.push(keeperFromRoster(pick));
+    // 뽑은 카드로 자동 전환하지 않는다. 무작위 결과가 뛰던 키퍼를 임의로 강등시키면
+    // 뽑기가 이득이 아니라 사고가 된다. 교체는 선수단에서 사람이 고른다.
+    lastPull = pick.name + ' 영입';
+    persist();
+    pips();
+    renderShop();
+  };
+}
+
+function openShop() {
+  el('shop').hidden = false;
+  renderShop();
+}
+
+function closeShop() {
+  el('shop').hidden = true;
+  // 지난번 결과를 들고 다시 열면 방금 뽑은 것처럼 읽힌다.
+  lastPull = '';
+}
+
 for (const b of document.querySelectorAll('.zone')) {
   b.onpointerdown = () => {
     if (state.phase === 'caption') return state.skip && state.skip();
@@ -521,11 +591,17 @@ el('lv').onpointerdown = (e) => {
   e.stopPropagation();
   if (el('me').hidden) openMe(); else closeMe();
 };
+el('purse').onpointerdown = (e) => {
+  // 막지 않으면 화면 전체를 덮은 #pad가 이 눌림을 방향 입력으로 먹는다.
+  e.stopPropagation();
+  if (el('shop').hidden) openShop(); else closeShop();
+};
 // 진단용. __pick은 화소 피킹이 이미 쓴다.
 window.__squad = () => ({ squad: state.squad.map((k) => k.name), pick: state.pick, coin: state.wallet.coin });
 window.__roster = (open) => { if (open) openRoster(); else closeRoster(); };
 window.__gram = (open) => { if (open) openGram(); else closeGram(); };
 window.__me = (open) => { if (open) openMe(); else closeMe(); };
+window.__shop = (open) => { if (open) openShop(); else closeShop(); };
 // 게이트는 화면 글자 대신 장부를 직접 읽어야 판정이 마크업 변경에 흔들리지 않는다.
 window.__record = () => state.record;
 
