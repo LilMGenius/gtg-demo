@@ -7,7 +7,7 @@ import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine } from './ui/lines.mjs';
-import { load, save, readSquad, offlineGain } from './state/save.mjs';
+import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
 import { coinGain, readWallet } from './state/wallet.mjs';
 
 const el = (id) => document.getElementById(id);
@@ -50,6 +50,8 @@ state.fans = Number(saved?.fans) || 0;
 state.posts = Array.isArray(saved?.posts) ? saved.posts.slice(-12) : [];
 // 지갑은 두 갈래로 읽는다. 이전 배포본 저장에는 지갑이 없고, 그때 둘 다 0에서 시작한다.
 state.wallet = readWallet(saved?.wallet);
+// 상대 전적. 키커 이름을 열쇠로 막은 수와 먹힌 수를 따로 센다.
+state.record = readRecord(saved);
 window.__points = () => state.points;
 // 두 갈래가 각각 어떻게 움직였는지 게이트가 직접 읽어야 한다. 화면 글자는 증거가 아니다.
 window.__wallet = () => state.wallet;
@@ -126,7 +128,16 @@ function setPad(on) {
 
 // 저장은 항상 보유 목록 전체로 나간다. 뛰는 키퍼만 저장하면 나머지가 다음 저장에서 지워진다.
 function persist() {
-  save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts);
+  save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record);
+}
+
+// 한 구가 끝날 때마다 그 키커 칸에 한 줄을 더한다.
+// 세트가 끝날 때 몰아 세면 중간에 탭을 닫은 구가 통째로 빠진다.
+function tally(name, conceded) {
+  if (!name) return;
+  const row = state.record[name] || (state.record[name] = { saved: 0, conceded: 0 });
+  if (conceded) row.conceded += 1;
+  else row.saved += 1;
 }
 
 // 이번 구에 들어온 땀을 잔고 옆에 한 번 띄운다.
@@ -217,6 +228,8 @@ function commit(dive) {
   stage.diving = state.keeper.diving;
   const result = resolve({ keeper: state.keeper, shot, rng, input });
   state.results[state.i] = result.conceded;
+  // 판정 결과에는 키커 이름이 없다. 장부는 이 자리에서만 이름을 알 수 있다.
+  tally(shot.kicker.name, result.conceded);
   // 비행 중에는 자막을 비운다. 자리표시자를 남기면 화면 위쪽에 말줄임표가 박힌 채 촬영된다.
   el('caption').innerHTML = '';
   stage.play(shot, input, result, () => rollCaptions(result));
@@ -434,6 +447,23 @@ function hiddenBand(key, v) {
 }
 
 // 내 정보. 오른쪽 기둥이 찼으므로 좌상단 레벨 칩이 진입이다.
+// 상대 전적. 만나본 키커만 올린다. 명단 77명을 다 깔면 읽을 것이 사라진다.
+// 먹힌 수를 먼저 세워 누구한테 약한지가 맨 위에 오게 한다.
+function recordRows() {
+  const names = Object.keys(state.record);
+  if (!names.length) return '<div class="note dim"><span>아직 상대 전적이 없다. 한 구를 막거나 먹히면 여기 쌓인다</span></div>';
+  names.sort((a, b) => {
+    const x = state.record[a];
+    const y = state.record[b];
+    return (y.conceded - x.conceded) || (y.saved + y.conceded - x.saved - x.conceded) || a.localeCompare(b);
+  });
+  const rows = names.map((n) => {
+    const r = state.record[n];
+    return '<span>' + n + '<b><em>' + r.saved + '</em><i>-</i>' + r.conceded + '</b></span>';
+  }).join('');
+  return '<div class="note"><b>상대 전적</b><i>막은 수 - 먹힌 수</i></div><div class="log">' + rows + '</div>';
+}
+
 function renderMe() {
   const box = el('me');
   const k = state.keeper;
@@ -448,7 +478,7 @@ function renderMe() {
     : '<div class="note dim"><span>달린 특성이 없다. 명단에서 데려오면 붙어 온다</span></div>';
   const hidden = HIDDEN.map((h) => '<div class="note"><b>' + HIDDEN_LABEL[h] + '</b><i>' + hiddenBand(h, k[h]) + '</i></div>').join('');
   box.innerHTML = '<h4>' + name + '<small>Lv ' + k.level + ' · ' + k.height + 'cm · ' + k.weight + 'kg</small></h4>'
-    + '<div class="card"><div class="grid">' + grid + '</div>' + traits + hidden + '</div>'
+    + '<div class="card"><div class="grid">' + grid + '</div>' + traits + hidden + recordRows() + '</div>'
     + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeMe;
 }
@@ -496,6 +526,8 @@ window.__squad = () => ({ squad: state.squad.map((k) => k.name), pick: state.pic
 window.__roster = (open) => { if (open) openRoster(); else closeRoster(); };
 window.__gram = (open) => { if (open) openGram(); else closeGram(); };
 window.__me = (open) => { if (open) openMe(); else closeMe(); };
+// 게이트는 화면 글자 대신 장부를 직접 읽어야 판정이 마크업 변경에 흔들리지 않는다.
+window.__record = () => state.record;
 
 // 소리. 끌 수 없는 소리는 소리가 아니라 사고다.
 // 음소거는 음량을 건드리지 않는다. 둘을 섞어버리면 한 번 누른 사람은 다시 켜도 무음으로 남는다.

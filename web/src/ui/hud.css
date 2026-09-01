@@ -389,6 +389,17 @@ body.playing #hud{opacity:1}
 #me .note i{display:block;font-style:normal;font-size:12px;font-weight:700;
   color:var(--good);margin-top:3px}
 #me .note.dim{color:var(--dim);text-align:center}
+/* 상대 전적. 두 칸씩 끊는다. 이름이 긴 키커가 많아 세 칸으로 깔면 수치가 줄바꿈된다. */
+#me .log{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+#me .log span{display:flex;justify-content:space-between;gap:10px;padding:7px 10px 9px;
+  border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
+  font-family:var(--disp);font-size:14px;font-weight:400;
+  box-shadow:6px 6px 0 var(--edge), var(--bevel)}
+#me .log span:nth-child(2n){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
+/* 막은 수는 좋은 색, 먹힌 수는 노랑. 두 숫자가 같은 색이면 어느 쪽이 늘었는지 안 읽힌다. */
+#me .log span b{color:#ffd83d;font-weight:400;white-space:nowrap}
+#me .log span em{font-style:normal;color:var(--good)}
+#me .log span i{font-style:normal;color:var(--dim);margin:0 3px}
 #me .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
   background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}

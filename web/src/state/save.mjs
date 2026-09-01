@@ -21,13 +21,30 @@ export function load() {
 // 지갑은 두 갈래가 한 덩어리로 나가고 들어온다. 한 갈래만 쓰면 나머지가 다음 저장에서 지워진다.
 // 보유 목록과 지금 뛰는 자리를 같이 넘긴다. keeper 칸은 구버전 저장을 읽는 쪽을 위해 남긴다.
 // 게시물도 같이 내보낸다. 저장에 안 실으면 다음 방문에 계정이 빈 채로 열린다.
-export function save(squad, pick, auto, fans, points, wallet, posts) {
+// 상대 전적도 같이 나간다. 탭을 닫을 때마다 지워지면 누구한테 약한지가 영영 안 쌓인다.
+export function save(squad, pick, auto, fans, points, wallet, posts, record) {
   try {
     const i = Number(pick) || 0;
-    localStorage.setItem(KEY, JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], at: Date.now() }));
+    localStorage.setItem(KEY, JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], record: record || {}, at: Date.now() }));
   } catch {
     // 사파리 프라이빗 모드는 쓰기를 막는다. 저장이 안 되는 것과 게임이 죽는 것은 다른 일이다.
   }
+}
+
+// 저장에서 상대 전적을 꺼낸다. 이전 배포본 저장에는 이 칸이 없고, 그때는 빈 장부에서 시작한다.
+// 두 수치만 받는다. 저장에 들어온 다른 모양은 장부를 오염시키므로 버린다.
+export function readRecord(saved) {
+  const src = saved && saved.record;
+  if (!src || typeof src !== 'object') return {};
+  const out = {};
+  for (const name of Object.keys(src)) {
+    const row = src[name];
+    if (!row || typeof row !== 'object') continue;
+    const saves = Number(row.saved) || 0;
+    const conceded = Number(row.conceded) || 0;
+    if (saves > 0 || conceded > 0) out[name] = { saved: saves, conceded };
+  }
+  return out;
 }
 
 // 저장에서 보유 목록을 꺼낸다. 구버전은 키퍼 하나를 한 명짜리 목록으로 승격한다.
