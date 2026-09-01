@@ -263,7 +263,8 @@ export function setPose(g, pose, time = 0) {
 
 // 얼굴. 흰자 위에 검은 동공을 얹는다. 눈이 없으면 사람이 아니라 캡슐이다.
 // dir은 얼굴이 보는 쪽이다. 키퍼는 키커를 보고, 키커는 렌즈 쪽을 본다.
-export function addFace(head, r, dir, skin) {
+// hairTone은 상점 헤어 등급의 색이다. 안 넘기면 기본 갈색으로 선다.
+export function addFace(head, r, dir, skin, hairTone) {
   const whiteMat = new THREE.MeshBasicMaterial({ color: 0xfbfbf5 });
   const darkMat = pupilMat;
   // 흰자 둘은 표정이 바뀌어도 자리가 그대로다. 한 장으로 붙여야 얼굴 하나가 드로우콜을 아홉 부르지 않는다.
@@ -305,7 +306,7 @@ export function addFace(head, r, dir, skin) {
   const collar = new THREE.CylinderGeometry(r * 1.22, r * 1.32, r * 0.26, 10);
   collar.translate(0, -r * 1.02, -dir * r * 0.1);
   const shellGeos = [hair, nape, neck, chin, collar];
-  const shellColors = [0x2b1d14, 0x5a4030, 0x1a1712, 0x141110, 0xd7dfd2];
+  const shellColors = [hairTone || 0x2b1d14, 0x5a4030, 0x1a1712, 0x141110, 0xd7dfd2];
   for (const s of [-1, 1]) {
     const ear = new THREE.SphereGeometry(r * 0.32, 8, 6);
     ear.scale(0.44, 1.05, 0.78);
@@ -375,7 +376,7 @@ function buildBody(o) {
   // 머리는 작다. 몸통과 같은 진폭을 주면 두개골이 찌그러진 것으로 읽힌다.
   jitterMesh(head, 0.008, 11);
   addOutline(head, 0.045);
-  addFace(head, o.headR, o.faceDir, o.skin);
+  addFace(head, o.headR, o.faceDir, o.skin, o.hair);
   neck.add(head);
 
   const joints = { spine, neck };
@@ -466,7 +467,8 @@ function buildBody(o) {
   return g;
 }
 
-export function buildKeeper(height, weight) {
+// look은 상점 외형이다. { hair, ink }. 없으면 기본 팔레트로 선다.
+export function buildKeeper(height, weight, look) {
   const h = height / 100;
   const w = 0.30 + (weight - 84) * 0.0035;
   const g = buildBody({
@@ -486,7 +488,8 @@ export function buildKeeper(height, weight) {
     // 같은 초록을 어둡게만 내린 소매는 팔이 아니라 몸통에 진 그림자로 읽혔다.
     // 색상을 청록으로 꺾으면 밝기가 아니라 색이 팔을 세우고, 양말과 한 벌로 묶인다.
     shirt: 0x2f8f5b, sleeve: 0x073239, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: 0x63d3e8,
-    cuffSleeve: 0x5f8f93, cuffShorts: 0x6d8898,
+    cuffSleeve: (look && look.ink) || 0x5f8f93, cuffShorts: 0x6d8898,
+    hair: look && look.hair,
     phase: 0.7, rest: POSES.ready
   });
   g.userData.girth = w;

@@ -492,7 +492,8 @@ export function restartDelay(keeper, result) {
 
 // 판 사이 대기는 회복이다. 스태미너와 호흡력은 잠겨 있어 지금은 상수로 선다.
 // 동네 등급은 소문의 배율이다. 사람이 많은 곳에서 막을수록 더 퍼진다.
-export function followerGain(keeper, result, city = 0) {
+// look은 외형 선반 승수다. 판정에는 안 들어가고 소문에만 붙는다.
+export function followerGain(keeper, result, city = 0, look = 1) {
   const saved = !result.conceded;
   const flair = result.events.some((e) => e.t === "beat" || e.t === "charge" || e.t === "talked");
   const base = saved ? 40 : 8;
@@ -500,7 +501,7 @@ export function followerGain(keeper, result, city = 0) {
   const fame = clamp(result.fame || 1, 1, 10) * (saved ? 9 : 2);
   // 등급당 12%. 3등급이 +36%인데, 같은 등급이 올린 실점 위험을 팔로워로 되사는 값이다.
   const crowd = 1 + 0.12 * clamp(city, 0, 3);
-  return Math.round((base + talk + fame) * (flair ? 2.2 : 1) * crowd);
+  return Math.round((base + talk + fame) * (flair ? 2.2 : 1) * crowd * clamp(look, 1, 1.3));
 }
 
 export function setBreak() {

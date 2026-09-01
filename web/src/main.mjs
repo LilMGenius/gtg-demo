@@ -10,7 +10,7 @@ import { eventLine, setEndLine, postLine } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
 import { coinGain, readWallet } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
-import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt } from './state/gear.mjs';
+import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
@@ -287,7 +287,7 @@ function rollCaptions(result) {
       state.skip = null;
       // 팔로워는 구마다 오른다. 먹혀도 오르고, 막으면 더 오른다.
       // 봇이 뛴 구는 사고가 안 나서 아무도 안 본다. 성장은 남고 화제만 안 남는다.
-      const gain = state.botRan ? 0 : followerGain(state.keeper, result, state.gear.city);
+      const gain = state.botRan ? 0 : followerGain(state.keeper, result, state.gear.city, lookBoost(state.gear));
       state.fans += gain;
       // 땀은 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
       // 유명한 키커를 막을수록 더 들어온다. 팔로워와 같은 fame 값을 쓴다.
@@ -382,7 +382,7 @@ function renderGym() {
       state.keeper[b.dataset.k] += growthGain(state.keeper, rng);
       state.points -= 1;
       persist();
-      stage.setKeeper(state.keeper);
+      stage.setKeeper(state.keeper, lookOf(state.gear));
       pips();
       renderGym();
     };
@@ -440,7 +440,7 @@ function renderRoster() {
       // 참조 재대입이다. 값을 복사하면 훈련이 보유 목록에 안 남는다.
       state.pick = at;
       state.keeper = state.squad[at];
-      stage.setKeeper(state.keeper);
+      stage.setKeeper(state.keeper, lookOf(state.gear));
       persist();
       pips();
       renderRoster();
@@ -565,7 +565,9 @@ const SHELVES = {
   kit: { head: '유니폼', list: KITS, field: 'pads', worn: '입는 중', past: '지난 유니폼', top: MAX_KIT, at: kitAt },
   sock: { head: '양말', list: SOCKS, field: 'socks', worn: '신는 중', past: '지난 양말', top: MAX_SOCK, at: sockAt },
   frame: { head: '골대', list: GOALS, field: 'frame', worn: '쓰는 중', past: '지난 골대', top: MAX_FRAME, at: frameAt },
-  city: { head: '동네', list: CITIES, field: 'city', worn: '뛰는 중', past: '지난 동네', top: MAX_CITY, at: cityAt }
+  city: { head: '동네', list: CITIES, field: 'city', worn: '뛰는 중', past: '지난 동네', top: MAX_CITY, at: cityAt },
+  hair: { head: '머리', list: HAIRS, field: 'hair', worn: '자른 머리', past: '지난 머리', top: MAX_HAIR, at: hairAt },
+  ink: { head: '타투', list: TATTOOS, field: 'ink', worn: '새긴 것', past: '지운 타투', top: MAX_INK, at: inkAt }
 };
 
 function gearShelf(kind) {
@@ -604,6 +606,8 @@ function bindGear(box) {
       state.gear[s.field] = g[s.field];
       // 동네를 사면 상점을 닫기 전에 배경이 바뀐다. 재시작을 요구하면 산 것이 안 읽힌다.
       if (s.field === 'city') stage.setCity(state.gear.city);
+      // 머리와 타투는 사면 그 자리에서 키퍼 껍데기 색이 바뀐다. 안 보이면 산 것이 아니다.
+      if (s.field === 'hair' || s.field === 'ink') stage.setKeeper(state.keeper, lookOf(state.gear));
       persist();
       pips();
       renderShop();
@@ -684,6 +688,8 @@ function renderShop() {
     + '<button class="tab" data-tab="sock"' + (shopTab === 'sock' ? ' aria-current="true"' : '') + '>양말</button>'
     + '<button class="tab" data-tab="frame"' + (shopTab === 'frame' ? ' aria-current="true"' : '') + '>골대</button>'
     + '<button class="tab" data-tab="city"' + (shopTab === 'city' ? ' aria-current="true"' : '') + '>동네</button>'
+    + '<button class="tab" data-tab="hair"' + (shopTab === 'hair' ? ' aria-current="true"' : '') + '>머리</button>'
+    + '<button class="tab" data-tab="ink"' + (shopTab === 'ink' ? ' aria-current="true"' : '') + '>타투</button>'
     + '<button class="tab" data-tab="bot"' + (shopTab === 'bot' ? ' aria-current="true"' : '') + '>봇</button>'
     + '</div>';
   box.innerHTML = tabs + (SHELVES[shopTab] ? gearShelf(shopTab) : shopTab === 'bot' ? botShelf() : pullShelf(pool)) + '<button class="close">닫기</button>';
@@ -805,7 +811,7 @@ addEventListener('keydown', (e) => {
 pips();
 mountTitle(() => {
   stage.leaveTitle();
-  stage.setKeeper(state.keeper);
+  stage.setKeeper(state.keeper, lookOf(state.gear));
   stage.setCity(state.gear.city);
   // 밀린 훈련이 있어도 공부터 온다. 쓸지 말지는 훈련장 버튼이 들고 있다.
   nextSet();

@@ -436,12 +436,12 @@ export function createScene(canvas) {
     scene.fog.color.setHex(HAZE[c]);
   }
 
-  function setKeeper(k) {
+  function setKeeper(k, look) {
     // 벗겨진 장갑은 장면에 붙어 있다. 키퍼를 다시 짓기 전에 치워야
     // 새 키퍼의 장갑 목록과 짝이 안 맞는 유령이 남지 않는다.
     if (loose) { scene.remove(loose); loose = null; }
     scene.remove(keeper);
-    keeper = buildKeeper(k.height, k.weight);
+    keeper = buildKeeper(k.height, k.weight, look);
     keeper.userData.sub = 'keeper';
     scene.add(keeper);
     markForeground(keeper);

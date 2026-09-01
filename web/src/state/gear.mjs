@@ -70,8 +70,32 @@ export const CITIES = [
 
 export const MAX_CITY = CITIES.length - 1;
 
+// 헤어 선반. 판정에는 손대지 않는다. 세이브율을 건드리면 장비 한 칸이 스탯 한 칸을 넘는 자와 부딪히고,
+// 순수 외형이면 화면에 없는 시스템이 된다. 그래서 축을 팔로워로 잡았다. 팔로워는 판정식 밖이다.
+// tone은 머리 껍데기 정점색이다. 색 상수를 렌더 파일에 따로 두면 두 곳이 갈린다.
+// 값 기준은 앞의 여섯과 같다. 첫 칸은 카드깡 380 땀보다 싸고 마지막 칸은 그보다 비싸다.
+export const HAIRS = [
+  { hair: 0, name: '엄마가 깎아준 머리', cost: 0, tone: 0x2b1d14, note: '아무것도 안 샀을 때 머리' },
+  { hair: 1, name: '동네 미용실 투블럭', cost: 135, tone: 0x1b1410, note: '적어도 단정하다' },
+  { hair: 2, name: '탈색한 노란 머리', cost: 375, tone: 0xd8b45c, note: '멀리서도 누군지 보인다' },
+  { hair: 3, name: '불붙은 빨간 모히칸', cost: 840, tone: 0xc4402c, note: '관중석이 먼저 알아본다' }
+];
+
+export const MAX_HAIR = HAIRS.length - 1;
+
+// 타투 선반. 헤어와 같은 축이고 보이는 자리만 다르다. ink는 소매 커프 색이라 팔에 드러난다.
+// 값 기준은 앞의 일곱과 같다. 첫 칸은 카드깡 380 땀보다 싸고 마지막 칸은 그보다 비싸다.
+export const TATTOOS = [
+  { ink: 0, name: '맨살', cost: 0, ink_tone: 0x5f8f93, note: '아무것도 안 새겼을 때 팔' },
+  { ink: 1, name: '지워지는 문신 스티커', cost: 140, ink_tone: 0x3a4f7a, note: '땀에 번진다. 그래도 있어 보인다' },
+  { ink: 2, name: '팔뚝에 새긴 이름 석 자', cost: 380, ink_tone: 0x2a2f3a, note: '누구 이름인지는 안 밝힌다' },
+  { ink: 3, name: '어깨까지 채운 먹토시', cost: 870, ink_tone: 0x14161c, note: '반팔을 입으면 소매가 하나 더 있다' }
+];
+
+export const MAX_INK = TATTOOS.length - 1;
+
 export function newGear() {
-  return { grip: 0, studs: 0, pads: 0, socks: 0, frame: 0, city: 0 };
+  return { grip: 0, studs: 0, pads: 0, socks: 0, frame: 0, city: 0, hair: 0, ink: 0 };
 }
 
 // 이전 배포본 저장에는 장비 칸이 없다. 없으면 0번 장갑에서 시작한다.
@@ -85,6 +109,8 @@ export function readGear(raw) {
   if (Number.isFinite(raw.socks)) g.socks = Math.min(MAX_SOCK, Math.max(0, Math.floor(raw.socks)));
   if (Number.isFinite(raw.frame)) g.frame = Math.min(MAX_FRAME, Math.max(0, Math.floor(raw.frame)));
   if (Number.isFinite(raw.city)) g.city = Math.min(MAX_CITY, Math.max(0, Math.floor(raw.city)));
+  if (Number.isFinite(raw.hair)) g.hair = Math.min(MAX_HAIR, Math.max(0, Math.floor(raw.hair)));
+  if (Number.isFinite(raw.ink)) g.ink = Math.min(MAX_INK, Math.max(0, Math.floor(raw.ink)));
   return g;
 }
 
@@ -110,4 +136,24 @@ export function frameAt(frame) {
 
 export function cityAt(city) {
   return CITIES[Math.min(MAX_CITY, Math.max(0, Math.floor(Number(city) || 0)))];
+}
+
+export function hairAt(hair) {
+  return HAIRS[Math.min(MAX_HAIR, Math.max(0, Math.floor(Number(hair) || 0)))];
+}
+
+export function inkAt(ink) {
+  return TATTOOS[Math.min(MAX_INK, Math.max(0, Math.floor(Number(ink) || 0)))];
+}
+
+// 렌더가 읽는 두 색을 한 곳에서 뽑는다. buildKeeper 인자와 상점 미리보기가 같은 값을 쓴다.
+export function lookOf(gear) {
+  return { hair: hairAt(gear && gear.hair).tone, ink: inkAt(gear && gear.ink).ink_tone };
+}
+
+// 팔로워 승수. 두 선반 최고 등급을 다 채워도 1.3배다. 동네 최고 등급(1.36배)을 넘기지 않게 잡았다.
+// 넘기면 실점을 감수하는 동네 선택이 외형 구매로 무력화된다.
+export function lookBoost(gear) {
+  const rank = hairAt(gear && gear.hair).hair + inkAt(gear && gear.ink).ink;
+  return 1 + 0.05 * rank;
 }
