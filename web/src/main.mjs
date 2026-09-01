@@ -9,7 +9,7 @@ import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
 import { coinGain, readWallet } from './state/wallet.mjs';
-import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, readGear, gloveAt, bootAt, kitAt } from './state/gear.mjs';
+import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, readGear, gloveAt, bootAt, kitAt, sockAt } from './state/gear.mjs';
 
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
@@ -231,7 +231,7 @@ function commit(dive) {
     ? autoInput(state.keeper, shot, rng)
     : { dive, errMs: performance.now() - pressAt, advance, auto: false };
   stage.diving = state.keeper.diving;
-  const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads });
+  const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads, socks: state.gear.socks });
   state.results[state.i] = result.conceded;
   // 판정 결과에는 키커 이름이 없다. 장부는 이 자리에서만 이름을 알 수 있다.
   tally(shot.kicker.name, result.conceded);
@@ -528,7 +528,8 @@ function shopOdds(pool) {
 const SHELVES = {
   glove: { head: '장갑', list: GLOVES, field: 'grip', worn: '끼는 중', past: '지난 장갑', top: MAX_GRIP, at: gloveAt },
   boot: { head: '축구화', list: BOOTS, field: 'studs', worn: '신는 중', past: '지난 축구화', top: MAX_STUD, at: bootAt },
-  kit: { head: '유니폼', list: KITS, field: 'pads', worn: '입는 중', past: '지난 유니폼', top: MAX_KIT, at: kitAt }
+  kit: { head: '유니폼', list: KITS, field: 'pads', worn: '입는 중', past: '지난 유니폼', top: MAX_KIT, at: kitAt },
+  sock: { head: '양말', list: SOCKS, field: 'socks', worn: '신는 중', past: '지난 양말', top: MAX_SOCK, at: sockAt }
 };
 
 function gearShelf(kind) {
@@ -601,6 +602,7 @@ function renderShop() {
     + '<button class="tab" data-tab="glove"' + (shopTab === 'glove' ? ' aria-current="true"' : '') + '>장갑</button>'
     + '<button class="tab" data-tab="boot"' + (shopTab === 'boot' ? ' aria-current="true"' : '') + '>축구화</button>'
     + '<button class="tab" data-tab="kit"' + (shopTab === 'kit' ? ' aria-current="true"' : '') + '>유니폼</button>'
+    + '<button class="tab" data-tab="sock"' + (shopTab === 'sock' ? ' aria-current="true"' : '') + '>양말</button>'
     + '</div>';
   box.innerHTML = tabs + (SHELVES[shopTab] ? gearShelf(shopTab) : pullShelf(pool)) + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeShop;

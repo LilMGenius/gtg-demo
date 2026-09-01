@@ -32,6 +32,9 @@ const STUD_MS = 7;
 // 유니폼 등급 한 칸이 깎는 정면 강슛 동반 실점 확률. 맷집 한 칸이 4.4를 깎으므로 한 칸은 그보다 작다.
 // 세 칸을 다 입어도 9라 맷집 세 칸 13.2에 못 미친다. 장비는 스탯 위에 얇게만 얹는다.
 const KIT_CARRY = 3;
+// 양말 등급 한 칸이 깎는 착지 실패 확률. 밸런스 한 칸이 14를 깎으므로 한 칸은 그보다 작다.
+// 세 칸을 다 신어도 24라 밸런스 세 칸 42에 못 미친다. 장비는 스탯 위에 얇게만 얹는다.
+const SOCK_LAND = 8;
 const WIN0 = 70;
 const STREAK_K = 6.0;
 
@@ -407,7 +410,9 @@ export function resolve(input) {
 
     // 3단 리바운드. 착지에 실패했으면 두 번째 창이 아예 없다.
     state.stage = 3;
-    const landing = Math.max(0, (10 - keeper.balance) * 14 + keeper.diving * 2);
+    // 양말 등급. 앞의 셋과 같은 이유로 선반 밖의 값은 잘라 넣는다.
+    const socks = Math.min(3, Math.max(0, Math.floor(Number(input.socks) || 0)));
+    const landing = Math.max(0, (10 - keeper.balance) * 14 + keeper.diving * 2 - socks * SOCK_LAND);
     const downed = inp.dive !== 0 && roll(landing);
     // 무거우면 일어나는 데 시간이 더 든다.
     const reboundWindow = (18 + keeper.reflex * 4.5) * (1 - (keeper.weight - 84) * 0.006);

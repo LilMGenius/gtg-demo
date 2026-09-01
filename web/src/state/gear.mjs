@@ -35,8 +35,19 @@ export const KITS = [
 
 export const MAX_KIT = KITS.length - 1;
 
+// 양말 선반. 손도 발도 몸도 아니라 착지고, 깎는 것은 흘린 뒤 못 일어나는 사고다.
+// 값 기준은 앞의 셋과 같다. 첫 칸은 카드깡 380 땀보다 싸고 마지막 칸은 그보다 비싸다.
+export const SOCKS = [
+  { socks: 0, name: '목 늘어난 흰 양말', cost: 0, note: '아무것도 안 샀을 때 신고 있는 것' },
+  { socks: 1, name: '축구 스타킹', cost: 130, note: '적어도 흘러내리지는 않는다' },
+  { socks: 2, name: '정강이 보호대 낀 스타킹', cost: 350, note: '까져도 덜 아파서 덜 눕는다' },
+  { socks: 3, name: '미끄럼방지 그립 양말', cost: 830, note: '발이 신발 안에서 안 논다. 넘어져도 금방 선다' }
+];
+
+export const MAX_SOCK = SOCKS.length - 1;
+
 export function newGear() {
-  return { grip: 0, studs: 0, pads: 0 };
+  return { grip: 0, studs: 0, pads: 0, socks: 0 };
 }
 
 // 이전 배포본 저장에는 장비 칸이 없다. 없으면 0번 장갑에서 시작한다.
@@ -47,6 +58,7 @@ export function readGear(raw) {
   if (Number.isFinite(raw.grip)) g.grip = Math.min(MAX_GRIP, Math.max(0, Math.floor(raw.grip)));
   if (Number.isFinite(raw.studs)) g.studs = Math.min(MAX_STUD, Math.max(0, Math.floor(raw.studs)));
   if (Number.isFinite(raw.pads)) g.pads = Math.min(MAX_KIT, Math.max(0, Math.floor(raw.pads)));
+  if (Number.isFinite(raw.socks)) g.socks = Math.min(MAX_SOCK, Math.max(0, Math.floor(raw.socks)));
   return g;
 }
 
@@ -60,4 +72,8 @@ export function bootAt(studs) {
 
 export function kitAt(pads) {
   return KITS[Math.min(MAX_KIT, Math.max(0, Math.floor(Number(pads) || 0)))];
+}
+
+export function sockAt(socks) {
+  return SOCKS[Math.min(MAX_SOCK, Math.max(0, Math.floor(Number(socks) || 0)))];
 }
