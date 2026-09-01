@@ -165,14 +165,26 @@ try {
   }
 
   // 글자가 남아 있으면 아이콘과 겹쳐 읽힌다. 이름은 aria-label이 맡는다.
-  const labels = await p.evaluate(() => ["out", "auto"].map((id) => {
-    const el = document.getElementById(id);
-    return id + ":" + JSON.stringify(el.textContent.trim()) + "/" + JSON.stringify(el.getAttribute("aria-label") || "");
-  }));
-  const labelOk = await p.evaluate(() => ["out", "auto"].every((id) => {
-    const el = document.getElementById(id);
-    return el.textContent.trim() === "" && (el.getAttribute("aria-label") || "").length > 0;
-  }));
+  // 재는 것은 화면에 그려지는 글자다. textContent는 display:none인 자식까지 세므로,
+  // 버튼이 품은 접힌 배지(#autoDot)가 켜져 있지도 않은데 글자로 잡혔다.
+  const seen = await p.evaluate(() => {
+    const vis = (node) => {
+      let t = "";
+      for (const c of node.childNodes) {
+        if (c.nodeType === 3) { t += c.nodeValue; continue; }
+        if (c.nodeType !== 1) continue;
+        if (getComputedStyle(c).display === "none") continue;
+        t += vis(c);
+      }
+      return t;
+    };
+    return ["out", "auto"].map((id) => {
+      const el = document.getElementById(id);
+      return { id, text: vis(el).trim(), label: el.getAttribute("aria-label") || "" };
+    });
+  });
+  const labels = seen.map((v) => v.id + ":" + JSON.stringify(v.text) + "/" + JSON.stringify(v.label));
+  const labelOk = seen.every((v) => v.text === "" && v.label.length > 0);
   check("icon:no-text-face-but-aria-label", labelOk, labels.join(" "));
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
