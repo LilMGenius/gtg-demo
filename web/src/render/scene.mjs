@@ -749,6 +749,10 @@ export function createScene(canvas) {
     // 두 번째부터는 결과만 남고 사건은 안 보인다. 판정 rng가 아니라 화면 전용 편차다.
     // 폭은 좁게 둔다. 넓히면 매번 다른 게 아니라 매번 어긋난 것으로 읽힌다.
     tail.vary = { a: Math.random(), b: Math.random(), c: Math.random() };
+    // from은 자막이 뜨는 순간의 공 위치다. 그 순간 공은 아직 코스 중간이라 x가 0에 가깝다.
+    // 꼬리가 from만 보고 끝나면 어느 코너로 찼든 공이 골문 한가운데에 선다.
+    // 키커가 노린 좌표는 비행식이 쓰는 VIEW_X * aimX * SX다. 종점은 그쪽이어야 한다.
+    tail.aimX = cue && cue.shot ? VIEW_X * cue.shot.aimX * SX : tail.from.x;
     // 장갑이 벗겨진 자리가 접촉점이다. 이 좌표를 여기서 잡아 두지 않으면
     // 뒤에서 장갑은 이미 공을 따라 움직이고 있어 손이 어디였는지 알 길이 없다.
     if (kind === 'gloveGone' && loose) tail.gw = loose.getWorldPosition(new THREE.Vector3());
@@ -1330,7 +1334,7 @@ export function createScene(canvas) {
             // x를 0으로 모으면 어디로 차 넣었든 공이 매번 골문 한가운데에서 멈춘다.
             // 아무도 안 건드린 공이 옆으로 휘어 들어갈 이유가 없다. 노린 자리에 그대로 꽂힌다.
             // 2.0은 골대 반폭 2.2에서 공 반지름 0.14와 그물 두께를 뺀 값이라 그물을 뚫지 않는다.
-            const inX = Math.max(-2.0, Math.min(2.0, tail.from.x));
+            const inX = Math.max(-2.0, Math.min(2.0, tail.aimX));
             ball.position.set(lerp(tail.from.x, inX, be), lerp(tail.from.y, REST_Y, be), lerp(tail.from.z, REST_Z, be));
           }
           break;
@@ -1348,9 +1352,9 @@ export function createScene(canvas) {
           // 키퍼는 고개만 돌리고 제자리에 선다. 종점이 x*1.3이면 실루엣 반폭(실측 0.72) 안이라
           // 공이 가슴을 뚫고 지나갔다. 실점 꼬리 여섯 중 이 하나만 520ms에 키퍼에 가려졌다.
           // 반폭 0.72에 공 반지름 0.14와 여유를 더한 1.05로 어깨 밖을 지나가게 한다.
-          const side = Math.sign(tail.from.x || 1);
+          const side = Math.sign(tail.aimX || 1);
           // 1.3 고정이면 공이 매번 같은 자리로 빠진다. 1.05 하한은 어깨 밖 보장이라 그대로 둔다.
-          const outX = side * Math.max(Math.abs(tail.from.x) * (1.18 + vy.c * 0.28), 1.05);
+          const outX = side * Math.max(Math.abs(tail.aimX) * (1.18 + vy.c * 0.28), 1.05);
           // 지나가는 속도도 흔든다. 폭 0.9~1.14는 꼬리 길이 안에서 끝나는 범위다.
           const be = Math.min(1, e * (0.9 + vy.a * 0.24));
           ball.position.set(lerp(tail.from.x, outX, be), lerp(tail.from.y, REST_Y, be), lerp(tail.from.z, REST_Z, be));
@@ -1363,7 +1367,14 @@ export function createScene(canvas) {
           // 1.6은 골대 반폭 2.2의 안쪽이라 화면 밖으로 나가지 않으면서 골문 가운데가 뚫려 보인다.
           keeper.position.x = Math.sign(tail.kx || 1) * 1.6;
           // 굴려 넣은 공이다. REST_Y까지 띄우면 굴린 것이 아니라 꽂아 넣은 것으로 읽힌다. 지면에 붙인다.
-          ball.position.set(lerp(tail.from.x, 0, e), BALL_R, lerp(tail.from.z, REST_Z, e));
+          // x를 0으로 모으면 빈 골문 어디로 밀어 넣었든 공이 매번 골문 한가운데에서 멈춘다.
+          // 막은 사람이 없는 공이라 휠 이유가 없다. 밀어 넣은 자리에 그대로 선다.
+          // 2.0은 talked와 같은 근거다. 골대 반폭 2.2에서 공 반지름 0.14와 그물 두께를 뺀 값이다.
+          ball.position.set(
+            lerp(tail.from.x, Math.max(-2.0, Math.min(2.0, tail.aimX)), e),
+            BALL_R,
+            lerp(tail.from.z, REST_Z, e),
+          );
           break;
         default:
           break;
