@@ -60,7 +60,15 @@ async function run(fixture) {
       };
       card.scrollTop = 0;
       const atTop = read();
-      card.scrollTop = card.scrollHeight;
+      // 한 위치에서 세 줄이 동시에 보이는지는 줄 높이가 늘면 깨지는 우연이다.
+      // 축이 재려던 것은 도달 가능성이므로 줄마다 따로 불러 그때 카드 안에 있는지 본다.
+      const reach = rows.map((n) => {
+        n.scrollIntoView({ block: 'center' });
+        const cr = card.getBoundingClientRect();
+        const r = n.getBoundingClientRect();
+        return r.top >= cr.top - 1 && r.bottom <= cr.bottom + 1;
+      });
+      card.scrollTop = 0;
       const atBottom = read();
       return {
         headPresent: head >= 0,
@@ -69,6 +77,7 @@ async function run(fixture) {
         dim,
         scrollHeight: card.scrollHeight,
         clientHeight: card.clientHeight,
+        reach,
         atTop,
         atBottom
       };
@@ -121,10 +130,10 @@ check('view:numbers-match-judgment', mismatch.length === 0, mismatch.join(' | ')
 const top = main.shot.rows[0] ? main.shot.rows[0].i : '';
 check('view:anchor-tier3-30pct-24pct', top.includes('30%') && top.includes('+24%'), top ? 'ok' : 'no row');
 
-// 실측: scrollTop 0에서 세 줄 모두 카드 밑변 아래. 바닥까지 내리면 모두 카드 안
+// 실측: scrollTop 0에서 세 줄 모두 카드 밑변 아래. 그 줄을 불러오면 모두 카드 안
 const belowFold = main.shot.atTop.rows.every((r) => r.top >= main.shot.atTop.cardBottom);
-const inViewAfter = main.shot.atBottom.rows.every((r) => r.bottom <= main.shot.atBottom.cardBottom + 1 && r.top >= main.shot.atBottom.cardTop - 1);
-check('scroll:rows-below-fold-until-scrolled', belowFold && inViewAfter, 'fold=' + belowFold + ' after=' + inViewAfter + ' h=' + main.shot.clientHeight + '/' + main.shot.scrollHeight);
+const inViewAfter = main.shot.reach.every(Boolean);
+check('scroll:rows-reachable-by-scrolling', belowFold && inViewAfter, 'fold=' + belowFold + ' after=' + inViewAfter + ' h=' + main.shot.clientHeight + '/' + main.shot.scrollHeight);
 
 const allErrs = main.errs.concat(ctrl.errs);
 check('console:no-errors', allErrs.length === 0, allErrs.join(' | ') || 'clean');
