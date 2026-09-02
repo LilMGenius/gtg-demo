@@ -97,6 +97,53 @@ check("look-fans", look.fans > c1.fans && look.fans <= Math.ceil(c1.fans * 1.3),
 check("look-cap", lookBoost({ hair: 3, ink: 3 }) === 1.3,
   "hair3+ink3 -> " + lookBoost({ hair: 3, ink: 3 }));
 
+// 등급 사다리. 위의 축은 전부 0과 3만 비교한다.
+// 양 끝만 재면 중간 등급이 값만 받고 아무것도 안 줘도 게이트가 초록이다.
+// 사다리는 끝점이 아니라 계단이다. 인접한 두 등급이 매번 같은 방향으로 움직여야 통과다.
+const RANKS = [0, 1, 2, 3];
+const rungs = {};
+function ladder(field) {
+  // 한 선반의 네 등급을 한 번만 돌리고 여러 축이 같은 표본을 나눠 쓴다.
+  if (!rungs[field]) rungs[field] = RANKS.map((r) => sweep({ [field]: r }));
+  return rungs[field];
+}
+function mono(name, field, pick, dir) {
+  const v = ladder(field).map(pick);
+  let ok = true;
+  for (let i = 1; i < v.length; i++) {
+    // dir가 1이면 오르기만, -1이면 내리기만 해야 한다. 같아도 계단이 죽은 것이라 불통과다.
+    if (dir > 0 ? !(v[i] > v[i - 1]) : !(v[i] < v[i - 1])) ok = false;
+  }
+  check(name, ok, v.join(" -> "));
+}
+
+const rateOf = (s) => Number(s.rate.toFixed(4));
+
+// 장갑 세 축. 세이브율은 오르고, 딸려 가는 것과 흘리는 것은 계단마다 줄어야 한다.
+mono("mono-grip-save", "grip", rateOf, 1);
+mono("mono-grip-glove", "grip", (s) => s.ev.gloveGone, -1);
+mono("mono-grip-spill", "grip", (s) => s.ev.spill, -1);
+
+// 축구화는 옆으로 뜨는 시간만 줄인다. 드러나는 축은 세이브율 하나다.
+mono("mono-studs-save", "studs", rateOf, 1);
+
+// 유니폼은 같이 밀려 들어가는 갈래를 계단마다 줄이면서 세이브율을 올린다.
+mono("mono-pads-save", "pads", rateOf, 1);
+mono("mono-pads-carry", "pads", (s) => s.ev.carriedIn, -1);
+
+// 양말은 눕는 갈래를 줄이고 그만큼 세이브율을 올린다.
+mono("mono-socks-save", "socks", rateOf, 1);
+mono("mono-socks-down", "socks", (s) => s.ev.downed, -1);
+
+// 골대는 흘린 공을 먹는다. 먹힌 횟수와 세이브율이 같이 올라가야 한다.
+mono("mono-frame-save", "frame", rateOf, 1);
+mono("mono-frame-eat", "frame", (s) => s.ev.reboundMiss, 1);
+
+// 동네는 대가 축이다. 소문과 한눈팔 기회는 오르고 세이브율은 내려가면서 둘 다 계단이다.
+mono("mono-city-fans", "city", (s) => s.fans, 1);
+mono("mono-city-gaze", "city", (s) => s.ev.gaze, 1);
+mono("mono-city-save", "city", rateOf, -1);
+
 for (const n of notes) console.log("ok  " + n);
 for (const f of fails) console.log("BAD " + f);
 console.log(fails.length ? "gear-effect FAIL " + fails.length : "gear-effect PASS");
