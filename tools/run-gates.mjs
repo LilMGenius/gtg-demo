@@ -1,0 +1,43 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+
+// 게이트를 한 번에 돌리고 결과를 모은다. 지금까지는 사람이 하나씩 불렀고,
+// 그래서 어느 게이트가 마지막으로 언제 돌았는지 아무도 몰랐다.
+// 기계가 읽는 계약은 마지막 줄 문장이 아니라 종료 코드다. 문장은 사람이 읽는다.
+
+// 브라우저를 여는 게이트는 코어를 하나씩 먹고 수십 초가 든다. 소스가 스스로 말하게 두면
+// 새 게이트를 넣을 때 이 목록을 고칠 일이 없다.
+const isSlow = (src) => src.includes("playwright");
+
+// 동시에 돌리면 시간을 재는 게이트가 자기 측정 창 안에서 죽어 거짓 빨간불을 낸다.
+// 그래서 순차다. 대신 한 게이트가 매달리면 전체가 멈추므로 각자에게 사망 시각을 준다.
+const CAP_MS = 180000;
+
+const mode = process.argv[2] || "fast";
+const all = readdirSync("tools").filter((f) => f.endsWith("-gate.mjs")).sort();
+const picked = all.filter((f) => {
+  const slow = isSlow(readFileSync("tools/" + f, "utf8"));
+  return mode === "all" || (mode === "slow" ? slow : !slow);
+});
+
+const NL2 = String.fromCharCode(10);
+console.log(mode + ": " + picked.length + " of " + all.length + " gates");
+
+const red = [];
+for (const f of picked) {
+  const name = f.replace("-gate.mjs", "");
+  const t0 = Date.now();
+  const r = spawnSync(process.execPath, ["tools/" + f], { encoding: "utf8", timeout: CAP_MS });
+  const secs = ((Date.now() - t0) / 1000).toFixed(1);
+  const code = r.status;
+  // 타임아웃은 status가 null로 온다. 통과와 구분되지 않으면 매달린 게이트가 초록으로 읽힌다.
+  const verdict = r.error && r.error.code === "ETIMEDOUT" ? "TIMEOUT" : code === 0 ? "pass" : "FAIL";
+  if (verdict !== "pass") red.push(name + " " + verdict);
+  // 마지막 비어 있지 않은 줄이 그 게이트가 사람에게 하는 말이다. 없으면 종료 코드만 남는다.
+  const lines = (r.stdout || "").trim().split(NL2).filter((x) => x.trim());
+  const say = lines.length ? lines[lines.length - 1].trim() : "(silent)";
+  console.log("  " + verdict.padEnd(7) + name.padEnd(14) + secs.padStart(6) + "s  " + say.slice(0, 60));
+}
+
+console.log(red.length ? "gates FAIL " + red.length + ": " + red.join(", ") : "gates PASS " + picked.length);
+if (red.length) process.exitCode = 1;
