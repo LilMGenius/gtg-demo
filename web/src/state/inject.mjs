@@ -12,19 +12,19 @@ const STAT_MAX = 10;
 
 // 만렙 표본에 훈련을 5회 남긴다. 0이면 올릴 칸도 없고 쓸 훈련도 없어
 // 잉여 훈련 환전 경로가 화면에 아예 안 뜬다. 그 경로까지 재려면 남은 훈련이 있어야 한다.
-const MAXED_POINTS = 5;
+export const MAXED_POINTS = 5;
 
 // 상점 8선반의 최상급 합이 6810이고 카드깡 한 번이 380이다. 8000이면 그 둘을 다 하고도
 // 남아, 장비 표본이 살 수 있는 등급 하나에 묶이지 않는다. 완봉 한 판 60 기준 약 133판 몫이다.
-const RICH_COIN = 8000;
+export const RICH_COIN = 8000;
 
 // 스폰은 결제로만 들어오고 이 빌드에는 결제 경로가 없다. 게이트가 스폰 칸을 읽으려면
 // 주입 말고는 방법이 없다. 1000은 두 갈래가 화면에서 서로 구분되는지 보는 데 쓴다.
-const RICH_CASH = 1000;
+export const RICH_CASH = 1000;
 
 // 만남 한 번의 실패가 100을 깎는다. 5000이면 그 오십 배라 한 번의 감소가 바닥에 안 닿는다.
 // 완봉 한 구가 40대 팔로워이므로 이 수는 백 구 남짓 쌓은 자리와 같다.
-const START_FANS = 5000;
+export const START_FANS = 5000;
 
 // 프리셋은 상태를 바꾸는 함수다. 값 덩어리로 두면 어느 칸이 정본인지가 호출부로 샌다.
 const PRESETS = {
@@ -48,16 +48,20 @@ const PRESETS = {
   }
 };
 
-// ?preset=maxed 처럼 주소로만 켜진다. 쉼표로 여러 개를 이어 붙일 수 있고,
-// 모르는 이름은 조용히 지나간다. 게이트가 오타로 멈추는 것보다 표본이 안 바뀌는 편이 낫다.
+// ?preset=maxed 처럼 주소로만 켜진다. 쉼표로 여러 개를 이어 붙일 수 있다.
+// 모르는 이름은 즉시 멈춘다. 조용히 지나가면 그 게이트는 만렙을 재는 줄 알고 신인을 재고,
+// 표본이 안 바뀐 채 나온 초록은 결함이 없다는 뜻이 아니라 아무것도 안 쟀다는 뜻이다.
+// 이 세션에서만 표본이 고정된 채 통과한 거짓 초록이 넷이었다.
 export function applyPreset(raw, state) {
   if (!raw) return [];
   const used = [];
-  for (const name of String(raw).split(',')) {
-    const fn = PRESETS[name.trim()];
-    if (!fn) continue;
+  for (const name of String(raw).split(",")) {
+    const key = name.trim();
+    if (!key) continue;
+    const fn = PRESETS[key];
+    if (!fn) throw new Error("unknown preset name: " + key + ". known: " + Object.keys(PRESETS).join(", "));
     fn(state);
-    used.push(name.trim());
+    used.push(key);
   }
   return used;
 }
