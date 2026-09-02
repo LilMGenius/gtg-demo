@@ -925,7 +925,7 @@ export function createScene(canvas) {
     if (frozen) dt = 0;
     frames += 1;
     // 맡겨 둔 사건을 그 프레임에서 건다. 밖에서 부르면 폴링 간격만큼 늦는다.
-    if (planAct && frames >= planAct.n) { act(planAct.kind); planAct = null; }
+    if (planAct && planAct.kind && frames >= planAct.n) { act(planAct.kind); planAct = null; }
     // 멈출 프레임에 닿으면 세계시간이 더 안 간다. 읽는 쪽이 언제 읽어도 같은 상태다.
     if (stopFrame >= 0 && frames >= stopFrame) dt = 0;
     if (stopLeft > 0) {
@@ -1852,6 +1852,8 @@ export function createScene(canvas) {
   window.__frames = () => frames;
 
   // 게이트가 사건을 걸 프레임과 세계를 멈출 프레임을 미리 맡긴다.
+  // kind가 비면 사건은 안 걸고 멈춤만 맞는다. 장부를 읽는 동안 판이 더 돌면
+  // 앞에 읽은 수와 뒤에 읽은 수가 한 판씩 어깼다.
   window.__plan = (at, kind, stopAt) => { planAct = { n: at, kind }; stopFrame = stopAt; };
 
   // 꼬리가 겨냥한 x. 키커가 노린 자리이고 먹힌 공이 끝나야 할 자리다.
