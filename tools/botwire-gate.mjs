@@ -8,12 +8,15 @@ const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win6
 const BASE = "http://127.0.0.1:10310/web/index.html";
 
 // 봇 랩과 사람 랩을 합쳐 두 분 가까이 돈다. 워치독은 그보다 넉넉해야 한다.
-const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 240000);
+const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 300000);
 t.unref();
 
 // 봇은 자동으로 도니 구가 빨리 넘어가고, 사람은 대기창을 다 쓴다. 관측 창이 다르다.
+// 이 수는 상한이지 목표가 아니다. 사람 랩은 라포가 오르는 순간 끝난다.
+// 시간으로만 끊으면 기계가 바쁜 날 같은 창에 구가 덜 돌아 표본이 비고,
+// 그러면 축이 아니라 부하가 빨간불을 낸다.
 const BOT_MS = 48000;
-const HAND_MS = 78000;
+const HAND_MS = 110000;
 const POLL = 250;
 // 자동을 켠 직후에는 아직 한 구도 안 끝나 botRan이 비어 있다. 그 구간은 세지 않는다.
 const WARMUP = 3500;
@@ -45,11 +48,15 @@ try {
   await p.evaluate(() => { window.__gear().city = 3; });
 
   // 한 랩을 도는 동안 장부를 계속 읽는다. 구 경계를 따로 잡지 않아도 델타는 정확하다.
-  const watch = async (ms, clickPad) => {
+  const watch = async (ms, clickPad, until) => {
     const start = Date.now();
     const base = await p.evaluate(() => ({ fans: window.__fans(), rap: window.__rapport() }));
     let ranTrue = 0, ranFalse = 0;
     while (Date.now() - start < ms) {
+      if (until) {
+        const now = await p.evaluate(() => ({ fans: window.__fans(), rap: window.__rapport() }));
+        if (until(base, now)) break;
+      }
       if (clickPad) {
         const z = await p.$(".zone:not([disabled])");
         if (z) await z.click({ force: true });
@@ -78,7 +85,9 @@ try {
   // 사람 랩. 자동을 끄고 같은 판을 손으로 친다. 대조군이 없으면 위 세 축은
   // 배선이 끊겨 아무것도 안 오르는 상태와 구분되지 않는다.
   await p.click("#auto", { force: true });
-  const hand = await watch(HAND_MS, true);
+  // 라포는 talked가 나야 오르고 talked는 확률이다. 그것이 한 번 관측되면 표본이 찬 것이라
+  // 더 돌 이유가 없다. 상한까지 못 채우면 계기가 표본을 못 모은 것이고 그때는 빨간불이 맞다.
+  const hand = await watch(HAND_MS, true, (b, n) => sum(n.rap) > sum(b.rap));
   hand.dRap = sum(hand.endRap) - sum(hand.baseRap);
 
   check("hand-ran-false", hand.ranFalse >= 3 && hand.ranTrue === 0, "true " + hand.ranTrue + " false " + hand.ranFalse);

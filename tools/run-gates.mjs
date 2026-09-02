@@ -11,7 +11,9 @@ const isSlow = (src) => src.includes("playwright");
 
 // 동시에 돌리면 시간을 재는 게이트가 자기 측정 창 안에서 죽어 거짓 빨간불을 낸다.
 // 그래서 순차다. 대신 한 게이트가 매달리면 전체가 멈추므로 각자에게 사망 시각을 준다.
-const CAP_MS = 180000;
+// 부하가 높은 날 한 게이트가 자기 상한을 다 쓰는다. 가장 긴 게이트의 상한보다 넣어야
+// 러너가 멀지도 않은 게이트를 죽이고 그것을 실패로 읽지 않는다.
+const CAP_MS = 240000;
 
 const mode = process.argv[2] || "fast";
 const all = readdirSync("tools").filter((f) => f.endsWith("-gate.mjs")).sort();
