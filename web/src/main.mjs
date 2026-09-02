@@ -888,6 +888,11 @@ window.__me = (open) => { if (open) openMe(); else closeMe(); };
 window.__shop = (open) => { if (open) openShop(); else closeShop(); };
 // 게이트는 화면 글자 대신 장부를 직접 읽어야 판정이 마크업 변경에 흔들리지 않는다.
 window.__record = () => state.record;
+// 팔로워와 라포는 화면에 숫자 하나와 막대로만 나온다. 봇이 뛴 구가 정말 아무것도 안 남기는지는 장부를 직접 읽어야 안다.
+window.__fans = () => state.fans;
+window.__rapport = () => state.rapport;
+// 봇이 실제로 뛴 구였는지. 크레딧과 자동 상태만 보고 짐작하면 배선이 끊겨도 게이트가 초록으로 남는다.
+window.__botRan = () => state.botRan;
 
 // 소리. 끌 수 없는 소리는 소리가 아니라 사고다.
 // 음소거는 음량을 건드리지 않는다. 둘을 섞어버리면 한 번 누른 사람은 다시 켜도 무음으로 남는다.

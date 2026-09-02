@@ -1,0 +1,98 @@
+import { chromium } from "playwright";
+
+// 봇이 뛴 구는 성장은 남기고 화제는 안 남긴다. 그 교환이 실제로 배선돼 있는지는
+// 시드 시뮬로 못 잰다. state.botRan 하나가 팔로워와 라포 둘을 지배하고,
+// 그 플래그는 화면이 아니라 브라우저 안의 장부에만 있기 때문이다.
+
+const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
+const BASE = "http://127.0.0.1:10310/web/index.html";
+
+// 봇 랩과 사람 랩을 합쳐 두 분 가까이 돈다. 워치독은 그보다 넉넉해야 한다.
+const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 240000);
+t.unref();
+
+// 봇은 자동으로 도니 구가 빨리 넘어가고, 사람은 대기창을 다 쓴다. 관측 창이 다르다.
+const BOT_MS = 48000;
+const HAND_MS = 78000;
+const POLL = 250;
+// 자동을 켠 직후에는 아직 한 구도 안 끝나 botRan이 비어 있다. 그 구간은 세지 않는다.
+const WARMUP = 3500;
+
+const fails = [], notes = [];
+const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
+const sum = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0);
+
+let b;
+try {
+  b = await chromium.launch({ executablePath: EXE });
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  const p = await ctx.newPage();
+  const errs = [];
+  p.on("pageerror", (e) => errs.push(String(e)));
+  p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+
+  // 의사소통과 악동이 만렙이라야 talked가 관측 가능한 빈도로 열린다. 3짜리 신규 저장으로는
+  // 라포 축이 한 시간을 돌려도 한 번 안 뜬다. 주입은 판정식을 안 건드리고 도달 가능한 상태만 앞당긴다.
+  const q = "?preset=maxed";
+  await p.goto(BASE + q, { waitUntil: "load" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "load" });
+  await p.waitForTimeout(1200);
+  await p.click("#go", { force: true });
+  await p.waitForTimeout(1400);
+
+  // 행인이 지나가야 말을 걸 수 있다. 도시 3이 gaze를 가장 자주 연다.
+  await p.evaluate(() => { window.__gear().city = 3; });
+
+  // 한 랩을 도는 동안 장부를 계속 읽는다. 구 경계를 따로 잡지 않아도 델타는 정확하다.
+  const watch = async (ms, clickPad) => {
+    const start = Date.now();
+    const base = await p.evaluate(() => ({ fans: window.__fans(), rap: window.__rapport() }));
+    let ranTrue = 0, ranFalse = 0;
+    while (Date.now() - start < ms) {
+      if (clickPad) {
+        const z = await p.$(".zone:not([disabled])");
+        if (z) await z.click({ force: true });
+      }
+      if (Date.now() - start > WARMUP) {
+        const r = await p.evaluate(() => window.__botRan());
+        if (r === true) ranTrue += 1; else ranFalse += 1;
+      }
+      await p.waitForTimeout(POLL);
+    }
+    const end = await p.evaluate(() => ({ fans: window.__fans(), rap: window.__rapport() }));
+    return { ranTrue, ranFalse, dFans: end.fans - base.fans, dRap: 0, endRap: end.rap, baseRap: base.rap };
+  };
+
+  // 봇 랩. 크레딧을 먼저 채워야 자동 버튼이 상점 대신 자동을 켠다.
+  await p.evaluate(() => { const bot = window.__bot(); bot.tier = 3; bot.ms = 3600000; });
+  await p.click("#auto", { force: true });
+  const bot = await watch(BOT_MS, false);
+  bot.dRap = sum(bot.endRap) - sum(bot.baseRap);
+
+  check("bot-ran-observed", bot.ranTrue >= 3, "true " + bot.ranTrue + " false " + bot.ranFalse);
+  check("bot-ran-pure", bot.ranFalse === 0, "false " + bot.ranFalse);
+  check("bot-fans-zero", bot.dFans === 0, "dFans " + bot.dFans);
+  check("bot-rapport-zero", bot.dRap === 0, "dRapport " + bot.dRap);
+
+  // 사람 랩. 자동을 끄고 같은 판을 손으로 친다. 대조군이 없으면 위 세 축은
+  // 배선이 끊겨 아무것도 안 오르는 상태와 구분되지 않는다.
+  await p.click("#auto", { force: true });
+  const hand = await watch(HAND_MS, true);
+  hand.dRap = sum(hand.endRap) - sum(hand.baseRap);
+
+  check("hand-ran-false", hand.ranFalse >= 3 && hand.ranTrue === 0, "true " + hand.ranTrue + " false " + hand.ranFalse);
+  check("hand-fans-positive", hand.dFans > 0, "dFans " + hand.dFans);
+  check("hand-rapport-positive", hand.dRap > 0, "dRapport " + hand.dRap);
+
+  check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
+
+  const LINE = String.fromCharCode(10);
+  if (notes.length) console.log(notes.map((s) => "  ok   " + s).join(LINE));
+  if (fails.length) console.log(fails.map((s) => "  FAIL " + s).join(LINE));
+  console.log(fails.length ? "botwire FAIL " + fails.length : "botwire PASS");
+  if (fails.length) process.exitCode = 1;
+} finally {
+  clearTimeout(t);
+  if (b) await b.close();
+}
