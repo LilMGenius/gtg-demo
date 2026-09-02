@@ -13,7 +13,7 @@ const NL2 = String.fromCharCode(10);
 // 백틱 안에 적힌 경로는 전부 실재해야 한다. 문서가 죽은 경로를 가리키면
 // 읽는 쪽은 그 경계가 아직 있다고 믿는다. 홀수 조각이 백틱 안이다.
 const inTicks = doc.split("`").filter((_, i) => i % 2 === 1);
-// 꼺쇠표가 들어간 것은 파일명이 아니라 이름 규칙이다. 그것까지 실재를 물으면 규칙을 문서에 못 적는다.
+// 이름 규칙 표기는 파일명이 아니다. 그것까지 실재를 물으면 규칙 자체를 문서에 못 적는다.
 const looksPath = (s) => s.indexOf(String.fromCharCode(60)) < 0 && s.endsWith(".mjs") || s.endsWith(".css") || s.endsWith(".json") || (s.endsWith("/") && s.indexOf(" ") < 0);
 const uniq = [...new Set(inTicks.filter(looksPath))];
 const missing = uniq.filter((p) => !existsSync(p));
