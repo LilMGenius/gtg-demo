@@ -341,20 +341,28 @@ try {
     dev.opened === 1, "opened " + dev.opened);
   check("live:a-device-swap-does-not-take-the-effects-with-it", dev.peak > 0.02, String(dev.peak));
 
-  // 발화되는 것과 소리가 난다고 느끼는 것은 다른 말이다.
-  // 슛 한 번만 울리고 결과 연출 수초가 통째로 조용하면 플레이어는 무음이라고 말한다.
   // 사건마다 강제로 발동시켜 어느 결과가 무음으로 끝나는지 센다.
+  // 기다리는 창은 실시간이 아니라 세계 프레임으로 센다. 잠으로 재면 기계가 바쁜 날 같은
+  // 1.2초에 프레임이 덜 지나가고, 공이 그물에 닿기 전에 세어 조용한 것으로 잡힌다.
+  // 실측: 부하가 걸린 쓸기에서 distracted가 무음으로 신고됐고 유휴에서 다시 돌리니 통과했다.
   const KINDS = ["catch", "save", "spill", "rebound", "reboundMiss", "gloveGone",
     "charge", "beat", "carriedIn", "downed", "lost", "talked", "distracted", "openGoalScored", "skied",
     "miss"];
   const silent = await lp.evaluate(async (kinds) => {
     const out = [];
+    window.__fixedStep(1 / 60);
     for (const k of kinds) {
       window.__sfxLog = [];
       window.__act(k);
-      await new Promise((r) => setTimeout(r, 1200));
+      const from = window.__frames();
+      await new Promise((r) => {
+        const tick = () => (window.__frames() - from >= 72 ? r() : requestAnimationFrame(tick));
+        tick();
+      });
       if (window.__sfxLog.length === 0) out.push(k);
     }
+    // 뒤에 오는 검사들은 실시간 그대로여야 한다. 세계시계를 원래대로 돌려놓는다.
+    window.__fixedStep(0);
     return out;
   }, KINDS);
   check("live:every-outcome-makes-at-least-one-sound", silent.length === 0,
