@@ -15,11 +15,8 @@ const ROUNDS = 3;
 const STEP = 1 / 60;
 const DIVE_STEPS = 42;
 const TAIL_STEPS = 31;
-// 바를 상수로 적으면 그 수가 무엇 위에 서 있는지를 아무도 모른다. 대조군에서 유도한다.
-// 편차를 끈 상태로 같은 절차를 지나도 회차는 조금씩 벌어진다. 520ms는 연출이 아직 움직이는 중이라
-// 프레임 타이밍이 몸과 공을 다른 자리에 놓기 때문이다. 그 최대치의 두 배를 바로 쓴다.
-// 두 배인 이유는 대조군이 쌍 하나짜리 추정이라 한 번 더 뽑으면 그만큼 커질 수 있어서다.
-const FLOOR = 2;
+// 바는 대조군 중앙값의 이 배수다. 근거는 아래 대조군 계산 자리에 적혀 있다.
+const FLOOR = 3;
 // 종류 간 분리는 pose 게이트의 바를 그대로 쓴다. 편차를 넣다가 이 선을 넘으면
 // 다양성이 아니라 사건이 다른 사건으로 읽히기 시작한 것이다.
 const KIND_BAR = 0.35;
@@ -101,18 +98,33 @@ try {
   const spread = low(shots, ROUNDS);
   const ctlMax = Math.max(...KINDS.map((k) => ctlSpread[k]));
   const ctlWho = KINDS.find((k) => ctlSpread[k] === ctlMax);
+  // 바는 대조군에서 유도한다. 다만 열다섯 개의 최댓값은 극단값이라 실행마다 크게 튄다.
+  // 실측으로 0.031과 0.056과 0.067이 나왔고 그때마다 바가 0.062에서 0.133까지 움직여,
+  // 산출물이 그대로인데 판정이 바뀌었다. 중앙값은 한 쌍이 튀어도 안 흔들린다.
+  // 세 배인 이유는 대조군이 쌍 하나짜리 추정이고, 그 두 배까지는 잡음이 닿을 수 있어서다.
+  const ctlSorted = KINDS.map((k) => ctlSpread[k]).sort((a, c) => a - c);
+  const ctlMid = ctlSorted[(ctlSorted.length - 1) >> 1];
+  for (const k of KINDS) console.log("  control " + k + " " + ctlSpread[k].toFixed(4));
+  console.log("  control median " + ctlMid.toFixed(4) + "  max " + ctlMax.toFixed(4));
   // 계기가 먼저다. 편차를 끈 두 회차가 종류 간 분리보다 더 벌어지면 이 채취는 재현되지 않는 것이고,
   // 그 위에서 잰 편차는 설계가 아니라 프레임 타이밍이다. 표본 실패와 산출물 실패를 같은 빨간불로 내보내면
   // 다음 랩이 멀쩡한 연출을 고치러 간다. 그래서 계기가 죽었으면 여기서 끝낸다.
   const alive = ctlMax < KIND_BAR;
   check("instrument:capture-is-reproducible", alive, ctlMax.toFixed(3) + " worst " + ctlWho + " must stay under " + KIND_BAR);
   if (alive) {
-    const SPREAD_BAR = ctlMax * FLOOR;
-    console.log("  bar " + SPREAD_BAR.toFixed(4));
+    // 잡음은 사건마다 다르다. 실측으로 catch는 0.0000이고 spill은 0.0461이라 사십 배 차이다.
+    // 전역 바 하나로 재면 조용한 사건에는 너무 높고 시끄러운 사건에는 너무 낮다.
+    // 각 사건을 제 잡음과 맞댄다. 다만 대조군이 0에 가까운 사건은 어떤 움직임도 통과하므로
+    // 중앙값에서 나온 바닥을 같이 건다.
+    const floorAll = ctlMid * FLOOR;
+    console.log("  floor " + floorAll.toFixed(4));
     // 편차를 켰을 때 실제로 더 벌어지는가. 한 종류라도 대조군보다 조용하면 그 종류에는 편차가 안 닿은 것이다.
     const deaf = KINDS.filter((k) => spread[k] <= ctlSpread[k]);
     check("control:variation-reaches-every-kind", deaf.length === 0, deaf.join(", ") || "all fifteen move more with it on");
-    for (const k of KINDS) check("varies:" + k, spread[k] >= SPREAD_BAR, spread[k].toFixed(4));
+    for (const k of KINDS) {
+      const need = Math.max(ctlSpread[k] * FLOOR, floorAll);
+      check("varies:" + k, spread[k] >= need, spread[k].toFixed(4) + " need " + need.toFixed(4));
+    }
   }
 
 
