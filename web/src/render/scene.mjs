@@ -1834,6 +1834,10 @@ export function createScene(canvas) {
   // 게이트는 프레임 수를 세어 시점을 잡는다. 그러면 사건 이후 흐른 세계시간이 프레임 수 곱하기 폭이다.
   window.__fixedStep = (sec) => { fixedDt = Number(sec) || 0; return fixedDt; };
   window.__frames = () => frames;
+
+  // 꼬리가 겨냥한 x. 키커가 노린 자리이고 먹힌 공이 끝나야 할 자리다.
+  // 이 값과 공의 최종 x가 따로 놀면 어느 코너로 찼든 공이 골문 한가운데에 선다.
+  window.__aim = () => (tail ? tail.aimX : null);
   // 사건이 다른데 실루엣이 같으면 관객은 같은 장면을 두 번 본다.
   // 선언된 오일러각이 아니라 캡처 순간의 관절 월드 좌표를 뽑는다.
   // 기울기와 위치까지 합쳐진 최종 몸이 화면에서 갈리는 것이고, 딕셔너리 비교로는 그게 안 잡힌다.
