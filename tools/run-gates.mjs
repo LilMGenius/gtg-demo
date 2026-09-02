@@ -57,6 +57,17 @@ for (const f of picked) {
   const lines = (r.stdout || "").trim().split(NL2).filter((x) => x.trim());
   const spoken = lines.length ? lines[lines.length - 1].trim() : "(silent)";
   say("  " + verdict.padEnd(7) + name.padEnd(14) + secs.padStart(6) + "s  " + spoken.slice(0, 60));
+  // 빨간불만 알리고 이유를 버리면 다음 사람이 그 게이트를 처음부터 다시 돌려야 한다.
+  // 실패를 표시하는 말은 게이트마다 갈려 있고 통일하려면 마흔둘을 건드려야 한다.
+  // 판정은 종료 코드가 하므로 여기서는 둘 다 받고, 어느 쪽도 없으면 끝부분을 그냥 옮긴다.
+  if (verdict !== "pass") {
+    const body = lines.slice(0, -1);
+    const flagged = body.filter((x) => x.includes("FAIL") || x.includes("BAD"));
+    const quote = flagged.length ? flagged.slice(0, 6) : body.slice(-4);
+    for (const l of quote) say("           " + l.trim().slice(0, 96));
+    const err = (r.stderr || "").trim();
+    if (err) say("           stderr " + err.split(NL2)[0].slice(0, 90));
+  }
 }
 
 say(red.length ? "gates FAIL " + red.length + ": " + red.join(", ") : "gates PASS " + picked.length);
