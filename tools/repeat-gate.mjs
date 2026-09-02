@@ -13,6 +13,8 @@ const ROUNDS = 3;
 // 다이빙 42프레임은 0.700초, 꼬리 31프레임은 0.517초로 이전의 잠과 거의 같은 자리다.
 // 다른 것은 그 자리가 기계 사정과 무관하게 매번 같다는 점이다.
 const STEP = 1 / 60;
+// 시작 버튼을 누르고 판이 자리를 잡기까지. 90프레임은 1.5초로, 이전에 잠으로 기다리던 값과 같다.
+const LEAD_STEPS = 90;
 const DIVE_STEPS = 42;
 const TAIL_STEPS = 31;
 // 바는 대조군 중앙값의 이 배수다. 근거는 아래 대조군 계산 자리에 적혀 있다.
@@ -61,19 +63,21 @@ try {
         const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
         const p = await ctx.newPage();
         await p.goto(BASE + q, { waitUntil: "load" });
-        await p.waitForTimeout(1200);
-        await p.click("#go", { force: true });
-        await p.waitForTimeout(1500);
-        // 잠으로 시점을 잡으면 그 사이 몇 프레임이 지났는지가 그날의 부하로 정해진다.
-        // 세계시계를 고정 폭으로 걷게 하고 프레임을 세면, 사건 이후 흐른 시간이 회차마다 같아진다.
-        // 다이빙도 이 안에 넣는다. 꼬리가 시작할 때의 몸이 흔들리면 종점도 같이 흔들린다.
+        // 시작 버튼이 생겼는지를 기다린다. 잠으로 기다리면 안 뜬 날 클릭이 조용히 흘러간다.
+        await p.waitForSelector("#go", { timeout: 15000 });
+        // 세계시계는 판이 시작되기 전에 고정한다. 시작 뒤에 고정하면 그 사이 몇 프레임이
+        // 지났는지가 실시간으로 정해져, 사건을 거는 순간 공이 비행 어디쯤인지가 회차마다 달라진다.
+        // 그 차이는 tail.from으로 들어가 종점을 흔든다. 실측으로 흘린 공의 대조군 잡음이
+        // 0.056이었고 나머지 사건의 중앙값은 0.0059였다.
         await p.evaluate((s) => window.__fixedStep(s), STEP);
         const at = async (n) => p.waitForFunction((m) => window.__frames() >= m, n, { timeout: 20000 });
+        await p.click("#go", { force: true });
         const base = await p.evaluate(() => window.__frames());
+        await at(base + LEAD_STEPS);
         await p.keyboard.press("ArrowLeft");
-        await at(base + DIVE_STEPS);
+        await at(base + LEAD_STEPS + DIVE_STEPS);
         await p.evaluate((kk) => window.__act(kk), k);
-        await at(base + DIVE_STEPS + TAIL_STEPS);
+        await at(base + LEAD_STEPS + DIVE_STEPS + TAIL_STEPS);
         const shot = await p.evaluate(() => window.__poseVis());
         shot.ball = await p.evaluate(() => window.__ballPos());
         got[k].push(shot);
