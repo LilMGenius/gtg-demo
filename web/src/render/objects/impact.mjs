@@ -260,6 +260,14 @@ export function createImpact(scene) {
 
   // 흙먼지. 흙 운동장이라 부딪히면 흙이 뜬다. 잔디였으면 이걸 안 넣었다.
   const dustMat = new THREE.MeshBasicMaterial({ color: 0xbf9a63, transparent: true, opacity: 0, depthWrite: false });
+  // 공 화소에는 그리지 않는다. depthTest만으로는 못 막는다. 카메라가 골대 뒤에서 +z를 보므로
+  // 접점에서 카메라 쪽으로 튄 입자가 공보다 앞에 와서 공을 덮는다. 스텐실 1은 공이 새긴 값이고 여기서는 읽기만 한다.
+  dustMat.stencilWrite = true;
+  dustMat.stencilRef = 1;
+  dustMat.stencilFunc = THREE.NotEqualStencilFunc;
+  dustMat.stencilFail = THREE.KeepStencilOp;
+  dustMat.stencilZFail = THREE.KeepStencilOp;
+  dustMat.stencilZPass = THREE.KeepStencilOp;
   const dustGeo = new THREE.CircleGeometry(0.16, 7);
   const dust = [];
   for (let i = 0; i < 6; i += 1) {
