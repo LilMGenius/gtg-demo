@@ -20,7 +20,13 @@ t.unref();
 // 워치독을 그만큼 넉넉히 잡는다.
 const STEP = 1 / 60;
 const BOT_FRAMES = 48 * 60;
-const HAND_FRAMES = 110 * 60;
+// 사람 랩은 라포가 오르면 끝난다. 그것은 확률이므로 창을 시간으로 잡으면 판 수가 그날의 몫이 된다.
+// 실측으로 110 세계초에 여섯에서 일곱 판이었고, 게이즈 48퍼센트에 말걸기 55퍼센트면
+// 일곱 판에서 한 번도 안 나올 확률이 12퍼센트다. 그만큼 이 게이트가 산출물과 무관하게 붉었다.
+// 그래서 창을 판 수로 센다. 스무다섯 판이면 못 볼 확률이 0.05퍼센트다.
+// 프레임 상한은 워치독을 위한 마지막 방패일 뿐이다.
+const HAND_FRAMES = 400 * 60;
+const HAND_ROUNDS = 25;
 const POLL = 250;
 
 const fails = [], notes = [];
@@ -56,11 +62,16 @@ try {
   // armOn은 표본이 열리는 상태다. 자동을 켜거나 끈 직후에는 직전 구의 값이 남아 있고,
   // 그것이 뒤집히는 순간이 새 랩의 첫 구가 커밋됐다는 유일한 증거다. 시계로 끊으면
   // 기계가 바쁜 날 구가 느려져 직전 랩의 값이 이번 랩의 표본으로 섞인다.
-  const watch = async (span, clickPad, until, armOn) => {
+  const watch = async (span, clickPad, until, armOn, maxRounds) => {
     const startF = await p.evaluate(() => window.__frames());
     const base = await p.evaluate(() => ({ fans: window.__fans(), rap: window.__rapport() }));
+    const rounds0 = await p.evaluate(() => Object.values(window.__record()).reduce((a, r) => a + r.saved + r.conceded, 0));
     let ranTrue = 0, ranFalse = 0, stale = 0, armed = false;
     while ((await p.evaluate(() => window.__frames())) - startF < span) {
+      if (maxRounds) {
+        const now = await p.evaluate(() => Object.values(window.__record()).reduce((a, r) => a + r.saved + r.conceded, 0));
+        if (now - rounds0 >= maxRounds) break;
+      }
       if (until) {
         const now = await p.evaluate(() => ({ fans: window.__fans(), rap: window.__rapport() }));
         if (until(base, now)) break;
@@ -75,7 +86,8 @@ try {
       await p.waitForTimeout(POLL);
     }
     const end = await p.evaluate(() => ({ fans: window.__fans(), rap: window.__rapport() }));
-    return { ranTrue, ranFalse, stale, armed, dFans: end.fans - base.fans, dRap: 0, endRap: end.rap, baseRap: base.rap };
+    const rounds1 = await p.evaluate(() => Object.values(window.__record()).reduce((a, r) => a + r.saved + r.conceded, 0));
+    return { ranTrue, ranFalse, stale, armed, rounds: rounds1 - rounds0, dFans: end.fans - base.fans, dRap: 0, endRap: end.rap, baseRap: base.rap };
   };
 
   // 봇 랩. 크레딧을 먼저 채워야 자동 버튼이 상점 대신 자동을 켠다.
@@ -96,12 +108,15 @@ try {
   await p.click("#auto", { force: true });
   // 라포는 talked가 나야 오르고 talked는 확률이다. 그것이 한 번 관측되면 표본이 찬 것이라
   // 더 돌 이유가 없다. 상한까지 못 채우면 계기가 표본을 못 모은 것이고 그때는 빨간불이 맞다.
-  const hand = await watch(HAND_FRAMES, true, (b, n) => sum(n.rap) > sum(b.rap), false);
+  const hand = await watch(HAND_FRAMES, true, (b, n) => sum(n.rap) > sum(b.rap), false, HAND_ROUNDS);
   hand.dRap = sum(hand.endRap) - sum(hand.baseRap);
 
   check("instrument:hand-sample-armed", hand.armed, "discarded " + hand.stale + " polls before the first hand round");
   check("hand-ran-false", hand.ranFalse >= 3 && hand.ranTrue === 0, "true " + hand.ranTrue + " false " + hand.ranFalse + " stale " + hand.stale);
   check("hand-fans-positive", hand.dFans > 0, "dFans " + hand.dFans);
+  // 라포는 행인이 지나가는 구에서만 오른다. 그 문이 열리는 빈도는 판 수가 정하므로,
+  // 몇 판을 돌았는지를 먼저 적는다. 판이 없었으면 라포가 안 오른 것은 배선이 아니라 표본이다.
+  check("instrument:hand-lap-played-enough-rounds", hand.rounds >= 8 || hand.dRap > 0, hand.rounds + " rounds in the window");
   check("hand-rapport-positive", hand.dRap > 0, "dRapport " + hand.dRap);
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
