@@ -13,6 +13,7 @@ import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
 import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost } from './state/rapport.mjs';
+import { passerName } from './state/passer.mjs';
 import { applyPreset } from './state/inject.mjs';
 
 const el = (id) => document.getElementById(id);
@@ -558,8 +559,8 @@ function rapportRows() {
     // 수치는 상수를 다시 적지 않고 판정에 들어가는 함수에서 되뽑는다. 두 자리가 어긋날 여지를 없앤다.
     const aid = Math.round((1 - rapportGazeAid(state.rapport, city, passer)) * 100);
     const fans = Math.round((rapportBoost(state.rapport, city, passer) - 1) * 100);
-    // 0번 행인은 어느 등급에서도 안 숨는 미인이다. 나머지는 번호로 구분한다.
-    const who = passer === 0 ? '미인' : '행인 ' + passer;
+    // 이름은 라포 1단계부터 열린다. 그 전에는 차림새로만 부른다.
+    const who = passerName(city, passer, tier);
     const face = tier > 0 ? tier + '단계' : '얼굴만 익었다';
     return '<div class="note"><b>' + cityAt(city).name + ' · ' + who + '</b><i>말 섞은 횟수 ' + n
       + ' · ' + face + ' · 한눈팔기 ' + aid + '% 감소 · 팔로워 +' + fans + '%</i></div>';
