@@ -219,6 +219,8 @@ function dribble(ac, out, noise, t0) {
 // 공을 땅에 놓는 소리. 흙 위에 얹는 것이라 울림이 없다.
 // 마른 마찰 한 겹과 아주 짧은 저역 하나. 그 이상 넣으면 공이 아니라 상자가 된다.
 function place(ac, out, noise, t0) {
+  // 가장 조용한 효과음이다. 음악 베드를 2.7dB밖에 못 넘어 규칙인 3dB을 못 채웠다.
+  // 상대적으로는 여전히 제일 작은 소리이고, 들리기만 하면 되므로 1.26배만 올린다.
   const dirt = noiseAt(ac, noise, t0, 0.11);
   const bp = ac.createBiquadFilter();
   bp.type = 'bandpass';
@@ -226,14 +228,14 @@ function place(ac, out, noise, t0) {
   bp.frequency.exponentialRampToValueAtTime(560, t0 + 0.1);
   bp.Q.value = 0.9;
   const dg = ac.createGain();
-  env(dg, 0.15, 0.11, t0);
+  env(dg, 0.19, 0.11, t0);
   dirt.connect(bp).connect(dg).connect(out);
 
   const thud = ac.createOscillator();
   thud.type = 'triangle';
   thud.frequency.value = 172;
   const tg = ac.createGain();
-  env(tg, 0.021, 0.07, t0);
+  env(tg, 0.027, 0.07, t0);
   thud.connect(tg).connect(out);
   thud.start(t0);
   thud.stop(t0 + 0.15);
