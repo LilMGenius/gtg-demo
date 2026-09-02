@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 // 게이트를 한 번에 돌리고 결과를 모은다. 지금까지는 사람이 하나씩 불렀고,
@@ -22,6 +22,19 @@ const picked = all.filter((f) => {
   return mode === "all" || (mode === "slow" ? slow : !slow);
 });
 
+// 느린 쓸기는 십 분이 넘어 커밋마다 겹칠 수 있다. 락은 이 파일이 소유한다.
+// 훅이 락을 만들고 지우면 두 곳이 같은 상태를 들고 있다가 갈라진다.
+const LOCK = "sweep.local.lock";
+if (mode === "slow") {
+  if (existsSync(LOCK)) {
+    console.log("slow sweep already running");
+    process.exit(0);
+  }
+  writeFileSync(LOCK, String(process.pid));
+  const drop = () => { try { unlinkSync(LOCK); } catch {} };
+  process.on("exit", drop);
+  process.on("SIGINT", () => { drop(); process.exit(130); });
+}
 const NL2 = String.fromCharCode(10);
 console.log(mode + ": " + picked.length + " of " + all.length + " gates");
 
