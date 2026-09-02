@@ -1,0 +1,54 @@
+// 게이트와 하네스는 1레벨 신규 저장만 본다. 만렙이나 부자 상태를 재려면 매번 손으로
+// 저장을 갈아끼워야 하고, 그 절차가 게이트마다 복사되면 표본이 서로 달라진다.
+// 여기서 한 번만 정의하고 모든 게이트가 같은 표본을 쓴다.
+//
+// 판정식은 건드리지 않는다. 저장이 정상적으로 도달할 수 있는 상태를 앞당길 뿐이다.
+// 도달 불가능한 값을 넣으면 그 표본으로 잰 수치는 게임의 수치가 아니다.
+
+import { GROWABLE } from '../../../src/ledger.mjs';
+
+// 스탯 상한. main.mjs 훈련장의 만렙 판정과 같은 값이어야 주입된 표본이 실제 만렙이 된다.
+const STAT_MAX = 10;
+
+// 만렙 표본에 훈련을 5회 남긴다. 0이면 올릴 칸도 없고 쓸 훈련도 없어
+// 잉여 훈련 환전 경로가 화면에 아예 안 뜬다. 그 경로까지 재려면 남은 훈련이 있어야 한다.
+const MAXED_POINTS = 5;
+
+// 상점 8선반의 최상급 합이 6810이고 카드깡 한 번이 380이다. 8000이면 그 둘을 다 하고도
+// 남아, 장비 표본이 살 수 있는 등급 하나에 묶이지 않는다. 완봉 한 판 60 기준 약 133판 몫이다.
+const RICH_COIN = 8000;
+
+// 스폰은 결제로만 들어오고 이 빌드에는 결제 경로가 없다. 게이트가 스폰 칸을 읽으려면
+// 주입 말고는 방법이 없다. 1000은 두 갈래가 화면에서 서로 구분되는지 보는 데 쓴다.
+const RICH_CASH = 1000;
+
+// 프리셋은 상태를 바꾸는 함수다. 값 덩어리로 두면 어느 칸이 정본인지가 호출부로 샌다.
+const PRESETS = {
+  // 성장 칸 전부 상한. 체격 둘과 히든은 GROWABLE 밖이라 손대지 않는다.
+  maxed(state) {
+    // 정본은 squad[pick]이다. keeper는 같은 객체이므로 한쪽만 쓰면 된다.
+    const head = state.squad[state.pick];
+    for (const k of GROWABLE) head[k] = STAT_MAX;
+    state.points = MAXED_POINTS;
+  },
+  // 지갑 두 갈래를 채운다. 스탯은 건드리지 않는다. 돈과 성장은 다른 축이고,
+  // 한 프리셋이 둘 다 움직이면 어느 쪽이 화면을 바꿨는지 게이트가 못 가른다.
+  rich(state) {
+    state.wallet.coin = RICH_COIN;
+    state.wallet.cash = RICH_CASH;
+  }
+};
+
+// ?preset=maxed 처럼 주소로만 켜진다. 쉼표로 여러 개를 이어 붙일 수 있고,
+// 모르는 이름은 조용히 지나간다. 게이트가 오타로 멈추는 것보다 표본이 안 바뀌는 편이 낫다.
+export function applyPreset(raw, state) {
+  if (!raw) return [];
+  const used = [];
+  for (const name of String(raw).split(',')) {
+    const fn = PRESETS[name.trim()];
+    if (!fn) continue;
+    fn(state);
+    used.push(name.trim());
+  }
+  return used;
+}

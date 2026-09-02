@@ -13,6 +13,7 @@ import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
 import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost } from './state/rapport.mjs';
+import { applyPreset } from './state/inject.mjs';
 
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
@@ -64,6 +65,9 @@ state.bot = readBot(saved?.bot);
 state.buff = readBuff(saved?.buff);
 // 라포. 도시별 행인 인덱스마다 마주친 횟수가 저장에 남는다.
 state.rapport = readRapport(saved?.rapport);
+// 게이트 표본 주입. 모든 read가 끝난 뒤라야 저장에서 올라온 값을 덮어쓴다.
+// 자동 판정보다는 앞이어야 주입된 지갑이 그 판정에 반영된다.
+window.__preset = applyPreset(new URLSearchParams(location.search).get('preset'), state);
 // 크레딧 없이 켜진 자동은 공짜 봇이다. 저장에서 올라온 자동은 크레딧이 있을 때만 산다.
 if (state.bot.ms <= 0) state.auto = false;
 window.__points = () => state.points;
