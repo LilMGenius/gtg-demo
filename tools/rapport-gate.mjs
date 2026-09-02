@@ -1,3 +1,4 @@
+import { GROWABLE } from "../src/ledger.mjs";
 import { makeRng, buildSet, resolve, newKeeper, followerGain } from "../src/chain.mjs";
 import { newRapport, readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost, RAPPORT_STEPS, RAPPORT_CAP } from "../web/src/state/rapport.mjs";
 
@@ -12,6 +13,10 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 
 // 키퍼 한 명 고정. 라포 폭을 재는 자리라 키퍼 차이는 잡음이다.
 const base = newKeeper();
+// 만렘 표본. 라포의 gazeAid는 gazeP에 곱해지는데 집중력 10이면 gazeP가 이미 0이라
+// 곱할 대상이 없다. 승수라도 그 항이 죽으면 같이 죽는다.
+const top = newKeeper();
+for (const k of GROWABLE) top[k] = 10;
 
 function sweep(opt) {
   let saved = 0, shots = 0, fans = 0, gazeSlip = 0, flairFans = 0, talked = 0;
@@ -21,7 +26,7 @@ function sweep(opt) {
     for (const shot of set) {
       const input = { dive: shot.side, errMs: 0, advance: 0, auto: false };
       const r = resolve({
-        keeper: base, shot, rng, input,
+        keeper: opt.keeper || base, shot, rng, input,
         grip: 0, studs: 0, pads: 0, socks: 0, frame: 0,
         focusAid: 1, rosin: false,
         // gazeAid는 resolve 인자 최상위다(chain.mjs 357). raw input 안에 넣으면 안 읽힌다.
@@ -32,7 +37,7 @@ function sweep(opt) {
       if (r.events.some((e) => e.t === "distracted")) gazeSlip++;
       const isTalk = r.events.some((e) => e.t === "talked");
       if (isTalk) talked++;
-      const g = followerGain(base, r, 0, 1, 1, opt.rapport || 1);
+      const g = followerGain(opt.keeper || base, r, 0, 1, 1, opt.rapport || 1);
       fans += g;
       if (isTalk) flairFans += g;
     }
@@ -110,6 +115,19 @@ check("aid-floor", rapportGazeAid({ "0:0": RAPPORT_CAP }, 0, 0) >= 0.7,
   "floor matches resolve clamp");
 check("read-junk", Object.keys(readRapport({ "9:99": 5, "0:2": 3, bad: 1 })).length === 1,
   "only city 0-3 keys survive");
+
+// 만렙에서 라포가 무엇을 하는지. gazeAid는 gazeP에 곱해지고 집중력 10이면 gazeP가 0이라
+// 판정 쪽 효과가 통째로 사라진다. 팔로워 배수는 followerGain 쪽이라 별개로 살아 있다.
+// 승산항이면 후반에도 산다는 규칙에는 단서가 붙는다. 곱해지는 항이 살아 있어야 한다.
+const topBase = sweep({ keeper: top });
+const topAid = sweep({ keeper: top, gazeAid: 0.7 });
+check("rapport:judgement-effect-at-max", topAid.rate !== topBase.rate,
+  "rate " + topBase.rate.toFixed(2) + " -> " + topAid.rate.toFixed(2) + " gazeSlip " + topBase.gazeSlip + " -> " + topAid.gazeSlip);
+
+// 팔로워 쪽은 살아 있어야 한다. 둘 다 죽으면 라포를 쌓을 이유가 후반에 없다.
+const topFans = sweep({ keeper: top, rapport: 1.25 });
+check("rapport:reach-effect-at-max", topFans.fans > topBase.fans,
+  topBase.fans + " -> " + topFans.fans);
 
 for (const n of notes) console.log("ok  " + n);
 for (const f of fails) console.log("BAD " + f);
