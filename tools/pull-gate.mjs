@@ -1,14 +1,14 @@
 import { chromium } from "playwright";
 import { KEEPERS, keeperCost, PULL_COST, pullWeight, pullFrom } from "../src/roster.mjs";
 
-// \uce74\ub4dc\uae61\uc740 \uc0c1\uc810\uc5d0\uc11c \uc720\uc77c\ud558\uac8c \uac12\uc744 \uc54c\uace0 \uc774\ub984\uc744 \ubaa8\ub974\ub294 \ucd95\uc778\ub370 \uc544\ubb34\ub3c4 \uc7ac\uc9c0 \uc54a\uc558\ub2e4.
-// \ubf51\uae30\uac00 \uac12\ub2f9 \ubb34\uc5c7\uc744 \uc0ac\ub294\uc9c0, \ud654\uba74\uc774 \uc778\uc1c4\ud55c \ud655\ub960\uc774 \uc2e4\uc81c \ubf51\uae30 \ube48\ub3c4\uc640 \uac19\uc740\uc9c0,
-// \uadf8\ub9ac\uace0 \uac12\ub9cc \uce58\ub974\uace0 \uc544\ubb34\uac83\ub3c4 \uc548 \uc8fc\ub294 \uacbd\ub85c\uac00 \uc5c6\ub294\uc9c0\ub97c \ud55c \uc790\ub9ac\uc5d0\uc11c \uc7b0\ub2e4.
-// \ud45c\ubcf8 \ubc94\uc704: \uc774 \uac8c\uc774\ud2b8\ub294 \ud310\uc815\uc2dd\uc744 \ubd80\ub974\uc9c0 \uc54a\ub294\ub2e4. \ud45c\ubcf8\uc740 \ud0a4\ud37c\uc758 \uc2a4\ud0ef \ubc94\uc704\uac00 \uc544\ub2c8\ub77c
-// \uba85\ub2e8 \uc804\uccb4\uc774\uace0, \ud654\uba74 \ucabd \ud45c\ubcf8\uc740 \ud398\uc774\uc9c0\uac00 \uc2a4\uc2a4\ub85c \ub9d0\ud558\ub294 \uc9c0\uae08\uc758 \ud480\uc774\ub2e4.
+// 카드깡은 상점에서 유일하게 값을 알고 이름을 모르는 축인데 아무도 재지 않았다.
+// 뽑기가 값당 무엇을 사는지, 화면이 인쇄한 확률이 실제 뽑기 빈도와 같은지,
+// 그리고 값만 치르고 아무것도 안 주는 경로가 없는지를 한 자리에서 잰다.
+// 표본 범위: 이 게이트는 판정식을 부르지 않는다. 표본은 키퍼의 스탯 범위가 아니라
+// 명단 전체이고, 화면 쪽 표본은 페이지가 스스로 말하는 지금의 풀이다.
 
-// \ubf51\uae30 \ube48\ub3c4\ub97c \uc7ac\ub824\uba74 \ub09c\uc218\uac00 \uacc4\uae30\uac00 \ub41c\ub2e4. \ucc98\uc74c\uc5d0 \uc798\ub77c \uc4f4 LCG\ub85c \uc7c0\ub354\ub2c8 \uac19\uc740 \ucd95\uc774
-// 8\uc2dc\uadf8\ub9c8\ub85c \uc5b4\uae0b\ub0ac\uace0 \uc6d0\uc778\uc740 \ubf51\uae30\uac00 \uc544\ub2c8\ub77c \ub09c\uc218\uc600\ub2e4. \uc800\ud488\uc9c8 \ub09c\uc218\ub294 \uc0b0\ucd9c\ubb3c\uc758 \uacb0\ud568\ucc98\ub7fc \ubcf4\uc778\ub2e4.
+// 뽑기 빈도를 재려면 난수가 계기가 된다. 처음에 잘라 쓴 LCG로 쟀더니 같은 축이
+// 8시그마로 어긋났고 원인은 뽑기가 아니라 난수였다. 저품질 난수는 산출물의 결함처럼 보인다.
 const mul32 = (a) => () => {
   a |= 0; a = (a + 0x6D2B79F5) | 0;
   let t = Math.imul(a ^ (a >>> 15), 1 | a);
@@ -30,30 +30,30 @@ const share = (pool) => {
   return { top: top / tot * 100, high: high / tot * 100 };
 };
 
-// \uac00\uc911\uce58\uac00 0\uc778 \uce74\ub4dc\ub294 \uac12\uc744 \uc544\ubb34\ub9ac \uce58\ub7ec\ub3c4 \uc601\uc601 \uc548 \ub098\uc628\ub2e4. \uba85\ub2e8\uc5d0 \uc788\ub294\ub370 \ubabb \ubf51\ub294 \uce74\ub4dc\ub294
-// \uc0c1\uc810\uc774 \ud30c\ub294 \ucc99\ub9cc \ud558\ub294 \uac83\uc774\ub2e4. fame 11\uc774\uba74 (11-f)^2\uc774 0\uc774 \ub418\ubbc0\ub85c \uadf8 \uc790\ub9ac\uac00 \ub300\uc870\uad70\uc774\ub2e4.
+// 가중치가 0인 카드는 값을 아무리 치러도 영영 안 나온다. 명단에 있는데 못 뽑는 카드는
+// 상점이 파는 척만 하는 것이다. fame 11이면 (11-f)^2이 0이 되므로 그 자리가 대조군이다.
 const dead = pullWeight({ fame: 11 });
 check("instrument:reachability-control", dead === 0, "fame 11 weight " + dead);
 const weights = KEEPERS.map(pullWeight);
 const minW = Math.min(...weights);
 check("pull:every-card-is-reachable", minW > 0, KEEPERS.length + " cards, min weight " + minW);
 
-// \uac12\ub9cc \uae4e\uace0 \uc544\ubb34\uac83\ub3c4 \uc548 \uc8fc\ub294 \uacbd\ub85c\ub294 \ub9cc\ub819 \ud6c8\ub828 \ub370\ub4dc\ub77d\uacfc \uac19\uc740 \uacb0\ud568\uc774\ub2e4.
-// \ube48 \ud480\uc774 null\uc744 \ub3cc\ub824\uc8fc\ub294 \uac83\ub9cc\uc73c\ub85c\ub294 \ubd80\uc871\ud558\uace0, \uc548 \ube48 \ud480\uc774 \uce74\ub4dc\ub97c \ub3cc\ub824\uc8fc\ub294 \uac83\uae4c\uc9c0 \ubd10\uc57c \ucd95\uc774\ub2e4.
+// 값만 깎고 아무것도 안 주는 경로는 만렙 훈련 데드락과 같은 결함이다.
+// 빈 풀이 null을 돌려주는 것만으로는 부족하고, 안 빈 풀이 카드를 돌려주는 것까지 봐야 축이다.
 const rng = mul32(20260903);
 const empty = pullFrom([], rng);
 const single = pullFrom([KEEPERS[0]], rng);
 check("pull:empty-pool-refuses", empty === null && single === KEEPERS[0], "empty " + String(empty) + ", single " + (single && single.name));
 
-// \ubf51\uc740 \uce74\ub4dc\uc758 \uc9c0\ubaa9 \uad6c\ub9e4\uac00\uac00 \ubf51\uae30 \uac12\ubcf4\ub2e4 \ub0ae\uc73c\uba74 \uce74\ub4dc\uae61\uc740 \uac12\uc744 \ud0dc\uc6b0\ub294 \ucc3d\uad6c\ub2e4.
+// 뽑은 카드의 지목 구매가가 뽑기 값보다 낮으면 카드깡은 값을 태우는 창구다.
 const N = 40000;
 let sum = 0;
 for (let i = 0; i < N; i++) sum += keeperCost(pullFrom(KEEPERS, rng));
 const mean = sum / N;
 check("pull:buys-more-than-it-costs", mean >= PULL_COST, mean.toFixed(0) + " value per " + PULL_COST + " sweat, x" + (mean / PULL_COST).toFixed(2));
 
-// \ucd95\uc758 \ucd9c\ucc98\ub294 roster.mjs\uc758 PULL_COST \uc8fc\uc11d\uc774\ub2e4. \ubb34\uc791\uc704 \ud55c \uc7a5\uc774 \uc774\ub984\uc744 \ucc0d\ub294 \uac83\ubcf4\ub2e4 \ube44\uc2f8\uba74
-// \ubf51\uc744 \uc774\uc720\uac00 \uc0ac\ub77c\uc9c4\ub2e4\uace0 \uadf8 \uc8fc\uc11d\uc774 \uc120\uc5b8\ud558\uace0, \uadf8 \uac12\uc744 \uba85\ub2e8 \ucd5c\uc800\uac00 \uc544\ub798\uc5d0 \ub450\uc5c8\ub2e4\uace0 \uc801\ud600 \uc788\ub2e4.
+// 축의 출처는 roster.mjs의 PULL_COST 주석이다. 무작위 한 장이 이름을 찍는 것보다 비싸면
+// 뽑을 이유가 사라진다고 그 주석이 선언하고, 그 값을 명단 최저가 아래에 두었다고 적혀 있다.
 const costs = KEEPERS.map(keeperCost);
 const floor = Math.min(...costs);
 const cheapest = KEEPERS[costs.indexOf(floor)].name;
@@ -76,7 +76,7 @@ try {
   await p.evaluate(() => window.__shop(true));
   await p.waitForTimeout(400);
 
-  // \ud480\uc740 \uba85\ub2e8\uc774 \uc544\ub2c8\ub77c \uc9c0\uae08 \uc548 \uac00\uc9c4 \uce74\ub4dc\ub2e4. \uba85\ub2e8\uc73c\ub85c \uc7ac\uba74 \ubcf4\uc720\ubd84\ub9cc\ud07c \ud654\uba74\uacfc \uc5b4\uae0b\ub09c\ub2e4.
+  // 풀은 명단이 아니라 지금 안 가진 카드다. 명단으로 재면 보유분만큼 화면과 어긋난다.
   const st = await p.evaluate(() => window.__squad());
   const owned = new Set(st.squad);
   const pool = KEEPERS.filter((k) => !owned.has(k.name));
@@ -85,7 +85,7 @@ try {
     return e ? e.innerText : "";
   });
 
-  // \uc815\uaddc\uc2dd \ub300\uc2e0 \ubb38\uc790\ub85c \ud6d1\ub294\ub2e4. \uc774 \ub808\ud3ec\uc5d0\uc11c \uac8c\uc774\ud2b8 \uc18c\uc2a4\uc758 \uc5ed\uc2ac\ub798\uc2dc\ub294 \uc804\uc1a1 \ub2e8\uacc4\uc5d0\uc11c \uc0ac\ub77c\uc9c4 \uc801\uc774 \uc788\ub2e4.
+  // 정규식 대신 문자로 훑는다. 이 레포에서 게이트 소스의 역슬래시는 전송 단계에서 사라진 적이 있다.
   const parse = (s) => {
     const out = { pct: [], cnt: -1 };
     let cur = "";
@@ -125,7 +125,7 @@ try {
   }));
   check("pull:owned-leaves-the-pool", bought !== null && after.cnt === cnt - 1, "bought " + String(bought) + ", screen " + cnt + " -> " + after.cnt);
 
-  // \uc778\uc1c4\ub41c \uc218\uc640 \uc2e4\uc81c \ubf51\uae30 \ube48\ub3c4\ub294 \ub2e4\ub978 \uba85\uc81c\ub2e4. \uac19\uc740 \ud480\uc5d0\uc11c \uc2e4\uc81c\ub85c \ubf51\uc544 \ube48\ub3c4\ub97c \uc13c\ub2e4.
+  // 인쇄된 수와 실제 뽑기 빈도는 다른 명제다. 같은 풀에서 실제로 뽑아 빈도를 센다.
   const M = 200000;
   const r2 = mul32(7);
   let h10 = 0, h9 = 0;
@@ -135,7 +135,7 @@ try {
   const z9 = (h9 / M * 100 - want.high) / sd(want.high);
   check("pull:draws-match-the-printed-odds", Math.abs(z10) < 4 && Math.abs(z9) < 4, "z " + z10.toFixed(2) + "/" + z9.toFixed(2) + " at " + (h10 / M * 100).toFixed(2) + "/" + (h9 / M * 100).toFixed(2));
 
-  // \ub300\uc870\uad70. \uac00\uc911\uce58\ub97c \ubc84\ub9ac\uace0 \uace0\ub974\uac8c \ubf51\uc73c\uba74 \uac19\uc740 \ucd95\uc774 \ud06c\uac8c \uc5b4\uae0b\ub098\uc57c \ud55c\ub2e4.
+  // 대조군. 가중치를 버리고 고르게 뽑으면 같은 축이 크게 어긋나야 한다.
   const r3 = mul32(11);
   let u10 = 0;
   for (let i = 0; i < M; i++) { if (pool[Math.floor(r3() * pool.length)].fame >= 10) u10++; }

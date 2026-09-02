@@ -4,10 +4,10 @@ import { rapportTier, rapportGazeAid, rapportBoost } from '../web/src/state/rapp
 // 3단계/2단계/0단계를 한 화면에 같이 세운다. 15는 마지막 문턱, 8은 중간 문턱, 2는 문턱 미달
 const FIX = { '0:0': 15, '0:2': 8, '0:3': 2 };
 const URL = 'http://127.0.0.1:10310/web/index.html?seed=20';
-const HEAD = '\uc544\ub294 \uc5bc\uad74';
-const SUB = '\ub9d0 \uc11e\uc740 \ub9cc\ud07c \ud55c\ub208\uc744 \ub35c \ud310\ub2e4';
-const RECORD = '\uc0c1\ub300 \uc804\uc801';
-const EMPTY = '\uc544\uc9c1 \uc5bc\uad74\uc744 \ud2bc \uc0ac\ub78c\uc774 \uc5c6\ub2e4';
+const HEAD = '아는 얼굴';
+const SUB = '말 섞은 만큼 한눈을 덜 판다';
+const RECORD = '상대 전적';
+const EMPTY = '아직 얼굴을 튼 사람이 없다';
 
 const fails = [];
 const notes = [];
@@ -106,7 +106,7 @@ const keys = Object.keys(FIX).sort((x, y) => FIX[y] - FIX[x]);
 check('view:row-count-matches-keys', main.shot.rows.length === keys.length, main.shot.rows.length + '/' + keys.length);
 check('view:fixture-survived-injection', JSON.stringify(main.kept) === JSON.stringify(FIX), JSON.stringify(main.kept));
 
-const counts = main.shot.rows.map((r) => num(r.i, '\ub9d0 \uc11e\uc740 \ud69f\uc218', '\ub2e8\uacc4'));
+const counts = main.shot.rows.map((r) => num(r.i, '말 섞은 횟수', '단계'));
 check('view:rows-descending', counts.every((n, i) => i === 0 || counts[i - 1] >= n), counts.join(','));
 
 let mismatch = [];
@@ -117,9 +117,9 @@ keys.forEach((k, idx) => {
   const aid = Math.round((1 - rapportGazeAid(FIX, 0, passer)) * 100);
   const fans = Math.round((rapportBoost(FIX, 0, passer) - 1) * 100);
   const tier = rapportTier(FIX, 0, passer);
-  const gotAid = num(row.i, '\ud55c\ub208\ud314\uae30', '\uac10\uc18c');
-  const gotFans = num(row.i, '\ud314\ub85c\uc6cc');
-  const tierOk = tier === 0 ? row.i.includes('\uc5bc\uad74\ub9cc \uc775\uc5c8\ub2e4') : row.i.includes(String(tier) + '\ub2e8\uacc4');
+  const gotAid = num(row.i, '한눈팔기', '감소');
+  const gotFans = num(row.i, '팔로워');
+  const tierOk = tier === 0 ? row.i.includes('얼굴만 익었다') : row.i.includes(String(tier) + '단계');
   if (counts[idx] !== FIX[k] || gotAid !== aid || gotFans !== fans || !tierOk) {
     mismatch.push(k + ' screen=' + counts[idx] + '/' + gotAid + '/' + gotFans + ' calc=' + FIX[k] + '/' + aid + '/' + fans + ' tier=' + tier);
   }

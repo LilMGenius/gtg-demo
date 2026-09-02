@@ -67,6 +67,24 @@ for (const f of gates) {
 }
 check("instruments:sample-scope-stated", mute.length === 0, mute.join(", ") || "every judgement gate spans or declares");
 
+// 한글 주석이 이스케이프 리터럴로 박히면 파일은 돌아가지만 사람이 못 읽는다.
+// 게이트를 셸 히어독으로 써 넣을 때 매번 그렇게 되고, 그렇게 박힌 주석은
+// 다음 세션에게 없는 주석과 같다. 다섯 파일에 1369자가 그 상태로 남아 있었다.
+const BS = String.fromCharCode(92);
+const escaped = [];
+const walk = (d) => {
+  for (const e of readdirSync(d, { withFileTypes: true })) {
+    const f = d + "/" + e.name;
+    if (e.isDirectory()) { walk(f); continue; }
+    if (!f.endsWith(".mjs") && !f.endsWith(".css")) continue;
+    // 이웃 세션의 스크래치까지 세면 이 축은 산출물이 아니라 그날 폴더에 뭐가 놓였는지를 재다.
+    if (f.includes(".local.")) continue;
+    if (readFileSync(f, "utf8").includes(BS + "u")) escaped.push(f);
+  }
+};
+for (const d of ["tools", "src", "web/src"]) walk(d);
+check("source:no-escaped-text", escaped.length === 0, escaped.join(", ") || "every file reads as itself");
+
 if (notes.length) console.log(notes.map((s) => "  ok   " + s).join(NL2));
 if (fails.length) console.log(fails.map((s) => "  FAIL " + s).join(NL2));
 console.log(fails.length ? "agents FAIL " + fails.length : "agents PASS");

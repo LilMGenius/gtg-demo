@@ -1,5 +1,5 @@
-// \uce90\ud504\ucc98 \uc911 \ubc1c\ud654\ud55c \ud6a8\uacfc\uc74c\uc744 \uadf8\ub300\ub85c \ub2e4\uc2dc \uc74d\uc73c\ub85c \ucc0d\uc5b4\ub0b8\ub2e4.
-// \uc0dd\uc131 \ud568\uc218\uac00 t0\ub97c \ubc1b\uc73c\ubbc0\ub85c \ud55c OfflineAudioContext\uc5d0 \uc804\ubd80 \uc608\uc57d\ud558\uba74 \ud55c \ubc88\uc5d0 \uc11e\uc778\ub2e4.
+// 캐프처 중 발화한 효과음을 그대로 다시 읍으로 찍어낸다.
+// 생성 함수가 t0를 받으므로 한 OfflineAudioContext에 전부 예약하면 한 번에 섞인다.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
@@ -28,7 +28,7 @@ try {
     for (const [name, arg, at] of events) mod.buildSfx(name, ac, g, noise, at, arg ?? undefined);
     const d = (await ac.startRendering()).getChannelData(0);
 
-    // 16bit PCM WAV. \ubc14\uc774\ud2b8\ub97c \uc9c1\uc811 \uc36c\ub2e4. \uc774 \ud398\uc774\uc9c0\uc5d0\ub294 \uc778\ucf54\ub354\uac00 \uc5c6\ub2e4.
+    // 16bit PCM WAV. 바이트를 직접 썬다. 이 페이지에는 인코더가 없다.
     const n = d.length;
     const buf = new ArrayBuffer(44 + n * 2);
     const v = new DataView(buf);
