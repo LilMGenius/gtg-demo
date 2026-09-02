@@ -85,11 +85,13 @@ export const MAX_HAIR = HAIRS.length - 1;
 
 // 타투 선반. 헤어와 같은 축이고 보이는 자리만 다르다. ink는 소매 커프 색이라 팔에 드러난다.
 // 값 기준은 앞의 일곱과 같다. 첫 칸은 카드깡 380 땀보다 싸고 마지막 칸은 그보다 비싸다.
+// span은 그 잉크가 위팔을 덮는 비율이다. 색만 바꾸면 이름이 약속한 면적이 화면에 안 선다.
+// 실측으로 색만 다른 2등급과 3등급의 그림 차이가 236화소였고, 그 둘은 사실상 같은 상품이었다.
 export const TATTOOS = [
-  { ink: 0, name: '맨살', cost: 0, ink_tone: 0x5f8f93, note: '아무것도 안 새겼을 때 팔' },
-  { ink: 1, name: '지워지는 문신 스티커', cost: 140, ink_tone: 0x3a4f7a, note: '땀에 번진다. 그래도 있어 보인다' },
-  { ink: 2, name: '팔뚝에 새긴 이름 석 자', cost: 380, ink_tone: 0x2a2f3a, note: '누구 이름인지는 안 밝힌다' },
-  { ink: 3, name: '어깨까지 채운 먹토시', cost: 870, ink_tone: 0x14161c, note: '반팔을 입으면 소매가 하나 더 있다' }
+  { ink: 0, name: '맨살', cost: 0, ink_tone: 0x5f8f93, span: 0.16, note: '아무것도 안 새겼을 때 팔' },
+  { ink: 1, name: '지워지는 문신 스티커', cost: 140, ink_tone: 0x3a4f7a, span: 0.22, note: '땀에 번진다. 그래도 있어 보인다' },
+  { ink: 2, name: '팔뚝에 새긴 이름 석 자', cost: 380, ink_tone: 0x2a2f3a, span: 0.40, note: '누구 이름인지는 안 밝힌다' },
+  { ink: 3, name: '어깨까지 채운 먹토시', cost: 870, ink_tone: 0x14161c, span: 0.72, note: '반팔을 입으면 소매가 하나 더 있다' }
 ];
 
 export const MAX_INK = TATTOOS.length - 1;
@@ -148,7 +150,8 @@ export function inkAt(ink) {
 
 // 렌더가 읽는 두 색을 한 곳에서 뽑는다. buildKeeper 인자와 상점 미리보기가 같은 값을 쓴다.
 export function lookOf(gear) {
-  return { hair: hairAt(gear && gear.hair).tone, ink: inkAt(gear && gear.ink).ink_tone };
+  const t = inkAt(gear && gear.ink);
+  return { hair: hairAt(gear && gear.hair).tone, ink: t.ink_tone, inkSpan: t.span };
 }
 
 // 팔로워 승수. 두 선반 최고 등급을 다 채워도 1.3배다. 동네 최고 등급(1.36배)을 넘기지 않게 잡았다.

@@ -327,15 +327,17 @@ export function addFace(head, r, dir, skin, hairTone) {
 // 캡슐을 중앙 피벗으로 두면 어깨를 돌렸을 때 팔이 몸통을 관통한다.
 // 사지에는 외곽선을 안 건다. 팔 여덟 개가 각자 복제본을 달면 드로우콜이 두 배가 되고,
 // 가늘어서 어차피 선만 남는다. 실루엣을 만드는 건 몸통과 머리다.
-function seg(radius, len, color, tag, salt, cuff) {
+function seg(radius, len, color, tag, salt, cuff, span) {
   const geo = new THREE.CapsuleGeometry(radius, len, 3, 6);
   geo.translate(0, -len / 2, 0);
   // 마디 중간에 밝은 띠를 하나 병합한다. 드로우콜은 그대로다.
   // 피벗 쪽에 두면 어깨 구와 몸통 측면에 묻혀 화면에 안 나온다.
   let m;
   if (cuff) {
-    const ring = new THREE.CylinderGeometry(radius * 1.18, radius * 1.18, len * 0.16, 8);
-    ring.translate(0, -len * 0.55, 0);
+    // 띄의 높이를 데이터가 정한다. 아랫단은 그대로 두고 위로만 자라 어깨를 향해 덮는다.
+    const h = len * (span || 0.16);
+    const ring = new THREE.CylinderGeometry(radius * 1.18, radius * 1.18, h, 8);
+    ring.translate(0, -(0.63 * len - h / 2), 0);
     m = new THREE.Mesh(mergeGeos([geo, ring], [color, cuff]), flatVertex(0xffffff));
   } else {
     m = new THREE.Mesh(geo, flat(color));
@@ -393,7 +395,7 @@ function buildBody(o) {
     delt.name = tag;
     jitterMesh(delt, 0.015, side < 0 ? 25 : 26);
     sh.add(delt);
-    const upper = seg(o.armR, o.upperLen, o.sleeve, tag, side < 0 ? 21 : 22, o.cuffSleeve);
+    const upper = seg(o.armR, o.upperLen, o.sleeve, tag, side < 0 ? 21 : 22, o.cuffSleeve, o.cuffSpan);
     sh.add(upper);
     const el = joint(sh, 0, -o.upperLen, 0);
     const fore = seg(o.armR * 0.92, o.foreLen, o.skin, tag, side < 0 ? 23 : 24);
@@ -488,7 +490,7 @@ export function buildKeeper(height, weight, look) {
     // 같은 초록을 어둡게만 내린 소매는 팔이 아니라 몸통에 진 그림자로 읽혔다.
     // 색상을 청록으로 꺾으면 밝기가 아니라 색이 팔을 세우고, 양말과 한 벌로 묶인다.
     shirt: 0x2f8f5b, sleeve: 0x073239, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: 0x63d3e8,
-    cuffSleeve: (look && look.ink) || 0x5f8f93, cuffShorts: 0x6d8898,
+    cuffSleeve: (look && look.ink) || 0x5f8f93, cuffSpan: (look && look.inkSpan) || 0.16, cuffShorts: 0x6d8898,
     hair: look && look.hair,
     phase: 0.7, rest: POSES.ready
   });
