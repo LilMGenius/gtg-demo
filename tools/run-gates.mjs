@@ -71,4 +71,13 @@ for (const f of picked) {
 }
 
 say(red.length ? "gates FAIL " + red.length + ": " + red.join(", ") : "gates PASS " + picked.length);
+
+// 빨간 게이트에는 두 종류가 있다. 고칠 것과 파운더 답을 기다리는 것이다.
+// 그 구분이 레포에 없으면 다음 세션이 대기 중인 결정을 그냥 고쳐 버린다.
+// OPEN.md에 이름이 적힌 게이트는 이미 알려진 대기 건이고, 안 적힌 빨간불만 새 소식이다.
+if (red.length && existsSync("OPEN.md")) {
+  const open = readFileSync("OPEN.md", "utf8");
+  const fresh = red.map((x) => x.split(" ")[0]).filter((n) => !open.includes("`" + n + "`"));
+  say(fresh.length ? "  not in OPEN.md: " + fresh.join(", ") : "  all red gates are logged in OPEN.md");
+}
 if (red.length) process.exitCode = 1;
