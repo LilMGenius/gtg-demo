@@ -729,7 +729,9 @@ function bindGear(box) {
       // 동네를 사면 상점을 닫기 전에 배경이 바뀐다. 재시작을 요구하면 산 것이 안 읽힌다.
       if (s.field === 'city') stage.setCity(state.gear.city);
       // 머리와 타투는 사면 그 자리에서 키퍼 껍데기 색이 바뀐다. 안 보이면 산 것이 아니다.
-      if (s.field === 'hair' || s.field === 'ink') stage.setKeeper(state.keeper, lookOf(state.gear));
+      // 머리와 잉크만 몸을 다시 세우고 있었다. 장갑과 축구화와 유니폼과 양말도
+      // 이제 색을 가지므로 같이 다시 세운다. 골대와 동네는 몸이 아니라 빠진다.
+      if (['hair', 'ink', 'grip', 'studs', 'pads', 'socks'].includes(s.field)) stage.setKeeper(state.keeper, lookOf(state.gear));
       persist();
       pips();
       renderShop();

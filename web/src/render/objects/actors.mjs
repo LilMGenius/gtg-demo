@@ -412,7 +412,7 @@ function buildBody(o) {
       thumb.translate(side * s * 0.6, s * 0.1, 0);
       const cuff = new THREE.BoxGeometry(s * 1.12, s * 0.32, s * 0.58);
       cuff.translate(0, s * 0.72, 0);
-      const gv = new THREE.Mesh(mergeGeos([palm, thumb, cuff]), flatMap(0xf2d64b, clothTex()));
+      const gv = new THREE.Mesh(mergeGeos([palm, thumb, cuff]), flatMap(o.gloveTone || 0xf2d64b, clothTex()));
       gv.name = tag;
       // 장갑은 화면에서 가장 자주 보는 물건이다. 직육면체 그대로면 여기서 티가 제일 크게 난다.
       jitterMesh(gv, 0.02, side < 0 ? 31 : 32);
@@ -442,7 +442,7 @@ function buildBody(o) {
     if (o.bootLen) {
       // 포스트 렌더타깃이 8비트 선형이라 이보다 어두우면 세 채널이 각기 다른 정수로 반올림돼 색비가 깨진다.
       // 0x14100c는 화면에 (41,2,2) 순적색으로 나왔고, 0x2a241c부터 (26,17,17) 가죽 갈색이 보존된다.
-      const boot = new THREE.Mesh(new THREE.BoxGeometry(o.legR * 1.5, o.legR * 0.9, o.bootLen), flat(0x2a241c));
+      const boot = new THREE.Mesh(new THREE.BoxGeometry(o.legR * 1.5, o.legR * 0.9, o.bootLen), flat(o.bootTone || 0x2a241c));
       boot.name = tag;
       jitterMesh(boot, 0.016, side < 0 ? 51 : 52);
       // 발끝은 얼굴이 보는 쪽으로 나간다. 뒤꿈치는 발목 밑에 남긴다.
@@ -489,8 +489,8 @@ export function buildKeeper(height, weight, look) {
     // 반바지는 무릎 위치를 알려줄 정도로만 밝힌다.
     // 같은 초록을 어둡게만 내린 소매는 팔이 아니라 몸통에 진 그림자로 읽혔다.
     // 색상을 청록으로 꺾으면 밝기가 아니라 색이 팔을 세우고, 양말과 한 벌로 묶인다.
-    shirt: 0x2f8f5b, sleeve: 0x073239, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: 0x63d3e8,
-    cuffSleeve: (look && look.ink) || 0x5f8f93, cuffSpan: (look && look.inkSpan) || 0.16, cuffShorts: 0x6d8898,
+    shirt: (look && look.shirt) || 0x2f8f5b, sleeve: 0x073239, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: (look && look.sock) || 0x63d3e8,
+    cuffSleeve: (look && look.ink) || 0x5f8f93, cuffSpan: (look && look.inkSpan) || 0.16, cuffShorts: 0x6d8898, gloveTone: (look && look.glove) || 0xf2d64b, bootTone: (look && look.boot) || 0x2a241c,
     hair: look && look.hair,
     phase: 0.7, rest: POSES.ready
   });

@@ -5,10 +5,10 @@
 // 값은 카드깡 380 땀을 기준으로 잡았다. 첫 칸은 그보다 싸야 처음 지르는 자리가 되고,
 // 마지막 칸은 그보다 비싸야 카드깡이 선반에서 밀려나지 않는다.
 export const GLOVES = [
-  { grip: 0, name: '장터 목장갑', cost: 0, note: '아무것도 안 샀을 때 끼고 있는 것' },
-  { grip: 1, name: '고무코팅 목장갑', cost: 140, note: '젖은 공을 한 번은 붙잡는다' },
-  { grip: 2, name: '송진 범벅 장갑', cost: 360, note: '손에서 공이 잘 안 떨어진다' },
-  { grip: 3, name: '문어 빨판 장갑', cost: 820, note: '안 떨어진다. 벗겨지지도 않는다' }
+  { grip: 0, name: '장터 목장갑', cost: 0, tone: 0xf2d64b, note: '아무것도 안 샀을 때 끼고 있는 것' },
+  { grip: 1, name: '고무코팅 목장갑', cost: 140, tone: 0xd9552f, note: '젖은 공을 한 번은 붙잡는다' },
+  { grip: 2, name: '송진 범벅 장갑', cost: 360, tone: 0xbf8a2e, note: '손에서 공이 잘 안 떨어진다' },
+  { grip: 3, name: '문어 빨판 장갑', cost: 820, tone: 0x8f4fd1, note: '안 떨어진다. 벗겨지지도 않는다' }
 ];
 
 export const MAX_GRIP = GLOVES.length - 1;
@@ -16,10 +16,10 @@ export const MAX_GRIP = GLOVES.length - 1;
 // 축구화 선반. 손이 아니라 발이고, 깎는 것은 반경이 아니라 출발이다.
 // 장갑과 같은 값 기준을 쓴다. 첫 칸은 카드깡 380 땀보다 싸고 마지막 칸은 그보다 비싸다.
 export const BOOTS = [
-  { studs: 0, name: '학교 앞 실내화', cost: 0, note: '아무것도 안 샀을 때 신고 있는 것' },
-  { studs: 1, name: '바닥 닳은 조기축구화', cost: 160, note: '그래도 미끄러지지는 않는다' },
-  { studs: 2, name: '스터드 여섯 개 축구화', cost: 400, note: '흙을 물고 첫 발이 빨리 뜬다' },
-  { studs: 3, name: '육상용 스파이크', cost: 880, note: '축구화는 아니다. 제일 빨리 뜬다' }
+  { studs: 0, name: '학교 앞 실내화', cost: 0, tone: 0x2a241c, note: '아무것도 안 샀을 때 신고 있는 것' },
+  { studs: 1, name: '바닥 닳은 조기축구화', cost: 160, tone: 0x4a3b2a, note: '그래도 미끄러지지는 않는다' },
+  { studs: 2, name: '스터드 여섯 개 축구화', cost: 400, tone: 0x1f4f8f, note: '흙을 물고 첫 발이 빨리 뜬다' },
+  { studs: 3, name: '육상용 스파이크', cost: 880, tone: 0xd94f2a, note: '축구화는 아니다. 제일 빨리 뜬다' }
 ];
 
 export const MAX_STUD = BOOTS.length - 1;
@@ -27,10 +27,10 @@ export const MAX_STUD = BOOTS.length - 1;
 // 유니폼 선반. 손도 발도 아니라 몸이고, 깎는 것은 정면 강슛에 같이 밀려 들어가는 사고다.
 // 값 기준은 앞의 둘과 같다. 첫 칸은 카드깡 380 땀보다 싸고 마지막 칸은 그보다 비싸다.
 export const KITS = [
-  { pads: 0, name: '아빠 옷장 면티', cost: 0, note: '아무것도 안 샀을 때 입고 있는 것' },
-  { pads: 1, name: '학교 체육복 상의', cost: 150, note: '적어도 땀은 먹는다' },
-  { pads: 2, name: '조기회 단체복', cost: 370, note: '등에 동네 철물점 이름이 박혀 있다' },
-  { pads: 3, name: '패드 박은 골키퍼 저지', cost: 850, note: '어깨에 스펀지가 들었다. 밀려도 덜 밀린다' }
+  { pads: 0, name: '아빠 옷장 면티', cost: 0, tone: 0x2f8f5b, note: '아무것도 안 샀을 때 입고 있는 것' },
+  { pads: 1, name: '학교 체육복 상의', cost: 150, tone: 0x2f6f8f, note: '적어도 땀은 먹는다' },
+  { pads: 2, name: '조기회 단체복', cost: 370, tone: 0x8f2f5b, note: '등에 동네 철물점 이름이 박혀 있다' },
+  { pads: 3, name: '패드 박은 골키퍼 저지', cost: 850, tone: 0x1c1f2b, note: '어깨에 스펀지가 들었다. 밀려도 덜 밀린다' }
 ];
 
 export const MAX_KIT = KITS.length - 1;
@@ -38,10 +38,10 @@ export const MAX_KIT = KITS.length - 1;
 // 양말 선반. 손도 발도 몸도 아니라 착지고, 깎는 것은 흘린 뒤 못 일어나는 사고다.
 // 값 기준은 앞의 셋과 같다. 첫 칸은 카드깡 380 땀보다 싸고 마지막 칸은 그보다 비싸다.
 export const SOCKS = [
-  { socks: 0, name: '목 늘어난 흰 양말', cost: 0, note: '아무것도 안 샀을 때 신고 있는 것' },
-  { socks: 1, name: '축구 스타킹', cost: 130, note: '적어도 흘러내리지는 않는다' },
-  { socks: 2, name: '정강이 보호대 낀 스타킹', cost: 350, note: '까져도 덜 아파서 덜 눕는다' },
-  { socks: 3, name: '미끄럼방지 그립 양말', cost: 830, note: '발이 신발 안에서 안 논다. 넘어져도 금방 선다' }
+  { socks: 0, name: '목 늘어난 흰 양말', cost: 0, tone: 0x63d3e8, note: '아무것도 안 샀을 때 신고 있는 것' },
+  { socks: 1, name: '축구 스타킹', cost: 130, tone: 0xe8d463, note: '적어도 흘러내리지는 않는다' },
+  { socks: 2, name: '정강이 보호대 낀 스타킹', cost: 350, tone: 0xe86363, note: '까져도 덜 아파서 덜 눕는다' },
+  { socks: 3, name: '미끄럼방지 그립 양말', cost: 830, tone: 0xf2f2f2, note: '발이 신발 안에서 안 논다. 넘어져도 금방 선다' }
 ];
 
 export const MAX_SOCK = SOCKS.length - 1;
@@ -148,10 +148,17 @@ export function inkAt(ink) {
   return TATTOOS[Math.min(MAX_INK, Math.max(0, Math.floor(Number(ink) || 0)))];
 }
 
+// 장비 네 선반은 지금까지 판정만 바꾸고 키퍼 몸에는 아무것도 남기지 않았다.
+// 880 땅짜리 상품을 사도 그림이 같으면 그 선반은 숫자만 팔고 있는 것이다.
+// 0등급은 지금 색 그대로라 신규 저장의 그림은 안 바뀐다.
 // 렌더가 읽는 두 색을 한 곳에서 뽑는다. buildKeeper 인자와 상점 미리보기가 같은 값을 쓴다.
 export function lookOf(gear) {
   const t = inkAt(gear && gear.ink);
-  return { hair: hairAt(gear && gear.hair).tone, ink: t.ink_tone, inkSpan: t.span };
+  return {
+    hair: hairAt(gear && gear.hair).tone, ink: t.ink_tone, inkSpan: t.span,
+    glove: gloveAt(gear && gear.grip).tone, boot: bootAt(gear && gear.studs).tone,
+    shirt: kitAt(gear && gear.pads).tone, sock: sockAt(gear && gear.socks).tone
+  };
 }
 
 // 팔로워 승수. 두 선반 최고 등급을 다 채워도 1.3배다. 동네 최고 등급(1.36배)을 넘기지 않게 잡았다.

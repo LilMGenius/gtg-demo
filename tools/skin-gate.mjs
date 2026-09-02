@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { HAIRS, TATTOOS } from "../web/src/state/gear.mjs";
+import { HAIRS, TATTOOS, GLOVES, BOOTS, KITS, SOCKS } from "../web/src/state/gear.mjs";
 
 // 머리와 타투는 판정에 한 칸도 안 닿는다. 오직 화면으로만 존재하는 상품이라,
 // 사고 나서 그림이 안 바뀌면 그 선반은 아무것도 팔지 않은 것이 된다.
@@ -65,6 +65,9 @@ try {
 
   // 스킨을 산다. 선반은 상점 탭 하나이고 줄마다 등급이 붙어 있다.
   const buy = async (tab, rank) => {
+    // 여섯 선반을 끝까지 사면 rich 프리셋의 8000 땅으로는 모자란다.
+    // 이 계기가 재는 것은 그림이지 감당할 수 있는가가 아니다. 살 때마다 지갑을 채운다.
+    await p.evaluate(() => { window.__wallet().coin = 999999; });
     await p.evaluate(() => window.__shop(true));
     await p.waitForTimeout(160);
     await p.evaluate((k) => document.querySelector(".tab[data-tab=" + JSON.stringify(k) + "]").click(), tab);
@@ -85,8 +88,8 @@ try {
   const still = await diff(base, await shot());
   check("control:the-same-skin-twice-is-the-same-picture", still === 0, still + " pixels moved with nothing changed");
 
-  const shots = { hair: {}, ink: {} };
-  for (const [tab, list] of [["hair", HAIRS], ["ink", TATTOOS]]) {
+  const shots = { hair: {}, ink: {}, glove: {}, boot: {}, kit: {}, sock: {} };
+  for (const [tab, list] of [["hair", HAIRS], ["ink", TATTOOS], ["glove", GLOVES], ["boot", BOOTS], ["kit", KITS], ["sock", SOCKS]]) {
     // 기준 컷은 탭마다 다시 잡는다. 처음 한 장을 계속 쓰면 앞 탭에서 산 것까지 차이에 섮인다.
     const tabBase = await shot();
     for (let r = 1; r < list.length; r += 1) {
@@ -100,7 +103,7 @@ try {
   }
 
   // 등급끼리도 갈려야 한다. 전부 사고 나서 그림이 같으면 위 칸은 값만 다른 같은 상품이다.
-  for (const tab of ["hair", "ink"]) {
+  for (const tab of ["hair", "ink", "glove", "boot", "kit", "sock"]) {
     const ranks = Object.keys(shots[tab]);
     for (let i = 0; i < ranks.length; i += 1) {
       for (let j = i + 1; j < ranks.length; j += 1) {
