@@ -1,4 +1,5 @@
 import { makeRng, buildSet, resolve, newKeeper, followerGain } from "../src/chain.mjs";
+import { GROWABLE } from "../src/ledger.mjs";
 import { newBuff, addBuff, spendBuff, readBuff, BUFF_CAP } from "../web/src/state/buff.mjs";
 
 // 버프 게이트. 세 종이 선반 문구가 판 것을 실제로 움직이는가.
@@ -70,7 +71,7 @@ check("tonic-cost", tonic.flairFans < c1.flairFans,
 // 그 몫이 전체의 12퍼센트가 되므로, 같은 약이 같은 비율을 깎아도 총합의 방향이 뒤집힌다.
 // 문구가 어느 표본에서 참인지를 축이 직접 말한다.
 const top = newKeeper();
-for (const k of Object.keys(base)) if (typeof base[k] === "number" && base[k] <= 10 && k !== "level") top[k] = 10;
+for (const k of GROWABLE) top[k] = 10;
 const topBase = sweep({ keeper: top });
 const topTonic = sweep({ keeper: top, focusAid: 0.5 });
 check("tonic-cost-at-max", topTonic.fans < topBase.fans,

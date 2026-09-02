@@ -1,4 +1,5 @@
 import { makeRng, buildSet, resolve, newKeeper, followerGain } from "../src/chain.mjs";
+import { GROWABLE } from "../src/ledger.mjs";
 import { lookBoost, GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, TATTOOS } from "../web/src/state/gear.mjs";
 
 // \uc7a5\ube44 \ud6a8\uacfc \uac8c\uc774\ud2b8. \uc5ec\ub35f \uc120\ubc18\uc774 \ud30c\ub294 \uac83\uc774 \ud310\uc815\uacfc \uc18c\ubb38\uc5d0\uc11c \uc2e4\uc81c\ub85c \uc6c0\uc9c1\uc774\ub294\uac00.
@@ -30,7 +31,7 @@ function sweep(opt) {
     const rng = makeRng(s + 90001);
     for (const shot of set) {
       const r = resolve({
-        keeper: base, shot, rng,
+        keeper: opt.keeper || base, shot, rng,
         input: { dive: shot.side, errMs: 0, advance: 0, auto: false },
         grip: o.grip || 0, studs: o.studs || 0, pads: o.pads || 0,
         socks: o.socks || 0, frame: o.frame || 0
@@ -40,7 +41,7 @@ function sweep(opt) {
       if (shot.gaze) ev.gaze++;
       // \uc774\ubca4\ud2b8 \uc885\ub958\ub294 \ubb38\uc790\uc5f4\uc774 \uc544\ub2c8\ub77c \uac1d\uccb4\uc758 t\uac00 \uc18c\uc720\ud55c\ub2e4.
       for (const e of r.events) if (ev[e.t] !== undefined && e.t !== "gaze") ev[e.t]++;
-      fans += followerGain(base, r, city, look);
+      fans += followerGain(opt.keeper || base, r, city, look);
     }
   }
   return { rate: saved / shots * 100, fans, ev, shots };
@@ -185,6 +186,17 @@ value("value-frame-save", "frame", rateOf);
 value("value-city-fans", "city", (s) => s.fans);
 value("value-hair-fans", "hair", (s) => s.fans);
 value("value-ink-fans", "ink", (s) => s.fans);
+
+// 표본 범위: 위 축들은 전부 신인 키퍼로 잰다. 장비는 감산항에 얹혀 있어 스탯이 오르면 시들므로,
+// 값당이 후반에 어떻게 되는지는 만렙 키퍼로 한 번 더 재야 나온다.
+const top = newKeeper();
+for (const s of GROWABLE) top[s] = 10;
+const topBase = sweep({ keeper: top }).rate;
+const perAtMax = (rank) => Math.abs(sweep({ keeper: top, grip: rank }).rate - topBase) / COST.grip[rank];
+const p1 = perAtMax(1), p3 = perAtMax(3);
+const ratioMax = p3 / p1;
+check("value-grip-save-at-max", ratioMax >= VALUE_FLOOR,
+  "r1 " + p1.toExponential(2) + " r3 " + p3.toExponential(2) + " ratio " + ratioMax.toFixed(2));
 
 for (const n of notes) console.log("ok  " + n);
 for (const f of fails) console.log("BAD " + f);

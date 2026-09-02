@@ -6,6 +6,7 @@ import { DATE_TIER, DATE_COST, DATE_FAIL_COUNT, MOVES, dateOdds, dateOutcome, ap
 // 라포 3단계에 도달점이 생겼는지를 잰다. 만남은 지갑과 팔로워와 라포 셋을 한 번에 움직이므로
 // 하나만 재면 나머지 둘이 끊겨도 초록으로 남는다.
 
+// 표본 범위: 만렙 키퍼를 따로 두지 않는다. dateOdds가 스탯을 인자로 직접 받으므로 이 게이트는 스탯 1과 10을 양쪽 다 밟고, 그 사이는 선형이라 중간 표본이 새 정보를 주지 않는다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html";
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);

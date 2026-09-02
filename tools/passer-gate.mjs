@@ -5,6 +5,7 @@ import { passerAt, passerName, passerCountAt } from "../web/src/state/passer.mjs
 // 행인이 번호가 아니라 사람으로 서는지를 잰다. 이름표가 판정 쪽 인원과 어긋나면
 // 라포 목록에 이름 없는 번호가 뜨고, 단계에 따라 호칭이 안 갈리면 얼굴을 트는 과정이 사라진다.
 
+// 표본 범위: 키퍼 스탯을 안 쓴다. 행인 이름표는 도시와 번호와 라포 단계만 읽으므로 어떤 키퍼로 재도 같은 결과가 나온다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html";
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);

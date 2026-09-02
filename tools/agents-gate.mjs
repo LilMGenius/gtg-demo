@@ -53,6 +53,20 @@ const gates = tools.filter((f) => f.endsWith("-gate.mjs"));
 const helpers = tools.filter((f) => !f.endsWith("-gate.mjs"));
 check("tools:gate-naming", gates.length >= 30, gates.length + " gates, helpers [" + helpers.join(", ") + "]");
 
+// 판정을 부르는 게이트는 어느 키퍼로 쟀는지가 결론을 바꾼다. 이 세션에서만 세 번,
+// 표본을 내부에 못 박은 게이트가 만렙 축을 붙이는 순간 거짓 초록을 냈다.
+// 만렙 표본을 쓰거나, 안 쓰는 이유를 소스에 적거나 둘 중 하나는 해야 한다.
+const SCOPE = "표본 범위:";
+const mute = [];
+for (const f of gates) {
+  const src = readFileSync("tools/" + f, "utf8");
+  if (!src.includes("src/chain.mjs")) continue;
+  // 단순한 숫자 대입은 클램프에도 나온다. 실제로 성장 칸 전체를 순회하는 신호만 인정한다.
+  const spans = src.includes("keeperAtLevel") || src.includes("GROWABLE");
+  if (!spans && !src.includes(SCOPE)) mute.push(f.replace("-gate.mjs", ""));
+}
+check("instruments:sample-scope-stated", mute.length === 0, mute.join(", ") || "every judgement gate spans or declares");
+
 if (notes.length) console.log(notes.map((s) => "  ok   " + s).join(NL2));
 if (fails.length) console.log(fails.map((s) => "  FAIL " + s).join(NL2));
 console.log(fails.length ? "agents FAIL " + fails.length : "agents PASS");
