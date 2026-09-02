@@ -49,6 +49,8 @@ export function createScene(canvas) {
   const RT_H = 384;
   const rt = new THREE.WebGLRenderTarget(683, RT_H, {
     // 선형 보간으로 늘리면 뿌옇기만 하고 픽셀이 안 보인다. 계단이 보여야 저해상도로 읽힌다.
+    // 스텐실을 켠다. 공이 자기 화소에 표식을 남기고 임팩트 플래시가 그 자리를 비켜 가려면 이 버퍼가 있어야 한다.
+    stencilBuffer: true,
     minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter
   });
   const postScene = new THREE.Scene();
@@ -269,6 +271,15 @@ export function createScene(canvas) {
   ball.userData.probeIgnore = true;
   scene.add(ball);
   markForeground(ball);
+  // 플래시는 깊이 검사를 끄고 맨 위에 그려서 공을 통째로 덮었다. 실측 gloveGone 88.2%, save 91.5%.
+  // 공이 그려진 화소에 1을 새기고 플래시가 1이 아닌 곳에만 그리게 한다. 깊이도 그물 순서도 그대로 둔다.
+  ball.material.stencilWrite = true;
+  ball.material.stencilRef = 1;
+  ball.material.stencilFunc = THREE.AlwaysStencilFunc;
+  ball.material.stencilZPass = THREE.ReplaceStencilOp;
+  // 장갑에 가려 깊이 검사에 진 프레임에도 공 자리를 새긴다. ZPass만 두면 그 프레임에서 스텐실이 비어
+  // 플래시가 다시 공을 덮었다. 실측 gloveGone cover 60.7% -> 0.0%.
+  ball.material.stencilZFail = THREE.ReplaceStencilOp;
   // 공은 깊이 검사를 그대로 받는다. 골라인 너머의 공이 안 보이던 진짜 원인은 뒷 가로대였고
   // 그것을 지오메트리에서 걷어냈다. 실측: 최장 가림 45프레임에서 4프레임으로 떨어졌다.
 

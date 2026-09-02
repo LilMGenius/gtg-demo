@@ -206,6 +206,13 @@ export function createImpact(scene) {
   // 깊이 검사를 끄고 맨 위에 그린다. 접점이 키퍼 몸에 묻히면 층이 통째로 안 보인다.
   const flashMat = new THREE.MeshBasicMaterial({ color: 0xfffdf0, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
   const flash = new THREE.Mesh(blobGeo(1.7, 15, 0.2, 0), flashMat);
+  // 공 화소에는 그리지 않는다. 스텐실 1은 scene.mjs에서 공이 새긴 값이고 여기서는 읽기만 한다.
+  flashMat.stencilWrite = true;
+  flashMat.stencilRef = 1;
+  flashMat.stencilFunc = THREE.NotEqualStencilFunc;
+  flashMat.stencilFail = THREE.KeepStencilOp;
+  flashMat.stencilZFail = THREE.KeepStencilOp;
+  flashMat.stencilZPass = THREE.KeepStencilOp;
   flash.visible = false;
   flash.renderOrder = 8;
   flash.userData.probeIgnore = true;
