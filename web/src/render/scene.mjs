@@ -138,6 +138,10 @@ export function createScene(canvas) {
   let vnow = 0;
   // 0이면 실시간을 쓴다. 양수면 프레임마다 그 폭만큼만 세계시계가 간다. window.__fixedStep이 켠다.
   let fixedDt = 0;
+  // 바깥에서 프레임 수를 폴링해 사건을 걸면 한두 프레임 늦게 걸리고, 그 순간 빠르게
+  // 흔들리는 값은 그만큼 어긋난다. 걸 프레임과 멈출 프레임을 미리 맡겨 두면 채취가 정확해진다.
+  let planAct = null;
+  let stopFrame = -1;
   // drive()는 frame() 밖에 있어 이번 프레임의 dt를 직접 못 본다. 여기에 실어 보낸다.
   let stepDt = 0;
   let realLast = performance.now() / 1000;
@@ -920,6 +924,10 @@ export function createScene(canvas) {
     if (fixedDt > 0) dt = fixedDt;
     if (frozen) dt = 0;
     frames += 1;
+    // 맡겨 둔 사건을 그 프레임에서 건다. 밖에서 부르면 폴링 간격만큼 늦는다.
+    if (planAct && frames >= planAct.n) { act(planAct.kind); planAct = null; }
+    // 멈출 프레임에 닿으면 세계시간이 더 안 간다. 읽는 쪽이 언제 읽어도 같은 상태다.
+    if (stopFrame >= 0 && frames >= stopFrame) dt = 0;
     if (stopLeft > 0) {
       stopLeft -= dt;
       dt *= HIT_SCALE;
@@ -1842,6 +1850,9 @@ export function createScene(canvas) {
   // 게이트는 프레임 수를 세어 시점을 잡는다. 그러면 사건 이후 흐른 세계시간이 프레임 수 곱하기 폭이다.
   window.__fixedStep = (sec) => { fixedDt = Number(sec) || 0; return fixedDt; };
   window.__frames = () => frames;
+
+  // 게이트가 사건을 걸 프레임과 세계를 멈출 프레임을 미리 맡긴다.
+  window.__plan = (at, kind, stopAt) => { planAct = { n: at, kind }; stopFrame = stopAt; };
 
   // 꼬리가 겨냥한 x. 키커가 노린 자리이고 먹힌 공이 끝나야 할 자리다.
   // 이 값과 공의 최종 x가 따로 놀면 어느 코너로 찼든 공이 골문 한가운데에 선다.

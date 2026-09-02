@@ -75,9 +75,12 @@ try {
         const base = await p.evaluate(() => window.__frames());
         await at(base + LEAD_STEPS);
         await p.keyboard.press("ArrowLeft");
-        await at(base + LEAD_STEPS + DIVE_STEPS);
-        await p.evaluate((kk) => window.__act(kk), k);
-        await at(base + LEAD_STEPS + DIVE_STEPS + TAIL_STEPS);
+        // 사건을 걸 프레임과 멈출 프레임을 페이지에 맡긴다. 밖에서 폴링해 걸면 한두 프레임 늦고,
+        // 그 순간 빠르게 흔들리는 값은 그만큼 어긋나 설계된 편차와 섞인다.
+        const actAt = base + LEAD_STEPS + DIVE_STEPS;
+        const stopAt = actAt + TAIL_STEPS;
+        await p.evaluate(([a, kk, s]) => window.__plan(a, kk, s), [actAt, k, stopAt]);
+        await at(stopAt);
         const shot = await p.evaluate(() => window.__poseVis());
         shot.ball = await p.evaluate(() => window.__ballPos());
         got[k].push(shot);
