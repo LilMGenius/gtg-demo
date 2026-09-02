@@ -602,6 +602,17 @@ export function createScene(canvas) {
   const goalFrame = () => goalFraming(camera, R_HALF_W, R_H);
   // 골대가 실물 형상인지 밖에서 물을 수 있어야 한다. 앞뒤 폭이 갈리면 사다리꼴인데,
   // 그 결함은 화면을 봐야만 보이고 그때는 이미 파운더가 먼저 본 뒤다.
+  // 동네 등급이 오르면 행인이 는다는 설계가 화면에서 참인지 밖에서 물을 수 있어야 한다.
+  // visible 플래그가 켜진 것과 그 사람이 화면 안에 있는 것은 다른 명제다.
+  const crowd = (city) => {
+    if (city !== undefined) setCity(city);
+    const v = new THREE.Vector3();
+    return passers.map((p, i) => {
+      p.getWorldPosition(v);
+      v.project(camera);
+      return { i, on: p.visible, x: v.x, y: v.y, z: v.z };
+    });
+  };
   const goalShape = () => {
     const span = (name) => {
       const b = new THREE.Box3();
@@ -2126,7 +2137,7 @@ export function createScene(canvas) {
     renderer.setRenderTarget(null);
     return { off, on };
   }
-  return { play, act, reset, setKeeper, setCity, sfx, ballProbe, stageProbe, goalFrame, goalShape, shadowRect, shadowPair,
+  return { play, act, reset, setKeeper, setCity, sfx, ballProbe, stageProbe, goalFrame, goalShape, crowd, shadowRect, shadowPair,
     ballPos: () => ({ x: ball.position.x, y: ball.position.y, z: ball.position.z }),
     // 세계시계. 히트스톱과 정지가 여기서 멈추므로, 화면에 숫자를 쓰는 쪽은 실시간 대신 이걸 읽는다.
     now: () => vnow,
