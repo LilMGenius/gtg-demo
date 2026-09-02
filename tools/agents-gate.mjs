@@ -27,14 +27,15 @@ for (const f of readdirSync("src")) {
 }
 check("judgement:headless", browserHits.length === 0, "browser refs in [" + browserHits.join(", ") + "]");
 
-// 문서가 죽었다고 적은 폴더는 정말 죽어 있어야 한다. 되살아나면 문서가 거짓말이 된다.
-const simFiles = existsSync("sim") ? readdirSync("sim") : [];
-let importers = "";
+// 계기는 한 폴더에 산다. 판정을 부르는 실행 스크립트가 다른 곳에 생기면 게이트를 셀 때
+// 그쪽이 빠지고, 빠진 쪽은 아무도 안 돌리며, 없는 게이트는 빨간불도 파란불도 내지 않는다.
+let strays = "";
 try {
-  const hit = execSync("git grep -l sim/ -- *.mjs *.html", { encoding: "utf8" }).trim();
-  importers = hit.split(NL2).filter((f) => f && f !== "tools/agents-gate.mjs").join(" ");
-} catch { importers = ""; }
-check("sim:still-dead", importers === "", simFiles.length + " files, importers [" + importers + "]");
+  const hit = execSync("git grep -l src/chain.mjs -- *.mjs", { encoding: "utf8" }).trim();
+  const ok = ["tools/", "test/", "web/", "src/"];
+  strays = hit.split(NL2).filter((f) => f && !ok.some((d) => f.startsWith(d))).join(" ");
+} catch { strays = ""; }
+check("instruments:one-folder", strays === "", "outside [" + strays + "]");
 
 // 원장 칸 수. 문서가 열다섯과 둘이라고 적었고 두 화면이 그 순서로 그린다.
 check("ledger:growable-15", GROWABLE.length === 15, String(GROWABLE.length));
