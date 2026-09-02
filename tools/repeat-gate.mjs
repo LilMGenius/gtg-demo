@@ -91,10 +91,24 @@ try {
     }
     return out;
   };
+  // 처치군은 최솟값을 쓴다. 가장 닮은 두 회차가 바를 넘어야 그 사건이 매번 다르다고 말할 수 있다.
+  // 대조군은 중앙값을 쓴다. 잡음을 대표해야 하는데 쌍 하나짜리 추정은 한 번 튀면 바가 같이 튄다.
+  // 실측: 리바운드가 한 실행에서 0.1283 대 필요 0.0936으로 통과하고 다음 실행에서
+  // 0.0902 대 0.0935로 떨어졌다. 산출물은 그대로였고 움직인 것은 대조군 한 쌍이었다.
+  const mid = (set, rounds) => {
+    const out = {};
+    for (const k of KINDS) {
+      const ds = [];
+      for (let i = 0; i < rounds; i++) for (let j = i + 1; j < rounds; j++) ds.push(dist(sceneVec(set[k][i]), sceneVec(set[k][j])));
+      ds.sort((a, c) => a - c);
+      out[k] = ds[(ds.length - 1) >> 1];
+    }
+    return out;
+  };
   const shots = await sample("", ROUNDS);
-  // 대조군은 쌍 하나면 충분하다. 편차를 끈 상태에서 두 회차가 얼마나 벌어지는지만 알면 된다.
-  const ctl = await sample("&vary=0", 2);
-  const ctlSpread = low(ctl, 2);
+  // 대조군도 세 회차다. 쌍이 셋이라야 중앙값이 서고, 쌍 하나로는 잡음을 대표할 수 없다.
+  const ctl = await sample("&vary=0", 3);
+  const ctlSpread = mid(ctl, 3);
   const spread = low(shots, ROUNDS);
   const ctlMax = Math.max(...KINDS.map((k) => ctlSpread[k]));
   const ctlWho = KINDS.find((k) => ctlSpread[k] === ctlMax);
