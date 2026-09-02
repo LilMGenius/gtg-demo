@@ -1301,7 +1301,9 @@ export function createScene(canvas) {
         }
         case 'spill':
           // 흘렸다. 공이 옆으로 튀어나가 아직 살아 있다.
-          ball.position.set(lerp(tail.from.x, tail.from.x + (tail.kx >= 0 ? 1.5 : -1.5), e), 0.14 + Math.abs(Math.sin(u * 9)) * 0.5 * (1 - u), lerp(tail.from.z, 3.2, e));
+          // 튀어나가는 폭이 1.5 상수라 회차가 전부 같은 자리에서 끝났다. 실측으로 이 사건만
+          // 편차를 켠 쪽이 끈 쪽보다 조용했다. 손에 맞고 튄 공이 매번 같은 거리로 갈 이유가 없다.
+          ball.position.set(lerp(tail.from.x, tail.from.x + (tail.kx >= 0 ? 1 : -1) * (1.2 + tail.vary.c * 0.6), e), 0.14 + Math.abs(Math.sin(u * 9)) * 0.5 * (1 - u), lerp(tail.from.z, 3.2, e));
           break;
         case 'downed': {
           keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.5, damp(0.06));
