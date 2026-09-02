@@ -9,6 +9,12 @@ const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
 const KINDS = ["save", "catch", "carriedIn", "downed", "lost", "openGoalScored", "gloveGone", "spill", "rebound", "reboundMiss", "charge", "beat", "talked", "distracted", "skied"];
 // 회차 셋이면 쌍이 셋이라 최솟값이 우연히 한 쌍만 가까운 경우를 걸러낸다. 둘이면 쌍이 하나라 그게 안 된다.
 const ROUNDS = 3;
+// 채취 시점은 잠이 아니라 프레임 수로 잡는다. 폭은 60분의 1초다.
+// 다이빙 42프레임은 0.700초, 꼬리 31프레임은 0.517초로 이전의 잠과 거의 같은 자리다.
+// 다른 것은 그 자리가 기계 사정과 무관하게 매번 같다는 점이다.
+const STEP = 1 / 60;
+const DIVE_STEPS = 42;
+const TAIL_STEPS = 31;
 // 바를 상수로 적으면 그 수가 무엇 위에 서 있는지를 아무도 모른다. 대조군에서 유도한다.
 // 편차를 끈 상태로 같은 절차를 지나도 회차는 조금씩 벌어진다. 520ms는 연출이 아직 움직이는 중이라
 // 프레임 타이밍이 몸과 공을 다른 자리에 놓기 때문이다. 그 최대치의 두 배를 바로 쓴다.
@@ -61,10 +67,16 @@ try {
         await p.waitForTimeout(1200);
         await p.click("#go", { force: true });
         await p.waitForTimeout(1500);
+        // 잠으로 시점을 잡으면 그 사이 몇 프레임이 지났는지가 그날의 부하로 정해진다.
+        // 세계시계를 고정 폭으로 걷게 하고 프레임을 세면, 사건 이후 흐른 시간이 회차마다 같아진다.
+        // 다이빙도 이 안에 넣는다. 꼬리가 시작할 때의 몸이 흔들리면 종점도 같이 흔들린다.
+        await p.evaluate((s) => window.__fixedStep(s), STEP);
+        const at = async (n) => p.waitForFunction((m) => window.__frames() >= m, n, { timeout: 20000 });
+        const base = await p.evaluate(() => window.__frames());
         await p.keyboard.press("ArrowLeft");
-        await p.waitForTimeout(700);
+        await at(base + DIVE_STEPS);
         await p.evaluate((kk) => window.__act(kk), k);
-        await p.waitForTimeout(520);
+        await at(base + DIVE_STEPS + TAIL_STEPS);
         const shot = await p.evaluate(() => window.__poseVis());
         shot.ball = await p.evaluate(() => window.__ballPos());
         got[k].push(shot);

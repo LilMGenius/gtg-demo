@@ -136,6 +136,8 @@ export function createScene(canvas) {
   let sceneCalls = 0;
   let sceneTris = 0;
   let vnow = 0;
+  // 0이면 실시간을 쓴다. 양수면 프레임마다 그 폭만큼만 세계시계가 간다. window.__fixedStep이 켠다.
+  let fixedDt = 0;
   // drive()는 frame() 밖에 있어 이번 프레임의 dt를 직접 못 본다. 여기에 실어 보낸다.
   let stepDt = 0;
   let realLast = performance.now() / 1000;
@@ -914,6 +916,8 @@ export function createScene(canvas) {
     // 탭이 백그라운드로 갔다 오면 dt가 몇 초로 들어와 연출이 한 프레임에 끝난다.
     let dt = Math.min(0.05, Math.max(0, real - realLast));
     realLast = real;
+    // 고정 폭이 켜져 있으면 실시간을 버린다. 프레임 수가 곧 세계시간이 된다.
+    if (fixedDt > 0) dt = fixedDt;
     if (frozen) dt = 0;
     frames += 1;
     if (stopLeft > 0) {
@@ -1811,6 +1815,13 @@ export function createScene(canvas) {
   // 뒤통수를 향한 머리에 하트 눈을 넣어도 관객이 보는 것은 검은 반구다.
   window.__faceVis = () => faceToCamera(keeper.userData.head, camera, 1);
 
+
+  // 채취를 재현 가능하게 만드는 훅. 켜면 세계시계가 실시간을 안 보고 프레임마다 같은 폭으로 걷는다.
+  // 잠으로 시점을 잡으면 그 사이에 몇 프레임이 지났는지가 그날의 부하로 정해져,
+  // 아무것도 안 바꾼 두 장이 사건 종류가 갈리는 거리보다 더 벌어진다. 실측 6.67 대 0.35였다.
+  // 게이트는 프레임 수를 세어 시점을 잡는다. 그러면 사건 이후 흐른 세계시간이 프레임 수 곱하기 폭이다.
+  window.__fixedStep = (sec) => { fixedDt = Number(sec) || 0; return fixedDt; };
+  window.__frames = () => frames;
   // 사건이 다른데 실루엣이 같으면 관객은 같은 장면을 두 번 본다.
   // 선언된 오일러각이 아니라 캡처 순간의 관절 월드 좌표를 뽑는다.
   // 기울기와 위치까지 합쳐진 최종 몸이 화면에서 갈리는 것이고, 딕셔너리 비교로는 그게 안 잡힌다.
