@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync, writeFileSync, appendFileSync, unlinkSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 // 게이트를 한 번에 돌리고 결과를 모은다. 지금까지는 사람이 하나씩 불렀고,
@@ -36,7 +36,12 @@ if (mode === "slow") {
   process.on("SIGINT", () => { drop(); process.exit(130); });
 }
 const NL2 = String.fromCharCode(10);
-console.log(mode + ": " + picked.length + " of " + all.length + " gates");
+// 결과 파일도 러너가 소유한다. 훅이 리다이렉트하면 락에 막혀 즉시 죽는
+// 둘째 러너가 그 파일을 먼저 비워 놓는다. 락을 통과한 뒤에만 열린다.
+const OUT = mode === "slow" ? "sweep.local.txt" : null;
+if (OUT) writeFileSync(OUT, "");
+const say = (s) => { console.log(s); if (OUT) appendFileSync(OUT, s + NL2); };
+say(mode + ": " + picked.length + " of " + all.length + " gates");
 
 const red = [];
 for (const f of picked) {
@@ -50,9 +55,9 @@ for (const f of picked) {
   if (verdict !== "pass") red.push(name + " " + verdict);
   // 마지막 비어 있지 않은 줄이 그 게이트가 사람에게 하는 말이다. 없으면 종료 코드만 남는다.
   const lines = (r.stdout || "").trim().split(NL2).filter((x) => x.trim());
-  const say = lines.length ? lines[lines.length - 1].trim() : "(silent)";
-  console.log("  " + verdict.padEnd(7) + name.padEnd(14) + secs.padStart(6) + "s  " + say.slice(0, 60));
+  const spoken = lines.length ? lines[lines.length - 1].trim() : "(silent)";
+  say("  " + verdict.padEnd(7) + name.padEnd(14) + secs.padStart(6) + "s  " + spoken.slice(0, 60));
 }
 
-console.log(red.length ? "gates FAIL " + red.length + ": " + red.join(", ") : "gates PASS " + picked.length);
+say(red.length ? "gates FAIL " + red.length + ": " + red.join(", ") : "gates PASS " + picked.length);
 if (red.length) process.exitCode = 1;

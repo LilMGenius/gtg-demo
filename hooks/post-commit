@@ -1,7 +1,7 @@
 #!/bin/sh
 # 느린 게이트 스물일곱은 십 분이 넘는다. 커밋을 붙잡지 않도록 윈도우 네이티브로 떼어 낸다.
-# 셸 백그라운드는 부모의 출력 핸들을 물고 있어 커밋이 그만큼 늦게 돌아왔다.
-# 락은 러너가 소유하므로 여기서는 띄우기만 한다.
-powershell -NoProfile -Command "Start-Process -FilePath node -ArgumentList 'tools/run-gates.mjs','slow' -WorkingDirectory (Get-Location) -WindowStyle Hidden -RedirectStandardOutput sweep.local.txt -RedirectStandardError sweeperr.local.txt" 2>/dev/null
+# 락과 결과 파일은 둘 다 러너가 소유한다. 여기서 출력을 리다이렉트하면
+# 락에 막혀 즉시 죽는 두 번째 러너가 그 파일을 먼저 비워 버린다.
+powershell -NoProfile -Command "Start-Process -FilePath node -ArgumentList 'tools/run-gates.mjs','slow' -WorkingDirectory (Get-Location) -WindowStyle Hidden" 2>/dev/null
 echo "  slow sweep dispatched"
 exit 0
