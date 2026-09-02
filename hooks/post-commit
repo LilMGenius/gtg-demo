@@ -1,0 +1,11 @@
+#!/bin/sh
+# 느린 게이트 스물일곱은 11분이 든다. 커밋을 막지 않고 뒤에서 돈다.
+# 결과는 다음 커밋의 pre-commit이 읽는다. 사람이 기억해서 부르는 규칙은 두 번 샜다.
+if [ -f sweep.local.lock ]; then
+  echo "  slow sweep already running, skipped"
+  exit 0
+fi
+touch sweep.local.lock
+(node tools/run-gates.mjs slow > sweep.local.txt 2>&1; rm -f sweep.local.lock) &
+echo "  slow sweep started in the background"
+exit 0

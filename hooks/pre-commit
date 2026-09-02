@@ -1,0 +1,11 @@
+#!/bin/sh
+# 빠른 게이트는 5초다. 커밋마다 돌려도 부담이 없고, 방금 고친 것이 다른 축을 깼는지 즉시 말한다.
+# 막지는 않는다. 한 문제가 풀리면 나머지가 빨간 상태여도 커밋한다는 규칙이 더 위다.
+node tools/run-gates.mjs fast || echo "  (fast gates are red; commit continues)"
+
+# 직전 커밋이 띄운 느린 쓸기의 결과를 여기서 읽는다. 11분짜리를 커밋 앞에 세울 수는 없고,
+# 읽지 않으면 그 쓸기는 아무에게도 도달하지 않는다.
+if [ -f sweep.local.txt ]; then
+  tail -1 sweep.local.txt | sed "s/^/  last slow sweep: /"
+fi
+exit 0
