@@ -1,5 +1,5 @@
 import { makeRng, buildSet, resolve, newKeeper, followerGain } from "../src/chain.mjs";
-import { lookBoost } from "../web/src/state/gear.mjs";
+import { lookBoost, GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES } from "../web/src/state/gear.mjs";
 
 // \uc7a5\ube44 \ud6a8\uacfc \uac8c\uc774\ud2b8. \uc5ec\ub35f \uc120\ubc18\uc774 \ud30c\ub294 \uac83\uc774 \ud310\uc815\uacfc \uc18c\ubb38\uc5d0\uc11c \uc2e4\uc81c\ub85c \uc6c0\uc9c1\uc774\ub294\uac00.
 // gear-gate\ub294 \uc0c1\uac70\ub798\ub9cc \ubcf8\ub2e4. \uac12\uc744 \uce58\ub974\uace0 \ubb34\uc5c7\uc744 \ubc1b\ub294\uc9c0\ub294 \uc5b4\ub5a4 \uac8c\uc774\ud2b8\ub3c4 \uc548 \ubd24\ub2e4.
@@ -143,6 +143,37 @@ mono("mono-frame-eat", "frame", (s) => s.ev.reboundMiss, 1);
 mono("mono-city-fans", "city", (s) => s.fans, 1);
 mono("mono-city-gaze", "city", (s) => s.ev.gaze, 1);
 mono("mono-city-save", "city", rateOf, -1);
+
+// 값당 효과. 위의 사다리는 방향만 본다. 3등급이 1등급의 약 5.9배 값인데
+// 효과 증분이 2배도 안 되면 마지막 칸은 값만 받고 거의 아무것도 안 주는 칸이다.
+// 등급마다 값당 효과가 같기를 요구하면 방치형의 정상적인 후반 체감 감소까지 빨개진다.
+// 그렇다고 절반 아래로 떨어지면 마지막 칸을 산 사람이 손해다. 그래서 하한을 1등급의 40%로 잡았다.
+const COST = {
+  grip: GLOVES.map((g) => g.cost),
+  studs: BOOTS.map((g) => g.cost),
+  pads: KITS.map((g) => g.cost),
+  socks: SOCKS.map((g) => g.cost),
+  frame: GOALS.map((g) => g.cost),
+  city: CITIES.map((g) => g.cost)
+};
+const VALUE_FLOOR = 0.4;
+function value(name, field, pick) {
+  // 등급은 순서대로 살 필요가 없다. 등급 r의 지출은 그 행의 cost 하나이고 누적이 아니다.
+  const v = ladder(field).map(pick);
+  const per = (r) => Math.abs(v[r] - v[0]) / COST[field][r];
+  const ratio = per(3) / per(1);
+  check(name, ratio >= VALUE_FLOOR,
+    "r1 " + per(1).toExponential(2) + " r3 " + per(3).toExponential(2) + " ratio " + ratio.toFixed(2));
+}
+
+// 선반마다 그 선반이 파는 문구의 알맹이 축 하나씩만 잰다.
+// 동네는 대가 축이라 세이브율이 아니라 소문 쪽으로 잰다.
+value("value-grip-save", "grip", rateOf);
+value("value-studs-save", "studs", rateOf);
+value("value-pads-save", "pads", rateOf);
+value("value-socks-save", "socks", rateOf);
+value("value-frame-save", "frame", rateOf);
+value("value-city-fans", "city", (s) => s.fans);
 
 for (const n of notes) console.log("ok  " + n);
 for (const f of fails) console.log("BAD " + f);
