@@ -7,7 +7,7 @@ import { createBallProbe, opaqueBlocker } from '../diagnostics/ball-probe.mjs';
 import { createStageProbe, goalFraming, footY, faceToCamera } from '../diagnostics/stage-probe.mjs';
 import {
   flat, flatVertex, BALL_R, VIEW_X, KICKER_OFF, BALL_PAST, REST_Z, REST_Y,
-  R_HALF_W, R_H, SX, SY, lerp, ease
+  R_HALF_W, R_H, SX, SY, MOUTH_X, lerp, ease
 } from './units.mjs';
 import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, pushPose, setPose } from './objects/actors.mjs';
 import { buildPitch, buildPassers } from './objects/pitch.mjs';
@@ -1267,7 +1267,11 @@ export function createScene(canvas) {
             const cx = lerp(tail.from.x, P.x, c);
             const cy = lerp(tail.from.y, P.y, c);
             const cz = lerp(tail.from.z, P.z, c);
-            ball.position.set(lerp(cx, P.x * 1.15, f), lerp(cy, REST_Y, f), lerp(cz, REST_Z, f));
+            // 목표만 묶으면 출발점이 입구 밖이라 가는 도중이 밖에 남는다. 손은 골포스트 밖에
+            // 있을 수 있어도 공은 어느 프레임에서도 골망 밖에 서면 안 된다. 결과를 묶는다.
+            const gx = P.x * 1.15;
+            const bx = lerp(cx, gx, f);
+            ball.position.set(Math.max(-MOUTH_X, Math.min(MOUTH_X, bx)), lerp(cy, REST_Y, f), lerp(cz, REST_Z, f));
           }
           if (loose) {
             // 장갑은 공에 딸려 간다. 0.3만큼 띄웠더니 장갑과 공이 따로 날아가는 것으로 읽혔다.
@@ -1431,7 +1435,7 @@ export function createScene(canvas) {
             // x를 0으로 모으면 어디로 차 넣었든 공이 매번 골문 한가운데에서 멈춘다.
             // 아무도 안 건드린 공이 옆으로 휘어 들어갈 이유가 없다. 노린 자리에 그대로 꽂힌다.
             // 2.0은 골대 반폭 2.2에서 공 반지름 0.14와 그물 두께를 뺀 값이라 그물을 뚫지 않는다.
-            const inX = Math.max(-2.0, Math.min(2.0, tail.aimX));
+            const inX = Math.max(-MOUTH_X, Math.min(MOUTH_X, tail.aimX));
             ball.position.set(lerp(tail.from.x, inX, be), lerp(tail.from.y, REST_Y, be), lerp(tail.from.z, REST_Z, be));
           }
           break;
@@ -1451,7 +1455,9 @@ export function createScene(canvas) {
           // 반폭 0.72에 공 반지름 0.14와 여유를 더한 1.05로 어깨 밖을 지나가게 한다.
           const side = Math.sign(tail.aimX || 1);
           // 1.3 고정이면 공이 매번 같은 자리로 빠진다. 1.05 하한은 어깨 밖 보장이라 그대로 둔다.
-          const outX = side * Math.max(Math.abs(tail.aimX) * (1.18 + vy.c * 0.28), 1.05);
+          // 다만 곱하기만 하면 바깥을 노린 구에서 입구를 넘는다. 실측 겨냥 -1.91이 -2.39로 나갔다.
+          // 어깨 밖 하한과 입구 안 상한 사이에 둔다.
+          const outX = side * Math.min(MOUTH_X, Math.max(Math.abs(tail.aimX) * (1.18 + vy.c * 0.28), 1.05));
           // 지나가는 속도도 흔든다. 폭 0.9~1.14는 꼬리 길이 안에서 끝나는 범위다.
           const be = Math.min(1, e * (0.9 + vy.a * 0.24));
           ball.position.set(lerp(tail.from.x, outX, be), lerp(tail.from.y, REST_Y, be), lerp(tail.from.z, REST_Z, be));
@@ -1468,7 +1474,7 @@ export function createScene(canvas) {
           // 막은 사람이 없는 공이라 휠 이유가 없다. 밀어 넣은 자리에 그대로 선다.
           // 2.0은 talked와 같은 근거다. 골대 반폭 2.2에서 공 반지름 0.14와 그물 두께를 뺀 값이다.
           ball.position.set(
-            lerp(tail.from.x, Math.max(-2.0, Math.min(2.0, tail.aimX)), e),
+            lerp(tail.from.x, Math.max(-MOUTH_X, Math.min(MOUTH_X, tail.aimX)), e),
             BALL_R,
             lerp(tail.from.z, REST_Z, e),
           );

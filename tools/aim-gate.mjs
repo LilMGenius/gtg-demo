@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { MOUTH_X } from "../web/src/render/units.mjs";
 
 // 먹힌 공은 키커가 노린 자리에서 끝나야 한다. 종점을 0으로 모으면 어느 코너로 찼든
 // 공이 매번 골문 한가운데에 서고, 그러면 그 구가 어디로 들어갔는지 화면이 말하지 않는다.
@@ -12,11 +13,10 @@ const SEEDS = [11, 20, 33, 47, 58];
 // 몸이 공을 데리고 들어가거나 몸 위로 굴려 보내는 갈래는 몸을 따라야 한다.
 // 겨냥 축을 몸 갈래에 대면 그것은 유추로 만든 축이고, 멀쩡한 연출이 빨간불을 낸다.
 const BALL_KINDS = ["talked", "distracted", "openGoalScored"];
-const BODY_KINDS = ["carriedIn", "gloveGone", "downed"];
-const KINDS = BALL_KINDS.concat(BODY_KINDS);
+const BODY_KINDS = ["carriedIn", "downed"];
+const KINDS = BALL_KINDS.concat(BODY_KINDS).concat(["gloveGone"]);
 // 채취는 잠이 아니라 프레임으로 잡는다. 잠으로 잡으면 그날의 부하가 시점을 정한다.
 const STEP = 1 / 60;
-const DIVE_STEPS = 42;
 const TAIL_STEPS = 31;
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 300000);
 t.unref();
@@ -40,16 +40,20 @@ try {
       await p.waitForTimeout(1400);
       await p.evaluate((s) => window.__fixedStep(s), STEP);
       const at = async (n) => p.waitForFunction((m) => window.__frames() >= m, n, { timeout: 20000 });
-      const base = await p.evaluate(() => window.__frames());
       // 다이빙은 대기 상태에서만 먹는다. 잠으로 그 순간을 맞추려 하면 그날의 부하가 맞추고,
       // 안 맞은 날은 키가 조용히 무시되어 키퍼가 가운데 선 채로 측정된다.
       await p.waitForSelector(".zone:not([disabled])", { timeout: 15000 });
       await p.keyboard.press("ArrowLeft");
-      await at(base + DIVE_STEPS);
-      // 다이빙이 실제로 일어나지 않았으면 아래 몸 축은 산출물이 아니라 채취 절차를 재는 것이다.
+      // 다이빙은 대기창이 열린 순간이 아니라 런업과 비행의 앞부분이 지난 뒤에 시작한다.
+      // 프레임 수로 끊으면 그 전에 사건을 걸어 키퍼가 가운데 선 채로 채취된다. 실측으로
+      // 42프레임 뒤 키퍼 x가 다섯 시드 모두 0.00이었다. 몸이 실제로 나갔는지를 기다린다.
+      // 문턱 0.8은 뻗는 폭의 하한 1.05의 3분의 2다. 0.2로 두면 넘자마자 찍혀 뻗기 초반이 잡힌다.
+      await p.waitForFunction(() => Math.abs(window.__poseVis().pos[0]) > 0.8, null, { timeout: 20000 });
       const pre = await p.evaluate(() => window.__poseVis());
+      // 꼬리 창은 사건이 걸린 프레임에서 센다. 라운드 시작에서 세면 다이빙을 기다린 만큼 꼬리가 짧아진다.
+      const actF = await p.evaluate(() => window.__frames());
       await p.evaluate((kk) => window.__act(kk), k);
-      await at(base + DIVE_STEPS + TAIL_STEPS);
+      await at(actF + TAIL_STEPS);
       const aim = await p.evaluate(() => window.__aim());
       const ball = await p.evaluate(() => window.__ballPos());
       const pose = await p.evaluate(() => window.__poseVis());
@@ -62,6 +66,10 @@ try {
   const aims = rows[KINDS[0]].map((r) => r.aim);
   const span = Math.max(...aims) - Math.min(...aims);
   check("control:aims-actually-differ", span > 0.5, "aim span " + span.toFixed(2) + " over " + SEEDS.length + " seeds");
+
+  // 다이빙이 실제로 일어나지 않았으면 아래 몸 축은 산출물이 아니라 채취 절차를 재는 것이다.
+  const dived = Math.max(...KINDS.map((k) => Math.max(...rows[k].map((r) => Math.abs(r.dive)))));
+  check("control:the-dive-actually-moved-the-keeper", dived > 0.3, "farthest keeper before the event " + dived.toFixed(2));
 
   for (const k of KINDS) {
     for (const r of rows[k]) console.log("  " + k + " seed " + r.seed + " aim " + r.aim.toFixed(2) + " ball " + r.x.toFixed(2) + " keeper " + r.kx.toFixed(2) + " dive " + r.dive.toFixed(2));
@@ -94,10 +102,17 @@ try {
     // 몸을 따라간다는 것은 몸 곁에서 끝난다는 뜻이다. 1.0은 키퍼 반폭에 공 지름을 더한 정도다.
     const gap = Math.max(...set.map((r) => Math.abs(r.x - r.kx)));
     check("body:" + k + "-ball-rests-by-the-keeper", gap < 1.0, "farthest gap " + gap.toFixed(2));
-    // 몸이 뛴 쪽으로 누워 있는지는 여기서 묻지 않는다. 이 채취는 아직 다이빙을 못 만든다.
-    // 대기 상태를 기다린 뒤 키를 눌러도 사건 직전 키퍼 x가 다섯 시드 모두 0.00으로 나온다.
-    // 그 상태를 못 만드는 자가 그 상태를 판정하면 하네스의 한계가 산출물의 결함으로 인쇄된다.
-    // 다이빙을 실제로 만드는 채취를 세우는 것이 먼저이고, 그 축은 그때 여기 붙는다.
+    // 그리고 그 몸이 가운데 서 있으면 안 된다. 뛴 쪽으로 누워 있어야 어느 쪽 구였는지가 읽힌다.
+    const mid = Math.max(...set.map((r) => Math.abs(r.kx)));
+    check("body:" + k + "-keeper-is-not-at-centre", mid > 0.3, "farthest keeper " + mid.toFixed(2));
+  }
+
+  // 먹힌 공은 어느 갈래로 들어갔든 골망 안에 서야 한다. 자막만 먹혔다고 말하고 그림이
+  // 아니라고 말하면 그 한 장은 사건을 증명하지 못한다. 입구 한계는 units.mjs가 소유한다.
+  for (const k of KINDS) {
+    const out = rows[k].filter((r) => Math.abs(r.x) > MOUTH_X);
+    const far = Math.max(...rows[k].map((r) => Math.abs(r.x)));
+    check("frame:" + k + "-ball-stays-inside-the-mouth", out.length === 0, "farthest " + far.toFixed(2) + " limit " + MOUTH_X + (out.length ? " seeds " + out.map((r) => r.seed).join(",") : ""));
   }
 
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));

@@ -8,6 +8,11 @@ export const flatMap = (c, tex) => new THREE.MeshLambertMaterial({ color: c, map
 // 정점색을 쓰는 재질. 재질 색과 곱해지므로 밑색은 흰색에 가깝게 둔다.
 export const flatVertex = (c) => new THREE.MeshLambertMaterial({ color: c, vertexColors: true });
 export const BALL_R = 0.14;
+
+// 먹힌 공이 설 수 있는 골 입구 안쪽 한계. 골대 반폭 2.2에서 공 반지름과 그물 두께를 뺀 자리다.
+// 이 밖에서 끝난 공은 골망 밖에 서고, 그러면 자막만 먹혔다고 말하고 그림은 아니라고 말한다.
+// 꼬리 세 갈래가 같은 수를 따로 들고 있었다. 한 곳에서 읽는다.
+export const MOUTH_X = 2.0;
 // 화면 좌우와 판정 좌우를 맞추는 부호. 판정식은 건드리지 않는다.
 export const VIEW_X = -1;
 // 키커가 공 바로 뒤에 서면 대기 내내 공을 가린다. 측정값: 23프레임 연속 사라짐.
