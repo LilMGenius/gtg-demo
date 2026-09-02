@@ -38,11 +38,18 @@ try {
       x.cen = m.centroid(d, 0, Math.max(60, x.tailMs));
       // 발소리는 두 접촉의 크기가 발마다 뒤집힌다. 한 번만 재면 뒷접촉이 큰 발에서
       // 상승이 25ms로 읽히고 게이트가 코드와 무관하게 붉어진다. 열한 번의 중앙값으로 잰다.
+      // 최고치도 같다. 합성에 난수가 들어 있어 드리블이 0.198에서 0.315 사이를 오간다.
+      // 그 수가 비율 축에 들어가면 부하와 무관하게 어느 날 1.22배가 되어 1.5배 문턱을 놓친다.
+      // 이미 열한 번 그리고 있으므로 같은 렌더에서 최고치도 같이 거둔다.
       const at = [];
+      const pk = [];
       for (let i = 0; i < 11; i += 1) {
-        at.push(m.attackMs(await m.renderSfx(sfx, name, ARG[name], LEN[name])));
+        const one = await m.renderSfx(sfx, name, ARG[name], LEN[name]);
+        at.push(m.attackMs(one));
+        pk.push(m.peakOf(one));
       }
       x.attackMs = at.sort((u, v) => u - v)[5];
+      x.peak = Number(pk.sort((u, v) => u - v)[5].toFixed(4));
       x.tailBright = m.tailBrightness(d);
       out.each[name] = x;
     }
