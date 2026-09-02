@@ -17,7 +17,7 @@ const base = newKeeper();
 
 // 입력을 정답 방향으로 못 박는다. 자동은 방향을 오판해서 버프 신호를 덮는다.
 function sweep(opt) {
-  let saved = 0, shots = 0, fans = 0, slip = 0, flairFans = 0;
+  let saved = 0, shots = 0, fans = 0, lapse = 0, flairFans = 0;
   for (let s = 0; s < SEEDS; s++) {
     // 슛은 키퍼 스탯을 안 읽는다. 같은 시드면 어느 조건에서도 같은 다섯 구가 나온다.
     const set = buildSet(makeRng(s + 1), 5, 0);
@@ -32,15 +32,17 @@ function sweep(opt) {
       shots++;
       if (!r.conceded) saved++;
       // 이벤트는 문자열이 아니라 { t, line, cause } 객체다. 종류는 t가 소유한다.
-      const distracted = r.events.some((e) => e.t === "distracted" || e.t === "talked");
-      if (distracted) slip++;
+      // 자양강장제는 focusAid로 한눈팔기와 수다를 함께 좁힌다. 그래서 이 수는 둘을 합친다.
+      // 라포 게이트는 gazeAid만 좁히므로 distracted만 센다. 두 수가 다른 이유다.
+      const leaked = r.events.some((e) => e.t === "distracted" || e.t === "talked");
+      if (leaked) lapse++;
       const g = followerGain(base, r, 0, 1, opt.boost || 1);
       fans += g;
       // 자양강장제가 파는 교환의 반대편. talked가 열어 준 flair 2.2배 몫이다.
       if (r.events.some((e) => e.t === "talked")) flairFans += g;
     }
   }
-  return { rate: saved / shots * 100, fans, slip, flairFans, shots };
+  return { rate: saved / shots * 100, fans, lapse, flairFans, shots };
 }
 
 // 대조군. 같은 조건 두 번이 완전히 같아야 나머지 수치가 차이로 읽힌다.
@@ -54,8 +56,8 @@ check("control", c1.rate === c2.rate && c1.fans === c2.fans,
 const tonic = sweep({ focusAid: 0.5 });
 check("tonic-save", tonic.rate > c1.rate,
   c1.rate.toFixed(2) + " -> " + tonic.rate.toFixed(2));
-check("tonic-distract", tonic.slip < c1.slip,
-  c1.slip + " -> " + tonic.slip);
+check("tonic-distract", tonic.lapse < c1.lapse,
+  c1.lapse + " -> " + tonic.lapse);
 // 교환의 반대편은 총 팔로워가 아니라 수다가 벌어 준 몫이다.
 // 총합은 세이브가 늘어 오히려 오른다. 그 방향을 여기서 같이 찍어 선반 문구와 대조한다.
 check("tonic-cost", tonic.flairFans < c1.flairFans,

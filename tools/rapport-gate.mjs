@@ -14,7 +14,7 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 const base = newKeeper();
 
 function sweep(opt) {
-  let saved = 0, shots = 0, fans = 0, slip = 0, flairFans = 0, talked = 0;
+  let saved = 0, shots = 0, fans = 0, gazeSlip = 0, flairFans = 0, talked = 0;
   for (let s = 0; s < SEEDS; s++) {
     const set = buildSet(makeRng(s + 1), 5, 0);
     const rng = makeRng(s + 90001);
@@ -29,7 +29,7 @@ function sweep(opt) {
       });
       shots++;
       if (!r.conceded) saved++;
-      if (r.events.some((e) => e.t === "distracted")) slip++;
+      if (r.events.some((e) => e.t === "distracted")) gazeSlip++;
       const isTalk = r.events.some((e) => e.t === "talked");
       if (isTalk) talked++;
       const g = followerGain(base, r, 0, 1, 1, opt.rapport || 1);
@@ -37,7 +37,7 @@ function sweep(opt) {
       if (isTalk) flairFans += g;
     }
   }
-  return { rate: saved / shots * 100, fans, slip, flairFans, talked, shots };
+  return { rate: saved / shots * 100, fans, gazeSlip, flairFans, talked, shots };
 }
 
 // 1. passer 인덱스. 도시 등급마다 5 + 2 * city명이고, 행인이 없는 구는 -1이다.
@@ -62,23 +62,25 @@ check("passer-zero", true, "index 0 present in every tier above");
 
 // 2. 스트림 불변식. gazeAid를 안 주면 라포가 붙기 전과 한 수치도 달라지지 않아야 한다.
 // 아래 다섯 값은 라포 배선 이전 HEAD 판본에서 실측한 것이다. 하나라도 어긋나면 난수 스트림이 밀린 것이다.
-// slip은 distracted만 센다. buff-gate의 slip은 distracted+talked라 441이고, 이 게이트는 340이다.
-const BASE = { rate: 18.94, fans: 766850, slip: 340, flairFans: 12126, shots: 10000 };
+// 라포는 gazeAid로 gazeP만 좁히므로 여기서는 distracted만 센다. 340이다.
+// buff-gate는 focusAid가 둘 다 좁히므로 distracted+talked를 lapse로 센다. 441이다.
+// 이름을 갈라 둔 이유는 같은 이름이 두 수를 가리키면 읽는 쪽이 반드시 섞기 때문이다.
+const BASE = { rate: 18.94, fans: 766850, gazeSlip: 340, flairFans: 12126, shots: 10000 };
 const c1 = sweep({});
 check("stream-rate", Number(c1.rate.toFixed(2)) === BASE.rate, BASE.rate + " vs " + c1.rate.toFixed(2));
 check("stream-fans", c1.fans === BASE.fans, BASE.fans + " vs " + c1.fans);
-check("stream-slip", c1.slip === BASE.slip, BASE.slip + " vs " + c1.slip);
+check("stream-slip", c1.gazeSlip === BASE.gazeSlip, BASE.gazeSlip + " vs " + c1.gazeSlip);
 check("stream-flair", c1.flairFans === BASE.flairFans, BASE.flairFans + " vs " + c1.flairFans);
 // 두 게이트가 같은 판을 보고 있다는 증명. 340 + 101 = 441이 buff-gate 기준선이다.
-check("slip-bridge", c1.slip + c1.talked === 441, c1.slip + " + " + c1.talked);
+check("slip-bridge", c1.gazeSlip + c1.talked === 441, c1.gazeSlip + " + " + c1.talked);
 check("stream-shots", c1.shots === BASE.shots, BASE.shots + " vs " + c1.shots);
 
 // 3. tier가 오르면 한눈팔기가 줄어든다. 세 단계가 전부 단조로 내려가야 한다.
 const t1 = sweep({ gazeAid: 0.9 });
 const t2 = sweep({ gazeAid: 0.8 });
 const t3 = sweep({ gazeAid: 0.7 });
-check("gaze-monotone", c1.slip > t1.slip && t1.slip >= t2.slip && t2.slip >= t3.slip,
-  c1.slip + " -> " + t1.slip + " -> " + t2.slip + " -> " + t3.slip);
+check("gaze-monotone", c1.gazeSlip > t1.gazeSlip && t1.gazeSlip >= t2.gazeSlip && t2.gazeSlip >= t3.gazeSlip,
+  c1.gazeSlip + " -> " + t1.gazeSlip + " -> " + t2.gazeSlip + " -> " + t3.gazeSlip);
 // 라포를 여는 사건은 talked다. 그 문이 같이 닫히면 축이 스스로를 닫는다.
 check("talk-open", t3.talked >= c1.talked,
   c1.talked + " -> " + t3.talked);
