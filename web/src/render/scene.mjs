@@ -657,6 +657,8 @@ export function createScene(canvas) {
   let cue = null;
   // 체인의 반전은 자막이 아니라 화면에서 일어나야 한다.
   // 여기서 결과를 바꾸지 않는다. 이미 확정된 사건 이름 하나를 받아 그것만 연기한다.
+  // 진단 플래그. 게이트가 대조군을 세울 때만 켠다.
+  const VARY_OFF = new URLSearchParams(location.search).get("vary") === "0";
   let tail = null;
   // 고개가 돌아가는 속도. 사건과 함께 즉시 최대로 돌면 목이 끊긴 것으로 보인다.
   let tailRamp = 0;
@@ -802,10 +804,10 @@ export function createScene(canvas) {
       keeper.userData.bareHands[gi].visible = true;
     }
     tail = { kind, t0: vnow, from: ball.position.clone(), kx: keeper.position.x };
-    // 종점이 상수로 박히면 같은 사건이 매번 같은 자리에서 같은 속도로 끝난다.
-    // 두 번째부터는 결과만 남고 사건은 안 보인다. 판정 rng가 아니라 화면 전용 편차다.
-    // 폭은 좁게 둔다. 넓히면 매번 다른 게 아니라 매번 어긋난 것으로 읽힌다.
-    tail.vary = { a: Math.random(), b: Math.random(), c: Math.random() };
+    // 화면 전용 편차. 판정 rng가 아니라 여기서 뽑으므로 시드 재현 게이트를 흔들지 않는다.
+    // ?vary=0이면 가운데 값으로 굳는다. 편차가 없을 때 회차 간 거리가 얼마인지를 재는 대조군이고,
+    // 그 수를 모르면 편차를 넣은 뒤의 수가 설계인지 채취 흔들림인지 말할 수 없다.
+    tail.vary = VARY_OFF ? { a: 0.5, b: 0.5, c: 0.5 } : { a: Math.random(), b: Math.random(), c: Math.random() };
     // from은 자막이 뜨는 순간의 공 위치다. 그 순간 공은 아직 코스 중간이라 x가 0에 가깝다.
     // 꼬리가 from만 보고 끝나면 어느 코너로 찼든 공이 골문 한가운데에 선다.
     // 키커가 노린 좌표는 비행식이 쓰는 VIEW_X * aimX * SX다. 종점은 그쪽이어야 한다.
@@ -1164,8 +1166,12 @@ export function createScene(canvas) {
         // 잔여. 최종을 넘겼다가 감쇠 진동으로 되돌아온다. 진동이 빨리 죽으면
         // 크리틱이 보는 520ms 프레임이 다시 마네킹이라 주기를 0.84초로 늘려 잡았다.
         const ft = tt - ANT;
-        const w = Math.cos(ft * 7.5) * Math.exp(-ft * 1.3);
-        kp = pushPose(tail.base, kp, 1 + 0.34 * w);
+        // 진동의 세기와 주기를 회차마다 흔든다. 종점은 그대로라 사건은 같은 사건으로 읽히고,
+        // 관객이 실제로 보는 0.5초 부근의 몸만 매번 다른 자리를 지난다.
+        // 종점을 흔들면 사건이 달라 보이고, 진동을 흔들면 같은 사건이 다르게 지나간다.
+        const vy = tail.vary;
+        const w = Math.cos(ft * (7.5 + (vy.a - 0.5) * 3.0)) * Math.exp(-ft * 1.3);
+        kp = pushPose(tail.base, kp, 1 + (0.34 + (vy.b - 0.5) * 0.30) * w);
         // 닿는 순간 몸이 눌린다. 없으면 충돌이 포즈 교체로만 나타난다.
         if (!tail.squashed) { tail.squashed = true; keeperPop = 0.09; }
       }
