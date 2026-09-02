@@ -64,6 +64,11 @@ const ratio = p3 / p1;
 check("value-bot-save", p1 > 0 && ratio >= VALUE_FLOOR,
   "r1 " + p1.toExponential(2) + " r3 " + p3.toExponential(2) + " ratio " + ratio.toFixed(2));
 
+// 선반의 첫 등급도 값을 해야 한다. 1등급이 맨몸 자동과 같은 수를 내면 그 150 땀이 사는 것은
+// 성능이 아니라 자동 접근권뿐이고, 접근권은 크레딧이 파는 것이지 등급이 파는 것이 아니다.
+// 위 값당 축은 이 동률을 분모 0 문제로 우회했다. 우회는 사실을 설명할 뿐 고치지 않는다.
+check("tier1:buys-something", rate[1] > rate[0], F(rate[0]) + " -> " + F(rate[1]));
+
 // 자동은 입력만 대신한다. 최상급 클론도 손으로 정확히 누른 것보다는 못 막아야 축이 산다.
 const hand = sweep({ hand: true });
 check("bot-below-hand", rate[3] < hand.rate, "bot3 " + F(rate[3]) + " hand " + F(hand.rate));
