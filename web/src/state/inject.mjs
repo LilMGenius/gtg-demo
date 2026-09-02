@@ -22,6 +22,10 @@ const RICH_COIN = 8000;
 // 주입 말고는 방법이 없다. 1000은 두 갈래가 화면에서 서로 구분되는지 보는 데 쓴다.
 const RICH_CASH = 1000;
 
+// 만남 한 번의 실패가 100을 깎는다. 5000이면 그 오십 배라 한 번의 감소가 바닥에 안 닿는다.
+// 완봉 한 구가 40대 팔로워이므로 이 수는 백 구 남짓 쌓은 자리와 같다.
+const START_FANS = 5000;
+
 // 프리셋은 상태를 바꾸는 함수다. 값 덩어리로 두면 어느 칸이 정본인지가 호출부로 샌다.
 const PRESETS = {
   // 성장 칸 전부 상한. 체격 둘과 히든은 GROWABLE 밖이라 손대지 않는다.
@@ -36,6 +40,11 @@ const PRESETS = {
   rich(state) {
     state.wallet.coin = RICH_COIN;
     state.wallet.cash = RICH_CASH;
+  },
+  // 팔로워만 채운다. 팔로워는 0에서 시작하고 아래로 안 내려가므로,
+  // 잃는 쪽을 재는 게이트는 신규 저장에서 감소가 0으로 보여 관측 자체가 안 된다.
+  famous(state) {
+    state.fans = START_FANS;
   }
 };
 

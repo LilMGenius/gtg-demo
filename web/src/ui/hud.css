@@ -461,3 +461,40 @@ body.playing #hud{opacity:1}
   background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #shop .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
+
+/* 만남 버튼. 아는 얼굴 줄 안에 붙어서 그 사람에게 붙은 행동임을 자리로 말한다. */
+#me .note .go{margin-top:7px;padding:7px 10px 9px;width:100%;
+  border:var(--line) solid var(--edge);background:#2b3a24;color:var(--ink);
+  font-family:var(--disp);font-size:13px;font-weight:400;cursor:pointer;
+  box-shadow:4px 4px 0 var(--edge), var(--bevel)}
+#me .note .go:disabled{color:#f6efdc5c;background:#141a12;cursor:default}
+#me .note .go:not(:disabled):hover{background:#37492e;transform:translateY(-3px)}
+#me .note .go:not(:disabled):active{transform:translateY(2px);box-shadow:2px 2px 0 var(--edge)}
+
+/* 만남 패널. 내 정보 위에 겹쳐 뜨므로 z-index가 그보다 높아야 한다. */
+/* 뒤에 내 정보가 열린 채로 겹치므로 배경이 반투명하면 두 제목이 한 줄로 읽힌다. */
+#date{position:absolute;inset:0;pointer-events:auto;z-index:3;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;
+  background:#080b07f5;padding:5vh 4vw}
+#date[hidden]{display:none}
+#date h4{font-family:var(--disp);font-size:clamp(17px,2.2vw,24px);font-weight:400;
+  color:#ffd83d;-webkit-text-stroke:3px var(--edge);paint-order:stroke;text-align:center;margin:0}
+#date .card{display:flex;flex-direction:column;gap:9px;width:min(560px,92vw)}
+#date .card button{padding:10px 12px 12px;border:var(--line) solid var(--edge);
+  background:#1b2318;color:var(--ink);font-family:var(--disp);font-size:14px;
+  font-weight:400;text-align:left;cursor:pointer;box-shadow:6px 6px 0 var(--edge), var(--bevel)}
+#date .card button em{display:block;font-style:normal;font-size:12px;font-weight:700;
+  color:var(--good);margin-top:3px}
+#date .card button:hover{background:#25301f;transform:translateY(-3px)}
+#date .card button:active{transform:translateY(2px);box-shadow:2px 2px 0 var(--edge)}
+#date .out{padding:11px 13px 13px;border:var(--line) solid var(--edge);background:#1b2318;
+  color:var(--ink);font-family:var(--disp);font-size:14px;line-height:1.4;
+  width:min(560px,92vw);text-align:center;box-shadow:6px 6px 0 var(--edge), var(--bevel)}
+#date .out i{display:block;font-style:normal;font-size:12px;font-weight:700;margin-top:5px}
+#date .out i.win{color:var(--good)}
+#date .out i.lose{color:#e0705f}
+/* 닫기 스타일은 id 스코프라 다른 패널 것이 상속되지 않는다. 안 적으면 브라우저 기본 버튼이 뜬다. */
+#date .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
+  background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
+  box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg);cursor:pointer}
+#date .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}

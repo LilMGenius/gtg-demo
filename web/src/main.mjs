@@ -14,6 +14,7 @@ import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOAL
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
 import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost } from './state/rapport.mjs';
 import { passerName } from './state/passer.mjs';
+import { DATE_COST, MOVES, dateOdds, dateOutcome, applyDate, dateGate } from './state/date.mjs';
 import { applyPreset } from './state/inject.mjs';
 
 const el = (id) => document.getElementById(id);
@@ -562,8 +563,11 @@ function rapportRows() {
     // 이름은 라포 1단계부터 열린다. 그 전에는 차림새로만 부른다.
     const who = passerName(city, passer, tier);
     const face = tier > 0 ? tier + '단계' : '얼굴만 익었다';
+    // 만남은 이 사람에게 붙은 행동이라 그 줄 안에 둔다. 못 누르는 사유도 버튼이 직접 말한다.
+    const g = dateGate(state.rapport, city, passer, state.wallet.coin);
     return '<div class="note"><b>' + cityAt(city).name + ' · ' + who + '</b><i>말 섞은 횟수 ' + n
-      + ' · ' + face + ' · 한눈팔기 ' + aid + '% 감소 · 팔로워 +' + fans + '%</i></div>';
+      + ' · ' + face + ' · 한눈팔기 ' + aid + '% 감소 · 팔로워 +' + fans + '%</i>'
+      + '<button class="go" data-city="' + city + '" data-passer="' + passer + '"' + (g.open ? '' : ' disabled') + '>' + g.why + '</button></div>';
   }).join('');
   return head + rows;
 }
@@ -585,6 +589,7 @@ function renderMe() {
     + '<div class="card"><div class="grid">' + grid + '</div>' + traits + hidden + rapportRows() + recordRows() + '</div>'
     + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeMe;
+  for (const b of box.querySelectorAll('.note .go')) b.onclick = () => openDate(Number(b.dataset.city), Number(b.dataset.passer));
 }
 
 function openMe() {
@@ -594,6 +599,54 @@ function openMe() {
 
 function closeMe() {
   el('me').hidden = true;
+}
+
+// 만남. 세 갈래를 한 번에 보여주고 하나를 고르면 그 자리에서 끝난다.
+// 무르기는 없다. 다시 열려면 라포를 다시 쌓아야 한다.
+function renderDate(city, passer, done) {
+  const box = el('date');
+  const who = passerName(city, passer, rapportTier(state.rapport, city, passer));
+  if (done) {
+    box.innerHTML = '<h4>' + who + '</h4>'
+      + '<div class="out">' + done.line + '<i class="' + (done.won ? 'win' : 'lose') + '">'
+      + '팔로워 ' + (done.fans > 0 ? '+' : '') + done.fans + ' · '
+      + (done.won ? '이 동네에서는 이제 눈이 안 흔들린다' : '처음부터 다시 말을 섞어야 한다')
+      + '</i></div><button class="close">닫기</button>';
+    box.querySelector('.close').onclick = closeDate;
+    return;
+  }
+  const moves = MOVES.map((m) => '<button data-move="' + m.id + '">' + m.label
+    + '<em>' + CAUSE_LABEL[m.stat] + ' ' + state.keeper[m.stat] + ' · 성공 ' + dateOdds(state.keeper, m.id) + '%</em></button>').join('');
+  box.innerHTML = '<h4>' + who + '</h4><div class="card">' + moves + '</div><button class="close">그냥 지나간다</button>';
+  box.querySelector('.close').onclick = closeDate;
+  for (const b of box.querySelectorAll('[data-move]')) b.onclick = () => commitDate(city, passer, b.dataset.move);
+}
+
+// 굴림은 화면 쪽 난수다. 판정용 rng를 쓰면 그 뒤 모든 구가 밀려 네 게이트가 통째로 흔들린다.
+function commitDate(city, passer, moveId) {
+  const out = dateOutcome(state.keeper, moveId, Math.random() * 100);
+  if (!out) return;
+  state.wallet.coin = Math.max(0, state.wallet.coin - DATE_COST);
+  state.fans = Math.max(0, state.fans + out.fans);
+  state.rapport = applyDate(state.rapport, city, passer, out.won);
+  persist();
+  pips();
+  renderDate(city, passer, out);
+  // 뒤에 열려 있는 내 정보도 같이 그린다. 안 그리면 방금 쓴 땀과 내려간 라포가
+  // 반투명 배경 너머에서 옛 값으로 남아 만남 버튼이 아직 열린 것처럼 보인다.
+  renderMe();
+}
+
+function openDate(city, passer) {
+  el('date').hidden = false;
+  renderDate(city, passer, null);
+}
+
+// 닫을 때 내 정보를 다시 그린다. 라포와 지갑이 방금 바뀌었는데 뒤 화면이 옛 값이면
+// 같은 사람에게 만남 버튼이 아직 열린 것처럼 보인다.
+function closeDate() {
+  el('date').hidden = true;
+  renderMe();
 }
 
 // 상점. 선반은 카드깡과 장비 둘이다. 지목 구매는 값을 알고 이름을 사는 축이고
@@ -886,6 +939,8 @@ window.__squad = () => ({ squad: state.squad.map((k) => k.name), pick: state.pic
 window.__roster = (open) => { if (open) openRoster(); else closeRoster(); };
 window.__gram = (open) => { if (open) openGram(); else closeGram(); };
 window.__me = (open) => { if (open) openMe(); else closeMe(); };
+// 만남은 내 정보 안의 버튼으로만 열린다. 게이트가 그 버튼까지 클릭해서 오게 하려면 좌표가 필요하다.
+window.__date = (city, passer) => { if (city === undefined) closeDate(); else openDate(city, passer); };
 window.__shop = (open) => { if (open) openShop(); else closeShop(); };
 // 게이트는 화면 글자 대신 장부를 직접 읽어야 판정이 마크업 변경에 흔들리지 않는다.
 window.__record = () => state.record;
