@@ -9,11 +9,22 @@ import { spawnSync } from "node:child_process";
 // 새 게이트를 넣을 때 이 목록을 고칠 일이 없다.
 const isSlow = (src) => src.includes("playwright");
 
-// 동시에 돌리면 시간을 재는 게이트가 자기 측정 창 안에서 죽어 거짓 빨간불을 낸다.
-// 그래서 순차다. 대신 한 게이트가 매달리면 전체가 멈추므로 각자에게 사망 시각을 준다.
-// 부하가 높은 날 한 게이트가 자기 상한을 다 쓰는다. 가장 긴 게이트의 상한보다 넣어야
-// 러너가 멀지도 않은 게이트를 죽이고 그것을 실패로 읽지 않는다.
+// 러너의 예산은 게이트가 스스로 정한 사망 시각보다 길어야 한다. 짧으면 러너가 아직 살아 있는
+// 게이트를 죽이고 그것을 실패로 읽는다. 실제로 회차 게이트가 자기 상한 600초 안에서 도는 중에
+// 240초에 잘려 TIMEOUT으로 기록됐다. 수를 여기 적으면 게이트가 상한을 올린 날 이 파일이
+// 조용히 뒤처지므로, 각 게이트의 워치독을 그 소스에서 읽어 여유를 얹는다.
 const CAP_MS = 240000;
+const GRACE_MS = 30000;
+const capOf = (src) => {
+  const i = src.indexOf("WATCHDOG");
+  if (i < 0) return CAP_MS;
+  let j = src.indexOf("}, ", i);
+  if (j < 0) return CAP_MS;
+  j += 3;
+  let n = "";
+  while (j < src.length && src[j] >= "0" && src[j] <= "9") { n += src[j]; j += 1; }
+  return n ? Number(n) + GRACE_MS : CAP_MS;
+};
 
 const mode = process.argv[2] || "fast";
 const all = readdirSync("tools").filter((f) => f.endsWith("-gate.mjs")).sort();
@@ -47,11 +58,13 @@ const red = [];
 for (const f of picked) {
   const name = f.replace("-gate.mjs", "");
   const t0 = Date.now();
-  const r = spawnSync(process.execPath, ["tools/" + f], { encoding: "utf8", timeout: CAP_MS });
+  const src = readFileSync("tools/" + f, "utf8");
+  const cap = capOf(src);
+  const r = spawnSync(process.execPath, ["tools/" + f], { encoding: "utf8", timeout: cap });
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
   const code = r.status;
   // 타임아웃은 status가 null로 온다. 통과와 구분되지 않으면 매달린 게이트가 초록으로 읽힌다.
-  const verdict = r.error && r.error.code === "ETIMEDOUT" ? "TIMEOUT" : code === 0 ? "pass" : "FAIL";
+  const verdict = r.error && r.error.code === "ETIMEDOUT" ? "TIMEOUT" + " at " + (cap / 1000) + "s" : code === 0 ? "pass" : "FAIL";
   if (verdict !== "pass") red.push(name + " " + verdict);
   // 마지막 비어 있지 않은 줄이 그 게이트가 사람에게 하는 말이다. 없으면 종료 코드만 남는다.
   const lines = (r.stdout || "").trim().split(NL2).filter((x) => x.trim());
