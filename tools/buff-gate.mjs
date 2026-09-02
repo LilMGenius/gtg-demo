@@ -17,6 +17,8 @@ const base = newKeeper();
 
 // 입력을 정답 방향으로 못 박는다. 자동은 방향을 오판해서 버프 신호를 덮는다.
 function sweep(opt) {
+  // 표본을 밖에서 넘길 수 있어야 같은 약을 신인과 만렘에게 나란히 대볼 수 있다.
+  const k = opt.keeper || base;
   let saved = 0, shots = 0, fans = 0, lapse = 0, flairFans = 0;
   for (let s = 0; s < SEEDS; s++) {
     // 슛은 키퍼 스탯을 안 읽는다. 같은 시드면 어느 조건에서도 같은 다섯 구가 나온다.
@@ -24,7 +26,7 @@ function sweep(opt) {
     const rng = makeRng(s + 90001);
     for (const shot of set) {
       const r = resolve({
-        keeper: base, shot, rng,
+        keeper: k, shot, rng,
         input: { dive: shot.side, errMs: 0, advance: 0, auto: false },
         grip: opt.grip || 0, studs: 0, pads: 0, socks: 0, frame: 0,
         focusAid: opt.focusAid || 1, rosin: !!opt.rosin
@@ -36,7 +38,7 @@ function sweep(opt) {
       // 라포 게이트는 gazeAid만 좁히므로 distracted만 센다. 두 수가 다른 이유다.
       const leaked = r.events.some((e) => e.t === "distracted" || e.t === "talked");
       if (leaked) lapse++;
-      const g = followerGain(base, r, 0, 1, opt.boost || 1);
+      const g = followerGain(k, r, 0, 1, opt.boost || 1);
       fans += g;
       // 자양강장제가 파는 교환의 반대편. talked가 열어 준 flair 2.2배 몫이다.
       if (r.events.some((e) => e.t === "talked")) flairFans += g;
@@ -62,6 +64,19 @@ check("tonic-distract", tonic.lapse < c1.lapse,
 // 총합은 세이브가 늘어 오히려 오른다. 그 방향을 여기서 같이 찍어 선반 문구와 대조한다.
 check("tonic-cost", tonic.flairFans < c1.flairFans,
   c1.flairFans + " -> " + tonic.flairFans + " (total " + c1.fans + " -> " + tonic.fans + ")");
+
+// 선반은 화제도 반이라고 적혀 있는데 신인에게는 총 팔로워가 오히려 오른다. 수다 몫이 전체의 1.6퍼센트뿐이라
+// 세이브가 늘어난 몫이 그것을 덮기 때문이다. 만렙은 의사소통과 악동이 10이라 수다가 열 배 넘게 일어나고
+// 그 몫이 전체의 12퍼센트가 되므로, 같은 약이 같은 비율을 깎아도 총합의 방향이 뒤집힌다.
+// 문구가 어느 표본에서 참인지를 축이 직접 말한다.
+const top = newKeeper();
+for (const k of Object.keys(base)) if (typeof base[k] === "number" && base[k] <= 10 && k !== "level") top[k] = 10;
+const topBase = sweep({ keeper: top });
+const topTonic = sweep({ keeper: top, focusAid: 0.5 });
+check("tonic-cost-at-max", topTonic.fans < topBase.fans,
+  "total " + topBase.fans + " -> " + topTonic.fans + " (talk " + topBase.flairFans + " -> " + topTonic.flairFans + ")");
+check("tonic-save-at-max", topTonic.rate > topBase.rate,
+  topBase.rate.toFixed(2) + " -> " + topTonic.rate.toFixed(2));
 
 // 바이럴 떡밥. 문구는 소문이 1.5배, 막는 실력과는 무관하다.
 // 판정 인자가 아니라서 세이브율은 완전히 같아야 한다. 조금이라도 움직이면 축이 샌 것이다.
