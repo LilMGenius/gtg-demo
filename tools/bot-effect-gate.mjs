@@ -1,4 +1,5 @@
 import { makeRng, buildSet, resolve, newKeeper } from "../src/chain.mjs";
+import { GROWABLE } from "../src/ledger.mjs";
 import { BOTS, botKeeper } from "../web/src/state/bot.mjs";
 
 // 봇 선반 효과 게이트. 클론 세 등급이 값을 치른 만큼 실제로 대신 막아주는가.
@@ -18,7 +19,9 @@ const base = newKeeper();
 // hand는 고정 최적 입력이다. 자동이 절대 넘으면 안 되는 천장을 재려고 둔다.
 function sweep(opt) {
   const o = opt || {};
-  const keeper = o.tier ? botKeeper(base, { tier: o.tier }) : base;
+  // 표본을 밖에서 넘길 수 있어야 한다. 고정되어 있으면 만렘 축을 붙여도 신인만 재고 조용히 초록을 낸다.
+  const who = o.keeper || base;
+  const keeper = o.tier ? botKeeper(who, { tier: o.tier }) : who;
   let saved = 0, shots = 0;
   for (let s = 0; s < SEEDS; s++) {
     const set = buildSet(makeRng(s + 1), 5, 0);
@@ -68,6 +71,20 @@ check("value-bot-save", p1 > 0 && ratio >= VALUE_FLOOR,
 // 성능이 아니라 자동 접근권뿐이고, 접근권은 크레딧이 파는 것이지 등급이 파는 것이 아니다.
 // 위 값당 축은 이 동률을 분모 0 문제로 우회했다. 우회는 사실을 설명할 뿐 고치지 않는다.
 check("tier1:buys-something", rate[1] > rate[0], F(rate[0]) + " -> " + F(rate[1]));
+
+// botKeeper는 판단력을 대입한다. 최대값이 아니라 덮어쓰기라, 키퍼 판단력이 봇보다 높으면
+// 봇을 켜는 순간 그만큼 내려간다. 만렙 키퍼는 판단력이 10이고 최상급 봇도 9라 모든 등급이 손해가 된다.
+// 이 축이 없으면 선반 전체가 후반에 함정이 되는 것을 신인 표본만으로는 영영 못 본다.
+const top = newKeeper();
+for (const s of GROWABLE) top[s] = 10;
+const topBare = sweep({ keeper: top }).rate;
+const worst = [];
+for (const b of BOTS) {
+  const r = sweep({ keeper: top, tier: b.tier }).rate;
+  if (r < topBare) worst.push("t" + b.tier + " " + F(r));
+}
+check("bot:never-downgrades-at-max", worst.length === 0,
+  "bare " + F(topBare) + " but " + (worst.join(", ") || "no tier falls below"));
 
 // 자동은 입력만 대신한다. 최상급 클론도 손으로 정확히 누른 것보다는 못 막아야 축이 산다.
 const hand = sweep({ hand: true });
