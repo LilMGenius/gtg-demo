@@ -329,6 +329,7 @@ export function buildPitch(scene) {
   // 낡은 아연도금 쇠 밝기로 올린다. 흰 골대와는 여전히 갈라지고, 빛을 받은 것으로 읽힌다.
   const rear = new THREE.Mesh(mergeGeos(rails), flatMap(0x9aa294, chippedTex()));
   // 앞 골대는 한 번 들이받혀 기울었다. 뒷틀만 정확히 서 있으면 둘이 다른 날 세운 물건으로 보인다.
+  rear.name = 'rear';
   rear.rotation.z = 0.012;
   jitterMesh(rear, 0.018, 5);
   scene.add(rear);

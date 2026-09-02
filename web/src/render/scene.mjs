@@ -600,6 +600,18 @@ export function createScene(canvas) {
   const ballProbe = createBallProbe(camera, scene, ball, BALL_R);
   const stageProbe = createStageProbe(camera, { kicker: () => kicker, keeper: () => keeper });
   const goalFrame = () => goalFraming(camera, R_HALF_W, R_H);
+  // 골대가 실물 형상인지 밖에서 물을 수 있어야 한다. 앞뒤 폭이 갈리면 사다리꼴인데,
+  // 그 결함은 화면을 봐야만 보이고 그때는 이미 파운더가 먼저 본 뒤다.
+  const goalShape = () => {
+    const span = (name) => {
+      const b = new THREE.Box3();
+      let hit = 0;
+      scene.traverse((o) => { if (o.name === name && o.isMesh) { b.expandByObject(o); hit += 1; } });
+      if (!hit) return null;
+      return { minX: b.min.x, maxX: b.max.x, minY: b.min.y, maxY: b.max.y, minZ: b.min.z, maxZ: b.max.z, n: hit };
+    };
+    return { post: span('post'), bar: span('bar'), rear: span('rear'), halfW: R_HALF_W, height: R_H };
+  };
 
   // 임팩트 판이 몸 뒤에 서려면 몸이 시선축으로 어디까지 뻗었는지 알아야 한다.
   // 넘어지거나 손을 뻗은 키퍼는 키의 대부분이 깊이 방향으로 눕는다. 고정값으로는 못 맞춘다.
@@ -2114,7 +2126,7 @@ export function createScene(canvas) {
     renderer.setRenderTarget(null);
     return { off, on };
   }
-  return { play, act, reset, setKeeper, setCity, sfx, ballProbe, stageProbe, goalFrame, shadowRect, shadowPair,
+  return { play, act, reset, setKeeper, setCity, sfx, ballProbe, stageProbe, goalFrame, goalShape, shadowRect, shadowPair,
     ballPos: () => ({ x: ball.position.x, y: ball.position.y, z: ball.position.z }),
     // 세계시계. 히트스톱과 정지가 여기서 멈추므로, 화면에 숫자를 쓰는 쪽은 실시간 대신 이걸 읽는다.
     now: () => vnow,
