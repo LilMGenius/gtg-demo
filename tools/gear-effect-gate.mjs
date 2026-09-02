@@ -1,5 +1,5 @@
 import { makeRng, buildSet, resolve, newKeeper, followerGain } from "../src/chain.mjs";
-import { lookBoost, GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES } from "../web/src/state/gear.mjs";
+import { lookBoost, GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, TATTOOS } from "../web/src/state/gear.mjs";
 
 // \uc7a5\ube44 \ud6a8\uacfc \uac8c\uc774\ud2b8. \uc5ec\ub35f \uc120\ubc18\uc774 \ud30c\ub294 \uac83\uc774 \ud310\uc815\uacfc \uc18c\ubb38\uc5d0\uc11c \uc2e4\uc81c\ub85c \uc6c0\uc9c1\uc774\ub294\uac00.
 // gear-gate\ub294 \uc0c1\uac70\ub798\ub9cc \ubcf8\ub2e4. \uac12\uc744 \uce58\ub974\uace0 \ubb34\uc5c7\uc744 \ubc1b\ub294\uc9c0\ub294 \uc5b4\ub5a4 \uac8c\uc774\ud2b8\ub3c4 \uc548 \ubd24\ub2e4.
@@ -20,6 +20,8 @@ const base = newKeeper();
 function sweep(opt) {
   const o = opt || {};
   const city = o.city || 0;
+  // 머리와 타투는 판정을 안 건드리고 외형 승수로만 소문에 들어간다.
+  const look = o.look !== undefined ? o.look : lookBoost({ hair: o.hair || 0, ink: o.ink || 0 });
   let saved = 0, shots = 0, fans = 0;
   const ev = { carriedIn: 0, gloveGone: 0, spill: 0, downed: 0, reboundMiss: 0, gaze: 0 };
   for (let s = 0; s < SEEDS; s++) {
@@ -38,7 +40,7 @@ function sweep(opt) {
       if (shot.gaze) ev.gaze++;
       // \uc774\ubca4\ud2b8 \uc885\ub958\ub294 \ubb38\uc790\uc5f4\uc774 \uc544\ub2c8\ub77c \uac1d\uccb4\uc758 t\uac00 \uc18c\uc720\ud55c\ub2e4.
       for (const e of r.events) if (ev[e.t] !== undefined && e.t !== "gaze") ev[e.t]++;
-      fans += followerGain(base, r, city, o.look || 1);
+      fans += followerGain(base, r, city, look);
     }
   }
   return { rate: saved / shots * 100, fans, ev, shots };
@@ -144,6 +146,11 @@ mono("mono-city-fans", "city", (s) => s.fans, 1);
 mono("mono-city-gaze", "city", (s) => s.ev.gaze, 1);
 mono("mono-city-save", "city", rateOf, -1);
 
+// 스킨 두 선반도 등급과 값이 있다. 판정 밖 축이라고 사다리를 안 재면 같은 구멍이 남는다.
+// 외형은 세이브율을 안 건드리므로 축은 소문 하나다.
+mono("mono-hair-fans", "hair", (s) => s.fans, 1);
+mono("mono-ink-fans", "ink", (s) => s.fans, 1);
+
 // 값당 효과. 위의 사다리는 방향만 본다. 3등급이 1등급의 약 5.9배 값인데
 // 효과 증분이 2배도 안 되면 마지막 칸은 값만 받고 거의 아무것도 안 주는 칸이다.
 // 등급마다 값당 효과가 같기를 요구하면 방치형의 정상적인 후반 체감 감소까지 빨개진다.
@@ -154,7 +161,9 @@ const COST = {
   pads: KITS.map((g) => g.cost),
   socks: SOCKS.map((g) => g.cost),
   frame: GOALS.map((g) => g.cost),
-  city: CITIES.map((g) => g.cost)
+  city: CITIES.map((g) => g.cost),
+  hair: HAIRS.map((g) => g.cost),
+  ink: TATTOOS.map((g) => g.cost)
 };
 const VALUE_FLOOR = 0.4;
 function value(name, field, pick) {
@@ -174,6 +183,8 @@ value("value-pads-save", "pads", rateOf);
 value("value-socks-save", "socks", rateOf);
 value("value-frame-save", "frame", rateOf);
 value("value-city-fans", "city", (s) => s.fans);
+value("value-hair-fans", "hair", (s) => s.fans);
+value("value-ink-fans", "ink", (s) => s.fans);
 
 for (const n of notes) console.log("ok  " + n);
 for (const f of fails) console.log("BAD " + f);
