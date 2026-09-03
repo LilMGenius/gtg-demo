@@ -91,3 +91,10 @@
 @media (max-aspect-ratio:1/1){
   #rotate{display:flex}
 }
+
+
+/* 한국어는 기본 규칙으로 아무 글자에서나 줄이 넘어간다. 조작법 둘째 줄이
+   "손이 안 닿 / 는다"로 끊겨 단어가 두 줄에 걸쳤다. 상자를 넘지는 않으므로
+   잘림 축은 이것을 통과시키고, 읽기 나쁨은 넘침과 다른 명제다.
+   keep-all은 띄어쓰기에서만 넘긴다. 한 낱말이 상자보다 길 때만 break-word가 받는다. */
+#title, #title * { word-break: keep-all; overflow-wrap: break-word; }

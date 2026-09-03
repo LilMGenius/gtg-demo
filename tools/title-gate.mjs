@@ -31,6 +31,32 @@ const SCAN = function () {
   return out;
 };
 
+// 줄이 단어 한가운데에서 끊기는지 본다. 상자를 넘지 않으므로 잘림 축은 이것을 통과시킨다.
+// 글자를 하나씩 재서 윗변이 바뀌는 자리가 줄이 넘어간 자리이고,
+// 그 앞 글자가 띄어쓰기가 아니면 단어를 자른 것이다.
+const WRAP = function () {
+  const bad = [];
+  const walk = document.createTreeWalker(document.getElementById("title"), NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = walk.nextNode())) {
+    const s = n.nodeValue;
+    if (!s || !s.trim()) continue;
+    const r = document.createRange();
+    let prevTop = null;
+    for (let i = 0; i < s.length; i += 1) {
+      r.setStart(n, i);
+      r.setEnd(n, i + 1);
+      const box = r.getBoundingClientRect();
+      if (!box.width && !box.height) continue;
+      if (prevTop !== null && box.top - prevTop > 1 && s[i - 1] !== " ") {
+        bad.push(s.slice(Math.max(0, i - 7), i) + "|" + s.slice(i, i + 4));
+      }
+      prevTop = box.top;
+    }
+  }
+  return bad;
+};
+
 let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
@@ -66,6 +92,8 @@ try {
     check("help:" + tag + ":opens-with-rows", open.hidden === false && open.aria === "true" && open.rows >= 2, "hidden " + open.hidden + " aria " + open.aria + " rows " + open.rows);
     const clippedOpen = await p.evaluate(SCAN);
     check("help:" + tag + ":open-panel-is-not-clipped", clippedOpen.length === 0, clippedOpen.join(", ") || "nothing overruns its box");
+    const wrapped = await p.evaluate(WRAP);
+    check("help:" + tag + ":no-word-is-cut-across-lines", wrapped.length === 0, wrapped.slice(0, 3).join(", ") || "every break falls on a space");
 
     // 바깥을 누르면 닫힌다. 닫는 길이 버튼 하나뿐이면 펼친 패널이 화면을 계속 가린다.
     await p.mouse.click(Math.floor(w * 0.5), Math.floor(h * 0.85));
