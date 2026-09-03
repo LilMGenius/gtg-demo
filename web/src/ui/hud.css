@@ -496,6 +496,11 @@ body.playing #hud{opacity:1}
 /* 장비 한 칸은 네 장이 한 화면에 같이 서야 등급 차이가 읽힌다. 720p에서 탭과 닫기까지 들어가려면
    카드 한 장이 120px 아래여야 해서 카드깡 한 장보다 여백을 좁게 준다. */
 #shop .card.gear{padding:10px 14px 12px;width:auto}
+/* 썸네일 자리. 높이를 고정해 두어야 그림이 늦게 붙어도 칸이 안 뛴다.
+   96px는 210px 칸에서 이름과 설명과 값 버튼을 남기고 물건이 알아볼 만하게 커지는 높이다. */
+#shop .shot{height:96px;margin-bottom:8px;background:#12180f;
+  border:2px solid #ffffff14;display:grid;place-items:center;overflow:hidden}
+#shop .shot img,#shop .shot canvas{width:100%;height:100%;object-fit:contain;display:block}
 #shop .card.gear em{margin-top:5px}
 #shop .card.gear .buy{margin-top:8px;padding:8px 0 10px;font-size:16px}
 #shop .card.gear:nth-child(2n){transform:rotate(.5deg)}

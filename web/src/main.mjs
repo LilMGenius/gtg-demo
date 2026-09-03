@@ -16,6 +16,7 @@ import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rap
 import { passerName } from './state/passer.mjs';
 import { DATE_COST, MOVES, dateOdds, dateOutcome, applyDate, dateGate } from './state/date.mjs';
 import { applyPreset } from './state/inject.mjs';
+import { thumbURL, startSpin, stopSpin } from './render/thumb.mjs';
 
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
@@ -736,7 +737,10 @@ function gearShelf(kind) {
       label = '땀 ' + (g.cost - state.wallet.coin) + ' 모자라다';
       off = true;
     }
-    return '<div class="card gear"><b>' + g.name + '</b><em>' + g.note + '</em>'
+    // 썸네일 자리는 마크업에서 비워 두고 그림은 bindGear가 굽는다. 굽는 데 렌더러가 필요해서
+    // 문자열을 만드는 자리에서는 그릴 수 없다. 자리가 없으면 카드 높이가 그림을 받고 나서 뛴다.
+    return '<div class="card gear"><div class="shot" data-kind="' + kind + '" data-rank="' + rank + '"></div>'
+      + '<b>' + g.name + '</b><em>' + g.note + '</em>'
       + '<button class="buy" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
   });
   const top = have >= s.top ? '<span class="got">' + s.at(s.top).name + '까지 갔다. 더 살 게 없다</span>' : '';
@@ -744,6 +748,20 @@ function gearShelf(kind) {
 }
 
 function bindGear(box) {
+  // 파는 물건을 그려서 건다. 등급마다 몸에 걸친 상태를 따로 만들어 굽기 때문에
+  // 등급이 색을 안 바꾸면 네 장이 같은 그림이 되고, 그 사실이 화면에서 바로 드러난다.
+  for (const shot of box.querySelectorAll('.shot[data-kind]')) {
+    const s = SHELVES[shot.dataset.kind];
+    if (!s) continue;
+    const g = s.at(shot.dataset.rank);
+    const look = lookOf(Object.assign({}, state.gear, { [s.field]: g[s.field] }));
+    const url = thumbURL(s.field, state.keeper, look);
+    if (!url) continue;
+    shot.innerHTML = '<img alt="" src="' + url + '">';
+    const card = shot.parentNode;
+    card.onpointerenter = () => startSpin(shot, s.field, state.keeper, look);
+    card.onpointerleave = () => stopSpin();
+  }
   for (const b of box.querySelectorAll('.buy[data-rank]')) {
     b.onclick = () => {
       if (b.disabled) return;
