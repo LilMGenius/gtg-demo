@@ -10,7 +10,8 @@
   --bevel: inset 2px 2px 0 #ffffff1f, inset -2px -2px 0 #00000038;
   /* 서체는 두 역할뿐이다. --disp는 제목과 강조와 값, --body는 본문과 설명과 능력치다.
      둘 다 이름이 @font-face로 받쳐져 있어야 한다. 받침 없는 이름은 기계마다 다른 글꼴로 떨어지고,
-     그 순간 일관성은 선언으로만 남는다. Pretendard GTG는 이 게임이 쓰는 1098자만 깎은 85KB다. */
+     그 순간 일관성은 선언으로만 남는다. Pretendard GTG는 이 게임이 쓰는 글자만 깎아 실었고,
+     그 글자 수와 지문은 web/assets/fonts/pretendard-subset.json이 소유한다. */
   --disp:'Black Han Sans',sans-serif;
   --body:'Pretendard GTG',sans-serif;
   --pad-l:calc(16px + env(safe-area-inset-left));
@@ -76,6 +77,10 @@ body.playing #hud{opacity:1}
   pointer-events:auto;background:none;border-top:0;border-right:0;border-bottom:0;
   color:inherit;font:inherit}
 #purse b{font-weight:700;font-style:normal;opacity:1;color:#ffd83d}
+/* 갈래가 다른 잔고는 세로선으로 가른다. 11px과 2px은 팔로워와 지갑을 가를 때 이미 쓰는 값이라
+   같은 칩 안에서 두 종류의 경계가 생기지 않는다. */
+#purse .cur{display:flex;align-items:center;gap:4px}
+#purse .cur + .cur{margin-left:7px;padding-left:11px;border-left:2px solid #ffffff24}
 /* 잔고만 움직이면 유명한 키커를 막아 더 벌었다는 사실이 화면에 없다. 사람은 총액의 차분을 안 센다.
    한 구에 들어온 값을 그 자리에서 한 번 띄운다. 12와 30은 글자 수부터 달라 옆에 안 놓고도 갈린다. */
 /* 패널 위로 띄우면 구 결과 칸과 겹쳐 둘 다 안 읽힌다. 패널 바깥 오른쪽이 비어 있고,
@@ -239,7 +244,7 @@ body.playing #hud{opacity:1}
 #mute[aria-pressed="true"] .slash{opacity:1}
 /* 상점은 왼쪽 기둥에 선다. 오른쪽 기둥은 세 버튼 아래가 크로스바 325px에 막혀 자리가 없고,
    왼쪽은 소리 하나뿐이라 그 아래가 비어 있다. 108px는 소리(68px)에 40px 칸을 더한 다음 자리다. */
-#shopBtn{position:absolute;left:var(--pad-l);top:calc(116px + env(safe-area-inset-top));
+#shopBtn{position:absolute;left:var(--pad-l);top:calc(125px + env(safe-area-inset-top));
   pointer-events:auto;width:44px;height:40px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);color:var(--dim);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(var(--tilt))}

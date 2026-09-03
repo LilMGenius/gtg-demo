@@ -146,11 +146,12 @@ function pips() {
   }).join('');
   el('lv').textContent = 'Lv ' + state.keeper.level;
   el('fans').innerHTML = IC_FANS + '<b>' + state.fans.toLocaleString() + '</b>';
-  // 땀과 스폰을 같은 줄에 붙여 둔다. 잔고가 하나로 보이면 상점에서 무엇으로 사는지가 새 정보가 된다.
-  el('purse').innerHTML = IC_SWEAT + '<b>' + state.wallet.coin.toLocaleString() + '</b>'
-    + IC_SPON + '<i>' + state.wallet.cash.toLocaleString() + '</i>'
-    // 남은 버프 구도 같은 줄에 붙는다. 몇 구 뒤에 꺼지는지를 상점을 열어야 알면 계획이 안 선다.
-    + (state.buff.shots > 0 ? IC_BUFF + '<u>' + state.buff.shots + '</u>' : '');
+  // 땀과 스폰은 갈래가 다른 잔고다. 붙여 두면 한 줄의 숫자 띠로 읽혀 어느 것으로 사는지가
+  // 상점을 열어야 아는 정보가 된다. 팔로워와 지갑을 가르는 것과 같은 세로선으로 둘을 가른다.
+  el('purse').innerHTML = '<span class="cur">' + IC_SWEAT + '<b>' + state.wallet.coin.toLocaleString() + '</b></span>'
+    + '<span class="cur">' + IC_SPON + '<i>' + state.wallet.cash.toLocaleString() + '</i></span>'
+    // 남은 버프도 같은 줄에 선다. 몇 판 뒤에 꺼지는지를 상점을 열어야 알면 계획이 안 선다.
+    + (state.buff.shots > 0 ? '<span class="cur">' + IC_BUFF + '<u>' + state.buff.shots + '</u></span>' : '');
   // 남은 훈련 횟수는 버튼 위에 붙는다. 열어봐야 아는 숫자는 방치형에서 안 열린다.
   const badge = el('gymDot');
   badge.textContent = state.points > 9 ? '9+' : String(state.points);
