@@ -74,6 +74,100 @@ const PANELS = [
   ["gym", (p) => p.click("#gymBtn", { force: true })]
 ];
 
+
+// 패널은 여섯인데 가림을 재던 자는 상점 탭만 봤다. 나머지도 같은 자리에 같은 HUD를 이고 있다.
+// 누를 수 있는 것이 덮여 있으면 그 버튼은 화면에 있으나 손에 안 잡힌다.
+
+// 덮임을 재는 자 하나. 심는 자리와 재는 자리가 같은 함수를 써야 심어서 증명한 것이 실제로 도는 자다.
+// 스크롤 목록은 접힌 줄을 감추는 것이 설계다. 잘려 나간 카드의 중심점은 목록 상자 밖에 있고
+// 그 자리에 무엇이 그려져 있든 그것은 덮은 것이 아니다. 선수단 마흔여섯 중 서른하나가 그렇게 접혀 있었고
+// 그중 하나의 중심이 목록 아래 닫기 버튼 위로 떨어져 덮임 하나로 잡혔다. 화면이 아니라 자가 틀린 것이다.
+const COVER = function (pid) {
+  const box = document.getElementById(pid);
+  if (!box) return { total: 0, seen: 0, hits: [] };
+  const clipOf = function (el) {
+    for (var n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+      var st = getComputedStyle(n);
+      if (/auto|scroll|hidden/.test(st.overflowY) || /auto|scroll|hidden/.test(st.overflowX)) return n.getBoundingClientRect();
+    }
+    return null;
+  };
+  const all = box.querySelectorAll("button");
+  const hits = [];
+  let seen = 0;
+  for (const el of all) {
+    const q = el.getBoundingClientRect();
+    if (q.width < 2 || q.height < 2) continue;
+    const cx = Math.round(q.left + q.width / 2);
+    const cy = Math.round(q.top + q.height / 2);
+    const clip = clipOf(el);
+    if (clip && (cy < clip.top || cy > clip.bottom || cx < clip.left || cx > clip.right)) continue;
+    seen += 1;
+    const at = document.elementFromPoint(cx, cy);
+    // 닿는 것이 그 버튼의 조상이면 덮인 것이 아니라 자린 것이다. 조상도 후손도 아닌 것이 닿을 때만 덮인 것이다.
+    if (!at || at === el || el.contains(at) || at.contains(el)) continue;
+    hits.push(el.textContent.trim().slice(0, 8) + " under " + (at.id || at.className || at.tagName.toLowerCase()));
+  }
+  return { total: all.length, seen: seen, hits: hits };
+};
+const panelCover = async (w, h) => {
+  const ctx = await b.newContext({ viewport: { width: w, height: h } });
+  const p = await ctx.newPage();
+  await p.goto(BASE + "&preset=rich", { waitUntil: "load" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "load" });
+  await p.waitForSelector("#go", { timeout: 15000 });
+  await p.click("#go", { force: true });
+  await p.waitForTimeout(1300);
+  const out = [];
+  const panels = [["shop", null], ["roster", null], ["gram", null], ["me", null], ["gym", "#gymBtn"]];
+  for (const [id, btn] of panels) {
+    if (btn) await p.click(btn, { force: true });
+    else await p.evaluate((k) => window["__" + k](true), id);
+    await p.waitForTimeout(300);
+    const r = await p.evaluate(COVER, id);
+    out.push({ id, total: r.total, seen: r.seen, hits: r.hits });
+    await p.evaluate((k) => { const e = document.getElementById(k); if (e) e.hidden = true; document.body.classList.remove("panelOpen"); }, id);
+    await p.waitForTimeout(120);
+  }
+  await ctx.close();
+  return out;
+};
+
+// 접힌 줄을 빼고 나면 이 자는 아무것도 안 잡을 수 있고, 그 0은 화면이 멀쩡하다는 뜻이 아니라
+// 자가 눈을 감았다는 뜻이다. 보이는 카드 하나 위에 뚜껑을 덮어 그 뚜껑을 잡는지 먼저 본다.
+const plantedLid = async (w, h) => {
+  const ctx = await b.newContext({ viewport: { width: w, height: h } });
+  const p = await ctx.newPage();
+  await p.goto(BASE + "&preset=rich", { waitUntil: "load" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "load" });
+  await p.waitForSelector("#go", { timeout: 15000 });
+  await p.click("#go", { force: true });
+  await p.waitForTimeout(1300);
+  await p.evaluate(() => window.__roster(true));
+  await p.waitForTimeout(300);
+  const before = (await p.evaluate(COVER, "roster")).hits.length;
+  const victim = await p.evaluate(() => {
+    const row = document.querySelector("#roster .row");
+    const rr = row.getBoundingClientRect();
+    const card = [...row.querySelectorAll("button")].find((e) => {
+      const q = e.getBoundingClientRect();
+      const cy = q.top + q.height / 2;
+      return cy > rr.top && cy < rr.bottom;
+    });
+    if (!card) return "";
+    const q = card.getBoundingClientRect();
+    const lid = document.createElement("button");
+    lid.id = "lidProbe";
+    lid.style.cssText = "position:fixed;z-index:99;left:" + (q.left | 0) + "px;top:" + (q.top | 0) + "px;width:" + (q.width | 0) + "px;height:" + (q.height | 0) + "px";
+    document.getElementById("roster").appendChild(lid);
+    return card.textContent.trim().slice(0, 8);
+  });
+  const after = (await p.evaluate(COVER, "roster")).hits.length;
+  await ctx.close();
+  return { before: before, after: after, victim: victim };
+};
 // 탭이 모두 화면 안에 서 있는가. 잃은 탭은 없는 탭과 같다.
 const tabScan = async (w, h) => {
   const ctx = await b.newContext({ viewport: { width: w, height: h } });
@@ -195,6 +289,12 @@ try {
   const tabsOut = await narrowTabs;
   check("narrow:every-shop-tab-is-on-screen", tabsOut.out === 0, tabsOut.out + " of " + tabsOut.total + " tabs off screen");
   check("narrow:no-shop-tab-is-covered", tabsOut.hidden === 0, tabsOut.hidden + " of " + tabsOut.total + " tabs covered" + (tabsOut.hidden ? ": " + tabsOut.names.join(", ") : ""));
+  const panels = await panelCover(844, 390);
+  const coverProbe = await plantedLid(844, 390);
+  for (const pn of panels) console.log("  panel " + pn.id + " " + pn.total + " buttons, " + pn.seen + " on the visible box, " + pn.hits.length + " covered" + (pn.hits.length ? ": " + pn.hits.join(", ") : ""));
+  // 접힌 줄을 뺀 뒤 남은 표본이 몇인지 같이 인쇄한다. 0이면 통과가 아니라 무응답이다.
+  for (const pn of panels) check("narrow:" + pn.id + "-controls-are-not-covered", pn.seen > 0 && pn.hits.length === 0, pn.hits.length + " covered of " + pn.seen + " seen, " + pn.total + " total" + (pn.hits.length ? ": " + pn.hits[0] : ""));
+  check("instrument:the-cover-scan-catches-a-planted-lid", coverProbe.before === 0 && coverProbe.after > 0, "before " + coverProbe.before + " after " + coverProbe.after + " over [" + coverProbe.victim + "]");
   check("maxed:no-word-is-cut-across-lines", maxed.cut.length === 0, maxed.cut.length + " words split" + (maxed.cut.length ? " first " + maxed.cut[0] : ""));
   check("console:no-errors", maxed.errs.length === 0 && fresh.errs.length === 0, (maxed.errs[0] || fresh.errs[0] || "clean"));
 
