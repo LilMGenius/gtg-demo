@@ -497,6 +497,16 @@ body.playing #hud{opacity:1}
 #shop .fitting b{font-family:var(--disp);font-weight:400;font-size:17px;color:#ffd83d}
 #shop .fitting .tried{display:flex;flex-direction:column;gap:3px;width:100%;min-height:34px}
 #shop .fitting .tried i{font-style:normal;font-size:12px;color:var(--good);line-height:1.35}
+/* 걸친 줄과 그 줄을 무르는 자리. X는 이름 오른쪽 끝에 붙어, 줄 어디를 눌러도 벗겨지는 것이
+   아니라 무르는 자리가 따로 있다는 것이 보인다. */
+#shop .fitting .tried i[data-off]{display:flex;justify-content:space-between;align-items:center;gap:6px;cursor:pointer}
+#shop .fitting .tried i[data-off] b{font-weight:400;color:var(--dim);font-family:var(--disp)}
+#shop .fitting .tried i[data-off]:hover b{color:var(--bad)}
+/* 사기와 벗기를 나란히 둔다. 세로로 쌓으면 왼쪽 기둥이 한 줄 길어지고 그만큼 효과 칸이 잘린다. */
+#shop .fitting .acts{display:flex;gap:7px;width:100%}
+#shop .fitting .acts .all{flex:1 1 auto}
+#shop .fitting .strip{flex:0 0 auto;padding:9px 11px 11px;border:var(--line) solid var(--edge);
+  background:#241a16;color:var(--dim);font-family:var(--disp);font-size:14px;font-weight:400}
 #shop .fitting .tried i.dim{color:var(--dim)}
 #shop .fitting .all{width:100%;padding:9px 0 11px;border:var(--line) solid var(--edge);
   background:#2b3a22;color:var(--ink);font-family:var(--disp);font-size:15px;font-weight:400;

@@ -911,8 +911,10 @@ function fittingRoom() {
   const url = thumbURL('body', state.keeper, fittedLook());
   const tried = Object.keys(fitting);
   const bill = tried.reduce((n, f) => n + costOfField(f, fitting[f]), 0);
+  // 걸친 줄마다 벗는 자리를 둔다. 다시 카드를 찾아 누르는 것이 유일한 길이면,
+  // 무엇을 걸쳤는지 아는 자리와 그것을 무르는 자리가 갈려 있다.
   const lines = tried.length
-    ? tried.map((f) => '<i>' + nameOfField(f, fitting[f]) + '</i>').join('')
+    ? tried.map((f) => '<i data-off="' + f + '">' + nameOfField(f, fitting[f]) + '<b>X</b></i>').join('')
     : '<i class="dim">눌러서 걸쳐 본다</i>';
   const canAll = tried.length > 0 && bill <= state.wallet.coin;
   const allLabel = tried.length === 0 ? '고른 것이 없다'
@@ -921,7 +923,10 @@ function fittingRoom() {
     + '<div class="me">' + (url ? '<img alt="" src="' + url + '">' : '') + '</div>'
     + '<b>' + state.keeper.name + '</b>'
     + '<div class="tried">' + lines + '</div>'
+    + '<div class="acts">'
     + '<button class="all"' + (canAll ? '' : ' disabled') + '>' + allLabel + '</button>'
+    + (tried.length ? '<button class="strip">전부 벗기</button>' : '')
+    + '</div>'
     // 효과 칸. 카드 본문은 이름과 한 줄만 들고, 수치는 손을 올린 카드의 것만 여기 뜬다.
     + '<div class="spec"><i class="dim">카드에 손을 올리면 무엇을 사는지가 여기 뜬다</i></div>'
     + '</div>';
@@ -1219,6 +1224,16 @@ function renderShop() {
   // 전부 사기. 걸쳐 본 것을 한 번에 치른다. 값이 모자라면 아무것도 안 산다.
   // 되는 것만 골라 사면 무엇이 빠졌는지를 화면이 안 말해 주고, 남은 잔고로 다시 계산하게 된다.
   const all = box.querySelector('.all');
+  // 벗기는 값을 안 건드린다. 시착용은 애초에 치른 적이 없으므로 되돌릴 잔고도 없다.
+  for (const off of box.querySelectorAll('.tried i[data-off]')) off.onclick = () => {
+    delete fitting[off.dataset.off];
+    renderShop();
+  };
+  const strip = box.querySelector('.strip');
+  if (strip) strip.onclick = () => {
+    fitting = {};
+    renderShop();
+  };
   if (all) all.onclick = () => {
     if (all.disabled) return;
     const tried = Object.keys(fitting);
