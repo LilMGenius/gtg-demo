@@ -2089,8 +2089,17 @@ export function createScene(canvas) {
   // 그물이 씬에 있다는 것과 관객이 그물을 본다는 것은 다른 주장이다.
   // 가시성은 그물만 끈 같은 프레임과의 화소 차로만 잴 수 있다. 그 토글이 이것이다.
   window.__netHide = (on) => {
-    pitch.net.visible = !on;
-    return pitch.net.visible;
+    pitch.setNets(!on);
+    return pitch.netsOn();
+  };
+
+  // 골대 등급을 화면에만 건다. 지갑과 저장을 안 지나므로 계기가 네 등급을 한 판에서 볼 수 있다.
+  // 감춘 그물은 다시 엮이면 보이는 상태로 돌아오니, 감춤 상태를 등급 교체 뒤에 다시 씌운다.
+  window.__goalSkin = (rank) => {
+    const was = pitch.netsOn();
+    setGoal(rank);
+    pitch.setNets(was);
+    return rank;
   };
 
   // 임팩트 프레임은 선언으로 증명되지 않는다. 세계시계가 실제로 늦었는지,
@@ -2233,7 +2242,15 @@ export function createScene(canvas) {
     renderer.setRenderTarget(null);
     return { off, on };
   }
-  return { play, act, reset, setKeeper, setCity, sfx, ballProbe, stageProbe, goalFrame, goalShape, crowd, shadowRect, shadowPair,
+  // 골대 등급. 그물이 통째로 다시 엮이므로 값이 안 바뀌면 부르지 않는다.
+  let goalRank = 0;
+  function setGoal(rank) {
+    const r = Math.max(0, Math.min(3, rank | 0));
+    if (r === goalRank) return;
+    goalRank = r;
+    pitch.setGoal(r);
+  }
+  return { play, act, reset, setKeeper, setCity, setGoal, sfx, ballProbe, stageProbe, goalFrame, goalShape, crowd, shadowRect, shadowPair,
     ballPos: () => ({ x: ball.position.x, y: ball.position.y, z: ball.position.z }),
     // 세계시계. 히트스톱과 정지가 여기서 멈추므로, 화면에 숫자를 쓰는 쪽은 실시간 대신 이걸 읽는다.
     now: () => vnow,

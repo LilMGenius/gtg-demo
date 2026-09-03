@@ -5,6 +5,7 @@ import { dirtTex, scuffTex, paintScuffBase, clothTex, chippedTex, cloudTex, wind
 import { loadDecor } from '../decor.mjs';
 import { jitterMesh, seeded, addOutline } from '../handmade.mjs';
 import { addFace } from './actors.mjs';
+import { frameAt } from '../../state/gear.mjs';
 
 // 사각 그물 한 장. wireframe 평면은 삼각형 대각선이 남아 그물이 아니라 격자무늬로 읽힌다.
 // 팽팽한 격자는 그물이 아니라 방충망이다. 가운데를 배가 부르게 늘어뜨려야 천으로 읽힌다.
@@ -270,20 +271,33 @@ export function buildPitch(scene) {
   // 0.34는 어두운 실이 흙 위에서 화소차 6을 겨우 넘겨 그물이 있다는 사실만 남고 형태가 안 읽혔다.
   // 0.52는 3.12%, 0.62는 3.58%로 둘 다 바 4%에 못 미쳤다. 0.70이 그 자를 넘긴 첫 값이다.
   // 밝은 실을 촘촘히 칠 때와 달리 어두운 실은 셀 0.36을 유지하는 한 알파를 올려도 앞면을 덮지 않는다.
-  const back = meshPanel(BACK_HW * 2, BACK_H, 0.36, NET_NEAR, 0.70, 0.22, true);
-  back.position.set(0, BACK_H / 2 + NET_LIFT, -NET_D);
-  scene.add(back);
-  for (const sgn of [-1, 1]) {
-    // 좌우 그물을 같은 밀도로 치면 골대가 공장에서 나온 물건이 된다. 한쪽이 더 삭았다.
-    const side = meshPanel(NET_D, R_H, 0.24, NET_C, sgn < 0 ? 0.48 : 0.44, 0.06);
-    side.rotation.y = Math.PI / 2;
-    side.position.set(sgn * R_HALF_W, R_H / 2 + NET_LIFT, -NET_D / 2);
-    scene.add(side);
+  // 그물 넉 장은 등급이 바뀔 때 통째로 다시 엮인다. 셀과 늘어짐이 정점에 굳으므로
+  // 재질만 갈아서는 촘촘함이 안 바뀐다. 지금 걸린 것을 버리고 새로 만드는 쪽이 정직하다.
+  let nets = [];
+  let back = null;
+  function weave(g) {
+    for (const n of nets) { scene.remove(n); n.geometry.dispose(); n.material.dispose(); }
+    nets = [];
+    back = meshPanel(BACK_HW * 2, BACK_H, g.cell, NET_NEAR, g.dim, g.sag, true);
+    back.position.set(0, BACK_H / 2 + NET_LIFT, -NET_D);
+    scene.add(back);
+    nets.push(back);
+    for (const sgn of [-1, 1]) {
+      // 좌우 그물을 같은 밀도로 치면 골대가 공장에서 나온 물건이 된다. 한쪽이 더 삭았다.
+      // 옆면은 뒷면보다 촘촘하게 짜므로 같은 비율로 줄여 등급 차이가 옆에서도 보인다.
+      const side = meshPanel(NET_D, R_H, g.cell * 0.67, NET_C, sgn < 0 ? g.dim - 0.22 : g.dim - 0.26, 0.06);
+      side.rotation.y = Math.PI / 2;
+      side.position.set(sgn * R_HALF_W, R_H / 2 + NET_LIFT, -NET_D / 2);
+      scene.add(side);
+      nets.push(side);
+    }
+    const roof = meshPanel(R_HALF_W * 2, NET_D, g.cell * 0.67, NET_C, g.dim - 0.30, 0.10);
+    roof.rotation.x = -Math.PI / 2;
+    roof.position.set(0, R_H + NET_LIFT, -NET_D / 2);
+    scene.add(roof);
+    nets.push(roof);
   }
-  const roof = meshPanel(R_HALF_W * 2, NET_D, 0.24, NET_C, 0.4, 0.10);
-  roof.rotation.x = -Math.PI / 2;
-  roof.position.set(0, R_H + NET_LIFT, -NET_D / 2);
-  scene.add(roof);
+  weave(frameAt(0));
 
   // 뒷그물은 서 있는 평면인데 실 격자만 있으면 어느 쪽이 위인지 알려주는 것이 하나도 없다.
   // 그물을 받치는 틀이 그 일을 한다. 흰 골대와 같은 색으로 칠하면 한 덩어리로 읽히니 뒷틀은 쇠색이다.
@@ -446,7 +460,15 @@ export function buildPitch(scene) {
 
   // punch는 패널의 로컬 좌표로 민다. 뒷그물 원점은 바닥이 아니라 BACK_H/2 + NET_LIFT다.
   // 이 값을 밖에서 짐작하면 밀리는 자리가 공이 지나간 자리와 어긋난다.
-  return { ground, box, bar, net: back, netZ: -NET_D, netY0: BACK_H / 2 + NET_LIFT, drift: dome.material.uniforms.drift };
+  // net은 게터다. 등급이 바뀌면 뒷그물 객체가 통째로 갈리므로, 한 번 받아 든 참조를 계속 쓰면
+  // 화면에서 사라진 옛 그물을 두드리게 된다.
+  return { ground, box, bar, get net() { return back; }, netZ: -NET_D, netY0: BACK_H / 2 + NET_LIFT,
+    setGoal: (rank) => weave(frameAt(rank)),
+    // 그물 넉 장을 한 번에 여닫는다. 뒷면만 감추면 옆면과 지붕이 남아,
+    // 그물을 껐다는 대조군이 실제로는 그물 넷 중 하나만 끈 것이 된다.
+    setNets: (on) => { for (const n of nets) n.visible = on; },
+    netsOn: () => nets.every((n) => n.visible),
+    drift: dome.material.uniforms.drift };
 }
 
 // 행인. 펜스 너머를 지나간다. 아무도 없는 운동장은 연습장이지 경기장이 아니다.
