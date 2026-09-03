@@ -34,23 +34,41 @@ try {
     for (const name of sfx.SFX_NAMES) {
       const d = await m.renderSfx(sfx, name, ARG[name], LEN[name]);
       const x = m.measure(d);
-      x.harmonicity = Number(m.harmonicity(x.peaks).toFixed(3));
-      x.cen = m.centroid(d, 0, Math.max(60, x.tailMs));
       // 발소리는 두 접촉의 크기가 발마다 뒤집힌다. 한 번만 재면 뒷접촉이 큰 발에서
       // 상승이 25ms로 읽히고 게이트가 코드와 무관하게 붉어진다. 열한 번의 중앙값으로 잰다.
       // 최고치도 같다. 합성에 난수가 들어 있어 드리블이 0.198에서 0.315 사이를 오간다.
       // 그 수가 비율 축에 들어가면 부하와 무관하게 어느 날 1.22배가 되어 1.5배 문턱을 놓친다.
       // 이미 열한 번 그리고 있으므로 같은 렌더에서 최고치도 같이 거둔다.
+      // 소리의 색과 길이도 같은 자로 잰다. 골대 소리를 백스무 번 그려 보니 무게중심이
+      // 1780에서 3655까지 흩어지고 중앙값은 1962인데, 백스무 번 중 한 번이 1800 아래로 내려갔다.
+      // 한 장만 뽑아 재면 그 한 번이 게이트를 붉히고, 붉은 이유는 소리가 아니라 뽑기다.
+      // 문턱은 그대로 두고 무엇을 재는지를 고친다. 한 장의 소리가 아니라 그 소리를 내는 합성이 대상이다.
       const at = [];
       const pk = [];
+      const ce = [];
+      const tl = [];
+      const hm = [];
+      const tb = [];
       for (let i = 0; i < 11; i += 1) {
         const one = await m.renderSfx(sfx, name, ARG[name], LEN[name]);
         at.push(m.attackMs(one));
         pk.push(m.peakOf(one));
+        const y = m.measure(one);
+        tl.push(y.tailMs);
+        ce.push(m.centroid(one, 0, Math.max(60, y.tailMs)));
+        hm.push(m.harmonicity(y.peaks));
+        tb.push(m.tailBrightness(one));
       }
+      const mid = (a) => a.sort((u, v) => u - v)[5];
       x.attackMs = at.sort((u, v) => u - v)[5];
       x.peak = Number(pk.sort((u, v) => u - v)[5].toFixed(4));
-      x.tailBright = m.tailBrightness(d);
+      x.tailMs = mid(tl);
+      x.cen = mid(ce);
+      x.harmonicity = Number(mid(hm).toFixed(3));
+      x.tailBright = mid(tb);
+      // 흩어짐을 같이 들고 나간다. 중앙값 하나만 찍으면 그 수가 얼마나 흔들리는 수인지 안 보인다.
+      x.cenLow = ce[0];
+      x.cenHigh = ce[ce.length - 1];
       out.each[name] = x;
     }
     out.kickSoft = Number(m.peakOf(await m.renderSfx(sfx, "kick", 0.05, 0.6)).toFixed(4));
@@ -200,7 +218,8 @@ try {
   // 먹먹함은 저역이 남는 것이다. 40ms에 끊기면 딱 소리지 퍽 소리가 아니다.
   check("kick:the-low-end-keeps-ringing-after-contact", r.each.kick.tailMs >= 80, r.each.kick.tailMs + "ms");
   // 알루미늄 크로스바는 712/1965/3845/6358 모드가 다 살아 울린다. 무게중심이 위로 올라간다.
-  check("post:is-a-bright-metal-ring", r.each.post.cen >= 1800, r.each.post.cen + "Hz");
+  check("post:is-a-bright-metal-ring", r.each.post.cen >= 1800,
+    r.each.post.cen + "Hz median of 11, spread " + r.each.post.cenLow + " to " + r.each.post.cenHigh);
   // 먹먹하다와 명쾌하다가 같은 밝기면 두 형용사 중 하나는 구현되지 않은 것이다.
   check("post:reads-brighter-than-the-kick-by-ear",
     r.each.post.cen >= r.each.kick.cen * 2,
