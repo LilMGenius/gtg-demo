@@ -467,6 +467,27 @@ body.playing #hud{opacity:1}
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
   background:#080b07c4}
 #shop[hidden]{display:none}
+/* 왼쪽은 탈의실, 오른쪽은 진열이다. 좁아지면 탈의실이 위로 접힌다.
+   200px는 온몸이 알아볼 만하게 서는 최소 폭이고, 그 아래로는 사람이 아니라 막대가 된다. */
+#shop .shopbody{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;
+  gap:14px;width:min(96vw,1300px)}
+#shop .goods{display:flex;flex-direction:column;align-items:center;gap:12px;flex:1 1 460px;min-width:0}
+#shop .fitting{flex:0 0 200px;display:flex;flex-direction:column;align-items:center;gap:8px;
+  padding:10px 12px 12px;border:var(--line) solid var(--edge);background:#161c14;
+  box-shadow:6px 6px 0 var(--edge), var(--bevel)}
+#shop .fitting .me{width:100%;height:200px;background:#12180f;border:2px solid #ffffff14;
+  display:grid;place-items:center;overflow:hidden}
+#shop .fitting .me img{width:100%;height:100%;object-fit:contain;display:block}
+#shop .fitting b{font-family:var(--disp);font-weight:400;font-size:17px;color:#ffd83d}
+#shop .fitting .tried{display:flex;flex-direction:column;gap:3px;width:100%;min-height:34px}
+#shop .fitting .tried i{font-style:normal;font-size:12px;color:var(--good);line-height:1.35}
+#shop .fitting .tried i.dim{color:var(--dim)}
+#shop .fitting .all{width:100%;padding:9px 0 11px;border:var(--line) solid var(--edge);
+  background:#2b3a22;color:var(--ink);font-family:var(--disp);font-size:15px;font-weight:400;
+  box-shadow:5px 5px 0 var(--edge), var(--bevel)}
+#shop .fitting .all:disabled{background:#141a12;color:#f6efdc5c;cursor:default}
+/* 걸쳐 본 칸은 테두리로 표시한다. 어느 것을 고른 상태인지가 탈의실 그림만으로는 안 갈린다. */
+#shop .card.gear.fit{border-color:#ffd83d}
 #shop h4{font-family:var(--disp);font-size:clamp(18px,2.4vw,26px);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
   text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}

@@ -688,6 +688,14 @@ let lastPull = '';
 
 // 지금 보고 있는 선반. lastPull과 같이 패널 수명만 사는 값이라 저장에 싣지 않는다.
 let shopTab = 'pull';
+// 시착용 장부. 아직 안 산 채로 걸쳐 본 등급이 칸마다 하나씩 들어간다.
+// 저장하지 않는다. 상점을 닫으면 벗는 것이 옷가게의 문법이고, 저장하면 안 산 옷을 입은 채로 판이 돈다.
+let fitting = {};
+
+// 지금 몸에 걸친 것과 걸쳐 본 것을 합친 모습. 탈의실 그림과 시착용 판정이 같은 값을 본다.
+function fittedLook() {
+  return lookOf(Object.assign({}, state.gear, fitting));
+}
 
 // 확률은 명단이 아니라 지금 남은 풀에서 다시 센다. 뽑을수록 남은 풀이 바뀌므로
 // 고정 문구를 걸면 뒤로 갈수록 화면이 거짓말을 한다.
@@ -718,6 +726,42 @@ const SHELVES = {
   hair: { head: '머리', list: HAIRS, field: 'hair', worn: '자른 머리', past: '지난 머리', top: MAX_HAIR, at: hairAt },
   ink: { head: '타투', list: TATTOOS, field: 'ink', worn: '새긴 것', past: '지운 타투', top: MAX_INK, at: inkAt }
 };
+
+// 탈의실. 지금 내 모습과 걸쳐 본 것을 한 자리에서 보여 준다.
+// 값을 치르기 전에 자기 몸에서 확인할 수 있어야 꾸미는 재미가 산다.
+function fittingRoom() {
+  const url = thumbURL('body', state.keeper, fittedLook());
+  const tried = Object.keys(fitting);
+  const bill = tried.reduce((n, f) => n + costOfField(f, fitting[f]), 0);
+  const lines = tried.length
+    ? tried.map((f) => '<i>' + nameOfField(f, fitting[f]) + '</i>').join('')
+    : '<i class="dim">눌러서 걸쳐 본다</i>';
+  const canAll = tried.length > 0 && bill <= state.wallet.coin;
+  const allLabel = tried.length === 0 ? '고른 것이 없다'
+    : (canAll ? '전부 사기 ' + bill + ' 땀' : (bill - state.wallet.coin) + ' 땀 모자라다');
+  return '<div class="fitting">'
+    + '<div class="me">' + (url ? '<img alt="" src="' + url + '">' : '') + '</div>'
+    + '<b>' + state.keeper.name + '</b>'
+    + '<div class="tried">' + lines + '</div>'
+    + '<button class="all"' + (canAll ? '' : ' disabled') + '>' + allLabel + '</button>'
+    + '</div>';
+}
+
+// 값과 이름은 선반 데이터가 소유한다. 탈의실이 따로 적으면 선반이 바뀐 날 두 곳이 갈린다.
+function shelfOfField(field) {
+  for (const k of Object.keys(SHELVES)) if (SHELVES[k].field === field) return SHELVES[k];
+  return null;
+}
+
+function costOfField(field, rank) {
+  const s = shelfOfField(field);
+  return s ? s.at(rank).cost : 0;
+}
+
+function nameOfField(field, rank) {
+  const s = shelfOfField(field);
+  return s ? s.at(rank).name : '';
+}
 
 function gearShelf(kind) {
   const s = SHELVES[kind];
@@ -761,6 +805,19 @@ function bindGear(box) {
     const card = shot.parentNode;
     card.onpointerenter = () => startSpin(shot, s.field, state.keeper, look);
     card.onpointerleave = () => stopSpin();
+    // 카드를 누르면 산 것이 아니라 걸쳐 본다. 값은 buy 버튼이 따로 받는다.
+    // 이미 가진 등급이나 지나간 등급은 걸쳐 볼 것이 없다.
+    const rank = g[s.field];
+    if (rank > state.gear[s.field]) {
+      card.onclick = (e) => {
+        if (e.target.closest('.buy')) return;
+        if (fitting[s.field] === rank) delete fitting[s.field];
+        else fitting[s.field] = rank;
+        stopSpin();
+        renderShop();
+      };
+    }
+    if (fitting[s.field] === rank) card.classList.add('fit');
   }
   for (const b of box.querySelectorAll('.buy[data-rank]')) {
     b.onclick = () => {
@@ -776,6 +833,8 @@ function bindGear(box) {
       // 머리와 잉크만 몸을 다시 세우고 있었다. 장갑과 축구화와 유니폼과 양말도
       // 이제 색을 가지므로 같이 다시 세운다. 골대와 동네는 몸이 아니라 빠진다.
       if (['hair', 'ink', 'grip', 'studs', 'pads', 'socks'].includes(s.field)) stage.setKeeper(state.keeper, lookOf(state.gear));
+      // 산 것은 걸쳐 본 목록에서 빠진다. 안 빼면 이미 내 것이 장바구니에 남아 값이 두 번 잡힌다.
+      if (fitting[s.field] !== undefined && fitting[s.field] <= state.gear[s.field]) delete fitting[s.field];
       persist();
       pips();
       renderShop();
@@ -904,8 +963,27 @@ function renderShop() {
     + '<button class="tab" data-tab="bot"' + (shopTab === 'bot' ? ' aria-current="true"' : '') + '>봇</button>'
     + '<button class="tab" data-tab="buff"' + (shopTab === 'buff' ? ' aria-current="true"' : '') + '>버프</button>'
     + '</div>';
-  box.innerHTML = tabs + (SHELVES[shopTab] ? gearShelf(shopTab) : shopTab === 'bot' ? botShelf() : shopTab === 'buff' ? buffShelf() : pullShelf(pool)) + '<button class="close">닫기</button>';
+  const goods = SHELVES[shopTab] ? gearShelf(shopTab) : shopTab === 'bot' ? botShelf() : shopTab === 'buff' ? buffShelf() : pullShelf(pool);
+  box.innerHTML = '<div class="shopbody">' + fittingRoom() + '<div class="goods">' + tabs + goods + '</div></div>'
+    + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeShop;
+  // 전부 사기. 걸쳐 본 것을 한 번에 치른다. 값이 모자라면 아무것도 안 산다.
+  // 되는 것만 골라 사면 무엇이 빠졌는지를 화면이 안 말해 주고, 남은 잔고로 다시 계산하게 된다.
+  const all = box.querySelector('.all');
+  if (all) all.onclick = () => {
+    if (all.disabled) return;
+    const tried = Object.keys(fitting);
+    const bill = tried.reduce((n, f) => n + costOfField(f, fitting[f]), 0);
+    if (bill > state.wallet.coin) return;
+    state.wallet.coin -= bill;
+    for (const f of tried) state.gear[f] = fitting[f];
+    fitting = {};
+    if (state.gear.city !== undefined) stage.setCity(state.gear.city);
+    stage.setKeeper(state.keeper, lookOf(state.gear));
+    persist();
+    pips();
+    renderShop();
+  };
   for (const t of box.querySelectorAll('.tab')) {
     t.onclick = () => { shopTab = t.dataset.tab; renderShop(); };
   }

@@ -17,7 +17,10 @@ const AIM = {
   pads: { part: "torso", dist: 1.5, lift: 0 },
   socks: { part: "shin", dist: 1.05, lift: 0.02 },
   hair: { part: "head", dist: 0.8, lift: 0 },
-  ink: { part: "arm", dist: 1.1, lift: 0 }
+  ink: { part: "arm", dist: 1.1, lift: 0 },
+  // 탈의실의 온몸. 부위가 아니라 사람을 보여 준다. 무엇을 걸쳤는지가 아니라
+  // 걸친 뒤의 내가 어떻게 보이는지가 이 칸이 답하는 질문이다.
+  body: { part: "torso", dist: 2.7, lift: 0.02 }
 };
 
 let R = null;
