@@ -1,7 +1,7 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
 import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain, GEAR_STEP } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
-import { KEEPERS, keeperCost, TRAITS, PULL_COST, PULL_BULK, TICKET_CAP, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
+import { KEEPERS, keeperCost, TRAITS, PULL_COST, PULL_BULK, TICKET_CAP, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
@@ -782,6 +782,8 @@ let shown = 0;
 let revealTimer = 0;
 
 // 지금 보고 있는 선반. lastPull과 같이 패널 수명만 사는 값이라 저장에 싣지 않는다.
+// 지금 고른 뽑기 갈래도 같다. 상점을 닫으면 동네로 돌아간다.
+let pullTab = 'town';
 let shopTab = 'pull';
 // 시착용 장부. 아직 안 산 채로 걸쳐 본 등급이 칸마다 하나씩 들어간다.
 // 저장하지 않는다. 상점을 닫으면 벗는 것이 옷가게의 문법이고, 저장하면 안 산 옷을 입은 채로 판이 돈다.
@@ -1078,16 +1080,24 @@ function paintTray() {
   tray.dataset.shown = String(shown);
 }
 
-function pullShelf(pool) {
+function pullShelf(all) {
+  const kind = pullKindOf(pullTab);
+  const pool = poolFor(all, kind.id);
+  const cost = pullCostOf(kind.id);
+  // 갈래 줄. 하한이 다르면 다른 뽑기라, 값과 확률과 남은 장수가 통째로 갈린다.
+  const tabs = '<div class="kinds">' + PULL_KINDS.map((k) =>
+    '<button class="kind" data-kind="' + k.id + '"' + (k.id === kind.id ? ' aria-current="true"' : '') + '>'
+    + k.name + '</button>').join('') + '</div>';
   // 이용권이 먼저 나가고 모자란 만큼만 값을 치른다. 두 자리가 같은 규칙을 쓰므로 판정이 소유한다.
+  const held = kind.ticketable ? state.tickets : 0;
   const rows = [1, PULL_BULK].map((want) => {
-    const bill = pullBill(want, state.tickets, state.wallet.coin);
+    const bill = pullBill(want, held, state.wallet.coin, cost);
     const left = Math.min(want, pool.length);
     let label = bill.cost > 0 ? SW(bill.cost) + ' 내고 ' + want + '장' : '이용권 ' + bill.free + '장으로 ' + want + '장';
     let off = false;
     // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 값이 모자란 것인지 살 것이 없는 것인지 모른다.
     if (!pool.length) {
-      label = '명단을 다 모았다';
+      label = '이 갈래는 다 모았다';
       off = true;
     } else if (!bill.afford) {
       label = SW(bill.cost - state.wallet.coin) + ' 모자라다';
@@ -1102,12 +1112,13 @@ function pullShelf(pool) {
   // 트레이는 뽑은 카드가 없어도 자리를 만들지 않는다. 빈 상자가 서 있으면 뽑기 전부터 결과 칸이 보인다.
   const got = lastPull.length ? '<div class="tray" data-shown="0"></div>' : '';
   // 이용권이 몇 장 남았는지는 사기 전에 보여야 한다. 열어 봐야 아는 잔고는 방치형에서 안 열린다.
-  const held = '<em class="held">완봉하면 이용권 한 장. 지금 ' + state.tickets + '장 있다</em>';
-  return '<h4>카드깡</h4><div class="card">아직 없는 키퍼 중 한 장이 나온다. 한 장에 '
-    + SW(PULL_COST) + odds + held + '<div class="buys">' + rows + '</div>' + got
+  const bank = kind.ticketable
+    ? '<em class="held">완봉하면 이용권 한 장. 지금 ' + state.tickets + '장 있다</em>'
+    : '<em class="held">이 갈래는 이용권을 안 받는다</em>';
+  return '<h4>카드깡</h4>' + tabs + '<div class="card">' + kind.note + '. 한 장에 '
+    + SW(cost) + odds + bank + '<div class="buys">' + rows + '</div>' + got
     + '</div>';
-}
-// 봇은 소모형이라 SHELVES에 못 넣는다. 등급을 갖는 게 아니라 분을 갖는다.
+}// 봇은 소모형이라 SHELVES에 못 넣는다. 등급을 갖는 게 아니라 분을 갖는다.
 function botShelf() {
   const cur = state.bot;
   const left = Math.ceil(cur.ms / 60000);
@@ -1232,17 +1243,24 @@ function renderShop() {
     tray.onclick = revealAll;
     paintTray();
   }
+  // 갈래를 바꾸면 값과 확률과 남은 장수가 통째로 갈리므로 선반을 다시 그린다.
+  for (const k of box.querySelectorAll('.kind')) k.onclick = () => {
+    pullTab = k.dataset.kind;
+    renderShop();
+  };
   if (SHELVES[shopTab]) return bindGear(box);
   if (shopTab === 'bot') return bindBot(box);
   if (shopTab === 'buff') return bindBuff(box);
   for (const buy of box.querySelectorAll('.buy[data-want]')) buy.onclick = () => {
     if (buy.disabled) return;
     const want = Number(buy.dataset.want);
-    const bill = pullBill(want, state.tickets, state.wallet.coin);
-    if (!bill.afford || want > pool.length) return;
+    const kind = pullKindOf(pullTab);
+    const here = poolFor(pool, kind.id);
+    const bill = pullBill(want, kind.ticketable ? state.tickets : 0, state.wallet.coin, pullCostOf(kind.id));
+    if (!bill.afford || want > here.length) return;
     // 값을 깎기 전에 뽑는다. 빈 풀에 값만 치르는 경로는 만렙 훈련 데드락과 같은 결함이다.
     // 뽑은 카드는 풀에서 즉시 빠진다. 안 빼면 한 묶음 안에서 같은 이름이 두 번 나온다.
-    const left = pool.slice();
+    const left = here.slice();
     const drawn = [];
     for (let i = 0; i < want; i += 1) {
       const pick = pullFrom(left, Math.random);
@@ -1279,6 +1297,7 @@ function closeShop() {
   stopReveal();
   // 선반도 처음 자리로 돌린다. 닫을 때 보던 탭이 남으면 다음에 연 사람이 카드깡을 못 찾는다.
   shopTab = 'pull';
+  pullTab = 'town';
 }
 
 for (const b of document.querySelectorAll('.zone')) {

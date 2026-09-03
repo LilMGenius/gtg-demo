@@ -171,11 +171,12 @@ export const TICKET_CAP = 40;
 
 // 이용권이 있으면 그것부터 쓴다. 값은 모자란 만큼만 땀으로 치른다.
 // 이용권을 남겨 두고 땀을 먼저 쓰면 받은 보상이 쌓이기만 하고 영영 안 열린다.
-export function pullBill(want, tickets, coin) {
+export function pullBill(want, tickets, coin, unit) {
   const n = Math.max(0, Math.floor(Number(want) || 0));
   const free = Math.min(n, Math.max(0, Math.floor(Number(tickets) || 0)));
   const paid = n - free;
-  const cost = paid * PULL_COST;
+  // 값은 갈래가 정한다. 안 주면 동네 갈래 값으로 읽어, 옛 호출부가 조용히 다른 값을 쓰지 않는다.
+  const cost = paid * (Number(unit) > 0 ? Number(unit) : PULL_COST);
   return { n, free, paid, cost, afford: cost <= (Number(coin) || 0) };
 }
 
@@ -186,6 +187,42 @@ export function ticketGain(results, held) {
   if (!Array.isArray(results) || !results.length) return now;
   if (results.some((r) => r !== false)) return now;
   return Math.min(TICKET_CAP, now + TICKET_PER_CLEAN);
+}
+
+/* 뽑기 갈래. 명성 하한이 다르면 다른 뽑기다. 하한 7은 마흔여섯 중 마흔둘이라 갈래가 못 되고,
+   9는 열여섯이라 갈래가 된다. 이용권은 동네에만 쓴다. 완봉 한 장으로 상위 풀이 열리면
+   그 보상이 너무 세지고, 이용권의 값어치가 고르는 갈래에 따라 달라진다. */
+export const PULL_KINDS = [
+  { id: 'town', name: '동네 카드깡', floor: 0, ticketable: true, note: '아직 없는 키퍼 중 한 장이 나온다' },
+  { id: 'legend', name: '전설 카드깡', floor: 9, ticketable: false, note: '명성 9 이상만 나온다. 이용권은 안 받는다' }
+];
+
+export function pullKindOf(id) {
+  return PULL_KINDS.find((k) => k.id === id) || PULL_KINDS[0];
+}
+
+// 그 갈래가 뽑을 수 있는 카드. 하한 미만은 아예 안 들어간다.
+export function poolFor(pool, id) {
+  const floor = pullKindOf(id).floor;
+  return (pool || []).filter((k) => (Number(k.fame) || 0) >= floor);
+}
+
+// 가중 평균 지목가. 그 풀에서 한 장이 나올 때 이름을 찍어 사면 얼마인가의 기댓값이다.
+function namingEV(list) {
+  let w = 0, wc = 0;
+  for (const k of list) { const q = pullWeight(k); w += q; wc += q * keeperCost(k); }
+  return w > 0 ? wc / w : 0;
+}
+
+/* 갈래별 한 장 값. 새 수를 지어내지 않고 동네 갈래가 이미 선 비율을 그대로 쓴다.
+   동네는 기댓 지목가 706에 380이라 0.538이고, 상위 풀도 같은 비율에 선다.
+   비율을 옮겨 적지 않고 명단에서 매번 되뽑으므로, 명단이 바뀌면 두 갈래가 같이 움직인다. */
+export function pullCostOf(id, roster) {
+  const all = Array.isArray(roster) && roster.length ? roster : KEEPERS;
+  const base = namingEV(all);
+  const here = namingEV(poolFor(all, id));
+  if (!(base > 0) || !(here > 0)) return PULL_COST;
+  return Math.round(here * (PULL_COST / base));
 }
 
 // fame 역가중. 유명한 키퍼일수록 드물게 나온다.
