@@ -1872,6 +1872,18 @@ export function createScene(canvas) {
   // 표정을 바꾸는 코드가 돌았다는 것과 표정이 화면에 있다는 것은 다른 주장이다.
   // 뒤통수를 향한 머리에 하트 눈을 넣어도 관객이 보는 것은 검은 반구다.
   window.__faceVis = () => faceToCamera(keeper.userData.head, camera, 1);
+  // 얼굴 자를 심어서 증명하기 위한 손잡이. 몸을 잠깐 돌려 같은 자를 대 본다.
+  // 자연히 뒤를 보는 사건에 기대면, 그 사건의 연출을 고친 날 이 자가 눈을 감았는지
+  // 화면이 좋아졌는지 구분할 수 없다. 재고 나서 원래 각으로 되돌린다.
+  window.__faceProbe = (yaw) => {
+    const was = keeper.rotation.y;
+    keeper.rotation.y = was + yaw;
+    keeper.updateMatrixWorld(true);
+    const v = faceToCamera(keeper.userData.head, camera, 1);
+    keeper.rotation.y = was;
+    keeper.updateMatrixWorld(true);
+    return v;
+  };
 
 
   // 채취를 재현 가능하게 만드는 훅. 켜면 세계시계가 실시간을 안 보고 프레임마다 같은 폭으로 걷는다.
