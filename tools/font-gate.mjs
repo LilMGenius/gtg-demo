@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
@@ -81,7 +82,27 @@ for (const f of walk(ROOT, [])) {
 console.log("  " + (ctlIn ? "ok  " : "FAIL") + " control:known-covered-syllables-present " + ctlIn);
 console.log("  " + (ctlOut ? "ok  " : "FAIL") + " control:known-absent-syllables-absent " + ctlOut);
 for (const [ch, files] of miss) console.log("  FAIL glyph:" + ch + " U+" + ch.codePointAt(0).toString(16) + " " + files.slice(0, 3).join(" "));
-const ok = ctlIn && ctlOut && miss.size === 0;
-console.log("font " + (ok ? "PASS " + cov.size : "FAIL " + miss.size));
+
+// 본문 서체는 이 코퍼스에서 깎아 만든 부분집합이라 cmap을 읽는 대신 지문을 맞춘다.
+// woff2는 압축이라 여기서 못 읽고, 읽더라도 물어볼 것은 같다. 소스가 움직였는데
+// 글꼴을 다시 안 깎았는가다. 지문이 어긋나면 새로 들어온 글자가 다른 서체로 떨어진다.
+const META = join(ROOT, "web/assets/fonts/pretendard-subset.json");
+let bodyOk = false;
+let bodyWhy = "manifest missing";
+try {
+  const meta = JSON.parse(readFileSync(META, "utf8"));
+  const seen = new Set();
+  for (const f of walk(ROOT, [])) for (const ch of readFileSync(f, "utf8")) seen.add(ch);
+  for (let c = 0x20; c < 0x7f; c += 1) seen.add(String.fromCharCode(c));
+  const text = [...seen].filter((c) => c.trim() !== "" || c === " ").sort().join("");
+  const sig = createHash("sha256").update(text, "utf8").digest("hex");
+  bodyOk = sig === meta.sha256;
+  bodyWhy = bodyOk ? meta.chars + " glyphs, corpus " + sig.slice(0, 16) : "corpus " + sig.slice(0, 16) + " but font built for " + String(meta.sha256).slice(0, 16) + ", rerun tools/subset-font.py";
+} catch (e) {
+  bodyWhy = String(e.message);
+}
+console.log("  " + (bodyOk ? "ok  " : "FAIL") + " body:subset-matches-the-source-corpus " + bodyWhy);
+const ok = ctlIn && ctlOut && miss.size === 0 && bodyOk;
+console.log("font " + (ok ? "PASS " + cov.size : "FAIL " + (miss.size + (bodyOk ? 0 : 1))));
 process.exit(ok ? 0 : 1);
 

@@ -6,7 +6,7 @@
   background:
     radial-gradient(62% 96% at 14% 54%, #0b0f0acc 0%, #0b0f0a4d 46%, #0000 76%),
     linear-gradient(180deg,#0b0f0a00 62%,#0b0f0a55);
-  font-family:'Black Han Sans','Pretendard','Malgun Gothic',sans-serif}
+  font-family:var(--disp)}
 #title[hidden]{display:none}
 
 #mark{transform:rotate(-2.2deg);max-width:min(660px,64vw)}
@@ -23,7 +23,7 @@
 /* 한 줄 카피가 흙바닥 위에 얹힌다. 반투명 회색 글자는 밝은 흙과 붙어 안 읽혔다.
    로고와 같은 검정 스트로크를 지면 배경이 무엇이든 떨어진다. */
 #tag{margin-top:clamp(14px,1.7vw,24px);color:#eef3ea;
-  font-family:'Pretendard','Malgun Gothic',sans-serif;font-weight:800;
+  font-family:var(--body);font-weight:700;
   font-size:clamp(12px,1.45vw,19px);
   -webkit-text-stroke:clamp(3px,.42vw,5px) #12160e;paint-order:stroke fill;
   text-shadow:2px 3px 0 #12160e}
@@ -64,14 +64,14 @@
 #helpPanel{width:min(330px,72vw);padding:16px;
   border:3px solid #12160e;background:#161c14;
   box-shadow:6px 7px 0 #12160e, inset 2px 2px 0 #ffffff1f, inset -2px -2px 0 #00000038;
-  font-family:'Pretendard','Malgun Gothic',sans-serif;
+  font-family:var(--body);
   transform-origin:top right;animation:pop .16s ease-out}
 #helpPanel[hidden]{display:none}
 @keyframes pop{from{opacity:0;transform:scale(.9) translateY(-6px)}}
 #helpPanel ul{list-style:none;display:flex;flex-direction:column;gap:14px}
 #helpPanel li{display:flex;align-items:center;gap:13px}
 #helpPanel li>svg{flex:0 0 auto;width:40px;height:40px}
-#helpPanel b{display:block;font-family:inherit;font-size:15px;font-weight:800}
+#helpPanel b{display:block;font-family:inherit;font-size:15px;font-weight:700}
 #helpPanel small{font-size:12px;color:var(--dim);line-height:1.45}
 #helpPanel .keys{margin-top:14px;padding-top:12px;border-top:1px solid #ffffff1a;
   font-size:11.5px;color:#7e8878;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
@@ -82,9 +82,9 @@
 #rotate{position:fixed;inset:0;z-index:60;display:none;
   flex-direction:column;align-items:center;justify-content:center;gap:18px;
   background:#0b0f0a;text-align:center;
-  font-family:'Pretendard','Malgun Gothic',sans-serif}
+  font-family:var(--body)}
 #rotate svg{width:74px;height:74px;animation:tilt 1.8s ease-in-out infinite}
-#rotate p{font-family:'Black Han Sans','Pretendard',sans-serif;font-size:21px;
+#rotate p{font-family:var(--disp);font-size:21px;
   font-weight:400;color:#ffd83d;-webkit-text-stroke:4px #12160e;paint-order:stroke fill}
 #rotate small{font-size:12.5px;color:var(--dim)}
 @keyframes tilt{0%,45%{transform:rotate(0)}70%,100%{transform:rotate(-90deg)}}
