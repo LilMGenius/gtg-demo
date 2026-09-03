@@ -235,11 +235,11 @@ body.playing #hud{opacity:1}
 #out.on{background:#e0563f;color:#fff;box-shadow:var(--lift) var(--lift) 0 var(--edge)}
 
 /* 소리. 끌 수 없는 소리는 소리가 아니라 사고다. 판을 굴리는 버튼이 아니라 시스템
-   토글이라 오른쪽 기둥에서 뺀다. 왼쪽 위 #top은 58px에서 끝나고 자막은 폭이
-   좁혀져 좌측 84px를 비워두므로 68px에 놓아도 46px 판때기가 아무것도 안 가린다. */
-#mute{position:absolute;left:var(--pad-l);top:calc(68px + env(safe-area-inset-top));
+   토글이라 오른쪽 기둥에서 뺀다. 상태 칩 #top이 실측 70px에서 끝나므로 82px에 놓아
+   판때기가 칩을 안 문다. 68px에 두었을 때는 두 px 겹쳐 있었고 어느 자도 그것을 안 쟀다. */
+#mute{position:absolute;left:var(--pad-l);top:calc(82px + env(safe-area-inset-top));
   pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
-  border:var(--line) solid var(--edge);background:var(--panel);color:var(--ink);
+  border:var(--line) solid var(--edge);background:var(--panel);color:var(--dim);
   transform:rotate(var(--tilt));box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel)}
 #mute svg{width:24px;height:24px}
 #mute .slash{opacity:0}
@@ -247,13 +247,14 @@ body.playing #hud{opacity:1}
 #mute[aria-pressed="true"]{color:var(--bad)}
 #mute[aria-pressed="true"] .wave{opacity:0}
 #mute[aria-pressed="true"] .slash{opacity:1}
-/* 상점은 왼쪽 기둥에 선다. 오른쪽 기둥은 세 버튼 아래가 크로스바 325px에 막혀 자리가 없고,
-   왼쪽은 소리 하나뿐이라 그 아래가 비어 있다. 108px는 소리(68px)에 40px 칸을 더한 다음 자리다. */
-#shopBtn{position:absolute;left:var(--pad-l);top:calc(125px + env(safe-area-inset-top));
-  pointer-events:auto;width:44px;height:40px;display:grid;place-items:center;
+/* 상점은 오른쪽 기둥의 조작 무리에 붙는다. 왼쪽에 혼자 서면 상태 칩 아래에 조작이 하나 끼는 꼴이라
+   어느 갈래인지가 안 읽힌다. 아웃문그램 40px 판때기 아래 298px에서 시작해 338px에 끝나고,
+   세로 390px짜리 가로 모바일에서도 화면 안이다. 판때기와 아이콘 크기는 위 넷과 같게 둔다. */
+#shopBtn{position:absolute;right:var(--pad-r);top:calc(298px + env(safe-area-inset-top));
+  pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);color:var(--dim);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(var(--tilt))}
-#shopBtn svg{width:24px;height:24px}
+#shopBtn svg{width:26px;height:26px}
 #shopBtn:active{transform:rotate(var(--tilt)) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 /* 재화를 눌렀을 때 여는 창. 무엇으로 버는지가 화면 어디에도 없어서 잔고가 왜 오르는지를
    플레이어가 추측하고 있었다. 상점과 달리 파는 곳이 아니라 버는 곳이다. */
