@@ -107,6 +107,16 @@ export function newGear() {
   return { grip: 0, studs: 0, pads: 0, socks: 0, frame: 0, city: 0, hair: 0, ink: 0 };
 }
 
+/* 갈래 둘. 몸에 걸치는 것은 그 키퍼의 것이고, 서는 자리는 계정의 것이다.
+   장갑을 낀 것은 그 사람이지만 골대와 동네는 누가 뛰든 같은 곳이라, 키퍼를 바꿨을 때
+   앞의 여섯은 따라 바뀌고 뒤의 둘은 그대로여야 한다. */
+export const WORN_FIELDS = ['grip', 'studs', 'pads', 'socks', 'hair', 'ink'];
+export const PLACE_FIELDS = ['frame', 'city'];
+
+export function isWorn(field) {
+  return WORN_FIELDS.indexOf(field) >= 0;
+}
+
 // 이전 배포본 저장에는 장비 칸이 없다. 없으면 0번 장갑에서 시작한다.
 // 선반 밖의 값은 버린다. 저장에 들어온 숫자를 그대로 믿으면 판정식이 오염된다.
 export function readGear(raw) {

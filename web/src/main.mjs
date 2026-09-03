@@ -10,7 +10,7 @@ import { eventLine, setEndLine, postLine } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
 import { coinGain, readWallet, COIN_DRILL, COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
-import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
+import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
 import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost } from './state/rapport.mjs';
 import { passerName } from './state/passer.mjs';
@@ -66,8 +66,31 @@ state.posts = Array.isArray(saved?.posts) ? saved.posts.slice(-12) : [];
 state.wallet = readWallet(saved?.wallet);
 // 상대 전적. 키커 이름을 열쇠로 막은 수와 먹힌 수를 따로 센다.
 state.record = readRecord(saved);
-// 장비. 상점에서 산 장갑 등급이 여기 남고 판정식에 그대로 들어간다.
-state.gear = readGear(saved?.gear);
+// 장비. 몸에 걸치는 여섯은 그 키퍼가 들고, 서는 자리 둘은 계정이 든다.
+// 저장에 실린 하나짜리 장비는 옛 판이므로 모든 키퍼에게 같은 것을 입혀 이어 붙인다.
+const savedGear = readGear(saved?.gear);
+for (const k of state.squad) {
+  if (!k.worn || typeof k.worn !== 'object') k.worn = {};
+  for (const f of WORN_FIELDS) {
+    const v = Number(k.worn[f]);
+    k.worn[f] = Number.isFinite(v) ? v : savedGear[f];
+  }
+}
+state.place = {};
+for (const f of PLACE_FIELDS) state.place[f] = savedGear[f];
+/* 두 갈래를 한 자리에서 읽고 쓴다. 호출부 스물다섯이 state.gear를 그대로 쓰고,
+   어느 칸이 누구 것인지는 이 자리 하나가 안다. 두 객체를 손으로 맞추면 그 둘이 갈린다. */
+state.gear = new Proxy({}, {
+  get: (_, f) => (isWorn(f) ? state.keeper.worn[f] : state.place[f]),
+  set: (_, f, v) => { if (isWorn(f)) state.keeper.worn[f] = v; else state.place[f] = v; return true; },
+  has: (_, f) => isWorn(f) || PLACE_FIELDS.indexOf(f) >= 0,
+  ownKeys: () => WORN_FIELDS.concat(PLACE_FIELDS),
+  getOwnPropertyDescriptor: (_, f) => ({
+    value: isWorn(f) ? state.keeper.worn[f] : state.place[f],
+    enumerable: true,
+    configurable: true
+  })
+});
 // 봇. 시간제 크레딧이라 남은 밀리초가 저장에 남는다.
 state.bot = readBot(saved?.bot);
 // 버프. 시간이 아니라 구로 닳는다. 탭을 닫아도 남은 구는 그대로 이어진다.
@@ -563,13 +586,16 @@ function renderRoster() {
         const cost = keeperCost(entry);
         if (state.wallet.coin < cost) return;
         state.wallet.coin -= cost;
-        state.squad.push(keeperFromRoster(entry));
+        state.squad.push(recruit(entry));
         at = state.squad.length - 1;
       }
       // 참조 재대입이다. 값을 복사하면 훈련이 보유 목록에 안 남는다.
       state.pick = at;
       state.keeper = state.squad[at];
+      // state.gear는 지금 뛰는 키퍼를 따라가므로, 교체한 뒤에 읽어야 그 사람이 걸친 것이 실린다.
       stage.setKeeper(state.keeper, lookOf(state.gear));
+      // 걸쳐 보던 것은 사람이 바뀌면 버린다. 남겨 두면 다른 사람 몸에 얹혀 산 것처럼 보인다.
+      fitting = {};
       persist();
       pips();
       renderRoster();
@@ -662,6 +688,16 @@ function dateLabel(g) {
   if (g.open) return '만나러 간다 · ' + SW(g.cost);
   if (g.short > 0) return SW(g.short) + ' 모자라다';
   return g.why;
+}
+
+
+// 명단에서 온 키퍼. 걸친 것은 사람마다 따로이므로 새로 온 사람은 맨몸에서 시작한다.
+// 여기 한 곳에서만 만들면 카드깡과 영입이 서로 다른 상태의 키퍼를 밀어 넣을 수 없다.
+function recruit(entry) {
+  const k = keeperFromRoster(entry);
+  k.worn = {};
+  for (const f of WORN_FIELDS) k.worn[f] = 0;
+  return k;
 }
 
 // 아는 얼굴. 라포는 이미 판정과 팔로워에 붙는데 화면 어디에도 없어서 플레이어가 늘어난 줄을 몰랐다.
@@ -1290,7 +1326,7 @@ function renderShop() {
     if (!drawn.length) return;
     state.tickets -= bill.free;
     state.wallet.coin -= bill.cost;
-    for (const pick of drawn) state.squad.push(keeperFromRoster(pick));
+    for (const pick of drawn) state.squad.push(recruit(pick));
     // 뽑은 카드로 자동 전환하지 않는다. 무작위 결과가 뛰던 키퍼를 임의로 강등시키면
     // 뽑기가 이득이 아니라 사고가 된다. 교체는 선수단에서 사람이 고른다.
     // 값은 여기서 이미 치러졌다. 뒤집기는 결과를 보여 주는 일이지 판정을 미루는 일이 아니다.
@@ -1378,6 +1414,10 @@ window.__earn = (open) => { if (open) openEarn(); else closeEarn(); };
 window.__tickets = () => state.tickets;
 // 뒤집힌 카드 수와 뽑은 카드 수. 연출이 도는 동안 계기가 이 둘을 읽어 한 번에 안 열리는 것을 본다.
 window.__reveal = () => ({ shown, drawn: lastPull.length });
+// 누가 무엇을 걸쳤는가. 계기가 교체 전후로 이 둘을 읽어 착용이 사람을 따라가는지 본다.
+window.__worn = () => ({ pick: state.pick, name: state.keeper.name,
+  worn: Object.assign({}, state.keeper.worn), place: Object.assign({}, state.place),
+  all: state.squad.map((k) => Object.assign({}, k.worn)) });
 // 게이트는 화면 글자 대신 장부를 직접 읽어야 판정이 마크업 변경에 흔들리지 않는다.
 window.__record = () => state.record;
 // 팔로워와 라포는 화면에 숫자 하나와 막대로만 나온다. 봇이 뛴 구가 정말 아무것도 안 남기는지는 장부를 직접 읽어야 안다.
