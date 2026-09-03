@@ -325,6 +325,10 @@ body.playing #hud{opacity:1}
 #gym .row button:nth-child(3n){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
 #gym .row button em{display:block;font-style:normal;font-size:12px;font-weight:700;
   color:var(--good);margin-top:3px}
+/* 이름 앞에 그 칸의 그림을 세운다. 18px은 15px 글자 옆에서 이름을 안 누르는 최대치이고,
+   두 창이 같은 규칙을 써야 같은 칸이 두 화면에서 다르게 안 보인다. */
+#gym .row button .who,#me .grid .who{display:flex;align-items:center;gap:6px;min-width:0}
+#gym .row button .who svg,#me .grid .who svg{width:18px;height:18px;flex:none;color:var(--dim)}
 /* 상한에 닿았거나 남은 훈련이 없는 칸. 눌러도 아무 일이 없다는 것이 먼저 보여야 한다. */
 #gym .row button:disabled{color:#f6efdc5c;background:#141a12;cursor:default}
 #gym .row button:disabled em{color:#f6efdc44}
