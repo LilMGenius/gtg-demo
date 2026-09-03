@@ -157,6 +157,37 @@ export function keeperCost(k) {
 // 무작위 한 장이 이름을 찍는 것보다 비싸면 뽑을 이유가 사라진다.
 export const PULL_COST = 380;
 
+// 한 번에 뽑는 묶음. 한 장과 열 장 두 자리를 둔다. 값은 정확히 열 배라 묶음이 할인은 아니다.
+// 묶음이 싸면 한 장 자리가 죽고, 뽑기가 값을 고르는 일이 아니라 한 번에 지르는 일이 된다.
+export const PULL_BULK = 10;
+
+// 완봉 한 판이 주는 이용권. 다섯 슛을 다 막아야 나오므로 방치로는 잘 안 쌓이고,
+// 훈련 포인트가 시간에 붙는 것과 달리 이쪽은 실력에 붙는다. 두 축이 같은 자원을 주면 하나가 죽는다.
+export const TICKET_PER_CLEAN = 1;
+
+// 이용권 천장. 봇 크레딧과 버프에 천장을 둔 것과 같은 이유로 무한 적립을 막는다.
+// 40이면 열 장 뽑기 네 번 몫이라, 모아서 크게 지르는 재미는 남고 영구 적립은 안 된다.
+export const TICKET_CAP = 40;
+
+// 이용권이 있으면 그것부터 쓴다. 값은 모자란 만큼만 땀으로 치른다.
+// 이용권을 남겨 두고 땀을 먼저 쓰면 받은 보상이 쌓이기만 하고 영영 안 열린다.
+export function pullBill(want, tickets, coin) {
+  const n = Math.max(0, Math.floor(Number(want) || 0));
+  const free = Math.min(n, Math.max(0, Math.floor(Number(tickets) || 0)));
+  const paid = n - free;
+  const cost = paid * PULL_COST;
+  return { n, free, paid, cost, afford: cost <= (Number(coin) || 0) };
+}
+
+// 한 판이 끝났을 때 받는 이용권. 다섯 슛을 다 막았을 때만 나오고 천장을 넘지 않는다.
+// 화면에 인라인으로 두면 브라우저를 띄워야만 이 규칙을 잴 수 있다.
+export function ticketGain(results, held) {
+  const now = Math.max(0, Math.floor(Number(held) || 0));
+  if (!Array.isArray(results) || !results.length) return now;
+  if (results.some((r) => r !== false)) return now;
+  return Math.min(TICKET_CAP, now + TICKET_PER_CLEAN);
+}
+
 // fame 역가중. 유명한 키퍼일수록 드물게 나온다.
 // (11 - fame)^2이면 fame 10은 fame 6보다 25배 귀하고, 실제 명단 기준 fame 10이 뽑힐 확률은 1.4%다.
 // 선형 역가중은 6과 10의 차이가 1.7배에 그쳐 뽑기라는 느낌이 서지 않는다.

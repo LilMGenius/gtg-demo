@@ -26,6 +26,10 @@ export const RICH_CASH = 1000;
 // 완봉 한 구가 40대 팔로워이므로 이 수는 백 구 남짓 쌓은 자리와 같다.
 export const START_FANS = 5000;
 
+// 주입할 이용권 수. 열두 장이면 열 장 묶음 한 번을 치르고도 둘이 남아,
+// 이용권이 먼저 나가고 모자란 만큼만 값이 나가는 규칙을 한 표본에서 양쪽 다 볼 수 있다.
+export const TICKETS_HELD = 12;
+
 // 프리셋은 상태를 바꾸는 함수다. 값 덩어리로 두면 어느 칸이 정본인지가 호출부로 샌다.
 const PRESETS = {
   // 성장 칸 전부 상한. 체격 둘과 히든은 GROWABLE 밖이라 손대지 않는다.
@@ -45,6 +49,11 @@ const PRESETS = {
   // 잃는 쪽을 재는 게이트는 신규 저장에서 감소가 0으로 보여 관측 자체가 안 된다.
   famous(state) {
     state.fans = START_FANS;
+  },
+  // 카드깡 이용권을 채운다. 완봉으로만 들어오므로 주입 말고는 계기가 이 칸을 만들 방법이 없다.
+  // 열 장 묶음 한 번과 낱장 둘이 되는 수라, 두 자리가 서로 다르게 동작하는 것을 한 표본에서 볼 수 있다.
+  ticketed(state) {
+    state.tickets = TICKETS_HELD;
   }
 };
 

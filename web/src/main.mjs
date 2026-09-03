@@ -1,7 +1,7 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
 import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain, GEAR_STEP } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
-import { KEEPERS, keeperCost, TRAITS, PULL_COST, pullWeight, pullFrom } from '../../src/roster.mjs';
+import { KEEPERS, keeperCost, TRAITS, PULL_COST, PULL_BULK, TICKET_CAP, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
@@ -58,6 +58,8 @@ state.keeper = state.squad[state.pick];
 state.points = (Number(saved?.points) || 0) + (saved ? offlineGain(saved.at, Date.now()) : 0);
 // 아웃문그램 팔로워. 의사소통과 악동이 여기서 값을 낸다.
 state.fans = Number(saved?.fans) || 0;
+// 카드깡 이용권. 완봉으로만 들어오므로 시간이 아니라 실력에 붙는 자원이다.
+state.tickets = Math.min(TICKET_CAP, Number(saved?.tickets) || 0);
 // 게시물은 한 화면 분량만 남긴다. 12장은 패널 스크롤 한 번에 끝나는 길이다.
 state.posts = Array.isArray(saved?.posts) ? saved.posts.slice(-12) : [];
 // 지갑은 두 갈래로 읽는다. 이전 배포본 저장에는 지갑이 없고, 그때 둘 다 0에서 시작한다.
@@ -246,7 +248,7 @@ function setPad(on) {
 
 // 저장은 항상 보유 목록 전체로 나간다. 뛰는 키퍼만 저장하면 나머지가 다음 저장에서 지워진다.
 function persist() {
-  save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport);
+  save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets);
 }
 
 // 봇 크레딧은 실시간으로 줄어든다. 구 수로 세면 탭을 열어두고 안 누르는 쪽이 이득이 된다.
@@ -463,6 +465,8 @@ function endSet() {
   // 자동 팝업이 없으므로 전 스탯 만렙이어도 다음 판이 그대로 온다.
   state.keeper.level += 1;
   state.points += 1;
+  // 완봉이면 카드깡 이용권 한 장. 규칙은 판정이 소유하고 화면은 그 답을 받는다.
+  state.tickets = ticketGain(state.results, state.tickets);
   persist();
   pips();
   timer = stage.after(0.9, () => countdown(setBreak(), '한숨 돌리는 중', nextSet));
@@ -1028,25 +1032,33 @@ function bindGear(box) {
 }
 
 function pullShelf(pool) {
-  const short = PULL_COST - state.wallet.coin;
-  let label = SW(PULL_COST) + ' 내고 한 장';
-  let off = false;
-  // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 값이 모자란 것인지 살 것이 없는 것인지 모른다.
-  if (!pool.length) {
-    label = '명단을 다 모았다';
-    off = true;
-  } else if (short > 0) {
-    label = SW(short) + ' 모자라다';
-    off = true;
-  }
+  // 이용권이 먼저 나가고 모자란 만큼만 값을 치른다. 두 자리가 같은 규칙을 쓰므로 판정이 소유한다.
+  const rows = [1, PULL_BULK].map((want) => {
+    const bill = pullBill(want, state.tickets, state.wallet.coin);
+    const left = Math.min(want, pool.length);
+    let label = bill.cost > 0 ? SW(bill.cost) + ' 내고 ' + want + '장' : '이용권 ' + bill.free + '장으로 ' + want + '장';
+    let off = false;
+    // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 값이 모자란 것인지 살 것이 없는 것인지 모른다.
+    if (!pool.length) {
+      label = '명단을 다 모았다';
+      off = true;
+    } else if (!bill.afford) {
+      label = SW(bill.cost - state.wallet.coin) + ' 모자라다';
+      off = true;
+    } else if (left < want) {
+      label = '남은 카드가 ' + left + '장뿐이다';
+      off = true;
+    }
+    return '<button class="buy" data-want="' + want + '"' + (off ? ' disabled' : '') + '>' + label + '</button>';
+  }).join('');
   const odds = pool.length ? '<em>' + shopOdds(pool) + '<br>남은 카드 ' + pool.length + '장</em>' : '';
   const got = lastPull ? '<span class="got">' + lastPull + '</span>' : '';
+  // 이용권이 몇 장 남았는지는 사기 전에 보여야 한다. 열어 봐야 아는 잔고는 방치형에서 안 열린다.
+  const held = '<em class="held">완봉하면 이용권 한 장. 지금 ' + state.tickets + '장 있다</em>';
   return '<h4>카드깡</h4><div class="card">아직 없는 키퍼 중 한 장이 나온다. 한 장에 '
-    + SW(PULL_COST) + odds
-    + '<button class="buy"' + (off ? ' disabled' : '') + '>' + label + '</button>' + got
+    + SW(PULL_COST) + odds + held + '<div class="buys">' + rows + '</div>' + got
     + '</div>';
 }
-
 // 봇은 소모형이라 SHELVES에 못 넣는다. 등급을 갖는 게 아니라 분을 갖는다.
 function botShelf() {
   const cur = state.bot;
@@ -1169,17 +1181,28 @@ function renderShop() {
   if (SHELVES[shopTab]) return bindGear(box);
   if (shopTab === 'bot') return bindBot(box);
   if (shopTab === 'buff') return bindBuff(box);
-  const buy = box.querySelector('.buy');
-  buy.onclick = () => {
+  for (const buy of box.querySelectorAll('.buy[data-want]')) buy.onclick = () => {
     if (buy.disabled) return;
+    const want = Number(buy.dataset.want);
+    const bill = pullBill(want, state.tickets, state.wallet.coin);
+    if (!bill.afford || want > pool.length) return;
     // 값을 깎기 전에 뽑는다. 빈 풀에 값만 치르는 경로는 만렙 훈련 데드락과 같은 결함이다.
-    const pick = pullFrom(pool, Math.random);
-    if (!pick) return;
-    state.wallet.coin -= PULL_COST;
-    state.squad.push(keeperFromRoster(pick));
+    // 뽑은 카드는 풀에서 즉시 빠진다. 안 빼면 한 묶음 안에서 같은 이름이 두 번 나온다.
+    const left = pool.slice();
+    const drawn = [];
+    for (let i = 0; i < want; i += 1) {
+      const pick = pullFrom(left, Math.random);
+      if (!pick) break;
+      left.splice(left.indexOf(pick), 1);
+      drawn.push(pick);
+    }
+    if (!drawn.length) return;
+    state.tickets -= bill.free;
+    state.wallet.coin -= bill.cost;
+    for (const pick of drawn) state.squad.push(keeperFromRoster(pick));
     // 뽑은 카드로 자동 전환하지 않는다. 무작위 결과가 뛰던 키퍼를 임의로 강등시키면
     // 뽑기가 이득이 아니라 사고가 된다. 교체는 선수단에서 사람이 고른다.
-    lastPull = pick.name + ' 영입';
+    lastPull = drawn.map((k) => k.name).join(', ') + ' 영입';
     persist();
     pips();
     renderShop();
@@ -1256,6 +1279,8 @@ window.__me = (open) => { if (open) openMe(); else closeMe(); };
 window.__date = (city, passer) => { if (city === undefined) closeDate(); else openDate(city, passer); };
 window.__shop = (open) => { if (open) openShop(); else closeShop(); };
 window.__earn = (open) => { if (open) openEarn(); else closeEarn(); };
+// 이용권 잔고. 완봉 보상과 뽑기 차감을 계기가 데이터에서 읽는다.
+window.__tickets = () => state.tickets;
 // 게이트는 화면 글자 대신 장부를 직접 읽어야 판정이 마크업 변경에 흔들리지 않는다.
 window.__record = () => state.record;
 // 팔로워와 라포는 화면에 숫자 하나와 막대로만 나온다. 봇이 뛴 구가 정말 아무것도 안 남기는지는 장부를 직접 읽어야 안다.
