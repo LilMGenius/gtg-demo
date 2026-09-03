@@ -46,8 +46,8 @@ const g0 = dateGate({ "0:1": 3 }, 0, 1, 9999);
 const g1 = dateGate({ "0:1": 15 }, 0, 1, 0);
 const g2 = dateGate({ "0:1": 15 }, 0, 1, DATE_COST);
 check("gate:low-tier-shut", g0.open === false && g0.why.length > 0, g0.why);
-check("gate:broke-shut", g1.open === false && g1.why.indexOf(String(DATE_COST)) >= 0, g1.why);
-check("gate:open", g2.open === true, g2.why);
+check("gate:broke-shut", g1.open === false && g1.short === DATE_COST, String(g1.short));
+check("gate:open", g2.open === true && g2.cost === DATE_COST, String(g2.cost));
 
 let b;
 try {

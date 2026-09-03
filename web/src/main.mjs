@@ -128,6 +128,12 @@ const IC_FANS = G('팔로워', R(9, 3, 6, 6) + R(6, 12, 12, 3) + R(3, 15, 18, 6)
 // 땀. 시간으로 버는 재화라 땀방울이다. 뾰족한 위와 둥근 아래라 별 실루엣과 안 겹친다.
 const IC_SWEAT = G('땀', R(10.5, 3, 3, 3) + R(7.5, 6, 9, 3) + R(6, 9, 12, 3) + R(4.5, 12, 15, 3)
   + R(4.5, 15, 15, 3) + R(6, 18, 12, 3) + R(7.5, 21, 9, 3));
+/* 값을 말하는 자리는 전부 이 함수를 지난다. 상단 잔고는 아이콘인데 상점 버튼만 '140 땀'처럼
+   글자로 적으면 같은 재화가 두 표기로 갈리고, 어느 재화로 사는지를 글자를 읽어야 안다. */
+// data-coin은 계기가 읽는 자리다. 그려진 숫자는 천 단위 쉼표가 붙고 아이콘 이름이 섞여 들어와,
+// 글자를 파싱하면 계기가 값을 못 읽거나 잘못 읽는다. 값은 데이터에서 꺼내 쓴다.
+const SW = (n) => '<span class="px" data-coin="' + Number(n) + '">' + IC_SWEAT
+  + '<b>' + Number(n).toLocaleString() + '</b></span>';
 // 스폰. 결제로만 들어오는 재화다. 별은 어느 게임에서든 유료 갈래로 읽힌다.
 const IC_SPON = G('스폰', R(10.5, 3, 3, 3) + R(9, 6, 6, 3) + R(0, 9, 24, 3) + R(4.5, 12, 15, 3)
   + R(6, 15, 12, 3) + R(4.5, 18, 6, 3) + R(13.5, 18, 6, 3));
@@ -402,7 +408,7 @@ function renderGym() {
   // 못 누르는 버튼도 사유를 글자로 들고 있다. 빈 자리는 왜 못 쓰는지를 말하지 않는다.
   const swap = maxed
     ? '<button class="swap"' + (state.points <= 0 ? ' disabled' : '') + '>'
-      + (state.points > 0 ? '남은 훈련 ' + state.points + '회를 땀 ' + state.points * COIN_DRILL + '으로' : '바꿀 훈련이 없다')
+      + (state.points > 0 ? '남은 훈련 ' + state.points + '회를 ' + SW(state.points * COIN_DRILL) + '으로' : '바꿀 훈련이 없다')
       + '</button>'
     : '';
   box.innerHTML = '<h4>' + head + '</h4><div class="row">' + GROWABLE.map((k) => {
@@ -464,7 +470,7 @@ function renderRoster() {
     } else if (owned) {
       tail = '교체';
     } else {
-      tail = cost + ' 땀';
+      tail = SW(cost);
       off = state.wallet.coin < cost;
     }
     return '<button data-n="' + entry.name + '"' + cls + (off ? ' disabled' : '') + '>' + entry.name + '<em>' + tail + '</em></button>';
@@ -575,6 +581,13 @@ function recordRows() {
   return '<div class="note"><b>상대 전적</b><i>막은 수 - 먹힌 수</i></div><div class="log">' + rows + '</div>';
 }
 
+// 만남 버튼 글자. 문은 판정이 열고, 값을 어떻게 보여 줄지는 화면이 정한다.
+function dateLabel(g) {
+  if (g.open) return '만나러 간다 · ' + SW(g.cost);
+  if (g.short > 0) return SW(g.short) + ' 모자라다';
+  return g.why;
+}
+
 // 아는 얼굴. 라포는 이미 판정과 팔로워에 붙는데 화면 어디에도 없어서 플레이어가 늘어난 줄을 몰랐다.
 function rapportRows() {
   const keys = Object.keys(state.rapport || {});
@@ -598,7 +611,7 @@ function rapportRows() {
     const g = dateGate(state.rapport, city, passer, state.wallet.coin);
     return '<div class="note"><b>' + cityAt(city).name + ' · ' + who + '</b><i>말 섞은 횟수 ' + n
       + ' · ' + face + ' · 한눈팔기 ' + aid + '% 감소 · 팔로워 +' + fans + '%</i>'
-      + '<button class="go" data-city="' + city + '" data-passer="' + passer + '"' + (g.open ? '' : ' disabled') + '>' + g.why + '</button></div>';
+      + '<button class="go" data-city="' + city + '" data-passer="' + passer + '"' + (g.open ? '' : ' disabled') + '>' + dateLabel(g) + '</button></div>';
   }).join('');
   return head + rows;
 }
@@ -738,7 +751,7 @@ function fittingRoom() {
     : '<i class="dim">눌러서 걸쳐 본다</i>';
   const canAll = tried.length > 0 && bill <= state.wallet.coin;
   const allLabel = tried.length === 0 ? '고른 것이 없다'
-    : (canAll ? '전부 사기 ' + bill + ' 땀' : (bill - state.wallet.coin) + ' 땀 모자라다');
+    : (canAll ? '전부 사기 ' + SW(bill) : SW(bill - state.wallet.coin) + ' 모자라다');
   return '<div class="fitting">'
     + '<div class="me">' + (url ? '<img alt="" src="' + url + '">' : '') + '</div>'
     + '<b>' + state.keeper.name + '</b>'
@@ -768,7 +781,7 @@ function gearShelf(kind) {
   const have = state.gear[s.field];
   const rows = s.list.map((g) => {
     const rank = g[s.field];
-    let label = g.cost + ' 땀';
+    let label = SW(g.cost);
     let off = false;
     if (rank === have) {
       label = s.worn;
@@ -778,7 +791,7 @@ function gearShelf(kind) {
       off = true;
     } else if (state.wallet.coin < g.cost) {
       // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
-      label = '땀 ' + (g.cost - state.wallet.coin) + ' 모자라다';
+      label = SW(g.cost - state.wallet.coin) + ' 모자라다';
       off = true;
     }
     // 썸네일 자리는 마크업에서 비워 두고 그림은 bindGear가 굽는다. 굽는 데 렌더러가 필요해서
@@ -844,20 +857,20 @@ function bindGear(box) {
 
 function pullShelf(pool) {
   const short = PULL_COST - state.wallet.coin;
-  let label = PULL_COST + ' 땀 · 한 장';
+  let label = SW(PULL_COST) + ' · 한 장';
   let off = false;
   // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 값이 모자란 것인지 살 것이 없는 것인지 모른다.
   if (!pool.length) {
     label = '명단을 다 모았다';
     off = true;
   } else if (short > 0) {
-    label = '땀 ' + short + ' 모자라다';
+    label = SW(short) + ' 모자라다';
     off = true;
   }
   const odds = pool.length ? '<em>' + shopOdds(pool) + '<br>남은 카드 ' + pool.length + '장</em>' : '';
   const got = lastPull ? '<span class="got">' + lastPull + '</span>' : '';
-  return '<h4>카드깡</h4><div class="card">아직 없는 키퍼 중 한 장이 나온다. 한 장에 <b>'
-    + PULL_COST + ' 땀</b>' + odds
+  return '<h4>카드깡</h4><div class="card">아직 없는 키퍼 중 한 장이 나온다. 한 장에 '
+    + SW(PULL_COST) + odds
     + '<button class="buy"' + (off ? ' disabled' : '') + '>' + label + '</button>' + got
     + '</div>';
 }
@@ -867,11 +880,11 @@ function botShelf() {
   const cur = state.bot;
   const left = Math.ceil(cur.ms / 60000);
   const rows = BOTS.map((b) => {
-    let label = b.cost + ' 땀 · ' + b.minutes + '분';
+    let label = SW(b.cost) + ' · ' + b.minutes + '분';
     let off = false;
     if (state.wallet.coin < b.cost) {
       // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
-      label = '땀 ' + (b.cost - state.wallet.coin) + ' 모자라다';
+      label = SW(b.cost - state.wallet.coin) + ' 모자라다';
       off = true;
     } else if (cur.ms > 0 && b.tier === cur.tier) {
       label = '남은 ' + left + '분에 ' + b.minutes + '분 더';
@@ -907,11 +920,11 @@ function bindBot(box) {
 function buffShelf() {
   const cur = state.buff;
   const rows = BUFFS.map((b) => {
-    let label = b.cost + ' 땀 · ' + b.shots + '구';
+    let label = SW(b.cost) + ' · ' + b.shots + '구';
     let off = false;
     if (state.wallet.coin < b.cost) {
       // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
-      label = '땀 ' + (b.cost - state.wallet.coin) + ' 모자라다';
+      label = SW(b.cost - state.wallet.coin) + ' 모자라다';
       off = true;
     } else if (cur.shots > 0 && cur.kind === b.kind) {
       label = '남은 ' + cur.shots + '구에 ' + b.shots + '구 더';

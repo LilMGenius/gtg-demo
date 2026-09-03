@@ -62,6 +62,11 @@ body.playing #hud{opacity:1}
   display:flex;align-items:center;gap:4px}
 /* 13px. 12px 글자와 같은 줄에서 숫자보다 커지지 않는 최대치다. 더 키우면 아이콘이 값을 눌러 읽는다. */
 #form svg,#fans svg,#purse svg{width:13px;height:13px;display:block;flex:none}
+/* 값을 말하는 자리에 붙는 재화 표기. 잔고 칩과 같은 아이콘을 쓰되 크기는 글자를 따라간다.
+   .9em은 숫자 옆에서 아이콘이 숫자보다 커지지 않는 최대치고, 버튼 글자가 커져도 같이 따라온다. */
+.px{display:inline-flex;align-items:center;gap:.28em;vertical-align:-.12em}
+.px svg{width:.9em;height:.9em;flex:none;color:#ffd83d}
+.px b{font-weight:inherit;color:inherit}
 #form{grid-area:form;min-height:13px}
 /* 화살표는 방향만으로도 읽히지만 색이 없으면 좋은 날과 나쁜 날이 같은 무게로 지나간다. */
 #form .up{color:#4fd08a;opacity:1;display:block}

@@ -32,7 +32,9 @@ try {
   const coin = () => p.evaluate(() => window.__squad().coin);
   const tap = (n) => p.evaluate((k) => { const c = [...document.querySelectorAll("#shop .rack .card")]; if (c[k]) c[k].click(); }, n);
   const tab = (t) => p.evaluate((x) => { for (const b of document.querySelectorAll("#shop .tab")) if (b.dataset.tab === x) b.click(); }, t);
-  const bill = () => p.evaluate(() => { const b = document.querySelector("#shop .fitting .all"); return { label: b ? b.textContent.trim() : "", off: b ? b.disabled : true, rows: document.querySelectorAll("#shop .fitting .tried i:not(.dim)").length }; });
+  // 값은 버튼이 들고 있는 데이터에서 읽는다. 그려진 글자에는 천 단위 쉼표와 아이콘 이름이 섞여
+  // 파싱이 값을 잘못 읽는다. 축은 그대로 버튼이 부르는 값이다.
+  const bill = () => p.evaluate(() => { const b = document.querySelector("#shop .fitting .all"); const c = b ? b.querySelector(".px[data-coin]") : null; return { label: b ? b.textContent.trim() : "", coin: c ? Number(c.dataset.coin) : null, off: b ? b.disabled : true, rows: document.querySelectorAll("#shop .fitting .tried i:not(.dim)").length }; });
 
   await tab("glove");
   await p.waitForTimeout(400);
@@ -70,7 +72,7 @@ try {
     const g = await import("/web/src/state/gear.mjs");
     return g.gloveAt(3).cost + g.kitAt(3).cost;
   });
-  check("fit:the-bill-is-the-sum-of-the-shelf-prices", two.label.indexOf(String(want)) >= 0, JSON.stringify(two.label) + " want " + want);
+  check("fit:the-bill-is-the-sum-of-the-shelf-prices", two.coin === want, two.coin + " want " + want);
   check("fit:both-tried-items-are-listed", two.rows === 2, two.rows + " rows");
 
   const before = await coin();

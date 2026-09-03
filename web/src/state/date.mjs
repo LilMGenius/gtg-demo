@@ -67,6 +67,7 @@ export function dateGate(rapport, city, passer, coin) {
   const tier = rapportTier(rapport, city, passer);
   if (tier < DATE_TIER) return { open: false, why: "아직 얼굴만 아는 사이다" };
   const short = DATE_COST - (Number(coin) || 0);
-  if (short > 0) return { open: false, why: "땀 " + short + " 모자라다" };
-  return { open: true, why: "만나러 간다 · " + DATE_COST + " 땀" };
+  // 값은 수로만 낸다. 여기서 재화 이름을 글자로 박으면 화면이 아이콘으로 그리는 표기와 갈린다.
+  if (short > 0) return { open: false, short };
+  return { open: true, cost: DATE_COST };
 }

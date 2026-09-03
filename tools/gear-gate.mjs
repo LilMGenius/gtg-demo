@@ -58,7 +58,8 @@ try {
     const got = box.querySelector('.got');
     return {
       head: box.querySelector("h4").textContent,
-      rows: [...box.querySelectorAll('.buy[data-rank]')].map((x) => ({ rank: Number(x.dataset.rank), text: x.textContent, off: x.disabled })),
+      // 값은 버튼이 들고 있는 데이터에서 읽는다. 그려진 글자에는 쉼표와 아이콘 이름이 섞인다.
+      rows: [...box.querySelectorAll('.buy[data-rank]')].map((x) => { const c = x.querySelector('.px[data-coin]'); return { rank: Number(x.dataset.rank), text: x.textContent, coin: c ? Number(c.dataset.coin) : NaN, off: x.disabled }; }),
       got: got ? got.textContent : null
     };
   }, tab);
@@ -90,7 +91,7 @@ try {
     if (pre.head === s.head && pre.rows.length === RANKS) shaped += 1;
     const top = pre.rows.find((r) => r.rank === TOP);
     if (top && !top.off) live += 1;
-    paid += top ? parseInt(top.text, 10) : 0;
+    paid += top ? top.coin : 0;
     await buyTop();
     await p.waitForTimeout(120);
     const post = await shelf(s.tab);
@@ -122,4 +123,3 @@ try {
   clearTimeout(t);
   if (b) await b.close();
 }
-
