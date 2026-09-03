@@ -572,6 +572,16 @@ body.playing #hud{opacity:1}
    세로 390px짜리 가로 모바일에서 그만큼 상점이 밀려 위쪽 탭이 화면 밖으로 나간다. */
 #shop .card .buys{display:flex;gap:9px;margin-top:13px}
 #shop .card .buys .buy{margin-top:0}
+/* 뽑은 카드가 담기는 자리. 뒤집힌 것과 안 뒤집힌 것이 같은 크기로 서야 몇 장 남았는지가 보인다.
+   58px는 이름 두 글자가 접히지 않는 최소 폭이고, 그 아래로 줄이면 뒷면과 앞면의 폭이 갈린다. */
+#shop .card .tray{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:13px;cursor:pointer}
+#shop .card .tray i{display:grid;place-items:center;width:58px;height:34px;font-style:normal;
+  font-family:var(--body);font-size:12px;font-weight:400;line-height:1.15;
+  border:2px solid var(--edge);background:#12180f;color:var(--dim)}
+/* 뒷면은 비어 있고 앞면은 이름을 든다. 뒤집히는 순간 위로 한 번 튀어 오른다. */
+#shop .card .tray i.up{background:#2b3a22;color:var(--ink);animation:flip .18s ease-out}
+#shop .card .tray i.rare{background:#3a3312;color:#ffd83d;border-color:#ffd83d}
+@keyframes flip{from{transform:translateY(6px) scaleY(.4)}to{transform:none}}
 #shop .got{display:block;margin-top:11px;font-size:15px;color:var(--good)}
 #shop .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
   background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;

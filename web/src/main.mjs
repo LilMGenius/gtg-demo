@@ -774,7 +774,12 @@ function closeDate() {
 // 카드깡은 값을 알고 이름을 모르는 축이라 두 축이 겹치지 않는다.
 // 장비는 이름도 값도 아는 대신 스탯 위에 얇게만 얹는 축이다.
 // 결과 한 줄은 state에 넣지 않는다. 저장에 남을 값이 아니라 이 패널이 열려 있는 동안만 쓰는 글자다.
-let lastPull = '';
+// 방금 뽑은 카드. 한 장씩 뒤집히는 동안 이름이 여기 쌓이고, 상점을 닫으면 비워진다.
+let lastPull = [];
+// 몇 장까지 뒤집혔는가. 뽑기와 별개로 도는 값이라, 이 수가 늘어도 지갑은 이미 치러져 있다.
+let shown = 0;
+// 뒤집기를 예약한 타이머. 상점을 닫거나 다시 뽑으면 끊는다. 안 끊으면 닫은 창에 카드가 계속 뜬다.
+let revealTimer = 0;
 
 // 지금 보고 있는 선반. lastPull과 같이 패널 수명만 사는 값이라 저장에 싣지 않는다.
 let shopTab = 'pull';
@@ -1031,6 +1036,48 @@ function bindGear(box) {
   }
 }
 
+
+// 카드 한 장이 뒤집히기까지 기다리는 시간. 열 장이면 1.3초라, 한 장씩 뜨는 것이 보이면서도
+// 방치형에서 매번 참기 힘든 길이는 아니다. 급하면 트레이를 눌러 한 번에 연다.
+const REVEAL_MS = 130;
+
+// 한 장씩 연다. 예약을 하나만 들고 있으므로 다시 뽑으면 앞의 연출이 끊긴다.
+function revealNext() {
+  revealTimer = 0;
+  if (shown >= lastPull.length) return;
+  shown += 1;
+  paintTray();
+  if (shown < lastPull.length) revealTimer = setTimeout(revealNext, REVEAL_MS);
+}
+
+// 남은 것을 한 번에 연다. 기다리는 것이 연출이지 벌은 아니다.
+function revealAll() {
+  if (revealTimer) { clearTimeout(revealTimer); revealTimer = 0; }
+  shown = lastPull.length;
+  paintTray();
+}
+
+function stopReveal() {
+  if (revealTimer) { clearTimeout(revealTimer); revealTimer = 0; }
+  lastPull = [];
+  shown = 0;
+}
+
+/* 뽑은 카드를 담는 자리. 뒤집힌 카드만 이름을 보이고 나머지는 뒷면으로 서 있어,
+   몇 장이 남았는지가 보인다. 상점 전체를 다시 그리면 뒤집던 카드가 처음부터 다시 서므로
+   이 함수는 트레이 안쪽만 갈아 끼운다. */
+function paintTray() {
+  const tray = el('shop') && el('shop').querySelector('.tray');
+  if (!tray) return;
+  tray.innerHTML = lastPull.map((k, i) => {
+    const up = i < shown;
+    // 명성 9 이상은 뒤집히는 순간이 달라야 한다. 마흔여섯 중 여덟이라 자주 오지 않는다.
+    const rare = up && k.fame >= 9 ? ' rare' : '';
+    return '<i class="' + (up ? 'up' : 'down') + rare + '">' + (up ? k.name : '') + '</i>';
+  }).join('');
+  tray.dataset.shown = String(shown);
+}
+
 function pullShelf(pool) {
   // 이용권이 먼저 나가고 모자란 만큼만 값을 치른다. 두 자리가 같은 규칙을 쓰므로 판정이 소유한다.
   const rows = [1, PULL_BULK].map((want) => {
@@ -1052,7 +1099,8 @@ function pullShelf(pool) {
     return '<button class="buy" data-want="' + want + '"' + (off ? ' disabled' : '') + '>' + label + '</button>';
   }).join('');
   const odds = pool.length ? '<em>' + shopOdds(pool) + '<br>남은 카드 ' + pool.length + '장</em>' : '';
-  const got = lastPull ? '<span class="got">' + lastPull + '</span>' : '';
+  // 트레이는 뽑은 카드가 없어도 자리를 만들지 않는다. 빈 상자가 서 있으면 뽑기 전부터 결과 칸이 보인다.
+  const got = lastPull.length ? '<div class="tray" data-shown="0"></div>' : '';
   // 이용권이 몇 장 남았는지는 사기 전에 보여야 한다. 열어 봐야 아는 잔고는 방치형에서 안 열린다.
   const held = '<em class="held">완봉하면 이용권 한 장. 지금 ' + state.tickets + '장 있다</em>';
   return '<h4>카드깡</h4><div class="card">아직 없는 키퍼 중 한 장이 나온다. 한 장에 '
@@ -1178,6 +1226,12 @@ function renderShop() {
     t.onclick = () => { shopTab = t.dataset.tab; renderShop(); };
   }
   bindSpec(box);
+  // 트레이를 누르면 남은 카드가 한 번에 열린다. 렌더가 트레이를 새로 만들 때마다 다시 건다.
+  const tray = box.querySelector('.tray');
+  if (tray) {
+    tray.onclick = revealAll;
+    paintTray();
+  }
   if (SHELVES[shopTab]) return bindGear(box);
   if (shopTab === 'bot') return bindBot(box);
   if (shopTab === 'buff') return bindBuff(box);
@@ -1202,10 +1256,13 @@ function renderShop() {
     for (const pick of drawn) state.squad.push(keeperFromRoster(pick));
     // 뽑은 카드로 자동 전환하지 않는다. 무작위 결과가 뛰던 키퍼를 임의로 강등시키면
     // 뽑기가 이득이 아니라 사고가 된다. 교체는 선수단에서 사람이 고른다.
-    lastPull = drawn.map((k) => k.name).join(', ') + ' 영입';
+    // 값은 여기서 이미 치러졌다. 뒤집기는 결과를 보여 주는 일이지 판정을 미루는 일이 아니다.
+    stopReveal();
+    lastPull = drawn.slice();
     persist();
     pips();
     renderShop();
+    revealTimer = setTimeout(revealNext, REVEAL_MS);
   };
 }
 
@@ -1218,8 +1275,8 @@ function openShop() {
 function closeShop() {
   document.body.classList.remove('panelOpen');
   el('shop').hidden = true;
-  // 지난번 결과를 들고 다시 열면 방금 뽑은 것처럼 읽힌다.
-  lastPull = '';
+  // 지난번 결과를 들고 다시 열면 방금 뽑은 것처럼 읽힌다. 예약도 같이 끊는다.
+  stopReveal();
   // 선반도 처음 자리로 돌린다. 닫을 때 보던 탭이 남으면 다음에 연 사람이 카드깡을 못 찾는다.
   shopTab = 'pull';
 }
@@ -1281,6 +1338,8 @@ window.__shop = (open) => { if (open) openShop(); else closeShop(); };
 window.__earn = (open) => { if (open) openEarn(); else closeEarn(); };
 // 이용권 잔고. 완봉 보상과 뽑기 차감을 계기가 데이터에서 읽는다.
 window.__tickets = () => state.tickets;
+// 뒤집힌 카드 수와 뽑은 카드 수. 연출이 도는 동안 계기가 이 둘을 읽어 한 번에 안 열리는 것을 본다.
+window.__reveal = () => ({ shown, drawn: lastPull.length });
 // 게이트는 화면 글자 대신 장부를 직접 읽어야 판정이 마크업 변경에 흔들리지 않는다.
 window.__record = () => state.record;
 // 팔로워와 라포는 화면에 숫자 하나와 막대로만 나온다. 봇이 뛴 구가 정말 아무것도 안 남기는지는 장부를 직접 읽어야 안다.
