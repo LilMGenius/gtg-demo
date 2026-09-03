@@ -144,6 +144,36 @@ const IC_DOWN = G('컨디션 나쁨', R(9, 0, 6, 12) + R(4.5, 12, 15, 3) + R(7.5
 const IC_BUFF = G('버프', R(9, 0, 6, 3) + R(9, 3, 6, 3) + R(6, 6, 12, 3) + R(4.5, 9, 15, 12)
   + R(6, 21, 12, 3));
 
+/* 상점 탭 아이콘. 열한 개가 글자로만 서 있으면 어느 칸이 무엇을 파는지 매번 읽어야 한다.
+   위 칩과 우측 기둥이 쓰는 3px 격자 픽셀 SVG 관례를 그대로 쓴다. 손그림 톤이 갈리면 안 붙어 보인다. */
+const TAB_ICON = {
+  // 폭이 다른 카드 두 장. 사이를 3px 비워야 두 장으로 갈리고, 맞닿으면 한 덩어리로 뭉친다.
+  pull: G('카드깡', R(3, 3, 9, 18) + R(15, 3, 6, 18)),
+  // 벙어리장갑. 엄지가 옆으로 나와야 손 모양으로 읽힌다.
+  glove: G('장갑', R(6, 6, 12, 15) + R(3, 9, 3, 6)),
+  // 옆에서 본 축구화. 아래 두 칸이 스터드라 맨발이나 양말과 안 갈린다.
+  boot: G('축구화', R(6, 3, 6, 9) + R(6, 12, 12, 6) + R(6, 18, 3, 3) + R(12, 18, 3, 3)),
+  // 티셔츠. 어깨가 몸통보다 넓어야 옷으로 선다.
+  kit: G('유니폼', R(3, 3, 18, 6) + R(6, 9, 12, 12)),
+  // 축구 스타킹. 띄운 밴드 한 줄이 줄무늬로 읽혀 축구화와 갈리고, 발이 왼쪽으로 나가 방향도 반대다.
+  sock: G('양말', R(6, 3, 12, 3) + R(6, 9, 9, 6) + R(3, 15, 12, 6)),
+  // 골대 세 변. 그물은 이 크기에서 뭉치므로 뼈대만 남긴다.
+  frame: G('골대', R(3, 6, 18, 3) + R(3, 9, 3, 12) + R(18, 9, 3, 12)),
+  // 높이가 다른 건물 두 채. 동네는 사람이 아니라 스카이라인으로 읽힌다.
+  city: G('동네', R(3, 9, 6, 12) + R(12, 3, 9, 18)),
+  // 빗. 머리 실루엣은 이 크기에서 골대와 같은 뒤집힌 ㄷ자가 되어 둘이 안 갈린다.
+  hair: G('머리', R(3, 6, 18, 6) + R(3, 12, 3, 6) + R(9, 12, 3, 6) + R(15, 12, 3, 6)),
+  // 번개. 문신 도안 중 이 크기에서 형태가 안 뭉개지는 몇 안 되는 모양이다.
+  ink: G('타투', R(12, 0, 6, 6) + R(9, 6, 6, 6) + R(6, 12, 6, 6) + R(9, 18, 3, 6)),
+  // 안테나 달린 로봇 머리. 3px 격자에서 안테나를 가운데 세우면 폭 6이 최소라 뭉툭해지므로,
+  // 오른쪽 위로 두 칸 계단을 놓아 가늘게 뻗은 것처럼 보이게 한다.
+  bot: G('봇', R(15, 0, 3, 3) + R(12, 3, 3, 3) + R(3, 6, 18, 12)),
+  buff: IC_BUFF
+};
+
+// 탭 차례. 뽑는 칸이 먼저 서고, 몸에 걸치는 여섯, 꾸미는 둘, 소모형 둘이 뒤를 잇는다.
+const SHOP_TABS = ['pull', 'glove', 'boot', 'kit', 'sock', 'frame', 'city', 'hair', 'ink', 'bot', 'buff'];
+
 function pips() {
   el('pips').innerHTML = state.shots.map((_, i) => {
     const r = state.results[i];
@@ -1061,19 +1091,12 @@ function renderShop() {
   const box = el('shop');
   const pool = KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name));
   // 장비를 한 탭에 몰면 카드가 여덟 장이라 720p에서 닫기 버튼이 화면 밖으로 밀린다.
-  const tabs = '<div class="tabs">'
-    + '<button class="tab" data-tab="pull"' + (shopTab === 'pull' ? ' aria-current="true"' : '') + '>카드깡</button>'
-    + '<button class="tab" data-tab="glove"' + (shopTab === 'glove' ? ' aria-current="true"' : '') + '>장갑</button>'
-    + '<button class="tab" data-tab="boot"' + (shopTab === 'boot' ? ' aria-current="true"' : '') + '>축구화</button>'
-    + '<button class="tab" data-tab="kit"' + (shopTab === 'kit' ? ' aria-current="true"' : '') + '>유니폼</button>'
-    + '<button class="tab" data-tab="sock"' + (shopTab === 'sock' ? ' aria-current="true"' : '') + '>양말</button>'
-    + '<button class="tab" data-tab="frame"' + (shopTab === 'frame' ? ' aria-current="true"' : '') + '>골대</button>'
-    + '<button class="tab" data-tab="city"' + (shopTab === 'city' ? ' aria-current="true"' : '') + '>동네</button>'
-    + '<button class="tab" data-tab="hair"' + (shopTab === 'hair' ? ' aria-current="true"' : '') + '>머리</button>'
-    + '<button class="tab" data-tab="ink"' + (shopTab === 'ink' ? ' aria-current="true"' : '') + '>타투</button>'
-    + '<button class="tab" data-tab="bot"' + (shopTab === 'bot' ? ' aria-current="true"' : '') + '>봇</button>'
-    + '<button class="tab" data-tab="buff"' + (shopTab === 'buff' ? ' aria-current="true"' : '') + '>버프</button>'
-    + '</div>';
+  // 이름은 선반 데이터가 소유하고 카드깡과 봇과 버프만 따로 적는다. 열한 줄을 손으로 늘어놓으면
+  // 선반 이름을 고친 날 탭만 옛 이름을 부른다.
+  const tabName = (k) => (SHELVES[k] ? SHELVES[k].head : { pull: '카드깡', bot: '봇', buff: '버프' }[k]);
+  const tabs = '<div class="tabs">' + SHOP_TABS.map((k) =>
+    '<button class="tab" data-tab="' + k + '"' + (shopTab === k ? ' aria-current="true"' : '') + '>'
+    + TAB_ICON[k] + '<span>' + tabName(k) + '</span></button>').join('') + '</div>';
   const goods = SHELVES[shopTab] ? gearShelf(shopTab) : shopTab === 'bot' ? botShelf() : shopTab === 'buff' ? buffShelf() : pullShelf(pool);
   box.innerHTML = '<div class="shopbody">' + fittingRoom() + '<div class="goods">' + tabs + goods + '</div></div>'
     + '<button class="close">닫기</button>';
