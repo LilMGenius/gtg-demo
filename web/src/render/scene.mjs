@@ -1311,7 +1311,11 @@ export function createScene(canvas) {
           // 흘렸다. 공이 옆으로 튀어나가 아직 살아 있다.
           // 튀어나가는 폭이 1.5 상수라 회차가 전부 같은 자리에서 끝났다. 실측으로 이 사건만
           // 편차를 켠 쪽이 끈 쪽보다 조용했다. 손에 맞고 튄 공이 매번 같은 거리로 갈 이유가 없다.
-          ball.position.set(lerp(tail.from.x, tail.from.x + (tail.kx >= 0 ? 1 : -1) * (1.2 + tail.vary.c * 0.6), e), 0.14 + Math.abs(Math.sin(u * 9)) * 0.5 * (1 - u), lerp(tail.from.z, 3.2, e));
+          // 종점 z가 3.2라 공이 키퍼(0.9)보다 2.3 뒤에 멈췄다. 카메라가 골대 뒤에 있어서
+          // 그 거리의 공은 화면에서 크로스바 높이로 올라가 가로대에 겹친다. 실측으로 공 원반의
+          // 8.7%만 남아 흘렸다는 사건이 화면에서 아예 안 읽혔다. 자막만 뜨고 공이 없었다.
+          // 살아 있는 공은 키퍼 곁으로 와야 한다. 같은 규칙을 드리블하는 공에 이미 쓰고 있다.
+          ball.position.set(lerp(tail.from.x, tail.from.x + (tail.kx >= 0 ? 1 : -1) * (1.2 + tail.vary.c * 0.6), e), 0.14 + Math.abs(Math.sin(u * 9)) * 0.5 * (1 - u), lerp(tail.from.z, 1.8, e));
           break;
         case 'downed': {
           keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.5, damp(0.06));
