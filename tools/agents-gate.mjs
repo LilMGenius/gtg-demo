@@ -27,6 +27,28 @@ for (const f of readdirSync("src")) {
 }
 check("judgement:headless", browserHits.length === 0, "browser refs in [" + browserHits.join(", ") + "]");
 
+// 브라우저를 모른다는 것과 밖을 모른다는 것은 다른 축이다. 판정이 헤드리스인 채로도
+// 상태 파일 하나를 끌고 들어오면 시드 재현이 저장된 값에 매인다. 화살표는 상태에서 판정으로
+// 한 방향뿐이고, 그 반대가 하나 생기는 순간 판정과 상태를 가른 이유가 사라진다.
+// 살펴본 화살표 수를 같이 인쇄한다. 0을 세고 통과하면 그 초록은 규칙이 아니라 눈감음이다.
+const outward = [];
+let edges = 0;
+for (const f of readdirSync("src")) {
+  const t = readFileSync("src/" + f, "utf8");
+  const parts = t.split("from ");
+  for (let i = 1; i < parts.length; i += 1) {
+    const s = parts[i].trim();
+    const q = s[0];
+    if (q !== '"' && q !== "'") continue;
+    const end = s.indexOf(q, 1);
+    if (end < 1) continue;
+    const spec = s.slice(1, end);
+    edges += 1;
+    if (!spec.startsWith("./")) outward.push(f + " -> " + spec);
+  }
+}
+check("judgement:imports-nothing-outward", edges > 0 && outward.length === 0, edges + " edges read, outward [" + outward.join(", ") + "]");
+
 // 계기는 한 폴더에 산다. 판정을 부르는 실행 스크립트가 다른 곳에 생기면 게이트를 셀 때
 // 그쪽이 빠지고, 빠진 쪽은 아무도 안 돌리며, 없는 게이트는 빨간불도 파란불도 내지 않는다.
 let strays = "";
