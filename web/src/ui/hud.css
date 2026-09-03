@@ -508,3 +508,8 @@ body.playing #hud{opacity:1}
    keep-all은 띄어쓰기에서만 넘긴다. 한 낱말이 상자보다 길 때만 break-word가 받는다. */
 #hud, #hud *, .panel, .panel * { word-break: keep-all; overflow-wrap: break-word; }
 body { word-break: keep-all; overflow-wrap: break-word; }
+
+/* 패널이 열리면 왼쪽 위 HUD 띄가 비킨다. 하단 버튼을 밀어내는 여백으로 푸려다가
+   손에 든 폭에서 닫기 버튼이 화면 밖으로 나갔다. 높이를 먹지 않는 쪽으로 고친다.
+   패널이 열려 있는 동안 레벨과 지갑은 읽을 일이 없고, 패널이 그 수를 자기 안에 다시 적는다. */
+body.panelOpen #top, body.panelOpen #top *{opacity:0;pointer-events:none}

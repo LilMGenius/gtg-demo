@@ -886,11 +886,13 @@ function renderShop() {
 }
 
 function openShop() {
+  document.body.classList.add('panelOpen');
   el('shop').hidden = false;
   renderShop();
 }
 
 function closeShop() {
+  document.body.classList.remove('panelOpen');
   el('shop').hidden = true;
   // 지난번 결과를 들고 다시 열면 방금 뽑은 것처럼 읽힌다.
   lastPull = '';

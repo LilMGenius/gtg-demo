@@ -89,8 +89,19 @@ const tabScan = async (w, h) => {
   const r = await p.evaluate((vw) => {
     const tabs = [...document.querySelectorAll("#shop .tab")];
     let out = 0;
-    for (const t of tabs) { const b = t.getBoundingClientRect(); if (b.left < -1 || b.right > vw + 1) out += 1; }
-    return { out, total: tabs.length };
+    let hidden = 0;
+    const names = [];
+    for (const t of tabs) {
+      const r = t.getBoundingClientRect();
+      if (r.left < -1 || r.right > vw + 1) out += 1;
+      // 사각형이 화면 안에 있다는 것과 사람 눈에 보인다는 것은 다른 명제다.
+      // 가운데 점을 누를 때 닿는 것이 그 탭이 아니면 위에 무언가가 덮어 있는 것이다.
+      const cx = Math.round(r.left + r.width / 2);
+      const cy = Math.round(r.top + r.height / 2);
+      const at = document.elementFromPoint(cx, cy);
+      if (!at || !(at === t || t.contains(at))) { hidden += 1; names.push(t.textContent.trim() + " under " + (at ? (at.id || at.tagName.toLowerCase() + "." + at.className) : "nothing")); }
+    }
+    return { out, hidden, names, total: tabs.length };
   }, w);
   await ctx.close();
   return r;
@@ -183,6 +194,7 @@ try {
   // 눈으로 보고 알았다. 지금 서 있는 탭이 왼쪽으로 나가 있으면 어느 선반인지를 화면이 안 말한다.
   const tabsOut = await narrowTabs;
   check("narrow:every-shop-tab-is-on-screen", tabsOut.out === 0, tabsOut.out + " of " + tabsOut.total + " tabs off screen");
+  check("narrow:no-shop-tab-is-covered", tabsOut.hidden === 0, tabsOut.hidden + " of " + tabsOut.total + " tabs covered" + (tabsOut.hidden ? ": " + tabsOut.names.join(", ") : ""));
   check("maxed:no-word-is-cut-across-lines", maxed.cut.length === 0, maxed.cut.length + " words split" + (maxed.cut.length ? " first " + maxed.cut[0] : ""));
   check("console:no-errors", maxed.errs.length === 0 && fresh.errs.length === 0, (maxed.errs[0] || fresh.errs[0] || "clean"));
 
