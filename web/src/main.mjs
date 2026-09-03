@@ -740,7 +740,7 @@ function gearShelf(kind) {
       + '<button class="buy" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
   });
   const top = have >= s.top ? '<span class="got">' + s.at(s.top).name + '까지 갔다. 더 살 게 없다</span>' : '';
-  return '<h4>' + s.head + '</h4>' + rows.join('') + top;
+  return '<h4>' + s.head + '</h4><div class="rack">' + rows.join('') + '</div>' + top;
 }
 
 function bindGear(box) {
@@ -806,7 +806,7 @@ function botShelf() {
     return '<div class="card gear"><b>' + b.name + '</b><em>' + b.note + '</em>'
       + '<button class="buy" data-bot="' + b.tier + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
   });
-  return '<h4>봇</h4><span class="got">봇이 뛴 구는 팔로워가 안 붙는다</span>' + rows.join('');
+  return '<h4>봇</h4><span class="got">봇이 뛴 구는 팔로워가 안 붙는다</span><div class="rack">' + rows.join('') + '</div>';
 }
 
 function bindBot(box) {
@@ -848,7 +848,7 @@ function buffShelf() {
     return '<div class="card gear"><b>' + b.name + '</b><em>' + b.note + '</em>'
       + '<button class="buy" data-buff="' + b.kind + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
   });
-  return '<h4>버프</h4><span class="got">시간이 아니라 구로 닳는다. 한 번에 한 종류만 든다</span>' + rows.join('');
+  return '<h4>버프</h4><span class="got">시간이 아니라 구로 닳는다. 한 번에 한 종류만 든다</span><div class="rack">' + rows.join('') + '</div>';
 }
 
 function bindBuff(box) {

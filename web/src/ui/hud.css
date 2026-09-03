@@ -488,9 +488,14 @@ body.playing #hud{opacity:1}
 /* 확률과 남은 장수는 값을 치르기 전에 읽혀야 한다. 뽑고 나서 아는 확률은 안내가 아니다. */
 #shop .card em{display:block;font-style:normal;font-size:12px;font-weight:700;
   color:var(--dim);margin-top:7px;line-height:1.5}
+/* 선반은 한 열로 세우지 않는다. 한 열이면 화면 폭의 대부분이 비고 상품은 스크롤 뒤로 숨는다.
+   auto-fill이 뷰포트가 허락하는 만큼 칸을 늘리므로, 폭이 늘면 상품이 더 보이고 좁으면 한 열로 접힌다.
+   210px는 이름과 설명 한 줄과 값 버튼이 안 접히는 최소 폭이다. */
+#shop .rack{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+  gap:12px;width:min(94vw,1040px);max-height:52vh;overflow-y:auto;padding:4px;align-content:start}
 /* 장비 한 칸은 네 장이 한 화면에 같이 서야 등급 차이가 읽힌다. 720p에서 탭과 닫기까지 들어가려면
    카드 한 장이 120px 아래여야 해서 카드깡 한 장보다 여백을 좁게 준다. */
-#shop .card.gear{padding:10px 14px 12px}
+#shop .card.gear{padding:10px 14px 12px;width:auto}
 #shop .card.gear em{margin-top:5px}
 #shop .card.gear .buy{margin-top:8px;padding:8px 0 10px;font-size:16px}
 #shop .card.gear:nth-child(2n){transform:rotate(.5deg)}

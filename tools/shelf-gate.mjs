@@ -53,7 +53,9 @@ try {
     await p.waitForTimeout(140);
     const seen = await p.evaluate(() => {
       const s = document.getElementById("shop");
-      const rows = [...s.children].filter((c) => c.classList.contains("card")).length;
+      // 카드는 이제 .rack 안에 산다. 직계 자식만 세면 격자로 옮긴 날 전부 0이 되고,
+      // 그 0은 선반이 비었다는 뜻으로 읽힌다. 상점 안의 카드를 깊이와 무관하게 센다.
+      const rows = s.querySelectorAll(".card").length;
       const head = s.querySelector("h4");
       return { rows, head: head ? head.textContent.trim().length : 0, marked: s.querySelectorAll('.tab[aria-current="true"]').length };
     });
