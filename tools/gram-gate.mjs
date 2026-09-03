@@ -50,7 +50,7 @@ try {
   const from = await p.evaluate(() => window.__frames());
   await p.waitForFunction((n) => window.__frames() >= n, from + ROUND_FRAMES, { timeout: 90000 });
 
-  // 읽는 동안에도 판은 계속 돌아서, 장부를 먼저 읽고 피드를 나중에 읽으면 한 판이 어깋간다.
+  // 읽는 동안에도 판은 계속 돌아서, 장부를 먼저 읽고 피드를 나중에 읽으면 한 판이 어긋난다.
   // 실측으로 장부는 일곱이고 피드는 여섯이었다. 읽기 전에 세계를 멈춘다.
   await p.evaluate(() => window.__plan(0, null, window.__frames()));
   await p.waitForTimeout(120);

@@ -90,7 +90,7 @@ try {
 
   const shots = { hair: {}, ink: {}, glove: {}, boot: {}, kit: {}, sock: {} };
   for (const [tab, list] of [["hair", HAIRS], ["ink", TATTOOS], ["glove", GLOVES], ["boot", BOOTS], ["kit", KITS], ["sock", SOCKS]]) {
-    // 기준 컷은 탭마다 다시 잡는다. 처음 한 장을 계속 쓰면 앞 탭에서 산 것까지 차이에 섮인다.
+    // 기준 컷은 탭마다 다시 잡는다. 처음 한 장을 계속 쓰면 앞 탭에서 산 것까지 차이에 섞인다.
     const tabBase = await shot();
     for (let r = 1; r < list.length; r += 1) {
       const bought = await buy(tab, r);
