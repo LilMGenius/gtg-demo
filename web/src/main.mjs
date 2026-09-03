@@ -8,7 +8,7 @@ import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
-import { coinGain, readWallet, COIN_DRILL } from './state/wallet.mjs';
+import { coinGain, readWallet, COIN_DRILL, COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
@@ -518,6 +518,31 @@ function openGram() {
   renderGram();
 }
 
+// 재화를 눌렀을 때 여는 창. 파는 곳이 아니라 버는 곳이다.
+// 값은 원장에서 그대로 읽는다. 여기에 숫자를 다시 적으면 원장이 바뀐 날 화면이 거짓말을 한다.
+function renderEarn() {
+  const box = el('earn');
+  const top = COIN_SAVE + COIN_FAME_STEP * 9;
+  const ways = [
+    [IC_SWEAT, '막으면 ' + COIN_SAVE, '유명한 키커일수록 더 준다. 명단 최상급을 막으면 ' + top + '이다'],
+    [IC_SWEAT, '먹혀도 ' + COIN_CONCEDED, '못 막는 날에도 진행이 멈추지 않는다'],
+    [IC_SWEAT, '훈련 대신 ' + COIN_DRILL, '올릴 칸이 없을 때 훈련 한 회를 이 값으로 바꿔 받는다'],
+    [IC_SPON, '스폰은 결제로만', '결제 경로는 아직 안 열렸다. 지금은 저장 자리만 지킨다']
+  ];
+  const rows = ways.map((w) => '<div class="way">' + w[0] + '<b>' + w[1] + '</b><i>' + w[2] + '</i></div>').join('');
+  box.innerHTML = '<h4>버는 법</h4><div class="ways">' + rows + '</div><button class="close">닫기</button>';
+  box.querySelector('.close').onclick = closeEarn;
+}
+
+function openEarn() {
+  el('earn').hidden = false;
+  renderEarn();
+}
+
+function closeEarn() {
+  el('earn').hidden = true;
+}
+
 function closeGram() {
   el('gram').hidden = true;
 }
@@ -933,14 +958,18 @@ el('gramBtn').onpointerdown = (e) => {
   e.stopPropagation();
   if (el('gram').hidden) openGram(); else closeGram();
 };
-el('lv').onpointerdown = (e) => {
+el('meBtn').onpointerdown = (e) => {
+  // 막지 않으면 화면 전체를 덮은 #pad가 이 눌림을 방향 입력으로 먹는다.
   e.stopPropagation();
   if (el('me').hidden) openMe(); else closeMe();
 };
-el('purse').onpointerdown = (e) => {
-  // 막지 않으면 화면 전체를 덮은 #pad가 이 눌림을 방향 입력으로 먹는다.
+el('shopBtn').onpointerdown = (e) => {
   e.stopPropagation();
   if (el('shop').hidden) openShop(); else closeShop();
+};
+el('purse').onpointerdown = (e) => {
+  e.stopPropagation();
+  if (el('earn').hidden) openEarn(); else closeEarn();
 };
 // 진단용. __pick은 화소 피킹이 이미 쓴다.
 window.__squad = () => ({ squad: state.squad.map((k) => k.name), pick: state.pick, coin: state.wallet.coin });
@@ -950,6 +979,7 @@ window.__me = (open) => { if (open) openMe(); else closeMe(); };
 // 만남은 내 정보 안의 버튼으로만 열린다. 게이트가 그 버튼까지 클릭해서 오게 하려면 좌표가 필요하다.
 window.__date = (city, passer) => { if (city === undefined) closeDate(); else openDate(city, passer); };
 window.__shop = (open) => { if (open) openShop(); else closeShop(); };
+window.__earn = (open) => { if (open) openEarn(); else closeEarn(); };
 // 게이트는 화면 글자 대신 장부를 직접 읽어야 판정이 마크업 변경에 흔들리지 않는다.
 window.__record = () => state.record;
 // 팔로워와 라포는 화면에 숫자 하나와 막대로만 나온다. 봇이 뛴 구가 정말 아무것도 안 남기는지는 장부를 직접 읽어야 안다.
