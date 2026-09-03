@@ -13,6 +13,10 @@ const LINE = String.fromCharCode(10);
 // U+B540. 재화 이름을 소스에 글자로 두면 이 파일 자신이 잔여 검색에 걸린다.
 // 값은 아래 대조군이 검증한다. 코드포인트를 잘못 적으면 이 자는 엉뚱한 글자를 재고 조용히 초록을 낸다.
 const WORD = String.fromCharCode(0xB540);
+// U+AD6C. 판을 세던 옛 단위이고 U+D55C은 그 앞에 붙던 관형사다.
+// 소스에 글자로 두는 것을 피하는 이유는 위와 같다.
+const SHOT = String.fromCharCode(0xAD6C);
+const HAN_ONE = String.fromCharCode(0xD55C);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();
 
@@ -63,7 +67,7 @@ try {
     const tabs = id === "shop"
       ? await p.evaluate(() => [...document.querySelectorAll("#shop .tab")].map((e) => e.dataset.tab))
       : [null];
-    let seenAll = "", total = 0, blind = 0, dark = [];
+    let seenAll = "", unitAll = "", total = 0, blind = 0, dark = [];
     for (const tab of tabs) {
       if (tab) {
         await p.click('#shop .tab[data-tab="' + tab + '"]', { force: true });
@@ -78,6 +82,13 @@ try {
         seenAll = (tab || id) + ": " + hit.trim();
         break;
       }
+      // 판을 세는 단위. 파운더가 두 번 짚은 표현이라 화면에서 사라진 것을 계기가 지킨다.
+      // 숫자나 관형사가 앞에 붙은 자리만 단위다. 낱말 자체는 다른 뜻으로도 쓰인다.
+      const unit = seen.find((s) => new RegExp("(?:[0-9]|" + HAN_ONE + ") ?" + SHOT).test(s));
+      if (unit) {
+        unitAll = (tab || id) + ": " + unit.trim();
+        break;
+      }
       const px = await p.evaluate((q) => {
         const es = [...document.querySelectorAll(q + " .px")].filter((e) => e.getClientRects().length);
         return { n: es.length, blind: es.filter((e) => !e.querySelector("svg")).length };
@@ -87,6 +98,7 @@ try {
       if (px.n === 0) dark.push(tab || id);
     }
     check("price:" + id + "-says-no-currency-in-letters", seenAll === "", seenAll || "clean over " + tabs.length + " view(s)");
+    check("unit:" + id + "-counts-rounds-in-the-new-word", unitAll === "", unitAll || "clean over " + tabs.length + " view(s)");
     check("price:" + id + "-every-price-carries-the-icon", total > 0 && blind === 0,
       total + " prices, " + blind + " without an icon");
     // 값을 하나도 안 그린 선반은 잰 것이 없다. 그 선반이 앞의 축을 초록으로 만들지 않도록 따로 적는다.
@@ -102,14 +114,16 @@ try {
   await p.evaluate((w) => {
     const q = document.createElement("span");
     q.id = "priceProbe";
-    q.textContent = "999 " + w;
+    q.textContent = "999 " + w[0] + " 3" + w[1];
     document.querySelector("#shop").appendChild(q);
-  }, WORD);
+  }, [WORD, SHOT]);
   await p.waitForTimeout(120);
   const planted = await p.evaluate(shown, "#shop");
   // 축과 같은 규칙으로 잰다. 자가 심은 것을 못 잡으면 앞의 초록은 아무것도 안 잰 초록이다.
   const gotIt = planted.find((s) => s.indexOf(WORD) >= 0 && /[0-9]/.test(s));
   check("instrument:a-planted-currency-word-is-caught", Boolean(gotIt), gotIt ? gotIt.trim() : "missed");
+  const gotUnit = planted.find((s) => new RegExp("(?:[0-9]|" + HAN_ONE + ") ?" + SHOT).test(s));
+  check("instrument:a-planted-round-unit-is-caught", Boolean(gotUnit), gotUnit ? gotUnit.trim() : "missed");
   await p.evaluate(() => { const q = document.getElementById("priceProbe"); if (q) q.remove(); });
 
   // 아이콘이 화소로 찍혔는가. DOM에 있는 것으로는 부족하다. 첫 값 표기 하나를 켜고 끄고 잰다.

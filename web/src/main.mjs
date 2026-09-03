@@ -516,7 +516,7 @@ function renderGram() {
   // 문장 안에 이미 상대 이름이 박혀 있다. 앞에 한 번 더 걸면 같은 이름이 두 번 읽힌다.
   const feed = state.posts.length
     ? state.posts.slice().reverse().map((p) => `<div class="post${p.c ? ' bad' : ''}"><span>${p.t.replace(p.n, `<b>${p.n}</b>`)}</span><i>${IC_FANS} +${p.g}</i></div>`).join('')
-    : '<div class="post empty"><span>아직 올린 글이 없다. 한 구 막고 오면 생긴다</span></div>';
+    : '<div class="post empty"><span>아직 올린 글이 없다. 한 슛 막고 오면 생긴다</span></div>';
   box.innerHTML = `<h4>Outmoongram</h4><div class="feed">${feed}</div><button class="close">닫기</button>`;
   box.querySelector('.close').onclick = closeGram;
 }
@@ -568,7 +568,7 @@ function hiddenBand(key, v) {
 // 먹힌 수를 먼저 세워 누구한테 약한지가 맨 위에 오게 한다.
 function recordRows() {
   const names = Object.keys(state.record);
-  if (!names.length) return '<div class="note dim"><span>아직 상대 전적이 없다. 한 구를 막거나 먹히면 여기 쌓인다</span></div>';
+  if (!names.length) return '<div class="note dim"><span>아직 상대 전적이 없다. 한 슛을 막거나 먹히면 여기 쌓인다</span></div>';
   names.sort((a, b) => {
     const x = state.record[a];
     const y = state.record[b];
@@ -896,7 +896,7 @@ function botShelf() {
     return '<div class="card gear"><b>' + b.name + '</b><em>' + b.note + '</em>'
       + '<button class="buy" data-bot="' + b.tier + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
   });
-  return '<h4>봇</h4><span class="got">봇이 뛴 구는 팔로워가 안 붙는다</span><div class="rack">' + rows.join('') + '</div>';
+  return '<h4>봇</h4><span class="got">봇이 대신 막은 슛에는 팔로워가 안 붙는다</span><div class="rack">' + rows.join('') + '</div>';
 }
 
 function bindBot(box) {
@@ -920,25 +920,25 @@ function bindBot(box) {
 function buffShelf() {
   const cur = state.buff;
   const rows = BUFFS.map((b) => {
-    let label = SW(b.cost) + ' · ' + b.shots + '구';
+    let label = SW(b.cost) + ' · ' + b.shots + '슛';
     let off = false;
     if (state.wallet.coin < b.cost) {
       // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
       label = SW(b.cost - state.wallet.coin) + ' 모자라다';
       off = true;
     } else if (cur.shots > 0 && cur.kind === b.kind) {
-      label = '남은 ' + cur.shots + '구에 ' + b.shots + '구 더';
+      label = '남은 ' + cur.shots + '슛에 ' + b.shots + '슛 더';
       // 상한에 닿으면 산 구가 그대로 버려진다. 사기 전에 알아야 한다.
       if (cur.shots >= BUFF_CAP) { label = '더 못 담는다'; off = true; }
     } else if (cur.shots > 0) {
       // 슬롯이 하나라 다른 종류를 사면 지금 것이 덮인다. 산 사람은 그걸 산 줄 모른다.
-      label = buffAt(cur.kind).name + '가 아직 ' + cur.shots + '구 남았다';
+      label = buffAt(cur.kind).name + '가 아직 ' + cur.shots + '슛 남았다';
       off = true;
     }
     return '<div class="card gear"><b>' + b.name + '</b><em>' + b.note + '</em>'
       + '<button class="buy" data-buff="' + b.kind + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
   });
-  return '<h4>버프</h4><span class="got">시간이 아니라 구로 닳는다. 한 번에 한 종류만 든다</span><div class="rack">' + rows.join('') + '</div>';
+  return '<h4>버프</h4><span class="got">시간이 아니라 슛으로 닳는다. 한 번에 한 종류만 든다</span><div class="rack">' + rows.join('') + '</div>';
 }
 
 function bindBuff(box) {
