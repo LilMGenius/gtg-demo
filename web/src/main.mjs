@@ -434,7 +434,8 @@ function renderGym() {
   const box = el('gym');
   // 성장 칸이 전부 상한이면 훈련은 더 쌓여도 쓸 곳이 없다. 그때만 환전 줄이 열린다.
   const maxed = GROWABLE.every((k) => state.keeper[k] >= 10);
-  const head = state.points > 0 ? '훈련장 · 남은 훈련 ' + state.points + '회' : '훈련장 · 밀린 훈련 없다';
+  // 제목과 수를 점으로 잇지 않는다. 창 이름은 제목이 갖고 수는 그 뒤 작은 줄이 갖는다.
+  const head = '훈련장<small>' + (state.points > 0 ? '남은 훈련 ' + state.points + '회' : '밀린 훈련이 없다') + '</small>';
   // 못 누르는 버튼도 사유를 글자로 들고 있다. 빈 자리는 왜 못 쓰는지를 말하지 않는다.
   const swap = maxed
     ? '<button class="swap"' + (state.points <= 0 ? ' disabled' : '') + '>'
@@ -505,7 +506,7 @@ function renderRoster() {
     }
     return '<button data-n="' + entry.name + '"' + cls + (off ? ' disabled' : '') + '>' + entry.name + '<em>' + tail + '</em></button>';
   }).join('');
-  box.innerHTML = '<h4>선수단 · 보유 ' + state.squad.length + '명</h4><div class="row">' + cards + '</div><button class="close">닫기</button>';
+  box.innerHTML = '<h4>선수단<small>보유 ' + state.squad.length + '명</small></h4><div class="row">' + cards + '</div><button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeRoster;
   for (const b of box.querySelectorAll('.row button')) {
     b.onclick = () => {
@@ -753,7 +754,8 @@ function shopOdds(pool) {
     if (k.fame >= 9) high += w;
   }
   if (!total) return '';
-  return '명성 10 ' + (top / total * 100).toFixed(1) + '% · 명성 9 이상 ' + (high / total * 100).toFixed(1) + '%';
+  // 두 확률을 점으로 잇지 않는다. 화면에서 그 점은 목록 기호로 읽히고, 값 둘이 한 항목처럼 붙는다.
+  return '명성 10이 나올 확률 ' + (top / total * 100).toFixed(1) + '%, 명성 9 이상은 ' + (high / total * 100).toFixed(1) + '%';
 }
 
 // 장비 칸 둘의 규칙이 같으므로 선반도 하나로 둔다. 선반을 칸마다 복제하면
@@ -815,8 +817,8 @@ function specLines(kind, rank) {
   if (kind === 'bot') {
     const b = botAt(rank);
     if (!b) return [];
-    // 쓰는 시간과 팔로워가 안 붙는다는 사실은 버튼과 선반 머리글이 이미 말한다. 여기는 성능만 말한다.
-    return ['판단력을 ' + b.judge + '로 대신 굴린다', '내 키퍼가 더 높으면 손해다'];
+    // 팔로워가 안 붙는다는 사실은 선반 머리글이 이미 말한다. 여기는 성능과 기간만 말한다.
+    return ['판단력을 ' + b.judge + '로 대신 굴린다', b.minutes + '분 켜지고, 내 키퍼가 더 높으면 손해다'];
   }
   if (kind === 'buff') {
     const b = buffAt(rank);
@@ -985,7 +987,7 @@ function bindGear(box) {
 
 function pullShelf(pool) {
   const short = PULL_COST - state.wallet.coin;
-  let label = SW(PULL_COST) + ' · 한 장';
+  let label = SW(PULL_COST) + ' 내고 한 장';
   let off = false;
   // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 값이 모자란 것인지 살 것이 없는 것인지 모른다.
   if (!pool.length) {
@@ -1008,7 +1010,7 @@ function botShelf() {
   const cur = state.bot;
   const left = Math.ceil(cur.ms / 60000);
   const rows = BOTS.map((b) => {
-    let label = SW(b.cost) + ' · ' + b.minutes + '분';
+    let label = SW(b.cost) + ' 내고 ' + b.minutes + '분';
     let off = false;
     if (state.wallet.coin < b.cost) {
       // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
@@ -1048,7 +1050,7 @@ function bindBot(box) {
 function buffShelf() {
   const cur = state.buff;
   const rows = BUFFS.map((b) => {
-    let label = SW(b.cost) + ' · ' + b.shots + '슛';
+    let label = SW(b.cost) + ' 내고 ' + b.shots + '슛';
     let off = false;
     if (state.wallet.coin < b.cost) {
       // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.

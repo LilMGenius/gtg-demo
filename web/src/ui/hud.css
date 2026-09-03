@@ -428,8 +428,9 @@ body.playing #hud{opacity:1}
 #me h4{font-family:var(--disp);font-size:clamp(18px,2.4vw,26px);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
   text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
-#me h4 small{display:block;font-size:13px;color:var(--ink);-webkit-text-stroke:2px var(--edge);
-  text-shadow:2px 3px 0 var(--edge);margin-top:4px}
+/* 창 이름 아래 붙는 수. 제목과 점으로 잇지 않고 줄을 나눈다. 세 창이 같은 규칙을 쓴다. */
+#me h4 small,#gym h4 small,#roster h4 small{display:block;font-size:13px;color:var(--ink);
+  -webkit-text-stroke:2px var(--edge);text-shadow:2px 3px 0 var(--edge);margin-top:4px}
 /* 62vh. 720p에서 15칸 다섯 줄과 특성, 히든 둘이 잘리지 않고 다 들어가는 하한이다.
    아래 여백 10px은 마지막 칸의 6px 그림자가 스크롤 경계에 잘리지 않게 둔 것이다. */
 #me .card{display:flex;flex-direction:column;gap:9px;

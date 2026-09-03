@@ -17,6 +17,9 @@ const WORD = String.fromCharCode(0xB540);
 // 소스에 글자로 두는 것을 피하는 이유는 위와 같다.
 const SHOT = String.fromCharCode(0xAD6C);
 const HAN_ONE = String.fromCharCode(0xD55C);
+// 값과 값을 잇는 자리에 쓰인 구분 기호. 화면에서는 목록 기호로 읽혀 두 값이 한 항목처럼 붙고,
+// 파운더가 이것을 불렛포인트라 부르며 두 번 짚었다. 가운뎃점, 불릿, 그리고 em 대시 무리다.
+const BULLETS = [0x00B7, 0x2022, 0x2014, 0x2013, 0x2015].map((c) => String.fromCharCode(c));
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();
 
@@ -67,7 +70,7 @@ try {
     const tabs = id === "shop"
       ? await p.evaluate(() => [...document.querySelectorAll("#shop .tab")].map((e) => e.dataset.tab))
       : [null];
-    let seenAll = "", unitAll = "", total = 0, blind = 0, dark = [];
+    let seenAll = "", unitAll = "", dotAll = "", total = 0, blind = 0, dark = [];
     for (const tab of tabs) {
       if (tab) {
         await p.click('#shop .tab[data-tab="' + tab + '"]', { force: true });
@@ -77,18 +80,17 @@ try {
       // 값으로 쓰인 자리만 잔여다. 선반 문구의 그 낱말은 재화가 아니라 몸에서 나는 것을 말한다.
       // 가르는 것은 한 글자 덩어리 안에 숫자가 같이 있는가다. 이웃한 값까지 이어 붙여 재면
       // 옆 카드의 가격이 문구를 값으로 만들어 버린다.
+      // 발견해도 다음 칸으로 넘어간다. 여기서 루프를 끊으면 아래 가격 집계가 0으로 남아,
+      // 이 축 하나가 옆 축까지 같이 빨갛게 만든다. 축은 서로를 안 끌고 죽어야 한다.
       const hit = seen.find((s) => s.indexOf(WORD) >= 0 && /[0-9]/.test(s));
-      if (hit) {
-        seenAll = (tab || id) + ": " + hit.trim();
-        break;
-      }
+      if (hit && !seenAll) seenAll = (tab || id) + ": " + hit.trim();
       // 판을 세는 단위. 파운더가 두 번 짚은 표현이라 화면에서 사라진 것을 계기가 지킨다.
       // 숫자나 관형사가 앞에 붙은 자리만 단위다. 낱말 자체는 다른 뜻으로도 쓰인다.
       const unit = seen.find((s) => new RegExp("(?:[0-9]|" + HAN_ONE + ") ?" + SHOT).test(s));
-      if (unit) {
-        unitAll = (tab || id) + ": " + unit.trim();
-        break;
-      }
+      if (unit && !unitAll) unitAll = (tab || id) + ": " + unit.trim();
+      // 값을 잇는 기호. 문장 안의 낱말이 아니라 값 사이에 선 자리만 결함이다.
+      const dotted = seen.find((s) => BULLETS.some((d) => s.indexOf(d) >= 0));
+      if (dotted && !dotAll) dotAll = (tab || id) + ": " + dotted.trim();
       const px = await p.evaluate((q) => {
         const es = [...document.querySelectorAll(q + " .px")].filter((e) => e.getClientRects().length);
         return { n: es.length, blind: es.filter((e) => !e.querySelector("svg")).length };
@@ -99,6 +101,7 @@ try {
     }
     check("price:" + id + "-says-no-currency-in-letters", seenAll === "", seenAll || "clean over " + tabs.length + " view(s)");
     check("unit:" + id + "-counts-rounds-in-the-new-word", unitAll === "", unitAll || "clean over " + tabs.length + " view(s)");
+    check("prose:" + id + "-joins-values-with-words-not-a-bullet", dotAll === "", dotAll || "clean over " + tabs.length + " view(s)");
     check("price:" + id + "-every-price-carries-the-icon", total > 0 && blind === 0,
       total + " prices, " + blind + " without an icon");
     // 값을 하나도 안 그린 선반은 잰 것이 없다. 그 선반이 앞의 축을 초록으로 만들지 않도록 따로 적는다.
@@ -114,9 +117,9 @@ try {
   await p.evaluate((w) => {
     const q = document.createElement("span");
     q.id = "priceProbe";
-    q.textContent = "999 " + w[0] + " 3" + w[1];
+    q.textContent = "999 " + w[0] + " 3" + w[1] + " " + w[2] + " 7";
     document.querySelector("#shop").appendChild(q);
-  }, [WORD, SHOT]);
+  }, [WORD, SHOT, BULLETS[0]]);
   await p.waitForTimeout(120);
   const planted = await p.evaluate(shown, "#shop");
   // 축과 같은 규칙으로 잰다. 자가 심은 것을 못 잡으면 앞의 초록은 아무것도 안 잰 초록이다.
@@ -124,6 +127,8 @@ try {
   check("instrument:a-planted-currency-word-is-caught", Boolean(gotIt), gotIt ? gotIt.trim() : "missed");
   const gotUnit = planted.find((s) => new RegExp("(?:[0-9]|" + HAN_ONE + ") ?" + SHOT).test(s));
   check("instrument:a-planted-round-unit-is-caught", Boolean(gotUnit), gotUnit ? gotUnit.trim() : "missed");
+  const gotDot = planted.find((s) => BULLETS.some((d) => s.indexOf(d) >= 0));
+  check("instrument:a-planted-bullet-is-caught", Boolean(gotDot), gotDot ? gotDot.trim() : "missed");
   await p.evaluate(() => { const q = document.getElementById("priceProbe"); if (q) q.remove(); });
 
   // 아이콘이 화소로 찍혔는가. DOM에 있는 것으로는 부족하다. 첫 값 표기 하나를 켜고 끄고 잰다.
