@@ -37,22 +37,23 @@ try {
   const hire = async () => {
     await p.evaluate(() => window.__roster(true));
     await p.waitForSelector("#roster .row button", { timeout: 8000 });
-    const who = await p.evaluate(() => {
-      const b = [...document.querySelectorAll("#roster .row button")].find((e) => !e.disabled);
-      if (!b) return "";
-      b.click();
-      return b.dataset.n;
+    // 영입 줄에서만 고른다. 보유 줄이 위에 서면서 첫 번째 눌리는 버튼이 이미 가진 사람이 됐다.
+    await p.evaluate(() => {
+      const b = [...document.querySelectorAll("#roster .row.hire button")].find((e) => !e.disabled);
+      if (b) b.click();
     });
     await p.waitForTimeout(450);
     await p.evaluate(() => window.__roster(false));
     await p.waitForTimeout(180);
-    return who;
+    // 이름은 화면 글자가 아니라 상태에서 읽는다. 버튼은 이름과 레벨과 안내를 한 덩어리로 들고 있어
+    // 글자를 쪼개면 카드 문구가 바뀐 날 이 자가 엉뚱한 이름을 든다.
+    return (await p.evaluate(() => window.__worn())).name;
   };
   const stand = async (name) => {
     await p.evaluate(() => window.__roster(true));
     await p.waitForSelector("#roster .row button", { timeout: 8000 });
     await p.evaluate((n) => {
-      const b = [...document.querySelectorAll("#roster .row button")].find((e) => e.dataset.n === n);
+      const b = [...document.querySelectorAll("#roster .row.mine button")].find((e) => e.textContent.indexOf(n) === 0);
       if (b) b.click();
     }, name);
     await p.waitForTimeout(450);

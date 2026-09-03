@@ -555,54 +555,61 @@ function closeGym() {
 function renderRoster() {
   const box = el('roster');
   const here = state.squad[state.pick];
-  const cards = KEEPERS.map((entry) => {
-    const owned = state.squad.some((k) => k.name === entry.name);
-    const now = here && here.name === entry.name;
-    const cost = keeperCost(entry);
-    let tail = '';
-    let off = false;
-    let cls = '';
-    if (now) {
-      tail = '출전 중';
-      off = true;
-      cls = ' class="here"';
-    } else if (owned) {
-      tail = '교체';
-    } else {
-      tail = SW(cost);
-      off = state.wallet.coin < cost;
-    }
-    return '<button data-n="' + entry.name + '"' + cls + (off ? ' disabled' : '') + '>' + entry.name + '<em>' + tail + '</em></button>';
+  /* 가진 사람과 데려올 사람은 다른 질문이라 목록을 가른다. 명단 하나로 둘을 겸하면
+     명단 밖에서 시작한 첫 키퍼는 어느 줄에도 없고, 다른 사람을 세우는 순간 못 돌아온다. */
+  const mine = state.squad.map((k, i) => {
+    const now = i === state.pick;
+    const tail = now ? '지금 뛰는 중' : '세우기';
+    return '<button data-at="' + i + '"' + (now ? ' class="here" disabled' : '') + '>'
+      + k.name + '<em>Lv ' + k.level + ', ' + tail + '</em></button>';
   }).join('');
-  box.innerHTML = '<h4>선수단<small>보유 ' + state.squad.length + '명</small></h4><div class="row">' + cards + '</div><button class="close">닫기</button>';
+  // 아직 없는 사람만 영입 줄에 선다. 가진 사람이 값과 함께 다시 뜨면 두 번 살 수 있는 것처럼 읽힌다.
+  const pool = KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name));
+  const hire = pool.map((entry) => {
+    const cost = keeperCost(entry);
+    const off = state.wallet.coin < cost;
+    return '<button data-n="' + entry.name + '"' + (off ? ' disabled' : '') + '>'
+      + entry.name + '<em>' + SW(cost) + '</em></button>';
+  }).join('');
+  box.innerHTML = '<h4>선수단<small>보유 ' + state.squad.length + '명</small></h4>'
+    + '<div class="row mine">' + mine + '</div>'
+    + '<h5>명단에서 데려오기</h5>'
+    + (hire ? '<div class="row hire">' + hire + '</div>'
+      : '<div class="note dim"><span>명단을 다 모았다</span></div>')
+    + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeRoster;
-  for (const b of box.querySelectorAll('.row button')) {
-    b.onclick = () => {
-      if (b.disabled) return;
-      const name = b.dataset.n;
-      let at = state.squad.findIndex((k) => k.name === name);
-      if (at < 0) {
-        const entry = KEEPERS.find((k) => k.name === name);
-        const cost = keeperCost(entry);
-        if (state.wallet.coin < cost) return;
-        state.wallet.coin -= cost;
-        state.squad.push(recruit(entry));
-        at = state.squad.length - 1;
-      }
-      // 참조 재대입이다. 값을 복사하면 훈련이 보유 목록에 안 남는다.
-      state.pick = at;
-      state.keeper = state.squad[at];
-      // state.gear는 지금 뛰는 키퍼를 따라가므로, 교체한 뒤에 읽어야 그 사람이 걸친 것이 실린다.
-      stage.setKeeper(state.keeper, lookOf(state.gear));
-      // 걸쳐 보던 것은 사람이 바뀌면 버린다. 남겨 두면 다른 사람 몸에 얹혀 산 것처럼 보인다.
-      fitting = {};
-      persist();
-      pips();
-      renderRoster();
-    };
-  }
+  // 세우기. 이미 가진 사람이라 값이 안 나간다.
+  for (const b of box.querySelectorAll('.row.mine button')) b.onclick = () => {
+    if (b.disabled) return;
+    swapTo(Number(b.dataset.at));
+  };
+  // 영입. 값을 치르고 명단 끝에 붙인 뒤 그 사람을 세운다.
+  for (const b of box.querySelectorAll('.row.hire button')) b.onclick = () => {
+    if (b.disabled) return;
+    const entry = KEEPERS.find((k) => k.name === b.dataset.n);
+    if (!entry) return;
+    const cost = keeperCost(entry);
+    if (state.wallet.coin < cost) return;
+    state.wallet.coin -= cost;
+    state.squad.push(recruit(entry));
+    swapTo(state.squad.length - 1);
+  };
 }
 
+// 세우는 자리 하나. 영입과 교체가 같은 길로 끝나야 한 쪽만 고쳐지는 일이 없다.
+function swapTo(at) {
+  if (!(at >= 0 && at < state.squad.length)) return;
+  // 참조 재대입이다. 값을 복사하면 훈련이 보유 목록에 안 남는다.
+  state.pick = at;
+  state.keeper = state.squad[at];
+  // state.gear는 지금 뛰는 키퍼를 따라가므로, 교체한 뒤에 읽어야 그 사람이 걸친 것이 실린다.
+  stage.setKeeper(state.keeper, lookOf(state.gear));
+  // 걸쳐 보던 것은 사람이 바뀌면 버린다. 남겨 두면 다른 사람 몸에 얹혀 산 것처럼 보인다.
+  fitting = {};
+  persist();
+  pips();
+  renderRoster();
+}
 function openRoster() {
   el('roster').hidden = false;
   renderRoster();
@@ -1418,6 +1425,9 @@ window.__reveal = () => ({ shown, drawn: lastPull.length });
 window.__worn = () => ({ pick: state.pick, name: state.keeper.name,
   worn: Object.assign({}, state.keeper.worn), place: Object.assign({}, state.place),
   all: state.squad.map((k) => Object.assign({}, k.worn)) });
+// 선수단 창의 두 목록. 가진 사람과 데려올 사람이 갈려 있는지를 계기가 데이터에서 읽는다.
+window.__squadView = () => ({ mine: state.squad.map((k) => k.name), pick: state.pick,
+  hire: KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name)).map((e) => e.name) });
 // 게이트는 화면 글자 대신 장부를 직접 읽어야 판정이 마크업 변경에 흔들리지 않는다.
 window.__record = () => state.record;
 // 팔로워와 라포는 화면에 숫자 하나와 막대로만 나온다. 봇이 뛴 구가 정말 아무것도 안 남기는지는 장부를 직접 읽어야 안다.

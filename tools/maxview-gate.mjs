@@ -149,7 +149,9 @@ const plantedLid = async (w, h) => {
   await p.waitForTimeout(300);
   const before = (await p.evaluate(COVER, "roster")).hits.length;
   const victim = await p.evaluate(() => {
-    const row = document.querySelector("#roster .row");
+    // 심을 자리는 영입 줄에서 고른다. 보유 줄은 지금 뛰는 사람이 눌리지 않는 상태라
+    // 덮임 표본에서 빠지고, 그 위에 뚜껑을 얹어도 이 자는 아무것도 못 본다.
+    const row = document.querySelector("#roster .row.hire") || document.querySelector("#roster .row");
     const rr = row.getBoundingClientRect();
     const card = [...row.querySelectorAll("button")].find((e) => {
       const q = e.getBoundingClientRect();

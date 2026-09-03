@@ -380,6 +380,12 @@ body.playing #hud{opacity:1}
 /* 출전 중인 한 장은 죽은 카드와 다른 색이어야 한다. 둘 다 안 눌리기 때문이다. */
 #roster .row button.here{background:#2b3a22;color:var(--ink)}
 #roster .row button.here em{color:#ffd83d}
+/* 두 목록을 가르는 줄. 가진 사람은 값이 없고 명단은 값이 있어, 같은 격자에 붙여 두면
+   위쪽이 공짜로 살 수 있는 칸으로 읽힌다. 제목 하나가 그 오해를 끊는다. */
+#roster h5{margin:0;font-family:var(--disp);font-size:15px;font-weight:400;color:var(--dim);
+  letter-spacing:.02em}
+/* 가진 사람 줄은 대체로 짧다. 다섯 칸 격자에 두 명만 서면 카드가 화면 폭을 다 먹는다. */
+#roster .row.mine{grid-template-columns:repeat(auto-fill,minmax(150px,180px));justify-content:center}
 #roster .row button:not(:disabled):hover{background:#25301f;transform:translateY(-4px);
   box-shadow:8px 10px 0 var(--edge), var(--bevel)}
 #roster .row button:not(:disabled):active{transform:translateY(3px);box-shadow:2px 2px 0 var(--edge)}
