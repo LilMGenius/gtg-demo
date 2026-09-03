@@ -1,5 +1,5 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
-import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain } from '../../src/chain.mjs';
+import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain, GEAR_STEP } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
 import { KEEPERS, keeperCost, TRAITS, PULL_COST, pullWeight, pullFrom } from '../../src/roster.mjs';
 import { createScene } from './render/scene.mjs';
@@ -297,7 +297,7 @@ function commit(dive) {
     ? autoInput(ran ? botKeeper(state.keeper, state.bot) : state.keeper, shot, rng)
     : { dive, errMs: performance.now() - pressAt, advance, auto: false };
   stage.diving = state.keeper.diving;
-  const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads, socks: state.gear.socks, frame: state.gear.frame, focusAid: state.buff.kind === 'tonic' ? 0.5 : 1, rosin: state.buff.kind === 'rosin', gazeAid: rapportGazeAid(state.rapport, state.gear.city, shot.passer) });
+  const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads, socks: state.gear.socks, frame: state.gear.frame, focusAid: state.buff.kind === 'tonic' ? TONIC_FOCUS : 1, rosin: state.buff.kind === 'rosin', gazeAid: rapportGazeAid(state.rapport, state.gear.city, shot.passer) });
   state.results[state.i] = result.conceded;
   // 판정 결과에는 키커 이름이 없다. 장부는 이 자리에서만 이름을 알 수 있다.
   tally(shot.kicker.name, result.conceded);
@@ -320,7 +320,7 @@ function rollCaptions(result) {
       state.skip = null;
       // 팔로워는 구마다 오른다. 먹혀도 오르고, 막으면 더 오른다.
       // 봇이 뛴 구는 사고가 안 나서 아무도 안 본다. 성장은 남고 화제만 안 남는다.
-      const gain = state.botRan ? 0 : followerGain(state.keeper, result, state.gear.city, lookBoost(state.gear), state.buff.kind === 'hype' ? 1.5 : 1, rapportBoost(state.rapport, state.gear.city, state.shots[state.i].passer));
+      const gain = state.botRan ? 0 : followerGain(state.keeper, result, state.gear.city, lookBoost(state.gear), state.buff.kind === 'hype' ? HYPE_BOOST : 1, rapportBoost(state.rapport, state.gear.city, state.shots[state.i].passer));
       state.fans += gain;
       // 라포는 말을 섞은 구에서만 쌓인다. 스쳐 지나간 얼굴은 다음에도 남이다.
       // 봇이 뛴 구는 팔로워와 같은 규칙으로 0이다. 봇이 서 있었으니 얼굴이 익을 리 없다.
@@ -740,6 +740,86 @@ const SHELVES = {
   ink: { head: '타투', list: TATTOOS, field: 'ink', worn: '새긴 것', past: '지운 타투', top: MAX_INK, at: inkAt }
 };
 
+
+/* 카드 하나가 파는 것을 문장으로 만든다. 수는 판정과 선반 데이터에서 꺼내고 문구만 여기서 짓는다.
+   카드 본문에 다 적으면 격자가 다시 글자 벽이 되므로, 이 문장들은 왼쪽 기둥의 별도 칸이 받는다. */
+
+// 자양강장제가 한눈팔기와 수다에 곱하는 값. 절반이라 두 사고가 같이 반으로 준다.
+// 화면이 이 수를 옮겨 적으면 버프를 손본 날 선반 문구가 거짓말을 한다.
+const TONIC_FOCUS = 0.5;
+// 바이럴 떡밥이 소문에 곱하는 값. 판정 밖 축이라 팔로워에만 붙는다.
+const HYPE_BOOST = 1.5;
+
+const AXIS_WORD = {
+  tear: '장갑이 벗겨지는 사고',
+  spill: '손에서 흘리는 사고',
+  delay: '첫 발이 뜨는 데 걸리는 시간',
+  carry: '정면 강슛에 같이 밀려 들어가는 사고',
+  landing: '착지에 실패하는 사고',
+  neteat: '그물이 공을 먼저 먹는 확률',
+  gaze: '눈에 띄는 행인이 지나갈 확률',
+  passer: '동네에 서 있는 행인 수',
+  crowd: '소문이 퍼지는 배율'
+};
+// 축마다 단위가 다르다. 확률은 %p, 시간은 ms, 사람은 명이다.
+const AXIS_UNIT = { delay: 'ms', passer: '명', crowd: '%', tear: '%p', spill: '%p', carry: '%p', landing: '%p', neteat: '%p' };
+
+function specLines(kind, rank) {
+  const n = Number(rank);
+  const s = SHELVES[kind];
+  if (s) {
+    const steps = GEAR_STEP[s.field];
+    // 외형 선반은 판정에 안 들어간다. 대신 소문에 붙는 승수가 있고, 그것도 값이다.
+    if (!steps) {
+      const gain = Math.round(0.05 * n * 100);
+      return n > 0 ? ['소문이 ' + gain + '% 더 퍼진다', '판정은 안 바뀐다. 보이는 것만 바뀐다']
+        : ['아무것도 안 바꾼다'];
+    }
+    if (n === 0) return ['아무것도 안 샀을 때 자리다'];
+    return steps.map((st) => {
+      const v = Math.round(st.per * n * 10) / 10;
+      const u = AXIS_UNIT[st.axis] || '';
+      return AXIS_WORD[st.axis] + (st.up ? ' +' : ' -') + v + u;
+    });
+  }
+  if (kind === 'bot') {
+    const b = botAt(rank);
+    if (!b) return [];
+    // 쓰는 시간과 팔로워가 안 붙는다는 사실은 버튼과 선반 머리글이 이미 말한다. 여기는 성능만 말한다.
+    return ['판단력을 ' + b.judge + '로 대신 굴린다', '내 키퍼가 더 높으면 손해다'];
+  }
+  if (kind === 'buff') {
+    const b = buffAt(rank);
+    if (!b) return [];
+    // 카드 본문이 이미 든 문장을 여기서 되풀이하면 이 칸이 새 정보를 안 준다. 수로 말한다.
+    const dose = b.shots + '슛 동안만 간다';
+    if (b.kind === 'tonic') {
+      const cut = Math.round((1 - TONIC_FOCUS) * 100);
+      return ['한눈팔기 확률 -' + cut + '%', '수다 확률 -' + cut + '%', dose];
+    }
+    if (b.kind === 'hype') return ['소문이 퍼지는 배율 +' + Math.round((HYPE_BOOST - 1) * 100) + '%', dose];
+    // 송진은 장갑 한 등급을 더 얹는 물건이라, 장갑 선반이 파는 그 두 축을 그대로 쓴다.
+    return GEAR_STEP.grip.map((st) => AXIS_WORD[st.axis] + ' -' + st.per + (AXIS_UNIT[st.axis] || '')).concat([dose]);
+  }
+  return [];
+}
+
+// 왼쪽 기둥의 효과 칸. 카드에 손을 올린 것만 여기에 뜬다.
+function showSpec(name, kind, rank) {
+  const box = el('shop') && el('shop').querySelector('.spec');
+  if (!box) return;
+  const lines = specLines(kind, rank);
+  box.innerHTML = '<b>' + name + '</b>' + lines.map((t) => '<i>' + t + '</i>').join('');
+  box.dataset.at = kind + String(rank);
+}
+
+function clearSpec() {
+  const box = el('shop') && el('shop').querySelector('.spec');
+  if (!box) return;
+  box.innerHTML = '<i class="dim">카드에 손을 올리면 무엇을 사는지가 여기 뜬다</i>';
+  box.dataset.at = '';
+}
+
 // 탈의실. 지금 내 모습과 걸쳐 본 것을 한 자리에서 보여 준다.
 // 값을 치르기 전에 자기 몸에서 확인할 수 있어야 꾸미는 재미가 산다.
 function fittingRoom() {
@@ -757,6 +837,8 @@ function fittingRoom() {
     + '<b>' + state.keeper.name + '</b>'
     + '<div class="tried">' + lines + '</div>'
     + '<button class="all"' + (canAll ? '' : ' disabled') + '>' + allLabel + '</button>'
+    // 효과 칸. 카드 본문은 이름과 한 줄만 들고, 수치는 손을 올린 카드의 것만 여기 뜬다.
+    + '<div class="spec"><i class="dim">카드에 손을 올리면 무엇을 사는지가 여기 뜬다</i></div>'
     + '</div>';
 }
 
@@ -796,12 +878,28 @@ function gearShelf(kind) {
     }
     // 썸네일 자리는 마크업에서 비워 두고 그림은 bindGear가 굽는다. 굽는 데 렌더러가 필요해서
     // 문자열을 만드는 자리에서는 그릴 수 없다. 자리가 없으면 카드 높이가 그림을 받고 나서 뛴다.
-    return '<div class="card gear"><div class="shot" data-kind="' + kind + '" data-rank="' + rank + '"></div>'
+    return '<div class="card gear" data-spec="' + kind + '" data-at="' + rank + '"><div class="shot" data-kind="' + kind + '" data-rank="' + rank + '"></div>'
       + '<b>' + g.name + '</b><em>' + g.note + '</em>'
       + '<button class="buy" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
   });
   const top = have >= s.top ? '<span class="got">' + s.at(s.top).name + '까지 갔다. 더 살 게 없다</span>' : '';
   return '<h4>' + s.head + '</h4><div class="rack">' + rows.join('') + '</div>' + top;
+}
+
+
+/* 카드에 손을 올리면 효과 칸이 그 카드 것을 받는다. 손을 떼면 안내로 돌아간다.
+   터치 기기에는 호버가 없어 pointerdown도 같이 받는다. 그 눌림은 시착용과 구매가 따로 처리한다. */
+function bindSpec(box) {
+  for (const c of box.querySelectorAll('.card[data-spec]')) {
+    const kind = c.dataset.spec;
+    const at = c.dataset.at;
+    const title = c.querySelector('b');
+    const name = title ? title.textContent : '';
+    const on = () => showSpec(name, kind, at);
+    c.addEventListener('pointerenter', on);
+    c.addEventListener('pointerdown', on);
+    c.addEventListener('pointerleave', clearSpec);
+  }
 }
 
 function bindGear(box) {
@@ -893,7 +991,7 @@ function botShelf() {
       label = '더 좋은 클론이 남아 있다';
       off = true;
     }
-    return '<div class="card gear"><b>' + b.name + '</b><em>' + b.note + '</em>'
+    return '<div class="card gear" data-spec="bot" data-at="' + b.tier + '"><b>' + b.name + '</b><em>' + b.note + '</em>'
       + '<button class="buy" data-bot="' + b.tier + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
   });
   return '<h4>봇</h4><span class="got">봇이 대신 막은 슛에는 팔로워가 안 붙는다</span><div class="rack">' + rows.join('') + '</div>';
@@ -935,7 +1033,7 @@ function buffShelf() {
       label = buffAt(cur.kind).name + '가 아직 ' + cur.shots + '슛 남았다';
       off = true;
     }
-    return '<div class="card gear"><b>' + b.name + '</b><em>' + b.note + '</em>'
+    return '<div class="card gear" data-spec="buff" data-at="' + b.kind + '"><b>' + b.name + '</b><em>' + b.note + '</em>'
       + '<button class="buy" data-buff="' + b.kind + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
   });
   return '<h4>버프</h4><span class="got">시간이 아니라 슛으로 닳는다. 한 번에 한 종류만 든다</span><div class="rack">' + rows.join('') + '</div>';
@@ -1000,6 +1098,7 @@ function renderShop() {
   for (const t of box.querySelectorAll('.tab')) {
     t.onclick = () => { shopTab = t.dataset.tab; renderShop(); };
   }
+  bindSpec(box);
   if (SHELVES[shopTab]) return bindGear(box);
   if (shopTab === 'bot') return bindBot(box);
   if (shopTab === 'buff') return bindBuff(box);

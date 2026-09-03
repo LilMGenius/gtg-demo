@@ -40,6 +40,29 @@ const SOCK_LAND = 8;
 // 그물 먹힘은 눕든 안 눕든 앞에서 한 번에 막으므로 실효가 더 크다. 그래서 등급당 3으로 낮춰 잡았다.
 // 세 칸을 다 사도 9고, 흘린 뒤 실점률을 곱하면 실효 5 남짓이라 반응속도 세 칸 6.75에 못 미친다.
 const NET_EAT = 3;
+
+// 동네 등급당 눈에 띄는 행인이 지나갈 확률 증가. 0등급 30에서 3등급 48로, 한 판 다섯 슛 중
+// 한 슛 반이 두 슛 반이 되는 폭이다. 이보다 크면 동네를 사는 순간 실점이 스탯보다 동네로 갈리고,
+// 이보다 작으면 산 걸 못 느낀다.
+const GAZE_BASE = 30;
+const CITY_GAZE = 6;
+// 동네 등급당 늘어나는 행인 수. 화면의 배치 인원과 같아야 안 보이는 사람에게 라포가 붙지 않는다.
+const PASSER_BASE = 5;
+const CITY_PASSER = 2;
+// 동네 등급당 소문 배율. 3등급이 +36%인데, 같은 등급이 올린 실점 위험을 팔로워로 되사는 값이다.
+const CITY_CROWD = 0.12;
+
+/* 선반 등급 하나가 판정에서 움직이는 값. 화면이 이 수를 옮겨 적으면 상수가 바뀐 날 두 곳이 갈린다.
+   axis는 판정이 부르는 이름이고 문구는 화면이 짓는다. per는 등급 한 칸당, sign은 오르는 쪽인지다. */
+export const GEAR_STEP = {
+  grip: [{ axis: "tear", per: GRIP_TEAR, up: false }, { axis: "spill", per: GRIP_SPILL, up: false }],
+  studs: [{ axis: "delay", per: STUD_MS, up: false }],
+  pads: [{ axis: "carry", per: KIT_CARRY, up: false }],
+  socks: [{ axis: "landing", per: SOCK_LAND, up: false }],
+  frame: [{ axis: "neteat", per: NET_EAT, up: true }],
+  city: [{ axis: "gaze", per: CITY_GAZE, up: true }, { axis: "passer", per: CITY_PASSER, up: true },
+    { axis: "crowd", per: CITY_CROWD * 100, up: true }]
+};
 const WIN0 = 70;
 const STREAK_K = 6.0;
 
@@ -143,9 +166,7 @@ function courseOf(aimX, aimY) {
 // 한 판은 슛 다섯 개. 앞 두 개는 판독을 가르치고 마지막 한 개는 나가지 않으면 못 막는다.
 // 동네 등급은 슛을 바꾸지 않는다. 바꾸는 것은 눈에 띄는 행인이 지나갈 확률 하나뿐이다.
 export function buildSet(rng, level = 5, city = 0) {
-  // 등급당 6%p. 0등급 30에서 3등급 48로, 한 판 다섯 구 중 한 구 반이 두 구 반이 되는 폭이다.
-  // 이보다 크면 동네를 사는 순간 실점이 스탯보다 동네로 갈리고, 이보다 작으면 산 걸 못 느낀다.
-  const gazeChance = 30 + 6 * clamp(city, 0, 3);
+  const gazeChance = GAZE_BASE + CITY_GAZE * clamp(city, 0, 3);
   const shots = [];
   for (let i = 0; i < 5; i++) {
     const k = scaleKicker(KICKERS[Math.floor(rng() * KICKERS.length)], level);
@@ -172,7 +193,7 @@ export function buildSet(rng, level = 5, city = 0) {
     // gaze가 이미 소비한 값을 재사용하면 스트림이 그대로다. gaze가 참인 구에서 gazeRoll은
     // [0, gazeChance)에 균등하므로 등분하면 인덱스도 균등하다.
     // 인원은 화면의 PASSER_BASE 5 + STEP 2 * 등급과 같아야 안 보이는 사람에게 라포가 붙지 않는다.
-    const passerCount = 5 + 2 * clamp(city, 0, 3);
+    const passerCount = PASSER_BASE + CITY_PASSER * clamp(city, 0, 3);
     const passer = gaze ? Math.min(passerCount - 1, Math.floor((gazeRoll / gazeChance) * passerCount)) : -1;
     // 휘어들어오는 공. 마커가 서준 자리에서 끝에 빗나간다.
     // 배치를 맞춘 키퍼를 저격하는 항이므로 키커 칸이 소유한다.
@@ -514,8 +535,7 @@ export function followerGain(keeper, result, city = 0, look = 1, boost = 1, rapp
   const base = saved ? 40 : 8;
   const talk = 6 * clamp(keeper.communication, 1, 10) + 3 * clamp(keeper.mischief, 1, 10);
   const fame = clamp(result.fame || 1, 1, 10) * (saved ? 9 : 2);
-  // 등급당 12%. 3등급이 +36%인데, 같은 등급이 올린 실점 위험을 팔로워로 되사는 값이다.
-  const crowd = 1 + 0.12 * clamp(city, 0, 3);
+  const crowd = 1 + CITY_CROWD * clamp(city, 0, 3);
   // boost는 바이럴 떡밥이다. 판정 밖 축이라 스킨 1.30, 관중 1.36과 곱셈 인자가 따로 선다.
   return Math.round((base + talk + fame) * (flair ? 2.2 : 1) * crowd * clamp(look, 1, 1.3) * clamp(boost, 1, 1.6) * clamp(rapport, 1, 1.25));
 }
