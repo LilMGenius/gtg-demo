@@ -1000,11 +1000,13 @@ function bindGear(box) {
     if (!s) continue;
     const g = s.at(shot.dataset.rank);
     const look = lookOf(Object.assign({}, state.gear, { [s.field]: g[s.field] }));
-    const url = thumbURL(s.field, state.keeper, look);
+    // 골대와 동네는 몸이 아니라 장면이라 외형 묶음이 아니라 등급 자체를 받는다.
+    const arg = (s.field === 'frame' || s.field === 'city') ? g[s.field] : look;
+    const url = thumbURL(s.field, state.keeper, arg);
     if (!url) continue;
     shot.innerHTML = '<img alt="" src="' + url + '">';
     const card = shot.parentNode;
-    card.onpointerenter = () => startSpin(shot, s.field, state.keeper, look);
+    card.onpointerenter = () => startSpin(shot, s.field, state.keeper, arg);
     card.onpointerleave = () => stopSpin();
     // 카드를 누르면 산 것이 아니라 걸쳐 본다. 값은 buy 버튼이 따로 받는다.
     // 이미 가진 등급이나 지나간 등급은 걸쳐 볼 것이 없다.

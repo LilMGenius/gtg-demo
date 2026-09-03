@@ -66,11 +66,13 @@ export const MAX_FRAME = GOALS.length - 1;
 // 그래서 한눈파는 구가 늘어난다. 대신 그 동네에서 막으면 소문이 더 빨리 퍼져 팔로워가 더 붙는다.
 // 순수 상승이 아니므로 장비 한 칸이 스탯 한 칸을 넘지 않는다는 자와 부딪히지 않는다.
 // 값 기준은 앞의 다섯과 같다. 첫 칸은 카드깡 380 땀보다 싸고 마지막 칸은 그보다 비싸다.
+// sky는 하늘색, haze는 안개색이다. 골대의 그물 값과 같은 이유로 렌더가 아니라 여기 있다.
+// 등급이 오를수록 하늘이 옅고 뿌예진다. 뒷산은 파랗고 번화가는 먼지가 낀다.
 export const CITIES = [
-  { city: 0, name: '동네 뒷산 공터', cost: 0, note: '아무것도 안 샀을 때 서 있는 곳. 지나가는 사람이 거의 없다' },
-  { city: 1, name: '학교 앞 흙 운동장', cost: 145, note: '하교 시간에 사람이 지나간다. 가끔 고개가 돌아간다' },
-  { city: 2, name: '역세권 풋살장', cost: 385, note: '유동인구가 많다. 막으면 소문이 빨리 난다' },
-  { city: 3, name: '번화가 한복판 코트', cost: 860, note: '사방이 사람이다. 팔로워도 실점도 같이 는다' }
+  { city: 0, name: '동네 뒷산 공터', cost: 0, sky: 0x86aecb, haze: 0x9dbdd4, note: '아무것도 안 샀을 때 서 있는 곳. 지나가는 사람이 거의 없다' },
+  { city: 1, name: '학교 앞 흙 운동장', cost: 145, sky: 0x8fb2c9, haze: 0xa6c0cf, note: '하교 시간에 사람이 지나간다. 가끔 고개가 돌아간다' },
+  { city: 2, name: '역세권 풋살장', cost: 385, sky: 0x9ab3c2, haze: 0xb0c2c9, note: '유동인구가 많다. 막으면 소문이 빨리 난다' },
+  { city: 3, name: '번화가 한복판 코트', cost: 860, sky: 0xa8b4ba, haze: 0xbcc5c4, note: '사방이 사람이다. 팔로워도 실점도 같이 는다' }
 ];
 
 export const MAX_CITY = CITIES.length - 1;

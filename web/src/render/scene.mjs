@@ -11,6 +11,7 @@ import {
 } from './units.mjs';
 import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, pushPose, setPose } from './objects/actors.mjs';
 import { buildPitch, buildPassers } from './objects/pitch.mjs';
+import { cityAt } from '../state/gear.mjs';
 import { createImpact } from './objects/impact.mjs';
 import { jitterMesh, addOutline, blobGeo, ballGeo } from './handmade.mjs';
 
@@ -223,8 +224,6 @@ export function createScene(canvas) {
   const PASSER_STEP = 2;   // 등급당 두 명. 한 명은 안 읽히고 세 명은 화면이 막힌다
   const PASSER_MAX = PASSER_BASE + PASSER_STEP * 3;
   // 등급이 오를수록 하늘이 탁해진다. 사람이 많은 동네일수록 공기가 나쁘다는 한 줄 연출
-  const SKY = [0x86aecb, 0x8fb2c9, 0x9ab3c2, 0xa8b4ba];
-  const HAZE = [0x9dbdd4, 0xa6c0cf, 0xb0c2c9, 0xbcc5c4];
   let passerCount = PASSER_BASE;
   const passers = buildPassers(scene, PASSER_MAX);
   subTag = 'impact';
@@ -449,8 +448,9 @@ export function createScene(canvas) {
       passers[i].visible = on;
       passerShadows[i].visible = on;
     }
-    scene.background.setHex(SKY[c]);
-    scene.fog.color.setHex(HAZE[c]);
+    // 색은 선반 데이터가 소유한다. 여기 배열을 따로 두면 상점 썸네일과 경기장이 갈린다.
+    scene.background.setHex(cityAt(c).sky);
+    scene.fog.color.setHex(cityAt(c).haze);
   }
 
   function setKeeper(k, look) {
