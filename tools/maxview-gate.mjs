@@ -33,6 +33,36 @@ const SCAN = function () {
   return out;
 };
 
+
+// 줄이 낱말 한가운데에서 끊기는지 본다. 상자를 넘지 않으므로 위의 잘림 자는 이것을 통과시킨다.
+// 글자를 하나씩 재서 윗변이 내려간 자리가 줄이 넘어간 자리이고, 그 앞 글자가 띄어쓰기가 아니면 낱말을 자른 것이다.
+// 타이틀에서 같은 자를 세워 "손이 안 닿|는다"를 잡았고, 게임 안 화면에는 그 자가 없었다.
+const WRAP = function () {
+  const bad = [];
+  let wrapped = 0;
+  const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = walk.nextNode())) {
+    const s = n.nodeValue;
+    if (!s || !s.trim()) continue;
+    const host = n.parentElement;
+    if (!host || !host.getClientRects().length) continue;
+    const r = document.createRange();
+    let prevTop = null;
+    for (let i = 0; i < s.length; i += 1) {
+      r.setStart(n, i);
+      r.setEnd(n, i + 1);
+      const box = r.getBoundingClientRect();
+      if (!box.width && !box.height) continue;
+      if (prevTop !== null && box.top - prevTop > 1) wrapped += 1;
+      if (prevTop !== null && box.top - prevTop > 1 && s[i - 1] !== " ") {
+        bad.push(s.slice(Math.max(0, i - 7), i) + "|" + s.slice(i, i + 4));
+      }
+      prevTop = box.top;
+    }
+  }
+  return { bad: bad, wrapped: wrapped };
+};
 // 열리는 창 다섯. 각 창에서 글자가 상자를 넘는지 따로 본다.
 // 창을 안 열고 HUD만 재면 만렙에서 자릿수가 늘어나는 자리 대부분을 안 보게 된다.
 const PANELS = [
@@ -44,12 +74,33 @@ const PANELS = [
   ["gym", (p) => p.click("#gymBtn", { force: true })]
 ];
 
+// 탭이 모두 화면 안에 서 있는가. 잃은 탭은 없는 탭과 같다.
+const tabScan = async (w, h) => {
+  const ctx = await b.newContext({ viewport: { width: w, height: h } });
+  const p = await ctx.newPage();
+  await p.goto(BASE + "&preset=rich", { waitUntil: "load" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "load" });
+  await p.waitForSelector("#go", { timeout: 15000 });
+  await p.click("#go", { force: true });
+  await p.waitForTimeout(1300);
+  await p.evaluate(() => window.__shop(true));
+  await p.waitForTimeout(320);
+  const r = await p.evaluate((vw) => {
+    const tabs = [...document.querySelectorAll("#shop .tab")];
+    let out = 0;
+    for (const t of tabs) { const b = t.getBoundingClientRect(); if (b.left < -1 || b.right > vw + 1) out += 1; }
+    return { out, total: tabs.length };
+  }, w);
+  await ctx.close();
+  return r;
+};
 let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
 
-  const sweep = async (q) => {
-    const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  const sweep = async (q, w, h) => {
+    const ctx = await b.newContext({ viewport: { width: w, height: h } });
     const p = await ctx.newPage();
     const errs = [];
     p.on("pageerror", (e) => errs.push(String(e)));
@@ -61,13 +112,18 @@ try {
     await p.click("#go", { force: true });
     await p.waitForTimeout(1400);
     const found = [];
+    const cut = [];
+    let lines = 0;
     for (const [name, open] of PANELS) {
       if (open) { await open(p); await p.waitForTimeout(320); }
       for (const hit of await p.evaluate(SCAN)) found.push({ panel: name, ...hit });
+      const wr = await p.evaluate(WRAP);
+      for (const w of wr.bad) cut.push(name + " " + w);
+      lines += wr.wrapped;
       if (open) await p.evaluate(() => { for (const id of ["shop", "roster", "gram", "me", "gym"]) { const e = document.getElementById(id); if (e) e.hidden = true; } });
     }
     await ctx.close();
-    return { found, errs };
+    return { found, cut, lines, errs };
   };
 
 
@@ -87,19 +143,47 @@ try {
       document.body.appendChild(el);
     });
     const after = await p.evaluate(SCAN);
+    // 줄바꿈 자도 같은 방법으로 증명한다. 낱말이 쪼개지는 상자를 하나 심어 그 자가 잡는지 본다.
+    // 자연히 넘어가는 줄에 기대면, 화면을 고쳐 넘어가는 줄이 사라진 날 이 자가 눈을 감았는지
+    // 화면이 좋아졌는지 구분할 수 없다.
+    const wrapBefore = (await p.evaluate(WRAP)).bad.length;
+    await p.evaluate(() => {
+      const el = document.createElement("div");
+      el.id = "wrapProbe";
+      el.style.cssText = "position:fixed;left:10px;top:60px;width:44px;font-size:14px;word-break:break-all";
+      el.textContent = "가나다라마바사아자차카타파하";
+      document.body.appendChild(el);
+    });
+    const wrapAfter = await p.evaluate(WRAP);
     await ctx.close();
-    return { before, hit: after.some((h) => h.where.indexOf("div") === 0 && h.txt.indexOf("00000") === 0), count: after.length };
+    return { before, hit: after.some((h) => h.where.indexOf("div") === 0 && h.txt.indexOf("00000") === 0), count: after.length, wrapBefore, wrapHit: wrapAfter.bad.length > wrapBefore, wrapCount: wrapAfter.bad.length };
   })();
   check("instrument:the-scan-catches-a-planted-overflow", probe.before === 0 && probe.hit, "before " + probe.before + " after " + probe.count + " caught " + probe.hit);
+  check("instrument:the-scan-catches-a-planted-word-break", probe.wrapBefore === 0 && probe.wrapHit, "before " + probe.wrapBefore + " after " + probe.wrapCount);
   // 대조군. 신규 저장에서도 같은 자를 댄다. 여기서도 넘치면 만렙 탓이 아니라 화면 탓이다.
-  const fresh = await sweep("");
+  const fresh = await sweep("", 1280, 720);
   for (const h of fresh.found) console.log("  fresh " + h.panel + " " + h.where + " [" + h.txt + "] over " + h.over);
   check("control:a-fresh-save-clips-nothing", fresh.found.length === 0, fresh.found.length + " clipped");
+  check("control:a-fresh-save-cuts-no-word", fresh.cut.length === 0, fresh.cut.length + " words split" + (fresh.cut.length ? " first " + fresh.cut[0] : ""));
 
   // 본시험. 스탯도 지갑도 팔로워도 전부 채운 화면이다.
-  const maxed = await sweep("&preset=maxed,rich,famous");
+  const maxed = await sweep("&preset=maxed,rich,famous", 1280, 720);
   for (const h of maxed.found) console.log("  maxed " + h.panel + " " + h.where + " [" + h.txt + "] over " + h.over);
   check("maxed:no-text-is-clipped", maxed.found.length === 0, maxed.found.length + " clipped" + (maxed.found.length ? " worst " + Math.max(...maxed.found.map((h) => h.over)) : ""));
+  for (const w of maxed.cut.slice(0, 6)) console.log("  cut " + w);
+  // 넘어가는 줄이 하나도 없으면 낱말 쪼개짐을 묻는 축은 0을 재고 조용히 통과한다.
+  // 실측으로 넓은 폭에서는 모든 줄이 한 줄에 들어가 넘어가는 줄이 0이었다.
+  // 그래서 글이 실제로 넘어가는 손에 든 폭에서 다시 재고, 거기서 넘어간 줄이 있었는지를 묻는다.
+  const narrow = await sweep("&preset=maxed,rich,famous", 844, 390);
+  const narrowTabs = tabScan(844, 390);
+  for (const w of narrow.cut.slice(0, 6)) console.log("  narrow cut " + w);
+  check("narrow:no-word-is-cut-across-lines", narrow.cut.length === 0, narrow.cut.length + " words split" + (narrow.cut.length ? " first " + narrow.cut[0] : ""));
+  check("narrow:no-text-is-clipped", narrow.found.length === 0, narrow.found.length + " clipped");
+  // 탭은 상자를 안 넘치고도 화면 밖으로 나갈 수 있다. 그것은 잔림이 아니라 밀림이다.
+  // 눈으로 보고 알았다. 지금 서 있는 탭이 왼쪽으로 나가 있으면 어느 선반인지를 화면이 안 말한다.
+  const tabsOut = await narrowTabs;
+  check("narrow:every-shop-tab-is-on-screen", tabsOut.out === 0, tabsOut.out + " of " + tabsOut.total + " tabs off screen");
+  check("maxed:no-word-is-cut-across-lines", maxed.cut.length === 0, maxed.cut.length + " words split" + (maxed.cut.length ? " first " + maxed.cut[0] : ""));
   check("console:no-errors", maxed.errs.length === 0 && fresh.errs.length === 0, (maxed.errs[0] || fresh.errs[0] || "clean"));
 
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
