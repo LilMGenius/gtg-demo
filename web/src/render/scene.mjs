@@ -1346,29 +1346,61 @@ let ballScaled = false;
           );
           break;
         }
-        case 'rebound': {
-          // 종점이 상수 0.6이면 어느 코너로 찼든 튄 공이 매번 같은 자리에 선다.
-          // 튀어나온 공은 접촉한 쪽에 남는다. 방향은 키커가 노린 좌표에서 온다.
+        /* 리바운드 두 갈래는 판정이 다시 찼다고 말하는 사건이다. 그런데 화면에서는 키커가
+           제자리에 선 채로 공만 혼자 굴러가, 자막과 그림이 서로 다른 사건을 가리켰다.
+           흘러나온 공으로 달려가 두 번째로 차는 마디를 넣는다. 꼬리 기본 0.8초가 아니라 1.25초를
+           쓰는데 달리기와 임팩트와 두 번째 비행이 한 마디씩 필요하고, 재시작은 최소 2.4초 뒤다. */
+        case 'rebound':
+        case 'reboundMiss': {
           const vy = tail.vary;
           const side = Math.sign(tail.aimX || 1);
-          // 0.45~1.15는 골문 안쪽이라 리바운드가 골대 앞에 남는 것이 화면에 보이고,
-          // 넓히면 튄 게 아니라 옆으로 흘러난 것으로 읽힌다.
-          const endX = side * (0.45 + vy.b * 0.7);
-          // 튀는 높이도 회차마다 다르다. 같은 높이로 두 번 튀면 애니메이션 반복으로 읽힌다.
-          const hop = Math.sin(Math.min(1, u / 0.8) * Math.PI) * (0.18 + vy.a * 0.16) * (1 - e);
-          ball.position.set(lerp(tail.from.x, endX, e), lerp(tail.from.y, REST_Y, e) + hop, lerp(tail.from.z, REST_Z, e));
+          const ru = Math.min(1, (vnow - tail.t0) / 1.25);
+          // 흘러나온 공이 서는 자리. 골문 앞을 벗어나 키커 쪽으로 나와야 달려와 찰 거리가 생긴다.
+          const looseX = side * (0.6 + vy.b * 0.9);
+          const looseZ = 4.4 + vy.a * 1.2;
+          // 0.34에 공이 서고 키커가 닿는다. 0.44에 두 번째 임팩트가 터진다.
+          const RUN = 0.34;
+          const HIT = 0.44;
+          if (ru < RUN) {
+            const q = ease(ru / RUN);
+            // 튀는 높이는 회차마다 다르다. 같은 높이로 두 번 튀면 애니메이션 반복으로 읽힌다.
+            const hop = Math.sin(q * Math.PI) * (0.22 + vy.a * 0.18);
+            // 흘러나온 공은 땅에 선다. REST_Y는 그물에 걸린 높이라 여기 쓰면 공이 필드 한복판에 뜬다.
+            ball.position.set(lerp(tail.from.x, looseX, q), lerp(tail.from.y, BALL_R, q) + hop, lerp(tail.from.z, looseZ, q));
+          } else if (ru < HIT) {
+            ball.position.set(looseX, BALL_R, looseZ);
+          } else {
+            const q = ease((ru - HIT) / (1 - HIT));
+            if (tail.kind === 'rebound') {
+              // 들어간 공이다. 0.45~1.15는 골문 안쪽이라 넣은 자리가 화면에 남는다.
+              const endX = side * (0.45 + vy.b * 0.7);
+              ball.position.set(lerp(looseX, endX, q), lerp(BALL_R, REST_Y, q) + Math.sin(q * Math.PI) * 0.42,
+                lerp(looseZ, REST_Z, q));
+            } else {
+              // 빗나간 공이다. 2.55~3.05는 포스트 바깥이면서 프레임 안이라 어디로 갔는지가 보인다.
+              ball.position.set(
+                lerp(looseX, (tail.kx >= 0 ? 1 : -1) * (2.55 + vy.b * 0.5), q),
+                0.14 + Math.abs(Math.sin(q * (7 + vy.a * 2.5))) * 0.45 * (1 - q),
+                lerp(looseZ, 3.0 + vy.c * 0.5, q));
+            }
+          }
+          // 키커가 공을 향해 달려와 밟고 선다. 0.75는 발 앞에 공을 두는 거리다.
+          const meet = Math.min(1, ru / RUN);
+          kicker.position.x = lerp(kicker.userData.startX ?? KICKER_OFF, looseX, ease(meet));
+          kicker.position.z = lerp(10.55, looseZ + 0.75, ease(meet));
+          // 달릴 때만 몸이 흔들린다. 임팩트 뒤에도 흔들리면 차고 나서 계속 뛰는 것으로 보인다.
+          kicker.rotation.z = ru < RUN ? Math.sin(ru * 42) * 0.12 : lerp(kicker.rotation.z, 0, damp(0.3));
+          kk = ru < RUN ? POSES.dribble
+            : (ru < HIT ? POSES.plant : (ru < HIT + 0.1 ? POSES.strike : (KICKER_TAIL[tail.kind] ?? POSES.follow)));
+          // 두 번째 임팩트는 한 번만 터진다. 매 프레임 부르면 소리가 톱니처럼 이어진다.
+          if (!tail.restruck && ru >= HIT) {
+            tail.restruck = true;
+            sfx.kick(0.7);
+            kickPop = 0.07;
+            shake(0.045, 0.12);
+          }
           break;
         }
-        case 'reboundMiss':
-          // 튀어나간 공이 골대 옆으로 흘러난다. 프레임 밖으로 보내면 어디로 갔는지 안 보인다.
-          // 2.55~3.05는 포스트 바깥이면서 프레임 안이다. 튕김 주기도 회차마다 어긋나야
-          // 같은 사건이 두 번 나왔을 때 재생된 영상으로 읽히지 않는다.
-          ball.position.set(
-            lerp(tail.from.x, (tail.kx >= 0 ? 1 : -1) * (2.55 + tail.vary.b * 0.5), e),
-            0.14 + Math.abs(Math.sin(u * (7 + tail.vary.a * 2.5))) * 0.45 * (1 - u),
-            lerp(tail.from.z, 3.0 + tail.vary.c * 0.5, e)
-          );
-          break;
         case 'charge':
           // 잡고 나서 드리블하러 나간다. 공이 발 앞에서 튄다.
           // 다이빙에서 넘어온 기울기가 남으면 달려 나가는 게 아니라 자빠지는 것으로 읽힌다.
@@ -2270,6 +2302,8 @@ let ballScaled = false;
     // 크기는 거리 배율과 짜부라짐 둘로 갈린다. 둘을 한 수로 돌려주면 임팩트의 튐과
     // 거리의 튐이 구분되지 않아, 이어져야 할 것과 튀어야 할 것을 같은 자로 재게 된다.
     ballSize: () => ({ gain: ballGain, x: ball.scale.x, y: ball.scale.y, z: ball.position.z }),
+    // 키커가 어디 서 있는지. 리바운드를 다시 차는 마디가 실제로 몸을 옮기는지는 좌표로만 갈린다.
+    kickerPos: () => ({ x: kicker.position.x, y: kicker.position.y, z: kicker.position.z }),
     // 세계시계. 히트스톱과 정지가 여기서 멈추므로, 화면에 숫자를 쓰는 쪽은 실시간 대신 이걸 읽는다.
     now: () => vnow,
     after,
