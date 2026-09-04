@@ -10,7 +10,7 @@ import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dm
 import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
 import { coinGain, readWallet, COIN_DRILL, COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
-import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, hairSkinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
+import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
 import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds, photoOdds, selfieFans,
   DM_MOVES, dmOdds, dmOutcome, dmClock, dmWaiting, applyDm } from './state/gram.mjs';
@@ -1293,13 +1293,15 @@ function gearShelf(kind) {
     // 변형 조각. 등급 하나가 여러 모양을 들고 있으면 그 조각들을 값 버튼 위에 깐다.
     // 색 견본이 아니라 지금 고른 것이 무엇인지를 알려야 하므로 켜진 조각에 표시를 남긴다.
     let skins = '';
-    if (s.field === 'hair') {
-      const list = hairSkinsAt(rank);
-      const pickedRank = fitting.hair !== undefined ? fitting.hair : state.gear.hair;
-      const picked = fitting.hairSkin !== undefined ? fitting.hairSkin : state.gear.hairSkin;
+    const list = skinsAt(s.field, rank);
+    if (list.length > 1) {
+      const key = s.field + 'Skin';
+      const pickedRank = fitting[s.field] !== undefined ? fitting[s.field] : state.gear[s.field];
+      const picked = fitting[key] !== undefined ? fitting[key] : state.gear[key];
       skins = '<div class="skins">' + list.map((v, i) =>
-        '<button class="skin' + (rank === pickedRank && i === picked ? ' on' : '') + '" data-rank="' + rank
-        + '" data-skin="' + i + '" title="' + v.name + '" style="--sw:#' + v.tone.toString(16).padStart(6, '0') + '"></button>').join('') + '</div>';
+        '<button class="skin' + (rank === pickedRank && i === picked ? ' on' : '') + '" data-field="' + s.field
+        + '" data-rank="' + rank + '" data-skin="' + i + '" title="' + v.name
+        + '" style="--sw:#' + v.tone.toString(16).padStart(6, '0') + '"></button>').join('') + '</div>';
     }
     return '<div class="card gear" data-spec="' + kind + '" data-at="' + rank + '"><div class="shot" data-kind="' + kind + '" data-rank="' + rank + '"></div>'
       + '<b>' + g.name + '</b><em>' + g.note + '</em>' + skins
@@ -1357,19 +1359,20 @@ function bindGear(box) {
   }
   // 변형 조각. 이미 가진 등급이면 눌러서 바로 바꾸고 값이 안 든다.
   // 아직 안 산 등급이면 그 등급을 걸쳐 보면서 그 변형으로 미리 본다.
-  for (const sw of box.querySelectorAll('.skin[data-rank]')) {
+  for (const sw of box.querySelectorAll('.skin[data-field]')) {
     sw.onclick = (e) => {
       e.stopPropagation();
+      const field = sw.dataset.field;
       const rank = Number(sw.dataset.rank);
       const at = Number(sw.dataset.skin);
-      if (rank <= state.gear.hair) {
-        state.gear.hair = rank;
-        state.gear.hairSkin = at;
+      if (rank <= state.gear[field]) {
+        state.gear[field] = rank;
+        state.gear[field + 'Skin'] = at;
         stage.setKeeper(state.keeper, lookOf(state.gear));
         persist();
       } else {
-        fitting.hair = rank;
-        fitting.hairSkin = at;
+        fitting[field] = rank;
+        fitting[field + 'Skin'] = at;
       }
       stopSpin();
       renderShop();
@@ -1384,9 +1387,9 @@ function bindGear(box) {
       state.wallet.coin -= g.cost;
       state.gear[s.field] = g[s.field];
       // 걸쳐 보던 변형이 있으면 그 변형으로 산다. 안 옮기면 미리 본 것과 산 것이 다르다.
-      if (s.field === 'hair' && fitting.hairSkin !== undefined) {
-        state.gear.hairSkin = fitting.hairSkin;
-        delete fitting.hairSkin;
+      if (fitting[s.field + 'Skin'] !== undefined) {
+        state.gear[s.field + 'Skin'] = fitting[s.field + 'Skin'];
+        delete fitting[s.field + 'Skin'];
       }
       // 동네를 사면 상점을 닫기 전에 배경이 바뀐다. 재시작을 요구하면 산 것이 안 읽힌다.
       if (s.field === 'city') stage.setCity(state.gear.city);

@@ -30,34 +30,42 @@ try {
   await p.click("#go", { force: true });
   await p.waitForTimeout(1300);
 
-  const shelf = await p.evaluate(async () => {
+  // 어느 선반을 재는지는 데이터가 정한다. 변형 표에 든 칸이 곧 대상이라,
+  // 새 선반에 변형을 붙이면 이 자가 손댈 목록 없이 따라온다.
+  const shelves = await p.evaluate(async () => {
     const g = await import("/web/src/state/gear.mjs");
-    const per = g.HAIRS.map((h) => g.hairSkinsAt(h.hair).length);
-    return { ranks: g.HAIRS.length, per, total: per.reduce((a, c) => a + c, 0) };
+    return g.SKIN_FIELDS.map((f) => {
+      const per = g.SKINS[f].map((_, r) => g.skinsAt(f, r).length);
+      return { field: f, ranks: g.SKINS[f].length, per, total: per.reduce((a, c) => a + c, 0) };
+    });
   });
-  check("variant:the-shelf-sells-more-than-one-thing-per-grade", shelf.total > shelf.ranks,
-    shelf.total + " items over " + shelf.ranks + " grades");
-  check("variant:every-grade-carries-at-least-two", shelf.per.every((n) => n >= 2), shelf.per.join(", "));
+  check("instrument:some-shelf-declares-variants", shelves.length > 0, shelves.map((s) => s.field).join(", "));
+  for (const s of shelves) {
+    check("variant:" + s.field + ":the-shelf-sells-more-than-one-thing-per-grade", s.total > s.ranks,
+      s.total + " items over " + s.ranks + " grades");
+    check("variant:" + s.field + ":every-grade-carries-at-least-two", s.per.every((n) => n >= 2), s.per.join(", "));
+  }
 
   // 같은 등급의 변형끼리 화면이 갈리는가. 굽힌 그림을 화소로 맞댄다.
   // 대조군으로 같은 변형을 두 번 구워 같은 그림이 나오는 것을 먼저 확인한다.
-  const drawn = await p.evaluate(async () => {
-    const m = await import("/web/src/render/thumb.mjs");
-    const g = await import("/web/src/state/gear.mjs");
-    const k = { height: 188, weight: 84 };
-    const bake = (rank, at) => m.thumbURL("hair", k, g.lookOf({ hair: rank, hairSkin: at }));
-    const same = [];
-    let twice = true;
-    for (let r = 0; r < g.HAIRS.length; r++) {
-      const list = g.hairSkinsAt(r);
-      const urls = list.map((v, i) => bake(r, i));
-      for (let i = 0; i < urls.length; i++) for (let j = i + 1; j < urls.length; j++) if (urls[i] === urls[j]) same.push(r + ":" + i + "-" + j);
-      if (r === 0) twice = bake(0, 1) === urls[1];
-    }
-    return { same, twice };
-  });
-  check("variant:variants-of-one-grade-do-not-bake-the-same-picture", drawn.same.length === 0, drawn.same.join(", ") || "all distinct");
-  check("control:the-same-variant-bakes-the-same-picture", drawn.twice, String(drawn.twice));
+  for (const s of shelves) {
+    const drawn = await p.evaluate(async (field) => {
+      const m = await import("/web/src/render/thumb.mjs");
+      const g = await import("/web/src/state/gear.mjs");
+      const k = { height: 188, weight: 84 };
+      const bake = (rank, at) => m.thumbURL(field, k, g.lookOf({ [field]: rank, [field + "Skin"]: at }));
+      const same = [];
+      let twice = true;
+      for (let r = 0; r < g.SKINS[field].length; r++) {
+        const urls = g.skinsAt(field, r).map((v, i) => bake(r, i));
+        for (let i = 0; i < urls.length; i++) for (let j = i + 1; j < urls.length; j++) if (urls[i] === urls[j]) same.push(r + ":" + i + "-" + j);
+        if (r === 0) twice = bake(0, 1) === urls[1];
+      }
+      return { same, twice };
+    }, s.field);
+    check("variant:" + s.field + ":variants-of-one-grade-do-not-bake-the-same-picture", drawn.same.length === 0, drawn.same.join(", ") || "all distinct");
+    check("control:" + s.field + ":the-same-variant-bakes-the-same-picture", drawn.twice, String(drawn.twice));
+  }
 
   // 가진 등급의 변형을 바꾸는 데 값이 드는가. 판을 세우고 잰다.
   await p.evaluate(() => window.__shop(true));

@@ -122,26 +122,14 @@ export const MAX_CITY = CITIES.length - 1;
 
 // 헤어 선반. 판정에는 손대지 않는다. 세이브율을 건드리면 장비 한 칸이 스탯 한 칸을 넘는 자와 부딪히고,
 // 순수 외형이면 화면에 없는 시스템이 된다. 그래서 축을 팔로워로 잡았다. 팔로워는 판정식 밖이다.
-// tone은 머리 껍데기 정점색이다. 색 상수를 렌더 파일에 따로 두면 두 곳이 갈린다.
-// cut은 그 머리의 형태다. 네 이름이 전부 색이 아니라 모양을 말하는데 색만 바꾸면
-// 같은 물건이 네 값에 팔린다. wide는 좌우 배율, tall은 높이 배율,
-// phi는 정수리 반구가 아래로 덮는 각의 배율이라 클수록 옆까지 덮는다.
+// 등급은 이름과 값만 소유한다. 색과 형태는 그 등급의 변형 목록이 소유하고,
+// 변형이 없으면 목록의 0번이 그 등급의 기본이다. 두 곳에 적으면 갈린다.
 // 값 기준은 앞의 여섯과 같다. 첫 칸은 카드깡 380 육수보다 싸고 마지막 칸은 그보다 비싸다.
 export const HAIRS = [
-  // 껍데기 반지름이 두개골의 1.05배라, wide와 tall이 1 아래로 내려가면 껍데기가 두개골 안으로
-  // 들어가 그 등급만 대머리가 된다. 짧은 머리는 높이가 아니라 phi로 줄인다.
-  // 집에서 깎은 머리라 한쪽이 더 눌렸다. tilt는 그 기울기다.
-  { hair: 0, name: '엄마가 깎아준 머리', cost: 0, tone: 0x2b1d14, note: '아무것도 안 샀을 때 머리',
-    cut: { wide: 1, tall: 1.02, phi: 0.46, tilt: 0.09 } },
-  // 투블럭은 옆을 밀고 정수리만 남긴다. 덮는 각만 좁히고 배율은 안 건드린다.
-  { hair: 1, name: '동네 미용실 투블럭', cost: 135, tone: 0x1b1410, note: '적어도 단정하다',
-    cut: { wide: 1, tall: 1.03, phi: 0.28, tilt: 0 } },
-  // 탈색은 기른 머리라 위아래로 부푼다.
-  { hair: 2, name: '탈색한 노란 머리', cost: 375, tone: 0xd8b45c, note: '멀리서도 누군지 보인다',
-    cut: { wide: 1.08, tall: 1.22, phi: 0.52, tilt: 0 } },
-  // 모히칸은 가운데 볏 하나다. 좌우를 3분의 1로 죄고 높이를 1.8배로 세운다.
-  { hair: 3, name: '불붙은 빨간 모히칸', cost: 840, tone: 0xc4402c, note: '관중석이 먼저 알아본다',
-    cut: { wide: 0.34, tall: 1.8, phi: 0.6, tilt: 0 } }
+  { hair: 0, name: '엄마가 깎아준 머리', cost: 0, note: '아무것도 안 샀을 때 머리' },
+  { hair: 1, name: '동네 미용실 투블럭', cost: 135, note: '적어도 단정하다' },
+  { hair: 2, name: '탈색한 노란 머리', cost: 375, note: '멀리서도 누군지 보인다' },
+  { hair: 3, name: '불붙은 빨간 모히칸', cost: 840, note: '관중석이 먼저 알아본다' }
 ];
 
 export const MAX_HAIR = HAIRS.length - 1;
@@ -150,7 +138,11 @@ export const MAX_HAIR = HAIRS.length - 1;
    그 둘을 여는 결정이 날 때까지 콘텐츠 수가 넷에서 멈춘다.
    변형은 그 매듭 밖이다. 같은 등급, 같은 값, 같은 승수에 모양과 색만 다르다.
    등급을 사면 그 등급의 변형이 전부 열리고 바꾸는 데 값이 안 든다.
-   0번은 그 등급의 기본이라 위 표의 tone과 cut을 그대로 쓴다. */
+   목록의 0번이 그 등급의 기본이다.
+
+   껍데기 반지름이 두개골의 1.05배라, wide와 tall이 1 아래로 내려가면 껍데기가 두개골 안으로
+   들어가 그 등급만 대머리가 된다. 짧은 머리는 높이가 아니라 phi로 줄인다.
+   wide는 좌우 배율, tall은 높이 배율, phi는 정수리 반구가 덮는 각의 배율, tilt는 기울기다. */
 export const HAIR_SKINS = [
   [{ name: '엄마 손 그대로', tone: 0x2b1d14, cut: { wide: 1, tall: 1.02, phi: 0.46, tilt: 0.09 } },
    { name: '한쪽만 눌린 자국', tone: 0x3b2a1a, cut: { wide: 1.04, tall: 1, phi: 0.5, tilt: -0.14 } },
@@ -166,46 +158,65 @@ export const HAIR_SKINS = [
    { name: '쓰러진 모히칸', tone: 0x8f2fd1, cut: { wide: 0.42, tall: 1.55, phi: 0.56, tilt: 0.24 } }]
 ];
 
-export function hairSkinsAt(hair) {
-  return HAIR_SKINS[Math.min(MAX_HAIR, Math.max(0, Math.floor(Number(hair) || 0)))];
+/* 잉크 변형. 머리와 같은 형식이다. span은 위팔을 덮는 비율, girth는 감는 두께 배율이다. */
+export const INK_SKINS = [
+  [{ name: '맨살', tone: 0x5f8f93, cut: { span: 0.14, girth: 1 } },
+   { name: '햇볕에 탄 자국', tone: 0x8f6f53, cut: { span: 0.2, girth: 1.02 } },
+   { name: '붕대 감은 팔', tone: 0xd8d4c6, cut: { span: 0.24, girth: 1.06 } }],
+  [{ name: '문신 스티커', tone: 0x3a4f7a, cut: { span: 0.26, girth: 1.03 } },
+   { name: '번진 스티커', tone: 0x4f3a7a, cut: { span: 0.34, girth: 1.01 } },
+   { name: '반쯤 뜯긴 스티커', tone: 0x2f5f4a, cut: { span: 0.2, girth: 1.08 } }],
+  [{ name: '이름 석 자', tone: 0x2a2f3a, cut: { span: 0.38, girth: 1.04 } },
+   { name: '등번호 하나', tone: 0x7a2a2f, cut: { span: 0.32, girth: 1.1 } },
+   { name: '알아볼 수 없는 글씨', tone: 0x1f3a2a, cut: { span: 0.44, girth: 1.02 } }],
+  [{ name: '검은 먹토시', tone: 0x14161c, cut: { span: 0.98, girth: 1.2 } },
+   { name: '푸른 먹토시', tone: 0x14263c, cut: { span: 0.9, girth: 1.26 } },
+   { name: '붉은 먹토시', tone: 0x3c1418, cut: { span: 1, girth: 1.14 } }]
+];
+
+/* 변형을 파는 선반 표. 여기 든 칸만 변형이 있고, 칸 이름에 Skin을 붙인 것이 그 선택을 담는 자리다.
+   선반마다 다른 함수를 두면 새 선반이 늘 때마다 상점과 게이트가 그 이름을 손으로 들어야 한다. */
+export const SKINS = { hair: HAIR_SKINS, ink: INK_SKINS };
+export const SKIN_FIELDS = Object.keys(SKINS);
+
+export function skinsAt(field, rank) {
+  const table = SKINS[field];
+  if (!table) return [];
+  return table[Math.min(table.length - 1, Math.max(0, Math.floor(Number(rank) || 0)))];
 }
 
 // 등급이 바뀌면 변형 번호가 그 등급의 범위를 넘을 수 있다. 넘으면 그 등급의 기본으로 돌아간다.
-export function hairSkinAt(hair, skin) {
-  const list = hairSkinsAt(hair);
+export function skinAt(field, rank, skin) {
+  const list = skinsAt(field, rank);
   const n = Math.floor(Number(skin) || 0);
   return list[n >= 0 && n < list.length ? n : 0];
 }
 
 // 타투 선반. 헤어와 같은 축이고 보이는 자리만 다르다. ink는 소매 커프 색이라 팔에 드러난다.
 // 값 기준은 앞의 일곱과 같다. 첫 칸은 카드깡 380 육수보다 싸고 마지막 칸은 그보다 비싸다.
-// cut은 잉크의 형태다. span은 위팔을 덮는 비율, girth는 감는 두께 배율이다.
-// 다른 선반과 같은 이름을 쓴다. 선반마다 형태를 다른 열 이름으로 선언하면
-// 형태를 재는 자가 선반 목록을 손으로 들고 있어야 한다.
+// 머리와 같다. 등급은 이름과 값만 들고, 색과 형태는 변형 목록이 소유한다.
 // 색만 바꾸면 이름이 약속한 면적이 화면에 안 선다.
 // 실측으로 색만 다른 2등급과 3등급의 그림 차이가 236화소였고, 그 둘은 사실상 같은 상품이었다.
 export const TATTOOS = [
-  { ink: 0, name: '맨살', cost: 0, ink_tone: 0x5f8f93, note: '아무것도 안 새겼을 때 팔',
-    cut: { span: 0.14, girth: 1 } },
-  { ink: 1, name: '지워지는 문신 스티커', cost: 140, ink_tone: 0x3a4f7a, note: '땀에 번진다. 그래도 있어 보인다',
-    cut: { span: 0.26, girth: 1.03 } },
-  { ink: 2, name: '팔뚝에 새긴 이름 석 자', cost: 380, ink_tone: 0x2a2f3a, note: '누구 이름인지는 안 밝힌다',
-    cut: { span: 0.38, girth: 1.04 } },
+  { ink: 0, name: '맨살', cost: 0, note: '아무것도 안 새겼을 때 팔' },
+  { ink: 1, name: '지워지는 문신 스티커', cost: 140, note: '땀에 번진다. 그래도 있어 보인다' },
+  { ink: 2, name: '팔뚝에 새긴 이름 석 자', cost: 380, note: '누구 이름인지는 안 밝힌다' },
   // 먹토시는 위팔을 통째로 덮는다. 소매가 하나 더 있다는 이름이 그 뜻이다.
-  { ink: 3, name: '어깨까지 채운 먹토시', cost: 870, ink_tone: 0x14161c, note: '반팔을 입으면 소매가 하나 더 있다',
-    cut: { span: 0.98, girth: 1.2 } }
+  { ink: 3, name: '어깨까지 채운 먹토시', cost: 870, note: '반팔을 입으면 소매가 하나 더 있다' }
 ];
 
 export const MAX_INK = TATTOOS.length - 1;
 
 export function newGear() {
-  return { grip: 0, studs: 0, pads: 0, socks: 0, frame: 0, city: 0, hair: 0, hairSkin: 0, ink: 0 };
+  const g = { grip: 0, studs: 0, pads: 0, socks: 0, frame: 0, city: 0, hair: 0, ink: 0 };
+  for (const f of SKIN_FIELDS) g[f + 'Skin'] = 0;
+  return g;
 }
 
 /* 갈래 둘. 몸에 걸치는 것은 그 키퍼의 것이고, 서는 자리는 계정의 것이다.
    장갑을 낀 것은 그 사람이지만 골대와 동네는 누가 뛰든 같은 곳이라, 키퍼를 바꿨을 때
    앞의 여섯은 따라 바뀌고 뒤의 둘은 그대로여야 한다. */
-export const WORN_FIELDS = ['grip', 'studs', 'pads', 'socks', 'hair', 'hairSkin', 'ink'];
+export const WORN_FIELDS = ['grip', 'studs', 'pads', 'socks', 'hair', 'ink'].concat(SKIN_FIELDS.map((f) => f + 'Skin'));
 export const PLACE_FIELDS = ['frame', 'city'];
 
 export function isWorn(field) {
@@ -224,9 +235,12 @@ export function readGear(raw) {
   if (Number.isFinite(raw.frame)) g.frame = Math.min(MAX_FRAME, Math.max(0, Math.floor(raw.frame)));
   if (Number.isFinite(raw.city)) g.city = Math.min(MAX_CITY, Math.max(0, Math.floor(raw.city)));
   if (Number.isFinite(raw.hair)) g.hair = Math.min(MAX_HAIR, Math.max(0, Math.floor(raw.hair)));
-  // 변형은 그 등급의 목록 안에서만 산다. 범위 밖 숫자는 기본으로 접는다.
-  if (Number.isFinite(raw.hairSkin)) g.hairSkin = Math.max(0, Math.min(hairSkinsAt(g.hair).length - 1, Math.floor(raw.hairSkin)));
   if (Number.isFinite(raw.ink)) g.ink = Math.min(MAX_INK, Math.max(0, Math.floor(raw.ink)));
+  // 변형은 그 등급의 목록 안에서만 산다. 범위 밖 숫자는 기본으로 접는다.
+  for (const f of SKIN_FIELDS) {
+    const v = raw[f + 'Skin'];
+    if (Number.isFinite(v)) g[f + 'Skin'] = Math.max(0, Math.min(skinsAt(f, g[f]).length - 1, Math.floor(v)));
+  }
   return g;
 }
 
@@ -267,11 +281,11 @@ export function inkAt(ink) {
 // 0등급은 지금 색 그대로라 신규 저장의 그림은 안 바뀐다.
 // 렌더가 읽는 두 색을 한 곳에서 뽑는다. buildKeeper 인자와 상점 미리보기가 같은 값을 쓴다.
 export function lookOf(gear) {
-  const t = inkAt(gear && gear.ink);
+  const t = skinAt('ink', gear && gear.ink, gear && gear.inkSkin);
+  const h = skinAt('hair', gear && gear.hair, gear && gear.hairSkin);
   return {
-    hair: hairSkinAt(gear && gear.hair, gear && gear.hairSkin).tone,
-    hairCut: hairSkinAt(gear && gear.hair, gear && gear.hairSkin).cut,
-    ink: t.ink_tone, inkSpan: t.cut.span, inkGirth: t.cut.girth,
+    hair: h.tone, hairCut: h.cut,
+    ink: t.tone, inkSpan: t.cut.span, inkGirth: t.cut.girth,
     glove: gloveAt(gear && gear.grip).tone, gloveCut: gloveAt(gear && gear.grip).cut,
     boot: bootAt(gear && gear.studs).tone, bootCut: bootAt(gear && gear.studs).cut,
     shirt: kitAt(gear && gear.pads).tone, kitCut: kitAt(gear && gear.pads).cut,
