@@ -66,7 +66,10 @@ try {
     const startF = await p.evaluate(() => window.__frames());
     const base = await p.evaluate(() => ({ fans: window.__fans(), rap: window.__rapport() }));
     const rounds0 = await p.evaluate(() => Object.values(window.__record()).reduce((a, r) => a + r.saved + r.conceded, 0));
-    let ranTrue = 0, ranFalse = 0, stale = 0, armed = false;
+    /* 델타의 기준선은 표본이 열리는 순간에 다시 잡는다. 창을 열 때 잡으면 직전 랩의 마지막 구가
+       아직 커밋되는 중이라 그 구의 몫이 이번 랩의 델타로 들어온다. 실측으로 봇 랩의 팔로워 증가가
+       604로 잡혔는데 그것은 자동을 켜기 직전 사람 구의 몫이었다. */
+    let ranTrue = 0, ranFalse = 0, stale = 0, armed = false, mark = null;
     while ((await p.evaluate(() => window.__frames())) - startF < span) {
       if (maxRounds) {
         const now = await p.evaluate(() => Object.values(window.__record()).reduce((a, r) => a + r.saved + r.conceded, 0));
@@ -81,13 +84,17 @@ try {
         if (z) await z.click({ force: true });
       }
       const r = await p.evaluate(() => window.__botRan());
-      if (!armed && r === armOn) armed = true;
+      if (!armed && r === armOn) {
+        armed = true;
+        mark = await p.evaluate(() => ({ fans: window.__fans(), rap: window.__rapport() }));
+      }
       if (armed) { if (r === true) ranTrue += 1; else ranFalse += 1; } else stale += 1;
       await p.waitForTimeout(POLL);
     }
     const end = await p.evaluate(() => ({ fans: window.__fans(), rap: window.__rapport() }));
     const rounds1 = await p.evaluate(() => Object.values(window.__record()).reduce((a, r) => a + r.saved + r.conceded, 0));
-    return { ranTrue, ranFalse, stale, armed, rounds: rounds1 - rounds0, dFans: end.fans - base.fans, dRap: 0, endRap: end.rap, baseRap: base.rap };
+    const from = mark || base;
+    return { ranTrue, ranFalse, stale, armed, rounds: rounds1 - rounds0, dFans: end.fans - from.fans, dRap: 0, endRap: end.rap, baseRap: from.rap };
   };
 
   // 봇 랩. 크레딧을 먼저 채워야 자동 버튼이 상점 대신 자동을 켠다.
