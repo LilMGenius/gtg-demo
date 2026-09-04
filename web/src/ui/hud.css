@@ -229,19 +229,19 @@ body.playing #hud{opacity:1}
    화면 아래 오른쪽은 골포스트와 골문 구석이고, 그 구석에서 선방과 실점이 갈린다.
    쌓는 차례는 손이 가는 빈도다. 나가기가 맨 위에서 가장 컸을 때 화면에서 제일 굵은
    덩어리가 판을 뜨는 버튼이었다. */
-/* 돌진. 되돌릴 수 없는 한 번이라 자동 아래에 두고 높이를 깎는다.
-   자동 66px 판때기 아래 90px에서 시작해 130px에 끝난다. */
-#out{position:absolute;right:var(--pad-r);top:calc(90px + env(safe-area-inset-top));
-  pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
+/* 돌진. 나가 있는 동안만 켜지는 토글이라 왼쪽 토글 무리에 선다.
+   자동 46px 판때기 아래 198px에서 시작해 244px에 끝난다. */
+#out{position:absolute;left:var(--pad-l);top:calc(198px + env(safe-area-inset-top));
+  pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(2deg);
   color:var(--dim);font-family:var(--disp);font-size:15px;font-weight:400;letter-spacing:-.03em}
-/* 26px. 40px 높이에서 위아래 7px씩 남는다. 그보다 키우면 브래킷이 테두리에 붙는다. */
+/* 26px. 46px 판때기에서 사방 10px씩 남아 손그림 지터로 기울어도 테두리에 안 닿는다. */
 #out svg{width:26px;height:26px}
 #out.on{background:#e0563f;color:#fff;box-shadow:var(--lift) var(--lift) 0 var(--edge)}
 
-/* 소리. 끌 수 없는 소리는 소리가 아니라 사고다. 판을 굴리는 버튼이 아니라 시스템
-   토글이라 오른쪽 기둥에서 뺀다. 상태 칩 #top이 실측 70px에서 끝나므로 82px에 놓아
+/* 소리. 끌 수 없는 소리는 소리가 아니라 사고다. 왼쪽 기둥은 켜고 끄는 토글 셋이 서고
+   오른쪽 기둥은 창을 여는 버튼 넷이 선다. 상태 칩 #top이 실측 70px에서 끝나므로 82px에 놓아
    판때기가 칩을 안 문다. 68px에 두었을 때는 두 px 겹쳐 있었고 어느 자도 그것을 안 쟀다. */
 #mute{position:absolute;left:var(--pad-l);top:calc(82px + env(safe-area-inset-top));
   pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
@@ -253,10 +253,9 @@ body.playing #hud{opacity:1}
 #mute[aria-pressed="true"]{color:var(--bad)}
 #mute[aria-pressed="true"] .wave{opacity:0}
 #mute[aria-pressed="true"] .slash{opacity:1}
-/* 상점은 오른쪽 기둥의 조작 무리에 붙는다. 왼쪽에 혼자 서면 상태 칩 아래에 조작이 하나 끼는 꼴이라
-   어느 갈래인지가 안 읽힌다. 아웃문그램 40px 판때기 아래 298px에서 시작해 338px에 끝나고,
-   세로 390px짜리 가로 모바일에서도 화면 안이다. 판때기와 아이콘 크기는 위 넷과 같게 둔다. */
-#shopBtn{position:absolute;right:var(--pad-r);top:calc(298px + env(safe-area-inset-top));
+/* 상점. 오른쪽 창 기둥의 넷째다. 아웃문그램 156px 판때기 아래 168px에서 시작해 208px에 끝나고,
+   세로 390px짜리 가로 모바일에서도 화면 안이다. 판때기와 아이콘 크기는 기둥의 나머지 셋과 같다. */
+#shopBtn{position:absolute;right:var(--pad-r);top:calc(168px + env(safe-area-inset-top));
   pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);color:var(--dim);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(var(--tilt))}
@@ -282,19 +281,20 @@ body.playing #hud{opacity:1}
   background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #earn .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
-/* 자동. 손가락만 대신한다. 기둥에서 손이 가장 자주 가는 하나라 맨 위에 둔다. */
-#auto{position:absolute;right:var(--pad-r);top:calc(12px + env(safe-area-inset-top));
-  pointer-events:auto;width:66px;height:66px;display:grid;place-items:center;
+/* 자동. 손가락만 대신하는 토글이라 소리 아래 왼쪽 기둥에 선다.
+   소리 128px 판때기 아래 140px에서 시작해 186px에 끝난다. */
+#auto{position:absolute;left:var(--pad-l);top:calc(140px + env(safe-area-inset-top));
+  pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(-2.4deg);
   color:var(--dim);font-family:var(--disp);font-size:19px;font-weight:400;letter-spacing:.02em}
-/* 38px. 66px 판때기에서 14px씩 여백이 남아 손그림 지터로 기울어도 잘리지 않는다. */
-#auto svg{width:38px;height:38px}
+/* 26px. 토글 셋이 같은 46px 판때기에 같은 크기 그림을 쓴다. */
+#auto svg{width:26px;height:26px}
 #auto.on{background:#4fd08a;color:#0d110c;box-shadow:var(--lift) var(--lift) 0 var(--edge)}
 
-/* 훈련장 진입. 돌진 40px 판때기 아래 142px에서 시작해 182px에 끝나고,
+/* 훈련장 진입. 오른쪽 창 기둥의 첫째라 12px에서 시작해 52px에 끝나고,
    크로스바 325px보다 위라 여전히 하늘 띠 안이다. */
-#gymBtn{position:absolute;right:var(--pad-r);top:calc(142px + env(safe-area-inset-top));
+#gymBtn{position:absolute;right:var(--pad-r);top:calc(12px + env(safe-area-inset-top));
   pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(-1.4deg);
@@ -353,8 +353,8 @@ body.playing #hud{opacity:1}
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #gym .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 
-/* 선수단 진입. 훈련장 182px 아래 194px에서 시작해 234px에 끝난다. 크로스바 325px 위다. */
-#rosterBtn{position:absolute;right:var(--pad-r);top:calc(194px + env(safe-area-inset-top));
+/* 선수단 진입. 훈련장 52px 아래 64px에서 시작해 104px에 끝난다. 크로스바 325px 위다. */
+#rosterBtn{position:absolute;right:var(--pad-r);top:calc(64px + env(safe-area-inset-top));
   pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(1.1deg);
@@ -400,8 +400,8 @@ body.playing #hud{opacity:1}
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #roster .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 
-/* 아웃문그램 진입. 선수단 234px 아래 246px에서 시작해 286px에 끝난다. 크로스바 325px 위다. */
-#gramBtn{position:absolute;right:var(--pad-r);top:calc(246px + env(safe-area-inset-top));
+/* 아웃문그램 진입. 선수단 104px 아래 116px에서 시작해 156px에 끝난다. 크로스바 325px 위다. */
+#gramBtn{position:absolute;right:var(--pad-r);top:calc(116px + env(safe-area-inset-top));
   pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(-2.9deg);

@@ -18,7 +18,10 @@ const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 
 // 화면 위 조작 전부. 상태 칩 #top은 조작이 아니라 표시라 여기 안 들어간다.
-const IDS = ["mute", "out", "auto", "gymBtn", "rosterBtn", "gramBtn", "shopBtn"];
+// 갈래가 둘이다. 켜고 끄는 토글과 창을 여는 버튼은 다른 일을 하므로 다른 기둥에 선다.
+const TOGGLES = ["mute", "auto", "out"];
+const OPENERS = ["gymBtn", "rosterBtn", "gramBtn", "shopBtn"];
+const IDS = TOGGLES.concat(OPENERS);
 
 let b;
 try {
@@ -61,7 +64,12 @@ try {
     const top = document.getElementById("top").getBoundingClientRect();
     const mute = document.getElementById("mute").getBoundingClientRect();
     const lift = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--lift")) || 0;
-    return { out, chipGap: Math.round(mute.top - top.bottom), lift };
+    const span = (list) => list.map((id) => document.getElementById(id).getBoundingClientRect());
+    const cols = {
+      toggleRight: Math.max(...span(["mute", "auto", "out"]).map((r) => r.right)),
+      openerLeft: Math.min(...span(["gymBtn", "rosterBtn", "gramBtn", "shopBtn"]).map((r) => r.left))
+    };
+    return { out, cols, chipGap: Math.round(mute.top - top.bottom), lift };
   }, IDS);
 
   check("instrument:every-control-was-found", scan.out.every((s) => !s.missing),
@@ -70,14 +78,16 @@ try {
     scan.out.filter((s) => s.strays !== 0 || s.offGrid !== 0).map((s) => s.id + " strays " + s.strays + " offGrid " + s.offGrid).join(", ") || "all rects on 3px");
   const tones = new Set(scan.out.map((s) => s.color));
   check("chrome:every-control-wears-one-colour", tones.size === 1, [...tones].join(" | "));
-  const widths = new Set(scan.out.map((s) => s.w));
-  const heights = new Set(scan.out.map((s) => s.h));
-  // 자동은 판을 여는 큰 버튼이라 혼자 크고, 소리는 정사각 토글이다. 나머지 다섯은 같은 판때기다.
-  const row = scan.out.filter((s) => s.id !== "auto" && s.id !== "mute");
-  check("chrome:the-column-buttons-share-one-plate", new Set(row.map((s) => s.w + "x" + s.h)).size === 1,
-    row.map((s) => s.id + " " + s.w + "x" + s.h).join(", "));
-  check("instrument:the-plates-were-not-all-identical-by-accident", widths.size > 1 || heights.size > 1,
-    widths.size + " widths, " + heights.size + " heights across all " + scan.out.length);
+  const plate = (list) => new Set(scan.out.filter((s) => list.includes(s.id)).map((s) => s.w + "x" + s.h));
+  const said = (list) => scan.out.filter((s) => list.includes(s.id)).map((s) => s.id + " " + s.w + "x" + s.h).join(", ");
+  // 갈래 안에서는 판때기가 같고 갈래끼리는 다르다. 크기까지 같으면 무엇이 창을 여는지가 눌러 봐야 안다.
+  check("chrome:each-kind-of-control-shares-one-plate", plate(TOGGLES).size === 1 && plate(OPENERS).size === 1,
+    said(TOGGLES) + " | " + said(OPENERS));
+  check("instrument:the-plates-were-not-all-identical-by-accident",
+    new Set([...plate(TOGGLES), ...plate(OPENERS)]).size === 2,
+    [...plate(TOGGLES)].join(",") + " against " + [...plate(OPENERS)].join(","));
+  check("chrome:the-two-kinds-stand-in-different-columns", scan.cols.toggleRight < scan.cols.openerLeft,
+    "toggles end at " + scan.cols.toggleRight.toFixed(0) + "px, openers start at " + scan.cols.openerLeft.toFixed(0) + "px");
   // 칩과 버튼은 갈래가 다른 조작이라 gap 게이트가 안 본다. 여기서 본다.
   check("chrome:the-sound-toggle-clears-the-status-chip", scan.chipGap >= scan.lift,
     scan.chipGap + "px against " + scan.lift + "px");
