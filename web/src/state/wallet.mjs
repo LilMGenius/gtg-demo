@@ -24,8 +24,15 @@ export const COIN_DRILL = 24;
 // 어려운 키커일수록 막기는 어렵고 보상은 크다. 난이도는 세이브에만 붙는다.
 // 실점에도 붙이면 유명한 키커에게 일부러 먹히는 것이 최적 전략이 되고,
 // 그 순간 막는 행위가 게임에서 빠진다.
-export function coinGain(conceded, fame = 1) {
+/* 헛구는 실점과 세이브 사이다. 골문은 지켜졌으니 실점보다 낫고, 막아 낸 것이 아니니
+   세이브보다 낮다. 명성 배수도 안 붙는다. 유명한 키커가 헛발질한 것은 그 사람의 일이지
+   이 키퍼가 한 일이 아니다. */
+// 실점 4보다 위, 세이브 12보다 아래다. 순서가 이 셋의 전부다. 3으로 두면 헛구가 실점보다
+// 나쁜 결과가 되어, 차라리 먹히는 쪽이 이득이라는 말이 된다.
+export const COIN_WIDE = 6;
+export function coinGain(conceded, fame = 1, untested = false) {
   if (conceded) return COIN_CONCEDED;
+  if (untested) return COIN_WIDE;
   const f = Number.isFinite(fame) ? Math.min(10, Math.max(1, Math.floor(fame))) : 1;
   return COIN_SAVE + COIN_FAME_STEP * (f - 1);
 }

@@ -30,6 +30,11 @@ const at = (lv) => {
     const k = lv === null ? newKeeper() : keeperAtLevel(lv, makeRng(s + 7));
     for (const shot of buildSet(makeRng(s + 1), 5, 0)) {
       const r = resolve({ keeper: k, shot, rng, input: { dive: shot.side, errMs: 0, advance: 0, auto: false } });
+      /* 키커가 골문 밖으로 찬 구는 키퍼의 성적이 아니다. 그런 구를 분모에 넣으면 못 차는 키커를
+         만난 것이 키퍼의 성장으로 읽히고, 이 곡선이 재는 것이 실력에서 상대 수준으로 바뀐다.
+         축의 문장은 그대로다. 세이브율은 언제나 시험받은 구 중 막아 낸 비율이었고,
+         시험받지 않는 구가 없던 동안에는 전체 구와 같은 수였을 뿐이다. */
+      if (r.untested) continue;
       shots += 1;
       if (!r.conceded) saved += 1;
     }

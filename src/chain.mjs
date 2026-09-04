@@ -370,15 +370,27 @@ export function resolve(input) {
   const roll = (p) => { state.rolls++; return pct(rng, p); };
   // 한 단계는 롤 하나를 쓴다. 같은 단계의 두 사고는 같은 난수를 구간으로 나눠 가른다.
   const draw = () => { state.rolls++; return rng() * 100; };
-  const done = (conceded, cause) => {
+  /* untested는 키퍼가 시험받지 않았다는 표시다. 실점도 세이브도 아닌 셋째 갈래라
+     보상 쪽이 이 값을 읽어 덜 준다. conceded 하나로만 말하면 헛구가 세이브와 같은 값을 받고,
+     그러면 못 차는 키커를 세우는 것이 이득이 되어 키커 선택이 거꾸로 선다. */
+  const done = (conceded, cause, untested) => {
     // 연속 실점은 상태로 남는다. 다음 구의 판정 창을 회복탄력성이 방어한다.
     keeper.streak = conceded ? (keeper.streak || 0) + 1 : 0;
     events.push({ t: "result", line: conceded ? "실점" : "세이브", cause: cause || null });
     // 유명한 키커를 막으면 더 오르고, 유명한 키커에게 먹히면 덜 오른다. STATS 4절의 M 경로다.
-    return { events, conceded, cause: conceded ? cause : null, stage: state.stage, rolls: state.rolls, fame: shot.kicker.fame };
+    return { events, conceded, cause: conceded ? cause : null, stage: state.stage, rolls: state.rolls,
+      fame: shot.kicker.fame, untested: Boolean(untested) };
   };
 
   const place = placement(keeper, shot);
+
+  /* 키커가 골문을 아예 못 맞히는 구. 지금까지 모든 슛이 골문 안으로 갔고, 그래서 키커를
+     고르는 일이 난도만 정하고 판의 밀도는 안 정했다. 침착성과 결정력이 이 확률을 산다.
+     잘 차는 키커를 세우면 막기는 어렵지만 헛구가 줄어 보상 밀도가 오른다.
+     실측: 침착성 10 결정력 10은 0퍼센트, 침착성 4 결정력 5는 14.6퍼센트다.
+     이 구는 키퍼가 시험받지 않은 구라 실점도 세이브도 아닌 셋째 결과로 나간다.
+     굴림은 아래 0단과 같이 쓴다. 새로 굴리면 한 구가 일곱 번 굴러 계약을 깬다. */
+  const wideP = Math.max(0, 26 - clamp(shot.kicker.composure, 1, 10) * 1.6 - clamp(shot.kicker.finishing, 1, 10));
 
   // 0단 배치. 나가서 생긴 사고와 안 와도 될 공에 누운 사고는 같은 판단에서 나온다.
   // 한 단계는 롤 하나를 쓴다. 두 사고는 같은 난수를 구간으로 나눠 가른다.
@@ -397,17 +409,25 @@ export function resolve(input) {
   // 팔로워를 버는 칸이 같은 자리에서 골을 먹인다. 이 칸이 양날인 이유가 그것이다.
   // 같은 약이 이 구간도 줄인다. talked가 줄면 followerGain의 flair 2.2배가 같이 사라져 교환이 된다.
   const talkP = shot.gaze ? Math.max(0, keeper.communication * keeper.mischief * 0.55) * focusAid : 0;
-  if (overP > 0 || diveP > 0 || gazeP > 0 || talkP > 0) {
+  if (wideP > 0 || overP > 0 || diveP > 0 || gazeP > 0 || talkP > 0) {
     const d = draw();
-    if (d < overP) {
+    /* 헛구가 이 구간의 맨 앞이다. 키커가 못 맞히면 키퍼가 무엇을 하려 했는지는 물을 일이 없다.
+       뒤의 넷은 남은 구간을 이어 나눠 가지므로 각자의 조건부 확률이 그대로 남는다. */
+    if (d < wideP) {
+      say("wide", "골문 밖으로 한참 벗어났습니다.", null);
+      return done(false, null, true);
+    }
+    const beforeOver = wideP;
+    if (d < beforeOver + overP * (100 - beforeOver) / 100) {
       say("emptyGoal", "뛰쳐나온 사이 넘겨 찼습니다. 골대는 비어 있었습니다.", "greed");
       return done(true, "greed");
     }
-    if (d < overP + diveP * (100 - overP) / 100) {
+    const beforeDive = beforeOver + overP * (100 - beforeOver) / 100;
+    if (d < beforeDive + diveP * (100 - beforeDive) / 100) {
       say("dived", "안 날아와도 될 공에 먼저 몸을 던졌습니다.", "judgement");
       return done(true, "judgement");
     }
-    const before = overP + diveP * (100 - overP) / 100;
+    const before = beforeDive + diveP * (100 - beforeDive) / 100;
     if (d < before + gazeP * (100 - before) / 100) {
       say("distracted", "지나가던 행인을 봤습니다. 눈에 하트가 떴습니다.", "focus");
       return done(true, "focus");
@@ -555,6 +575,18 @@ export function restartDelay(keeper, result) {
 // look은 외형 선반 승수다. 판정에는 안 들어가고 소문에만 붙는다.
 export function followerGain(keeper, result, city = 0, look = 1, boost = 1, rapport = 1, social = 1) {
   const saved = !result.conceded;
+  /* 키퍼가 손을 안 댄 구는 화제가 안 된다. 막아 낸 것이 아니라 상대가 못 찬 것이기 때문이다.
+     세이브와 같은 값을 주면 못 차는 키커를 세우는 쪽이 이득이 되어 선택이 거꾸로 선다.
+     실점보다는 낫다. 골문은 지켜졌고 그 자리에 서 있던 것은 사실이다. */
+  if (result.untested) {
+    /* 명성 항은 뺀다. 유명한 키커가 헛발질한 것은 그 사람의 일이라 이 키퍼의 화제가 아니다.
+       말을 섞는 항은 남는다. 그 자리에 서서 사람을 상대한 것은 사실이다.
+       34는 실점 쪽의 천장 위다. 먹힌 구는 기본 8에 명성 항이 최대 20까지 붙어 28까지 오르므로,
+       20으로 두면 유명한 키커에게 먹히는 쪽이 헛구보다 화제가 되어 순서가 뒤집힌다.
+       세이브 쪽 바닥은 기본 40에 명성 9라 49다. 34는 그 아래다. */
+    const talkTerm = 6 * clamp(keeper.communication, 1, 10) + 3 * clamp(keeper.mischief, 1, 10);
+    return Math.round((34 + talkTerm) * (1 + CITY_CROWD * clamp(city, 0, 3)));
+  }
   const flair = result.events.some((e) => e.t === "beat" || e.t === "charge" || e.t === "talked");
   const base = saved ? 40 : 8;
   const talk = 6 * clamp(keeper.communication, 1, 10) + 3 * clamp(keeper.mischief, 1, 10);

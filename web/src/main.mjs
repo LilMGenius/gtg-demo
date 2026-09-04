@@ -539,7 +539,7 @@ function rollCaptions(result) {
       if (!state.botRan && result.events.some((e) => e.t === 'talked')) state.rapport = addRapport(state.rapport, state.gear.city, state.shots[state.i].passer);
       // 육수는 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
       // 유명한 키커를 막을수록 더 들어온다. 팔로워와 같은 fame 값을 쓴다.
-      const coin = coinGain(result.conceded, result.fame);
+      const coin = coinGain(result.conceded, result.fame, result.untested);
       state.wallet.coin += coin;
       // 구가 끝나면 계정에 한 장 올라간다. 먹힌 구에도 올라가야 성적표가 아니라 사람으로 읽힌다.
       // 이름은 state.i를 올리기 전에 읽는다. result에는 키커 이름이 없다.

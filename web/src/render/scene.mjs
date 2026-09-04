@@ -794,7 +794,9 @@ const TOUCHED = new Set(['contact']);
     downed: 0.88, rebound: 0.6, reboundMiss: 0.62, charge: 0.9, beat: 0.92,
     lost: 0.66, skied: 0.58, talked: 0.9, distracted: 0.8, openGoalScored: 0.8,
     // 반대로 뛴 몸이라 이미 등을 보이고 누워 있다. 흘린 공과 같은 섞음량이면 표정이 렌즈에 닿는다.
-    bodyBlock: 0.6
+    bodyBlock: 0.6,
+    // 헛구는 키퍼가 선 채로 끝난다. 몸이 안 돌아가 있으므로 더 돌려야 얼굴이 렌즈에 닿는다.
+    wide: 0.86
   };
   const FACE_MOOD = {
     catch: 'grin', save: 'grin', carriedIn: 'shock', gloveGone: 'shock',
@@ -802,7 +804,9 @@ const TOUCHED = new Set(['contact']);
     charge: 'grin', beat: 'shock', lost: 'shock', skied: 'shock',
     talked: 'heart', distracted: 'heart', openGoalScored: 'shock',
     // 잡을 생각이 없던 자리에서 공이 몸에 맞았다. 기뻐할 일이 아니라 놀랄 일이다.
-    bodyBlock: 'shock'
+    bodyBlock: 'shock',
+    // 안 와도 될 공이었다. 웃을 일도 놀랄 일도 아니고 어이가 없는 자리다.
+    wide: 'shock'
   };
   // 머리 위로 떠오르는 하트 셋. 눈동자만 하트로 바꾸면 고개가 돌아간 순간 얼굴이 뒤를 보고 있어 안 읽힌다.
   // 정지 화면 한 장에서 한눈팔림을 알리는 픽셀은 이것뿐이다.
@@ -918,7 +922,7 @@ const TOUCHED = new Set(['contact']);
     // 문장을 넣으면 자막과 같은 것이 두 개가 되어 둘 다 안 읽힌다.
     // 흘림은 손에서 빠지는 툭이고, 몸에 맞는 것은 더 둔한 소리다. 두 사건이 같은 글자를 쓰면
     // 화면에서 갈리지 않는다.
-    const WORD = { save: '퍽!', catch: '꽉!', gloveGone: '어?', carriedIn: '으어', spill: '툭', downed: '으악', bodyBlock: '퉁' };
+    const WORD = { save: '퍽!', catch: '꽉!', gloveGone: '어?', carriedIn: '으어', spill: '툭', downed: '으악', bodyBlock: '퉁', wide: '아웃' };
     // 손이 안 닿은 사건. 장갑 좌표에 띄우면 닿지도 않은 자리에서 흙이 뜬다.
     // 흙 없이 공 옆에 단어만 얹는다. charge 프레임은 화면에 글자가 하나도 없었다.
     const CALL = { charge: '나간다!', beat: '제꼈다', lost: '뺏겼다', skied: '넘겼다', rebound: '튕김', reboundMiss: '흘렀다' };
@@ -1440,6 +1444,18 @@ const TOUCHED = new Set(['contact']);
             lerp(tail.from.x, tail.from.x - (tail.kx >= 0 ? 1 : -1) * (1.6 + tail.vary.c * 0.8), e),
             0.14 + Math.abs(Math.sin(u * 6)) * 0.28 * (1 - u),
             lerp(tail.from.z, 2.4, e)
+          );
+          break;
+        case 'wide':
+          /* 골문 밖으로 나간 공. 키커가 노린 쪽으로 더 밀어 포스트 바깥에 세운다.
+             2.9는 포스트(2.2) 밖이면서 프레임 안이라 어디로 나갔는지가 보이는 자리다.
+             빗나간 공의 임자는 키커이므로 키퍼 좌표를 안 쓴다. 몸 옆으로 보내면
+             손을 못 댄 것이 아니라 손을 안 댄 것으로 읽힌다.
+             z는 골라인을 지나 카메라 쪽으로 흐른다. 그물에 안 걸린 공은 계속 굴러간다. */
+          ball.position.set(
+            lerp(tail.from.x, (tail.aimX >= 0 ? 1 : -1) * (2.9 + tail.vary.b * 0.7), e),
+            0.14 + Math.abs(Math.sin(u * 5)) * 0.4 * (1 - u),
+            lerp(tail.from.z, -0.6, e)
           );
           break;
         case 'downed': {
