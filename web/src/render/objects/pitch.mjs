@@ -6,7 +6,7 @@ import { loadDecor } from '../decor.mjs';
 import { jitterMesh, seeded, addOutline } from '../handmade.mjs';
 import { MARK_LINES, ARC_R, ARC_HALF, SPOT_Z, FAR_W } from './markspec.mjs';
 import { addFace } from './actors.mjs';
-import { frameAt } from '../../state/gear.mjs';
+import { skinAt } from '../../state/gear.mjs';
 
 // 사각 그물 한 장. wireframe 평면은 삼각형 대각선이 남아 그물이 아니라 격자무늬로 읽힌다.
 // 팽팽한 격자는 그물이 아니라 방충망이다. 가운데를 배가 부르게 늘어뜨려야 천으로 읽힌다.
@@ -304,7 +304,7 @@ export function buildPitch(scene) {
     scene.add(roof);
     nets.push(roof);
   }
-  weave(frameAt(0));
+  weave(skinAt('frame', 0, 0));
 
   // 뒷그물은 서 있는 평면인데 실 격자만 있으면 어느 쪽이 위인지 알려주는 것이 하나도 없다.
   // 그물을 받치는 틀이 그 일을 한다. 흰 골대와 같은 색으로 칠하면 한 덩어리로 읽히니 뒷틀은 쇠색이다.
@@ -477,7 +477,7 @@ export function buildPitch(scene) {
         w: p.width, d: p.height, inner: p.innerRadius, outer: p.outerRadius,
         from: p.thetaStart, span: p.thetaLength };
     }),
-    setGoal: (rank) => weave(frameAt(rank)),
+    setGoal: (rank, skin) => weave(skinAt('frame', rank, skin)),
     // 그물 넉 장을 한 번에 여닫는다. 뒷면만 감추면 옆면과 지붕이 남아,
     // 그물을 껐다는 대조군이 실제로는 그물 넷 중 하나만 끈 것이 된다.
     setNets: (on) => { for (const n of nets) n.visible = on; },

@@ -130,15 +130,30 @@ export const MAX_SOCK = SOCKS.length - 1;
 // 골대 선반. 몸에 걸치는 것이 아니라 뒤에 서 있는 것이고, 깎는 것은 흘린 공이 두 번째 슛까지 살아남는 사고다.
 // 값 기준은 앞의 넷과 같다. 첫 칸은 카드깡 380 육수보다 싸고 마지막 칸은 그보다 비싸다.
 //
-// cell은 그물코 한 변의 미터, dim은 실의 진하기, sag는 가운데가 늘어지는 깊이다.
-// 셋 다 렌더가 아니라 여기 있다. 색 상수를 렌더 파일에 두면 두 곳이 갈린다는 것과 같은 이유다.
-// 0.50에서 0.30으로 좁히면 같은 폭에 실이 열여덟 줄에서 서른 줄이 되어 촘촘함이 눈에 보이고,
-// 늘어짐 0.34에서 0.14로 줄면 팽팽하게 당겨 맨 그물로 읽힌다. 안 산 사람의 골대가 가장 성기다.
 export const GOALS = [
-  { frame: 0, name: '기울어진 동네 철골대', cost: 0, cell: 0.50, dim: 0.55, sag: 0.34, note: '아무것도 안 샀을 때 뒤에 서 있는 것' },
-  { frame: 1, name: '구멍 기운 나일론 그물', cost: 145, cell: 0.44, dim: 0.62, sag: 0.28, note: '뚫린 데는 없다. 그게 전부다' },
-  { frame: 2, name: '팽팽하게 당겨 맨 그물', cost: 385, cell: 0.36, dim: 0.70, sag: 0.22, note: '맞으면 팅 소리가 난다' },
-  { frame: 3, name: '공을 먹는 촘촘한 겹그물', cost: 860, cell: 0.30, dim: 0.80, sag: 0.14, note: '들어간 공이 안 나온다. 튄 공도 안 나온다' }
+  { frame: 0, name: '기울어진 동네 철골대', cost: 0, note: '아무것도 안 샀을 때 뒤에 서 있는 것' },
+  { frame: 1, name: '구멍 기운 나일론 그물', cost: 145, note: '뚫린 데는 없다. 그게 전부다' },
+  { frame: 2, name: '팽팽하게 당겨 맨 그물', cost: 385, note: '맞으면 팅 소리가 난다' },
+  { frame: 3, name: '공을 먹는 촘촘한 겹그물', cost: 860, note: '들어간 공이 안 나온다. 튄 공도 안 나온다' }
+];
+
+/* 골대 변형. cell은 그물코 한 변의 미터, dim은 실의 진하기, sag는 가운데가 늘어지는 깊이,
+   post는 기둥 색이다. 0.50에서 0.30으로 좁히면 같은 폭에 실이 열여덟 줄에서 서른 줄이 되어
+   촘촘함이 눈에 보이고, 늘어짐 0.34에서 0.14로 줄면 팽팽하게 당겨 맨 그물로 읽힌다.
+   안 산 사람의 골대가 가장 성기다. 한 등급의 변형은 그 성김을 지키고 기둥 색과 늘어짐만 갈린다. */
+export const GOAL_SKINS = [
+  [{ name: '녹슨 철골대', tone: 0x8a7a68, cell: 0.50, dim: 0.55, sag: 0.34, post: 0x8a7a68 },
+   { name: '페인트 벗겨진 골대', tone: 0xd8d4c8, cell: 0.52, dim: 0.5, sag: 0.38, post: 0xd8d4c8 },
+   { name: '파란 철골대', tone: 0x3f6f9f, cell: 0.48, dim: 0.6, sag: 0.3, post: 0x3f6f9f }],
+  [{ name: '흰 나일론', tone: 0xf2f4f0, cell: 0.44, dim: 0.62, sag: 0.28, post: 0xf2f4f0 },
+   { name: '누런 나일론', tone: 0xd8c88a, cell: 0.46, dim: 0.58, sag: 0.31, post: 0xd8c88a },
+   { name: '초록 기둥 나일론', tone: 0x3f8f5f, cell: 0.42, dim: 0.66, sag: 0.25, post: 0x3f8f5f }],
+  [{ name: '팽팽한 흰 그물', tone: 0xf6f8f4, cell: 0.36, dim: 0.70, sag: 0.22, post: 0xf6f8f4 },
+   { name: '팽팽한 검은 그물', tone: 0x2a2c30, cell: 0.34, dim: 0.76, sag: 0.2, post: 0x2a2c30 },
+   { name: '팽팽한 붉은 그물', tone: 0xb84a3a, cell: 0.38, dim: 0.68, sag: 0.24, post: 0xb84a3a }],
+  [{ name: '검은 겹그물', tone: 0x1e2024, cell: 0.30, dim: 0.80, sag: 0.14, post: 0x1e2024 },
+   { name: '은색 겹그물', tone: 0xc8ccd2, cell: 0.28, dim: 0.86, sag: 0.12, post: 0xc8ccd2 },
+   { name: '형광 겹그물', tone: 0xc8e02f, cell: 0.32, dim: 0.78, sag: 0.16, post: 0xc8e02f }]
 ];
 
 export const MAX_FRAME = GOALS.length - 1;
@@ -150,10 +165,28 @@ export const MAX_FRAME = GOALS.length - 1;
 // sky는 하늘색, haze는 안개색이다. 골대의 그물 값과 같은 이유로 렌더가 아니라 여기 있다.
 // 등급이 오를수록 하늘이 옅고 뿌예진다. 뒷산은 파랗고 번화가는 먼지가 낀다.
 export const CITIES = [
-  { city: 0, name: '동네 뒷산 공터', cost: 0, sky: 0x86aecb, haze: 0x9dbdd4, note: '아무것도 안 샀을 때 서 있는 곳. 지나가는 사람이 거의 없다' },
-  { city: 1, name: '학교 앞 흙 운동장', cost: 145, sky: 0x8fb2c9, haze: 0xa6c0cf, note: '하교 시간에 사람이 지나간다. 가끔 고개가 돌아간다' },
-  { city: 2, name: '역세권 풋살장', cost: 385, sky: 0x9ab3c2, haze: 0xb0c2c9, note: '유동인구가 많다. 막으면 소문이 빨리 난다' },
-  { city: 3, name: '번화가 한복판 코트', cost: 860, sky: 0xa8b4ba, haze: 0xbcc5c4, note: '사방이 사람이다. 팔로워도 실점도 같이 는다' }
+  { city: 0, name: '동네 뒷산 공터', cost: 0, note: '아무것도 안 샀을 때 서 있는 곳. 지나가는 사람이 거의 없다' },
+  { city: 1, name: '학교 앞 흙 운동장', cost: 145, note: '하교 시간에 사람이 지나간다. 가끔 고개가 돌아간다' },
+  { city: 2, name: '역세권 풋살장', cost: 385, note: '유동인구가 많다. 막으면 소문이 빨리 난다' },
+  { city: 3, name: '번화가 한복판 코트', cost: 860, note: '사방이 사람이다. 팔로워도 실점도 같이 는다' }
+];
+
+/* 동네 변형. sky는 하늘색, haze는 안개색이다. 등급이 정하는 것은 행인 수라
+   변형이 그 수를 안 건드리고 시간대만 바꾼다. 낮과 노을과 흐린 날이다.
+   등급이 오를수록 하늘이 옅고 뿌옇다는 규칙은 각 변형의 낮 하늘이 지킨다. */
+export const CITY_SKINS = [
+  [{ name: '맑은 낮', tone: 0x86aecb, sky: 0x86aecb, haze: 0x9dbdd4 },
+   { name: '노을 지는 저녁', tone: 0xd88f5f, sky: 0xd88f5f, haze: 0xe0ac86 },
+   { name: '비 오기 직전', tone: 0x6f7a84, sky: 0x6f7a84, haze: 0x8d959c }],
+  [{ name: '맑은 낮', tone: 0x8fb2c9, sky: 0x8fb2c9, haze: 0xa6c0cf },
+   { name: '노을 지는 저녁', tone: 0xd4956a, sky: 0xd4956a, haze: 0xdfb08d },
+   { name: '비 오기 직전', tone: 0x757f88, sky: 0x757f88, haze: 0x929aa0 }],
+  [{ name: '맑은 낮', tone: 0x9ab3c2, sky: 0x9ab3c2, haze: 0xb0c2c9 },
+   { name: '노을 지는 저녁', tone: 0xd09a74, sky: 0xd09a74, haze: 0xdcb495 },
+   { name: '비 오기 직전', tone: 0x7b848c, sky: 0x7b848c, haze: 0x969ea4 }],
+  [{ name: '맑은 낮', tone: 0xa8b4ba, sky: 0xa8b4ba, haze: 0xbcc5c4 },
+   { name: '노을 지는 저녁', tone: 0xcc9f7d, sky: 0xcc9f7d, haze: 0xd9b89c },
+   { name: '비 오기 직전', tone: 0x81888e, sky: 0x81888e, haze: 0x9aa1a6 }]
 ];
 
 export const MAX_CITY = CITIES.length - 1;
@@ -214,7 +247,7 @@ export const INK_SKINS = [
 
 /* 변형을 파는 선반 표. 여기 든 칸만 변형이 있고, 칸 이름에 Skin을 붙인 것이 그 선택을 담는 자리다.
    선반마다 다른 함수를 두면 새 선반이 늘 때마다 상점과 게이트가 그 이름을 손으로 들어야 한다. */
-export const SKINS = { grip: GLOVE_SKINS, studs: BOOT_SKINS, pads: KIT_SKINS, socks: SOCK_SKINS, hair: HAIR_SKINS, ink: INK_SKINS };
+export const SKINS = { grip: GLOVE_SKINS, studs: BOOT_SKINS, pads: KIT_SKINS, socks: SOCK_SKINS, hair: HAIR_SKINS, ink: INK_SKINS, frame: GOAL_SKINS, city: CITY_SKINS };
 export const SKIN_FIELDS = Object.keys(SKINS);
 
 export function skinsAt(field, rank) {
@@ -254,8 +287,12 @@ export function newGear() {
 /* 갈래 둘. 몸에 걸치는 것은 그 키퍼의 것이고, 서는 자리는 계정의 것이다.
    장갑을 낀 것은 그 사람이지만 골대와 동네는 누가 뛰든 같은 곳이라, 키퍼를 바꿨을 때
    앞의 여섯은 따라 바뀌고 뒤의 둘은 그대로여야 한다. */
-export const WORN_FIELDS = ['grip', 'studs', 'pads', 'socks', 'hair', 'ink'].concat(SKIN_FIELDS.map((f) => f + 'Skin'));
-export const PLACE_FIELDS = ['frame', 'city'];
+const WORN_BASE = ['grip', 'studs', 'pads', 'socks', 'hair', 'ink'];
+const PLACE_BASE = ['frame', 'city'];
+// 변형 칸은 그 등급 칸을 따라간다. 몸에 걸치는 것의 변형은 키퍼의 것이고 자리의 변형은 계정의 것이라,
+// 이 둘이 갈리지 않으면 키퍼를 바꿀 때 하늘색이 같이 따라 바뀐다.
+export const WORN_FIELDS = WORN_BASE.concat(SKIN_FIELDS.filter((f) => WORN_BASE.indexOf(f) >= 0).map((f) => f + 'Skin'));
+export const PLACE_FIELDS = PLACE_BASE.concat(SKIN_FIELDS.filter((f) => PLACE_BASE.indexOf(f) >= 0).map((f) => f + 'Skin'));
 
 export function isWorn(field) {
   return WORN_FIELDS.indexOf(field) >= 0;

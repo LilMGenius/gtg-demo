@@ -53,7 +53,9 @@ try {
       const m = await import("/web/src/render/thumb.mjs");
       const g = await import("/web/src/state/gear.mjs");
       const k = { height: 188, weight: 84 };
-      const bake = (rank, at) => m.thumbURL(field, k, g.lookOf({ [field]: rank, [field + "Skin"]: at }));
+      // 장면 칸은 외형 묶음이 아니라 등급과 변형을 받는다. 몸 칸은 그 둘을 담은 외형 묶음을 받는다.
+      const scene = field === "frame" || field === "city";
+      const bake = (rank, at) => m.thumbURL(field, k, scene ? { rank, skin: at } : g.lookOf({ [field]: rank, [field + "Skin"]: at }));
       const same = [];
       let twice = true;
       for (let r = 0; r < g.SKINS[field].length; r++) {

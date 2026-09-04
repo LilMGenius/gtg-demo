@@ -1336,7 +1336,11 @@ function bindGear(box) {
     const g = s.at(shot.dataset.rank);
     const look = lookOf(Object.assign({}, state.gear, { [s.field]: g[s.field] }));
     // 골대와 동네는 몸이 아니라 장면이라 외형 묶음이 아니라 등급 자체를 받는다.
-    const arg = (s.field === 'frame' || s.field === 'city') ? g[s.field] : look;
+    // 장면 칸은 외형 묶음이 아니라 등급과 변형 둘을 받는다. 걸쳐 본 변형이 있으면 그것으로 굽는다.
+    const pickSkin = fitting[s.field + 'Skin'] !== undefined ? fitting[s.field + 'Skin'] : state.gear[s.field + 'Skin'];
+    const arg = (s.field === 'frame' || s.field === 'city')
+      ? { rank: g[s.field], skin: fitting[s.field] === g[s.field] ? pickSkin : 0 }
+      : look;
     const url = thumbURL(s.field, state.keeper, arg);
     if (!url) continue;
     shot.innerHTML = '<img alt="" src="' + url + '">';
@@ -1368,7 +1372,10 @@ function bindGear(box) {
       if (rank <= state.gear[field]) {
         state.gear[field] = rank;
         state.gear[field + 'Skin'] = at;
-        stage.setKeeper(state.keeper, lookOf(state.gear));
+        // 자리 칸은 몸이 아니라 장면이라 키퍼를 다시 세우는 것으로는 안 바뀐다.
+        if (field === 'city') stage.setCity(state.gear.city, state.gear.citySkin);
+        else if (field === 'frame') stage.setGoal(state.gear.frame, state.gear.frameSkin);
+        else stage.setKeeper(state.keeper, lookOf(state.gear));
         persist();
       } else {
         fitting[field] = rank;
@@ -1392,8 +1399,8 @@ function bindGear(box) {
         delete fitting[s.field + 'Skin'];
       }
       // 동네를 사면 상점을 닫기 전에 배경이 바뀐다. 재시작을 요구하면 산 것이 안 읽힌다.
-      if (s.field === 'city') stage.setCity(state.gear.city);
-      if (s.field === 'frame') stage.setGoal(state.gear.frame);
+      if (s.field === 'city') stage.setCity(state.gear.city, state.gear.citySkin);
+      if (s.field === 'frame') stage.setGoal(state.gear.frame, state.gear.frameSkin);
       // 머리와 타투는 사면 그 자리에서 키퍼 껍데기 색이 바뀐다. 안 보이면 산 것이 아니다.
       // 머리와 잉크만 몸을 다시 세우고 있었다. 장갑과 축구화와 유니폼과 양말도
       // 이제 색을 가지므로 같이 다시 세운다. 골대와 동네는 몸이 아니라 빠진다.
@@ -1607,8 +1614,8 @@ function renderShop() {
     state.wallet.coin -= bill;
     for (const f of Object.keys(fitting)) state.gear[f] = fitting[f];
     fitting = {};
-    if (state.gear.city !== undefined) stage.setCity(state.gear.city);
-    if (state.gear.frame !== undefined) stage.setGoal(state.gear.frame);
+    if (state.gear.city !== undefined) stage.setCity(state.gear.city, state.gear.citySkin);
+    if (state.gear.frame !== undefined) stage.setGoal(state.gear.frame, state.gear.frameSkin);
     stage.setKeeper(state.keeper, lookOf(state.gear));
     persist();
     pips();
@@ -1799,8 +1806,8 @@ pips();
 mountTitle(() => {
   stage.leaveTitle();
   stage.setKeeper(state.keeper, lookOf(state.gear));
-stage.setCity(state.gear.city);
-stage.setGoal(state.gear.frame);
+stage.setCity(state.gear.city, state.gear.citySkin);
+stage.setGoal(state.gear.frame, state.gear.frameSkin);
   // 밀린 훈련이 있어도 공부터 온다. 쓸지 말지는 훈련장 버튼이 들고 있다.
   nextSet();
 });

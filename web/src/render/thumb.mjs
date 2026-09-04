@@ -6,7 +6,7 @@
 import * as THREE from "../../vendor/three.module.min.js";
 import { buildKeeper } from "./objects/actors.mjs";
 import { meshPanel, buildPassers } from "./objects/pitch.mjs";
-import { frameAt, cityAt } from "../state/gear.mjs";
+import { skinAt } from "../state/gear.mjs";
 
 // 행인 수는 경기장이 쓰는 그 규칙이다. 다섯에서 시작해 등급마다 둘이 는다.
 const PASSER_BASE = 5;
@@ -57,15 +57,17 @@ function clearScene() {
   sceneRig = null;
 }
 
-// 골대 한 짝. 흰 기둥 둘과 크로스바, 그 뒤에 그 등급의 그물 한 장.
-function goalRig(rank) {
-  const g = frameAt(rank);
+// 골대 한 짝. 기둥 둘과 크로스바, 그 뒤에 그 등급의 그물 한 장.
+// 장면 칸은 등급과 변형을 같이 받는다. 등급이 그물의 성김을 정하고 변형이 기둥 색과 늘어짐을 정한다.
+function goalRig(pick) {
+  const g = skinAt("frame", pick && pick.rank, pick && pick.skin);
   const grp = new THREE.Group();
   // 실제 골대 폭 7.32에 높이 2.44를 4로 나눈 축소판이다. 칸 안에서 비율이 실물과 같아야
   // 상점에서 본 것과 경기장에 선 것이 같은 물건으로 읽힌다.
   const W = 7.32 / 4;
   const H = 2.44 / 4;
-  const bar = new THREE.MeshLambertMaterial({ color: 0xf2f4f0 });
+  // 기둥 색은 변형이 정한다. 여기 상수로 두면 녹슨 철골대와 은색 겹그물이 같은 기둥으로 선다.
+  const bar = new THREE.MeshLambertMaterial({ color: g.post });
   const post = new THREE.BoxGeometry(0.055, H, 0.055);
   for (const s of [-1, 1]) {
     const m = new THREE.Mesh(post, bar);
@@ -86,15 +88,16 @@ function goalRig(rank) {
     new THREE.MeshLambertMaterial({ color: 0x8d6a41 }));
   ground.rotation.x = -Math.PI / 2;
   grp.add(ground);
-  grp.userData.sky = cityAt(0).sky;
+  grp.userData.sky = skinAt("city", 0, 0).sky;
   // 골대는 0.13으로 거의 정면에서 본다. 높이가 0.61m뿐이라 행인과 같은 0.26으로 내려다보면
   // 화면 가운데가 땅이 되고 크로스바만 남는다. 3.6은 문틀 좌우가 칸에 다 들어가는 거리다.
   return { grp, at: new THREE.Vector3(0, H * 0.52, -0.2), dist: 3.6, high: 0.13 };
 }
 
 // 동네 한 조각. 그 등급의 하늘 아래 그 등급만큼의 행인이 선다.
-function cityRig(rank) {
-  const c = cityAt(rank);
+function cityRig(pick) {
+  const rank = Math.floor(Number(pick && pick.rank) || 0);
+  const c = skinAt("city", rank, pick && pick.skin);
   const grp = new THREE.Group();
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30),
     new THREE.MeshLambertMaterial({ color: 0x8d6a41 }));
@@ -162,7 +165,9 @@ function frame(kind, keeper, look, yaw) {
   if (kind === "frame" || kind === "city") {
     if (rig) { scene.remove(rig); rig = null; }
     clearScene();
-    const made = kind === "frame" ? goalRig(look) : cityRig(look);
+    // 옛 호출은 등급 하나만 넘겼다. 숫자로 오면 그 등급의 기본 변형으로 읽는다.
+    const pick = typeof look === "number" ? { rank: look, skin: 0 } : look;
+    const made = kind === "frame" ? goalRig(pick) : cityRig(pick);
     sceneRig = made.grp;
     scene.add(sceneRig);
     // 동네는 하늘이 상품의 절반이다. 골대 칸은 배경을 비워 그물이 칸을 채우게 둔다.

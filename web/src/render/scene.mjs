@@ -11,7 +11,7 @@ import {
 } from './units.mjs';
 import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, pushPose, setPose } from './objects/actors.mjs';
 import { buildPitch, buildPassers } from './objects/pitch.mjs';
-import { cityAt } from '../state/gear.mjs';
+import { skinAt } from '../state/gear.mjs';
 import { createImpact } from './objects/impact.mjs';
 import { jitterMesh, addOutline, blobGeo, ballGeo } from './handmade.mjs';
 
@@ -453,7 +453,7 @@ const TOUCHED = new Set(['contact']);
   markForeground(keeper);
 
   // 동네 등급은 버프가 아니라 교환이다. 배경이 바뀌는 것은 화면이고, 확률은 chain이 쥔다.
-  function setCity(city) {
+  function setCity(city, skin) {
     const c = Math.max(0, Math.min(3, city | 0));
     passerCount = PASSER_BASE + PASSER_STEP * c;
     for (let i = 0; i < passers.length; i += 1) {
@@ -463,8 +463,10 @@ const TOUCHED = new Set(['contact']);
       passerShadows[i].visible = on;
     }
     // 색은 선반 데이터가 소유한다. 여기 배열을 따로 두면 상점 썸네일과 경기장이 갈린다.
-    scene.background.setHex(cityAt(c).sky);
-    scene.fog.color.setHex(cityAt(c).haze);
+    // 등급은 행인 수를 정하고 변형은 하늘을 정한다. 시간대를 바꿔도 유동인구는 그대로다.
+    const look = skinAt('city', c, skin);
+    scene.background.setHex(look.sky);
+    scene.fog.color.setHex(look.haze);
   }
 
   function setKeeper(k, look) {
