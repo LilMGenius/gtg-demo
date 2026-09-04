@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { GOALS } from "../web/src/state/gear.mjs";
+import { GOALS, GOAL_SKINS, skinAt } from "../web/src/state/gear.mjs";
 
 // 골대 등급의 자. 등급이 판정에만 들어가고 화면에는 안 나타나면, 그 상품은 값만 다른 같은 물건이다.
 //
@@ -18,14 +18,28 @@ const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 
 // 데이터가 방향을 지키는지는 브라우저 없이 본다. 등급이 오르면 촘촘하고 진하고 덜 처져야 한다.
-const cells = GOALS.map((g) => g.cell);
-const dims = GOALS.map((g) => g.dim);
-const sags = GOALS.map((g) => g.sag);
-check("instrument:every-grade-declares-a-look", GOALS.every((g) => g.cell > 0 && g.dim > 0 && g.sag >= 0),
-  GOALS.map((g) => g.cell + "/" + g.dim + "/" + g.sag).join(" "));
-check("goalskin:a-higher-grade-is-tighter", cells.every((c, i) => i === 0 || c < cells[i - 1]), cells.join(" > "));
-check("goalskin:a-higher-grade-is-darker-thread", dims.every((d, i) => i === 0 || d > dims[i - 1]), dims.join(" < "));
-check("goalskin:a-higher-grade-sags-less", sags.every((s, i) => i === 0 || s < sags[i - 1]), sags.join(" > "));
+// 그 값은 등급 줄이 아니라 그 등급의 변형이 소유한다. 변형이 여럿이면 사다리는 변형 번호마다 따로 서야 하고,
+// 한 변형만 보면 나머지 변형이 사다리를 깨도 이 자가 통과시킨다.
+const widest = Math.max.apply(null, GOAL_SKINS.map((l) => l.length));
+const looks = (at) => GOALS.map((g, r) => skinAt("frame", r, Math.min(at, GOAL_SKINS[r].length - 1)));
+const ladder = (at, key, up) => {
+  const v = looks(at).map((g) => g[key]);
+  return { ok: v.every((x, i) => i === 0 || (up ? x > v[i - 1] : x < v[i - 1])), say: at + ": " + v.join(up ? " < " : " > ") };
+};
+const every = (key, up) => {
+  const rows = [];
+  for (let at = 0; at < widest; at += 1) rows.push(ladder(at, key, up));
+  return { ok: rows.every((r) => r.ok), say: rows.map((r) => r.say).join(" | ") };
+};
+check("instrument:every-grade-declares-a-look",
+  GOALS.every((g, r) => GOAL_SKINS[r].every((v) => v.cell > 0 && v.dim > 0 && v.sag >= 0 && v.post >= 0)),
+  GOAL_SKINS.map((l) => l.length + " variants").join(", "));
+const tight = every("cell", false);
+const dark = every("dim", true);
+const sag = every("sag", false);
+check("goalskin:a-higher-grade-is-tighter", tight.ok, tight.say);
+check("goalskin:a-higher-grade-is-darker-thread", dark.ok, dark.say);
+check("goalskin:a-higher-grade-sags-less", sag.ok, sag.say);
 
 const mean = (p, s) => p.evaluate((b64) => new Promise((res) => {
   const im = new Image();
