@@ -447,6 +447,10 @@ body.playing #hud{opacity:1}
 /* 창 이름 아래 붙는 수. 제목과 점으로 잇지 않고 줄을 나눈다. 세 창이 같은 규칙을 쓴다. */
 #me h4 small,#gym h4 small,#roster h4 small{display:block;font-size:13px;color:var(--ink);
   -webkit-text-stroke:2px var(--edge);text-shadow:2px 3px 0 var(--edge);margin-top:4px}
+/* 값 셋을 가운뎃점으로 이으면 화면에서는 목록 기호로 읽혀 세 값이 한 항목처럼 붙는다.
+   14px. 글자 13px보다 넓어야 사이가 기호 없이도 갈린다. */
+#me h4 small i{font-style:normal;margin-right:14px}
+#me h4 small i:last-child{margin-right:0}
 /* 62vh. 720p에서 15칸 다섯 줄과 특성, 히든 둘이 잘리지 않고 다 들어가는 하한이다.
    아래 여백 10px은 마지막 칸의 6px 그림자가 스크롤 경계에 잘리지 않게 둔 것이다. */
 #me .card{display:flex;flex-direction:column;gap:9px;

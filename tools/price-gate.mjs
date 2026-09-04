@@ -111,6 +111,27 @@ try {
     await p.waitForTimeout(120);
   }
 
+  // 값이 없는 창에도 글자는 있다. 불렛과 옛 단위와 재화 이름은 값과 무관하게 나오므로
+  // 값을 재는 축과 글자를 재는 축은 순회 목록이 다르다. 여기는 글자만 본다.
+  const PROSE = [["gram", "__gram"], ["me", "__me"], ["earn", "__earn"], ["top", null], ["caption", null]];
+  let letters = "", oldUnit = "", dots = "", swept = 0;
+  for (const [id, hook] of PROSE) {
+    if (hook) { await p.evaluate((h) => { window[h](true); }, hook); await p.waitForTimeout(320); }
+    const seen = await p.evaluate(shown, "#" + id);
+    swept += seen.length;
+    const hit = seen.find((s) => s.indexOf(WORD) >= 0 && /[0-9]/.test(s));
+    if (hit && !letters) letters = id + ": " + hit.trim();
+    const unit = seen.find((s) => new RegExp("(?:[0-9]|" + HAN_ONE + ") ?" + SHOT).test(s));
+    if (unit && !oldUnit) oldUnit = id + ": " + unit.trim();
+    const dotted = seen.find((s) => BULLETS.some((d) => s.indexOf(d) >= 0));
+    if (dotted && !dots) dots = id + ": " + dotted.trim();
+    if (hook) { await p.evaluate((h) => { window[h](false); }, hook); await p.waitForTimeout(120); }
+  }
+  check("instrument:the-wordless-surfaces-had-words", swept > 0, swept + " text nodes over " + PROSE.length + " surfaces");
+  check("price:the-wordless-surfaces-say-no-currency-in-letters", letters === "", letters || "clean");
+  check("unit:the-wordless-surfaces-count-rounds-in-the-new-word", oldUnit === "", oldUnit || "clean");
+  check("prose:the-wordless-surfaces-join-values-with-words-not-a-bullet", dots === "", dots || "clean");
+
   // 대조군. 상점에 재화 이름을 글자로 심어 두면 이 자가 그것을 잡아야 한다.
   await p.evaluate((h) => { window.__shop(true); }, "__shop");
   await p.waitForTimeout(320);

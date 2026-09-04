@@ -709,7 +709,7 @@ function recordRows() {
 
 // 만남 버튼 글자. 문은 판정이 열고, 값을 어떻게 보여 줄지는 화면이 정한다.
 function dateLabel(g) {
-  if (g.open) return '만나러 간다 · ' + SW(g.cost);
+  if (g.open) return SW(g.cost) + ' 내고 만나러 간다';
   if (g.short > 0) return SW(g.short) + ' 모자라다';
   return g.why;
 }
@@ -745,8 +745,8 @@ function rapportRows() {
     const face = tier > 0 ? tier + '단계' : '얼굴만 익었다';
     // 만남은 이 사람에게 붙은 행동이라 그 줄 안에 둔다. 못 누르는 사유도 버튼이 직접 말한다.
     const g = dateGate(state.rapport, city, passer, state.wallet.coin);
-    return '<div class="note"><b>' + cityAt(city).name + ' · ' + who + '</b><i>말 섞은 횟수 ' + n
-      + ' · ' + face + ' · 한눈팔기 ' + aid + '% 감소 · 팔로워 +' + fans + '%</i>'
+    return '<div class="note"><b>' + cityAt(city).name + '에서 마주친 ' + who + '</b><i>말 섞은 횟수 ' + n
+      + '. ' + face + '. 한눈팔기 ' + aid + '% 감소, 팔로워 +' + fans + '%</i>'
       + '<button class="go" data-city="' + city + '" data-passer="' + passer + '"' + (g.open ? '' : ' disabled') + '>' + dateLabel(g) + '</button></div>';
   }).join('');
   return head + rows;
@@ -766,7 +766,7 @@ function renderMe() {
     ? k.traits.map((t) => '<div class="note"><b>' + t + '</b><i>' + (TRAITS[t] ? TRAITS[t].note : '') + '</i></div>').join('')
     : '<div class="note dim"><span>달린 특성이 없다. 명단에서 데려오면 붙어 온다</span></div>';
   const hidden = HIDDEN.map((h) => '<div class="note"><b>' + HIDDEN_LABEL[h] + '</b><i>' + hiddenBand(h, k[h]) + '</i></div>').join('');
-  box.innerHTML = '<h4>' + name + '<small>Lv ' + k.level + ' · ' + k.height + 'cm · ' + k.weight + 'kg</small></h4>'
+  box.innerHTML = '<h4>' + name + '<small><i>Lv ' + k.level + '</i><i>' + k.height + 'cm</i><i>' + k.weight + 'kg</i></small></h4>'
     + '<div class="card"><div class="grid">' + grid + '</div>' + traits + hidden + rapportRows() + recordRows() + '</div>'
     + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeMe;
@@ -791,14 +791,14 @@ function renderDate(city, passer, done) {
   if (done) {
     box.innerHTML = '<h4>' + who + '</h4>'
       + '<div class="out">' + done.line + '<i class="' + (done.won ? 'win' : 'lose') + '">'
-      + '팔로워 ' + (done.fans > 0 ? '+' : '') + done.fans + ' · '
+      + '팔로워 ' + (done.fans > 0 ? '+' : '') + done.fans + '. '
       + (done.won ? '이 동네에서는 이제 눈이 안 흔들린다' : '처음부터 다시 말을 섞어야 한다')
       + '</i></div><button class="close">닫기</button>';
     box.querySelector('.close').onclick = closeDate;
     return;
   }
   const moves = MOVES.map((m) => '<button data-move="' + m.id + '">' + m.label
-    + '<em>' + CAUSE_LABEL[m.stat] + ' ' + state.keeper[m.stat] + ' · 성공 ' + dateOdds(state.keeper, m.id) + '%</em></button>').join('');
+    + '<em>' + CAUSE_LABEL[m.stat] + ' ' + state.keeper[m.stat] + '로 성공 ' + dateOdds(state.keeper, m.id) + '%</em></button>').join('');
   box.innerHTML = '<h4>' + who + '</h4><div class="card">' + moves + '</div><button class="close">그냥 지나간다</button>';
   box.querySelector('.close').onclick = closeDate;
   for (const b of box.querySelectorAll('[data-move]')) b.onclick = () => commitDate(city, passer, b.dataset.move);
