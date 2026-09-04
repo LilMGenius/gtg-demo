@@ -227,6 +227,34 @@ function placement(keeper, shot) {
   };
 }
 
+/* 판정 창. 접촉의 여유를 재는 항 가운데 시간에 관한 것만 떼어 놓는다.
+   화면의 타이밍 자가 이 값을 그대로 그린다. 두 곳에서 각자 구하면 그린 창과 재는 창이 갈리고,
+   플레이어가 자를 못 믿게 되는 순간 그 자는 없느니만 못하다. */
+export function judgeWindow(keeper, shot, input, over) {
+  const form = keeper.form || 0;
+  const s = (k) => clamp((over && k in over ? over[k] : keeper[k]) + form, 1, 10);
+  const power = over && "kickerPower" in over ? over.kickerPower : shot.kicker.power;
+  const flight = clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
+  // 판정 창과 기동. 반응속도가 인지이고 민첩성이 기동이다.
+  let windowMs = WIN0 + 13 * s("reflex") + 4 * s("composure");
+  // 연속 실점은 다음 구를 좁힌다. 회복탄력성이 그 좁혀짐을 먹는다.
+  const streak = Math.min(keeper.streak || 0, 3);
+  if (streak > 0) windowMs -= streak * (10 - s("resilience")) * STREAK_K;
+  // 강슛은 창을 좁힌다. 침착성이 그 좁혀짐을 막는다.
+  if (shot.strong) windowMs -= (10 - s("composure")) * 10;
+  // 무게는 기동을 늦춘다. 정면 공은 서 있는 자리로 오므로 기동이 없고, 그래서 이 항도 없다.
+  let moveDelay = 104 - 12 * s("agility");
+  if (shot.course !== "정면") moveDelay += (keeper.weight - 84) * W_MOVE;
+  // 큰 키는 낮은 공까지 몸을 접어 내리는 데 시간이 더 든다.
+  if (shot.course === "하단") moveDelay += (keeper.height - 188) * H_LOW;
+  // 축구화. 흙을 무는 만큼 첫 발이 빨리 뜬다. 선반 밖의 값은 저장이 오염된 것이므로 잘라 넣는다.
+  moveDelay -= Math.min(3, Math.max(0, Math.floor(Number(input && input.studs) || 0))) * STUD_MS;
+  const markerAt = flight * 0.72;
+  const reactBudget = (flight - markerAt) * 1000;
+  // 이 값만큼 이르거나 늦어도 timing이 0 이상이다. 자는 이 폭을 노랑으로 칠한다.
+  return { flight, markerAt, slackMs: windowMs + reactBudget - moveDelay };
+}
+
 // 1단 접촉의 여유. 양수면 닿는다.
 // 각 항의 주인은 STATS 15절이 정한다. 여기서 계수를 발명하지 않는다.
 function contactMargin(keeper, shot, input, over) {
@@ -241,29 +269,13 @@ function contactMargin(keeper, shot, input, over) {
   const offball = s("offball");
   const lateral = lateralGap(offball);
   const depth = 0.12;
-  const markerAt = flight * 0.72;
 
   const advance = input.advance;
   const forward = depth + advance;
 
-  // 판정 창과 기동. 반응속도가 인지이고 민첩성이 기동이다.
-  let windowMs = WIN0 + 13 * s("reflex") + 4 * s("composure");
-  // 연속 실점은 다음 구를 좁힌다. 회복탄력성이 그 좁혀짐을 먹는다.
-  const streak = Math.min(keeper.streak || 0, 3);
-  if (streak > 0) windowMs -= streak * (10 - s("resilience")) * STREAK_K;
-  // 강슛은 창을 좁힌다. 침착성이 그 좁혀짐을 막는다.
-  if (shot.strong) windowMs -= (10 - s("composure")) * 10;
   const SCALE_MS = 200;
-  // 무게는 기동을 늦춘다. 정면 공은 서 있는 자리로 오므로 기동이 없고, 그래서 이 항도 없다.
-  let moveDelay = 104 - 12 * s("agility");
-  if (shot.course !== "정면") moveDelay += (keeper.weight - 84) * W_MOVE;
-  // 큰 키는 낮은 공까지 몸을 접어 내리는 데 시간이 더 든다.
-  if (shot.course === "하단") moveDelay += (keeper.height - 188) * H_LOW;
-  // 축구화. 흙을 무는 만큼 첫 발이 빨리 뜬다. 선반 밖의 값은 저장이 오염된 것이므로 잘라 넣는다.
-  moveDelay -= Math.min(3, Math.max(0, Math.floor(Number(input.studs) || 0))) * STUD_MS;
-
-  const reactBudget = (flight - markerAt) * 1000;
-  const slack = windowMs + reactBudget - moveDelay - Math.abs(input.errMs);
+  // 시간 항은 judgeWindow가 소유한다. 화면의 자가 그리는 그 창이 여기서 그대로 쓰인다.
+  const slack = judgeWindow(keeper, shot, input, over).slackMs - Math.abs(input.errMs);
   // 상한을 두지 않는다. 늦으면 늦은 만큼 손이 짧아져야 그 늦음이 원인으로 잡힌다.
   const timing = clamp(slack / SCALE_MS, -1.2, 1.35);
 

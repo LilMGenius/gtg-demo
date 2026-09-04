@@ -1,5 +1,5 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
-import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain, GEAR_STEP } from '../../src/chain.mjs';
+import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain, judgeWindow, GEAR_STEP } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
 import { KEEPERS, keeperCost, TRAITS, PULL_COST, PULL_BULK, TICKET_CAP, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
 import { createScene } from './render/scene.mjs';
@@ -349,19 +349,35 @@ function coinPop(n) {
   s.addEventListener('animationend', () => s.remove());
 }
 
-// 타이밍 자. 맞는 구간의 자리와 폭은 그 구의 비행시간이 정한다.
-// 판정에 쓰는 값을 그대로 그리는 것이므로 여기서 새 규칙이 생기지 않는다.
+/* 타이밍 자. 노란 구간은 판정이 쓰는 그 창이고, 폭은 judgeWindow가 소유한다.
+   240ms 상수를 그리던 동안에는 반응속도 3인 키퍼와 10인 키퍼가 같은 창을 보고 있었다.
+   꼬리 260ms. 900ms를 달 때는 창이 레인 왼쪽 38%에 몰리고 바늘이 창을 지나고도 한참 달려,
+   이 자가 무엇을 세는지가 화면에서 안 읽혔다. */
+const BEAT_TAIL_MS = 260;
+let lastBeat = null;
+
 function beatStart(shot) {
   const b = el('beat');
-  const span = shot.flight * 1000 + 900;
-  const center = (shot.flight * 720) / span;
-  const width = 240 / span;
+  const span = shot.flight * 1000 + BEAT_TAIL_MS;
+  const w = judgeWindow(state.keeper, shot, { studs: state.gear.studs });
+  const center = (w.markerAt * 1000) / span;
+  // 창이 레인 앞뒤로 넘치면 잘라 그린다. 0.04는 가장 좁은 창도 한 칸으로는 보이게 하는 하한이다.
+  const half = Math.min(center, Math.max(0.04, w.slackMs / span));
+  const left = Math.max(0, center - half);
+  const width = Math.min(1 - left, half * 2);
   b.hidden = false;
   b.classList.remove('hit');
   b.style.setProperty('--beat', span.toFixed(0) + 'ms');
   const lane = b.querySelector('.lane');
-  lane.style.setProperty('--hot-l', ((center - width / 2) * 100).toFixed(2) + '%');
+  lane.style.setProperty('--hot-l', (left * 100).toFixed(2) + '%');
   lane.style.setProperty('--hot-w', (width * 100).toFixed(2) + '%');
+  lastBeat = { spanMs: span, markerAt: w.markerAt, slackMs: w.slackMs, flight: shot.flight,
+    strong: Boolean(shot.strong), course: shot.course, studs: state.gear.studs,
+    /* 그릴 때의 키퍼를 그대로 뜬다. 나중에 읽으면 그 사이에 연속 실점과 컨디션이 바뀌어,
+       같은 구를 두 값으로 재게 된다. 실제로 이 자를 세우다 그렇게 48ms가 갈렸다. */
+    keeper: { reflex: state.keeper.reflex, composure: state.keeper.composure, agility: state.keeper.agility,
+      resilience: state.keeper.resilience, height: state.keeper.height, weight: state.keeper.weight,
+      streak: state.keeper.streak || 0, form: state.keeper.form || 0 } };
   // 같은 노드에 시간만 갈면 애니메이션이 다시 돌지 않는다. 자막과 같은 이유다.
   const run = document.createElement('i');
   run.className = 'run';
@@ -407,7 +423,8 @@ function nextShot() {
   // 창이 닫히면 손가락 대신 자동 입력이 친다. 늦은 만큼은 스탯이 아니라 손가락 탓이다.
   stage.cancel(timer);
   // 자동은 손가락만 대신한다. 공은 같은 시간을 날고 대기시간은 그대로다.
-  const wait = state.auto ? Math.max(0, pressAt - performance.now()) : shot.flight * 1000 + 900;
+  // 안 누르고 넘어가는 시간도 자와 같아야 한다. 바늘이 끝난 뒤에도 눌리면 자가 거짓말을 한 것이다.
+  const wait = state.auto ? Math.max(0, pressAt - performance.now()) : shot.flight * 1000 + BEAT_TAIL_MS;
   timer = stage.after(wait / 1000, () => { if (state.phase === 'wait') commit(null); });
 }
 
@@ -1491,6 +1508,13 @@ el('purse').onpointerdown = (e) => {
 window.__squad = () => ({ squad: state.squad.map((k) => k.name), pick: state.pick, coin: state.wallet.coin });
 window.__roster = (open) => { if (open) openRoster(); else closeRoster(); };
 window.__gym = (open) => { if (open) openGym(); else closeGym(); };
+// 그린 창과 잰 창을 맞대는 자리. 화면이 읽은 값과 판정이 쓰는 값을 같이 돌려준다.
+window.__beat = () => {
+  const lane = el('beat').querySelector('.lane');
+  const st = getComputedStyle(lane);
+  return Object.assign({ hotL: st.getPropertyValue('--hot-l').trim(), hotW: st.getPropertyValue('--hot-w').trim() },
+    lastBeat || {});
+};
 window.__gram = (open) => { if (open) openGram(); else closeGram(); };
 window.__me = (open) => { if (open) openMe(); else closeMe(); };
 // 만남은 내 정보 안의 버튼으로만 열린다. 게이트가 그 버튼까지 클릭해서 오게 하려면 좌표가 필요하다.
