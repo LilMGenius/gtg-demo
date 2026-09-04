@@ -84,4 +84,21 @@ console.log("");
 console.log("C2 귀속   " + (c2 ? "PASS" : "FAIL") + "  원장 밖 원인 " + orphans.length + "건");
 console.log("C3 비독점 " + (c3 ? "PASS" : "FAIL") + "  1위 원인 " + distinctTops + "종");
 
-if (!c2 || !c3) process.exit(1);
+
+/* C4 지배. 1위가 구간마다 바뀌어도 한 원인이 실점의 절반을 먹고 있으면 그 게임은 스탯이 하나다.
+   1위의 이름만 보는 C3는 그 쓸림을 못 본다. 원인이 열일곱이므로 균등은 5.9퍼센트이고,
+   그 네 배인 25를 트립와이어로 둔다. 지금 최악은 14.3이라 이 수는 통과용으로 맞춘 것이 아니다. */
+const SHARE_CAP = 25;
+let worstShare = 0;
+let worstAt = "";
+for (const l of LEVELS) {
+  const v = table.get(l);
+  for (const [k, n] of v.counts) {
+    const share = 100 * n / v.levelConceded;
+    if (share > worstShare) { worstShare = share; worstAt = "Lv" + l + " " + (CAUSE_LABEL[k] || k); }
+  }
+}
+const c4 = worstShare <= SHARE_CAP;
+console.log("C4 지배   " + (c4 ? "PASS" : "FAIL") + "  최대 비중 " + worstShare.toFixed(1) + "% (" + worstAt + ") 바 " + SHARE_CAP + "%");
+
+if (!c2 || !c3 || !c4) process.exit(1);
