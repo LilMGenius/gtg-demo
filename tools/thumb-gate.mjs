@@ -72,7 +72,13 @@ try {
         c.drawImage(im, 0, 0);
         const d = c.getImageData(0, 0, im.width, im.height).data;
         const a = [];
-        for (let i = 0; i < d.length; i += 4) a.push(d[i] > 150 && d[i + 1] < 90 && d[i + 2] > 150 && d[i + 3] > 16 ? 1 : 0);
+        // 색조로 고른다. 밝기로 고르면 등을 보는 칸처럼 빛이 안 닿는 면에서 표식이 어두워져
+        // 칠해진 자리가 0으로 읽힌다. 표식은 초록이 0이라 어두워져도 비율이 살아 있다.
+        // 1.9배는 가장 보라에 가까운 상품인 문어 빨판 장갑(143,79,209)이 안 걸리는 값이다.
+        for (let i = 0; i < d.length; i += 4) {
+          const r = d[i], g2 = d[i + 1], bl = d[i + 2];
+          a.push(r > g2 * 1.9 && bl > g2 * 1.9 && r > 40 && bl > 40 && d[i + 3] > 16 ? 1 : 0);
+        }
         a.w = im.width; a.h = im.height;
         res(a);
       };
