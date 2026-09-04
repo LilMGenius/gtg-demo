@@ -1468,10 +1468,15 @@ const TOUCHED = new Set(['contact']);
           );
           break;
         case 'beat':
-          keeper.position.z = lerp(CHARGE_Z, CHARGE_Z + 5.2, e);
-          keeper.rotation.z = lerp(keeper.rotation.z, Math.sin(u * 16) * 0.12, damp(0.34));
+          /* 이 갈래만 회차 편차를 하나도 안 쓰고 있었다. 열다섯 종류 중 유일하게
+             제 잡음의 두 배 남짓밖에 안 벌어져, 두 번째 재생부터는 결과만 남고 사건이 안 보였다.
+             달려 나간 거리와 몸의 흔들림과 제껴진 키커가 넘어지는 각을 회차마다 흔든다.
+             폭은 다른 갈래가 쓰는 것과 같은 규모라 이 사건이 다른 사건으로 읽히지 않는다. */
+          keeper.position.z = lerp(CHARGE_Z, CHARGE_Z + 5.2 + (tail.vary.b - 0.5) * 1.6, e);
+          keeper.rotation.z = lerp(keeper.rotation.z,
+            Math.sin(u * (16 + tail.vary.c * 8)) * (0.12 + (tail.vary.a - 0.5) * 0.06), damp(0.34));
           ball.position.set(keeper.position.x, 0.14, keeper.position.z + 0.7);
-          kicker.rotation.z = lerp(0, 1.3, e);
+          kicker.rotation.z = lerp(0, 1.3 + (tail.vary.a - 0.5) * 0.5, e);
           break;
         case 'lost':
           // 뺏겼다. 키퍼는 저기 나가 있고 골대가 비어 있다.
