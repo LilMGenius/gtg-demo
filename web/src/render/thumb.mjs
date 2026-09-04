@@ -27,7 +27,9 @@ const AIM = {
   studs: { part: "boot", dist: 0.72, lift: -0.02, high: -0.34 },
   pads: { part: "torso", dist: 1.5, lift: 0 },
   socks: { part: "shin", dist: 1.05, lift: 0.02 },
-  hair: { part: "head", dist: 0.8, lift: 0 },
+  // 겨냥점은 머리 한가운데인데 파는 것은 그 위에 얹힌 껍데기다. 보정 없이 잡으면
+  // 모히칸의 무게중심이 칸 위에서 13퍼센트 지점에 걸려 볏이 잘린다.
+  hair: { part: "head", dist: 0.78, lift: 0.1, high: 0.1 },
   ink: { part: "arm", dist: 1.1, lift: 0 },
   // 탈의실의 온몸. 부위가 아니라 사람을 보여 준다. 무엇을 걸쳤는지가 아니라
   // 걸친 뒤의 내가 어떻게 보이는지가 이 칸이 답하는 질문이다.

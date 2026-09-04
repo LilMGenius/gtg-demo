@@ -73,6 +73,7 @@ try {
         const d = c.getImageData(0, 0, im.width, im.height).data;
         const a = [];
         for (let i = 0; i < d.length; i += 4) a.push(d[i] > 150 && d[i + 1] < 90 && d[i + 2] > 150 && d[i + 3] > 16 ? 1 : 0);
+        a.w = im.width; a.h = im.height;
         res(a);
       };
       im.src = url;
@@ -95,7 +96,13 @@ try {
       const twice = await mask(bake(ranks[ranks.length - 1]));
       const pairs = [];
       for (let i = 0; i < ms.length; i++) for (let j = i + 1; j < ms.length; j++) pairs.push({ n: ranks[i] + "-" + ranks[j], v: iou(ms[i], ms[j]) });
-      out.push({ tab: s.tab, cover: ms.map((x) => x.reduce((a, b) => a + b, 0)), pairs, control: iou(ms[ms.length - 1], twice) });
+      // 무게중심. 물건이 칸 구석에 걸쳐 있으면 화소 수는 넉넉해도 사람은 잘린 물건을 본다.
+      const mid = ms.map((x) => {
+        let sx = 0, sy = 0, n = 0;
+        for (let i = 0; i < x.length; i++) if (x[i]) { sx += i % x.w; sy += Math.floor(i / x.w); n++; }
+        return n ? { x: sx / n / x.w, y: sy / n / x.h } : { x: -1, y: -1 };
+      });
+      out.push({ tab: s.tab, cover: ms.map((x) => x.reduce((a, b) => a + b, 0)), pairs, mid, control: iou(ms[ms.length - 1], twice) });
     }
     return out;
   });
@@ -109,6 +116,11 @@ try {
     // 1000화소. 굽는 칸의 1퍼센트쯤이다. 이 아래로 내려간 등급은 껍데기가 몸 안으로 들어가
     // 그 값을 치른 사람만 맨몸이 된다. 실제로 높이를 줄여 짧은 머리를 만들다 이 값이 227까지 내려갔다.
     check("thumb:" + s.tab + ":every-rank-paints-something", s.cover.every((n) => n >= 1000), s.cover.join(", "));
+    // 가운데 60퍼센트. 겨냥이 어긋나면 물건이 변으로 밀리고, 그때 칸에 담기는 것은 물건이 아니라
+    // 그 옆에 붙은 몸이다. 축구화 칸이 정강이만 담고 있던 것을 아무 축도 못 봤다.
+    const off = s.mid.filter((m) => m.x < 0.2 || m.x > 0.8 || m.y < 0.2 || m.y > 0.8);
+    check("thumb:" + s.tab + ":the-goods-sit-inside-the-frame", off.length === 0,
+      s.mid.map((m) => m.x.toFixed(2) + "/" + m.y.toFixed(2)).join(" "));
     check("control:" + s.tab + ":the-same-cut-paints-the-same-pixels", s.control > 0.999, s.control.toFixed(4));
   }
 
