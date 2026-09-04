@@ -74,6 +74,45 @@ try {
     return hit;
   }, { old: OLD });
   check("control:a-planted-copy-of-the-old-name-is-found", caught === 1, "planted 1, found " + caught);
+
+  /* 선반이 장르 문법을 따르는지. 버튼은 값을 들고, 못 사는 이유는 문장이 아니라 상태와 배지가 말하고,
+     확률은 접혀 있고, 보유 이용권은 문장이 아니라 숫자다. 넷 다 화면에서 읽어 판정한다. */
+  const shelf = await p.evaluate(() => {
+    const buys = [...document.querySelectorAll("#shop .buy.pull")];
+    const det = document.querySelector("#shop .odds");
+    const held = document.querySelector("#shop .held");
+    return {
+      n: buys.length,
+      // 회차와 값이 각자 자기 자리에 있는가. 값은 글자가 아니라 데이터에서 읽는다.
+      shaped: buys.map((e) => ({
+        times: (e.querySelector("b") || {}).textContent || "",
+        coin: e.querySelector("[data-coin]") ? Number(e.querySelector("[data-coin]").dataset.coin) : null,
+        ticket: Boolean(e.querySelector("i svg")),
+        text: e.textContent
+      })),
+      oddsOpen: det ? det.open : null,
+      oddsText: det ? (det.querySelector("em") || {}).textContent || "" : "",
+      heldText: held ? held.textContent.trim() : null,
+      heldNum: held && held.querySelector("b") ? held.querySelector("b").textContent.trim() : null
+    };
+  });
+
+  check("instrument:both-draw-buttons-stand", shelf.n === 2, shelf.n + " buttons");
+  check("market:each-button-says-how-many-and-what-it-costs",
+    shelf.shaped.every((s) => /^[0-9]+회$/.test(s.times) && (s.coin !== null || s.ticket)),
+    shelf.shaped.map((s) => s.times + " " + (s.coin === null ? "ticket" : s.coin)).join(", "));
+  // 버튼이 설명문이 되던 자리. 셋 다 장르가 상태로 말하는 것을 글자로 적고 있었다.
+  const chatty = ["모자라다", "뿐이다", "내고", "다 모았다"];
+  check("market:no-button-explains-itself-in-a-sentence",
+    shelf.shaped.every((s) => chatty.every((w) => !s.text.includes(w))),
+    shelf.shaped.map((s) => s.text.replace(/\s+/g, " ").trim()).join(" | "));
+  check("market:the-odds-are-folded-away", shelf.oddsOpen === false, "open " + shelf.oddsOpen);
+  // 접힌 것과 없는 것은 다르다. 펼쳤을 때 확률 글자가 실제로 있는지 확인한다.
+  check("control:the-folded-panel-holds-the-odds", /%/.test(shelf.oddsText),
+    shelf.oddsText.replace(/\s+/g, " ").trim().slice(0, 60) || "empty");
+  check("market:the-ticket-balance-is-a-number",
+    shelf.heldNum !== null && /^[0-9,]+$/.test(shelf.heldNum) && !/있다|장/.test(shelf.heldText),
+    shelf.heldText);
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 

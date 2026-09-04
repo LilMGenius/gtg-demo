@@ -191,6 +191,10 @@ const IC_DOWN = G('컨디션 나쁨', R(9, 0, 6, 12) + R(4.5, 12, 15, 3) + R(7.5
 // 버프. 목이 좁고 배가 넓은 병 하나면 마시는 물건인 것이 문장 없이 선다.
 const IC_BUFF = G('버프', R(9, 0, 6, 3) + R(9, 3, 6, 3) + R(6, 6, 12, 3) + R(4.5, 9, 15, 12)
   + R(6, 21, 12, 3));
+/* 이용권. 완봉으로만 들어오는 자원이라 육수와도 스폰과도 다른 그림이어야 한다.
+   가로로 누운 테두리와 가운데 절취선이면 표로 읽히고, 물방울이나 별 실루엣과 안 겹친다. */
+const IC_TICKET = G('이용권', R(3, 6, 18, 3) + R(3, 15, 18, 3) + R(3, 9, 3, 6) + R(18, 9, 3, 6)
+  + R(12, 9, 3, 3) + R(12, 15, 3, 3));
 /* 종류마다 다른 그림. 병 하나로 셋을 다 그리면 지금 무엇이 걸려 있는지가 상점을 열어야 아는 값이 된다.
    자양강장제는 마시는 물건이라 병을 그대로 쓴다. 나머지 둘은 3px 격자에서 실루엣이 안 겹치게 골랐다. */
 const BUFF_ICON = {
@@ -1495,30 +1499,30 @@ function pullShelf(all) {
   const rows = [1, PULL_BULK].map((want) => {
     const bill = pullBill(want, held, state.wallet.coin, cost);
     const left = Math.min(want, pool.length);
-    let label = bill.cost > 0 ? SW(bill.cost) + ' 내고 ' + want + '장' : '이용권 ' + bill.free + '장으로 ' + want + '장';
-    let off = false;
-    // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 값이 모자란 것인지 살 것이 없는 것인지 모른다.
-    if (!pool.length) {
-      label = '이 갈래는 다 모았다';
-      off = true;
-    } else if (!bill.afford) {
-      label = SW(bill.cost - state.wallet.coin) + ' 모자라다';
-      off = true;
-    } else if (left < want) {
-      label = '남은 카드가 ' + left + '장뿐이다';
-      off = true;
-    }
-    return '<button class="buy" data-want="' + want + '"' + (off ? ' disabled' : '') + '>' + label + '</button>';
+    /* 뽑기 버튼은 장르가 오래 쓴 자리를 그대로 쓴다. 큰 글씨로 몇 회인지, 그 아래 값이다.
+       내고 몇 장이라는 문장은 버튼이 할 말이 아니고, 못 사는 이유도 버튼 글자가 아니라
+       비활성 상태가 이미 말한다. 사유는 버튼 위 배지가 한 마디로 받는다. */
+    const off = !pool.length || !bill.afford || left < want;
+    // 이용권으로 다 내는 회차는 값 대신 이용권 수를 적는다. 나가는 것이 다른 자원이다.
+    const price = bill.cost > 0 ? SW(bill.cost) : IC_TICKET + bill.free;
+    const why = !pool.length ? '품절' : (!bill.afford ? '잔고 부족' : (left < want ? '남은 카드 ' + left : ''));
+    return '<button class="buy pull" data-want="' + want + '"' + (off ? ' disabled' : '') + '>'
+      + (why ? '<u>' + why + '</u>' : '') + '<b>' + want + '회</b><i>' + price + '</i></button>';
   }).join('');
-  const odds = pool.length ? '<em>' + shopOdds(pool) + '<br>남은 카드 ' + pool.length + '장</em>' : '';
+  /* 확률은 사는 자리가 아니라 확인하는 자리다. 본문에 두 줄로 깔면 살 것을 고르는 눈이
+     매번 그 줄을 지나간다. 눌러야 열리는 칸으로 뺀다. */
+  const odds = pool.length
+    ? '<details class="odds"><summary>확률과 남은 카드</summary><em>' + shopOdds(pool)
+      + '<br>남은 카드 ' + pool.length + '장</em></details>'
+    : '';
   // 트레이는 뽑은 카드가 없어도 자리를 만들지 않는다. 빈 상자가 서 있으면 뽑기 전부터 결과 칸이 보인다.
   const got = lastPull.length ? '<div class="tray" data-shown="0"></div>' : '';
-  // 이용권이 몇 장 남았는지는 사기 전에 보여야 한다. 열어 봐야 아는 잔고는 방치형에서 안 열린다.
-  const bank = kind.ticketable
-    ? '<em class="held">완봉하면 이용권 한 장. 지금 ' + state.tickets + '장 있다</em>'
-    : '<em class="held">이 갈래는 이용권을 안 받는다</em>';
-  return '<h4>이적시장</h4>' + tabs + '<div class="card">' + kind.note + '. 한 장에 '
-    + SW(cost) + odds + bank + '<div class="buys">' + rows + '</div>' + got
+  /* 보유 이용권은 문장이 아니라 숫자다. 지금 몇 장 있다고 말하는 대신 아이콘 옆에 수를 세운다.
+     이 갈래가 이용권을 안 받으면 그 줄을 안 세운다. 없는 자원을 설명하는 줄은 읽을 것만 는다. */
+  const bank = kind.ticketable ? '<span class="held">' + IC_TICKET + '<b>' + state.tickets + '</b></span>' : '';
+  return '<h4>이적시장</h4>' + tabs + '<div class="card">'
+    + '<div class="lede"><em>' + kind.note + '</em>' + bank + '</div>' + odds
+    + '<div class="buys">' + rows + '</div>' + got
     + '</div>';
 }// 봇은 소모형이라 SHELVES에 못 넣는다. 등급을 갖는 게 아니라 분을 갖는다.
 function botShelf() {

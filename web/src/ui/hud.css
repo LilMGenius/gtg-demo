@@ -728,8 +728,33 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #shop .buy:not(:disabled):active{transform:translateY(3px);box-shadow:2px 2px 0 var(--edge)}
 /* 못 누르는 이유는 버튼 글자 자체가 말한다. 회색만으로는 왜 죽었는지가 안 남는다. */
 #shop .buy:disabled{background:#141a12;color:#f6efdc5c;cursor:default}
-/* 이용권 잔고 줄. 값 아래 확률 줄과 버튼 사이에 서서, 사기 전에 몇 장 남았는지를 말한다. */
-#shop .card .held{display:block;margin-top:9px;color:#ffd83d}
+/* 갈래 한 줄 소개와 보유 이용권. 문장은 왼쪽, 수는 오른쪽에 선다. 한 줄 안에 두면
+   설명을 읽는 눈과 잔고를 세는 눈이 같은 높이에서 끝난다. */
+#shop .card .lede{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left}
+#shop .card .lede em{margin:0;flex:1}
+/* 보유 이용권. 지금 몇 장 있다는 문장 대신 아이콘 옆 숫자다. 재화 칩과 같은 문법이다. */
+#shop .card .held{display:flex;align-items:center;gap:5px;flex:none;color:#ffd83d}
+#shop .card .held svg{width:15px;height:15px;display:block}
+#shop .card .held b{font-family:var(--disp);font-size:15px;font-weight:400}
+/* 확률은 접힌 채로 선다. 펼치기 전에는 한 줄만 먹고, 살 것을 고르는 눈을 안 붙잡는다. */
+#shop .odds{margin-top:10px;text-align:left}
+#shop .odds summary{cursor:pointer;list-style:none;display:inline-block;
+  padding:4px 10px 6px;border:2px solid var(--edge);background:var(--panel);
+  color:var(--dim);font-size:12px;font-weight:700;box-shadow:3px 3px 0 var(--edge)}
+#shop .odds summary::-webkit-details-marker{display:none}
+#shop .odds[open] summary{background:#2b3a22;color:#ffd83d}
+#shop .odds em{margin-top:8px}
+/* 뽑기 버튼. 큰 글씨가 회차, 아래가 값이다. 못 사는 이유는 버튼 위 배지가 한 마디로 받고
+   버튼 글자는 언제나 같은 두 줄이라, 살 수 있을 때와 없을 때 버튼이 다른 물건으로 안 읽힌다. */
+#shop .buy.pull{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:12px 0 13px;line-height:1.1}
+#shop .buy.pull b{font-family:var(--disp);font-size:22px;font-weight:400;color:inherit}
+#shop .buy.pull i{display:flex;align-items:center;gap:4px;font-style:normal;font-size:14px;font-weight:700}
+#shop .buy.pull i svg{width:14px;height:14px;display:block}
+/* 사유 배지. 버튼 위 모서리에 걸쳐 서서 버튼 안 글자를 밀어내지 않는다. */
+#shop .buy.pull u{position:absolute;top:-9px;left:50%;translate:-50% 0;text-decoration:none;
+  padding:2px 8px 3px;background:var(--bad);color:#0d110c;font-size:11px;font-weight:700;
+  border:2px solid var(--edge);white-space:nowrap}
 /* 한 장과 열 장을 나란히 둔다. 세로로 쌓으면 카드가 한 줄만큼 길어지고,
    세로 390px짜리 가로 모바일에서 그만큼 상점이 밀려 위쪽 탭이 화면 밖으로 나간다. */
 #shop .card .buys{display:flex;gap:9px;margin-top:13px}
