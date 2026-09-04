@@ -466,6 +466,21 @@ body.playing #hud{opacity:1}
 #me .grid span b{color:#ffd83d;font-weight:400}
 /* 만렙 칸. 더 줄 곳이 없다는 것이 수치보다 먼저 보여야 한다. */
 #me .grid span.max b{color:var(--good)}
+/* 지금 걸친 것. 왼쪽은 그 차림 그대로 구운 그림이고 오른쪽은 무엇을 걸쳤는지의 목록이다.
+   140px. 상점 탈의실이 쓰는 200px보다 좁게 잡아야 오른쪽 여덟 줄이 두 칸으로 선다. */
+#me .wear{display:flex;gap:10px;padding:12px 12px 11px;
+  border:var(--line) solid var(--edge);background:#1b2318;
+  box-shadow:6px 6px 0 var(--edge), var(--bevel)}
+#me .wear .shot{flex:0 0 140px;height:150px;background:#12180f;border:2px solid #ffffff14}
+#me .wear .shot img{width:100%;height:100%;object-fit:contain;display:block}
+/* 여덟 줄을 한 줄씩 쌓으면 능력치 격자보다 세로가 길어진다. 두 칸으로 접고 제목은 줄 전체를 쓴다. */
+#me .wear .on{flex:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px;align-content:start}
+#me .wear .on h5{grid-column:1 / -1;margin:0;font-family:var(--disp);font-size:14px;font-weight:400;
+  color:var(--dim);letter-spacing:.02em;line-height:1.25}
+#me .wear .on h5:not(:first-child){margin-top:6px}
+#me .wear .on i{font-style:normal;font-family:var(--body);font-size:13px;font-weight:400;color:var(--ink);
+  line-height:1.35}
+#me .wear .on i b{display:block;font-weight:400;font-size:11px;color:var(--dim)}
 #me .note{padding:9px 12px 11px;border:var(--line) solid var(--edge);background:#1b2318;
   color:var(--ink);font-family:var(--body);font-size:14px;font-weight:400;line-height:1.35;
   box-shadow:6px 6px 0 var(--edge), var(--bevel)}

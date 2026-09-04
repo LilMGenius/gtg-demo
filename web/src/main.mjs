@@ -756,6 +756,17 @@ function renderMe() {
   const box = el('me');
   const k = state.keeper;
   const name = k.name || '무명';
+  /* 지금 걸친 것. 이름은 선반 데이터에서 꺼낸다. 화면이 따로 적으면 선반이 바뀐 날 둘이 갈린다.
+     갈래를 둘로 나눈다. 몸에 걸친 여섯은 이 키퍼의 것이고 골대와 동네는 계정의 것이라,
+     사람을 바꾸면 앞의 여섯만 따라 바뀐다. 한 목록에 섞으면 그 차이가 화면에서 사라진다. */
+  const wearRow = (key) => {
+    const s = SHELVES[key];
+    return '<i data-wear="' + s.field + '"><b>' + s.head + '</b>' + s.at(state.gear[s.field]).name + '</i>';
+  };
+  const wear = '<div class="wear"><span class="shot"><img alt="' + name + '" src="'
+    + thumbURL('body', k, lookOf(state.gear)) + '"></span>'
+    + '<div class="on"><h5>몸에 걸친 것</h5>' + ['glove', 'boot', 'kit', 'sock', 'hair', 'ink'].map(wearRow).join('')
+    + '<h5>서 있는 자리</h5>' + ['frame', 'city'].map(wearRow).join('') + '</div></div>';
   const grid = GROWABLE.map((s) => {
     const v = k[s];
     // 10은 성장 상한이다. 훈련장과 같은 기준이어야 두 창이 어긋나지 않는다.
@@ -767,7 +778,7 @@ function renderMe() {
     : '<div class="note dim"><span>달린 특성이 없다. 명단에서 데려오면 붙어 온다</span></div>';
   const hidden = HIDDEN.map((h) => '<div class="note"><b>' + HIDDEN_LABEL[h] + '</b><i>' + hiddenBand(h, k[h]) + '</i></div>').join('');
   box.innerHTML = '<h4>' + name + '<small><i>Lv ' + k.level + '</i><i>' + k.height + 'cm</i><i>' + k.weight + 'kg</i></small></h4>'
-    + '<div class="card"><div class="grid">' + grid + '</div>' + traits + hidden + rapportRows() + recordRows() + '</div>'
+    + '<div class="card">' + wear + '<div class="grid">' + grid + '</div>' + traits + hidden + rapportRows() + recordRows() + '</div>'
     + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeMe;
   for (const b of box.querySelectorAll('.note .go')) b.onclick = () => openDate(Number(b.dataset.city), Number(b.dataset.passer));
