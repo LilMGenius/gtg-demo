@@ -62,8 +62,8 @@ try {
   const bare = await read();
   // 대조군. 아무것도 안 걸렸으면 배지가 없다. 늘 서 있는 배지는 상태를 말하는 것이 아니라 장식이다.
   check("control:nothing-is-worn-so-no-buff-badge-stands",
-    bare.tags.filter((x) => x.kind && x.kind.indexOf("form") !== 0).length === 0,
-    bare.tags.map((x) => x.kind).join(", ") || "only the condition badge, if any");
+    bare.tags.length === 0,
+    bare.tags.map((x) => x.kind).join(", ") || "no badge");
 
   const seen = {};
   for (const spec of BUFFS) {
@@ -97,12 +97,11 @@ try {
   check("aura:the-chip-and-the-badge-draw-the-same-glyph",
     kinds.every((k) => seen[k].chipGlyph === tagOf(k).glyph),
     kinds.map((k) => k + " " + (seen[k].chipGlyph === tagOf(k).glyph)).join(", "));
-  // 컨디션은 판당 한 번 굴러 칩과 배지가 같은 값을 읽는다. 한쪽만 뜨면 두 곳이 각자 굴린 것이다.
-  const formOk = kinds.every((k) => {
-    const tag = seen[k].tags.find((x) => x.kind === "form-up" || x.kind === "form-dn");
-    return seen[k].arrow === "" ? !tag : Boolean(tag) && tag.kind === "form-" + seen[k].arrow;
-  });
-  check("aura:the-condition-badge-agrees-with-the-chip", formOk,
+  /* 컨디션은 이 배지가 말하지 않는다. 상단 칩이 소유자이고, 이 자가 둘의 일치를 요구하던 동안
+     한 사실이 화면 두 자리에서 말해지는 상태가 축으로 굳어 있었다. 소유는 dupe 게이트가 잰다.
+     여기서는 배지에 컨디션이 섞여 들어오지 않는 것만 본다. */
+  check("aura:the-badge-carries-no-condition",
+    kinds.every((k) => seen[k].tags.every((x) => String(x.kind).indexOf("form") !== 0)),
     kinds.map((k) => k + " chip " + (seen[k].arrow || "flat")).join(", "));
   check("aura:the-badges-clear-the-beat-lane",
     kinds.every((k) => seen[k].gap >= seen[k].lift && seen[k].onScreen),

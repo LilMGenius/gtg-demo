@@ -120,6 +120,11 @@ window.__points = () => state.points;
 window.__wallet = () => state.wallet;
 // 버프가 몇 구 남아 판정에 들어갔는지도 상태로 재야 한다. 배지 숫자는 증거가 아니다.
 window.__buff = () => state.buff;
+// 기복은 판당 한 번 굴러서 계기가 원하는 쪽을 기다릴 수 없다. 값을 넣으면 그 값으로 다시 그린다.
+window.__form = (v) => {
+  if (v !== undefined) { state.form = Number(v); formChip(); aura(); }
+  return state.form;
+};
 // 장비가 판정에 실제로 들어갔는지는 화면 글자가 아니라 상태로 재야 한다.
 window.__gear = () => state.gear;
 // 봇이 실제로 섰는지는 자막이 아니라 상태로만 확인된다.
@@ -299,8 +304,9 @@ function pips() {
 }
 
 /* 지금 몸에 걸린 것. 잔고 줄의 숫자는 다음 판을 계획하는 값이고, 이 배지는 이번 판이 왜 이렇게
-   굴러가는지다. 판을 보는 눈이 화면 아래에 있으므로 배지도 키퍼 옆에 선다. 상단 칩까지 눈을 올리면
-   그 사이에 공이 지나간다. */
+   굴러가는지다. 판을 보는 눈이 화면 아래에 있으므로 배지도 키퍼 옆에 선다.
+   컨디션은 여기 없다. 상단 칩이 이미 같은 값을 화살표로 세우고 있어서, 한 값이 화면 두 자리에서
+   두 번 말해졌다. 화면에도 한 사실은 한 곳이 소유한다. 소유자는 칩이다. */
 function aura() {
   const box = el('aura');
   const rows = [];
@@ -309,11 +315,15 @@ function aura() {
     rows.push('<span class="tag buff" data-kind="' + state.buff.kind + '">' + buffIcon(state.buff.kind)
       + '<b>' + state.buff.shots + '</b><i>' + (spec ? spec.name : '') + '</i></span>');
   }
-  // 0.4는 상단 칩이 컨디션 화살표를 세우는 그 문턱이다. 두 자리가 다른 수를 쓰면 한쪽만 뜨는 판이 생긴다.
-  if (state.form > 0.4) rows.push('<span class="tag up" data-kind="form-up">' + IC_UP + '<i>몸이 가볍다</i></span>');
-  else if (state.form < -0.4) rows.push('<span class="tag dn" data-kind="form-dn">' + IC_DOWN + '<i>몸이 무겁다</i></span>');
   box.innerHTML = rows.join('');
   box.hidden = rows.length === 0;
+}
+
+/* 컨디션의 유일한 자리. 0.4는 화살표를 세우는 문턱이고, 이 값을 읽는 곳이 여기 하나뿐이라
+   두 자리가 다른 수를 쓸 일이 없다. */
+function formChip() {
+  el('form').innerHTML = state.form > 0.4 ? '<span class="up">' + IC_UP + '</span>'
+    : state.form < -0.4 ? '<span class="dn">' + IC_DOWN + '</span>' : '';
 }
 
 function setPad(on) {
@@ -412,10 +422,8 @@ function beatStop(byHand) {
 function nextSet() {
   // 기복은 판당 한 번 굴러서 그 판 내내 같은 값으로 선다.
   const form = rollForm(state.keeper, rng);
-  // 배지도 같은 값을 읽어야 한다. 화면 두 곳이 각자 굴리면 칩과 배지가 다른 컨디션을 말한다.
   state.form = form;
-  el('form').innerHTML = form > 0.4 ? '<span class="up">' + IC_UP + '</span>'
-    : form < -0.4 ? '<span class="dn">' + IC_DOWN + '</span>' : '';
+  formChip();
   state.shots = buildSet(rng, state.keeper.level, state.gear.city);
   state.i = 0;
   state.results = [];
