@@ -664,7 +664,8 @@ function renderGym() {
 // 창은 한 번에 하나만 선다. 닫기 전에 겹쳐 열리면 뒤엣것이 앞엣것을 덮고,
 // 닫았을 때 무엇이 남는지가 닫아 봐야 안다. 만남만 예외다. 내 정보 안의 버튼으로만
 // 열리고 닫으면 그 자리로 돌아가는 한 단계라 부모를 같이 닫으면 길이 끊긴다.
-const PANEL_SHUT = { gym: closeGym, roster: closeRoster, gram: closeGram, me: closeMe, date: closeDate, shop: closeShop, earn: closeEarn };
+// 개봉은 창이 아니라 상점이 낳는 화면이라 다른 창을 닫지 않는다. 다만 다른 창이 열리면 같이 걷힌다.
+const PANEL_SHUT = { gym: closeGym, roster: closeRoster, gram: closeGram, me: closeMe, date: closeDate, shop: closeShop, earn: closeEarn, pull: stopReveal };
 function shutOthers(keep) {
   const spare = keep === 'date' ? ['me', 'date'] : [keep];
   for (const id of Object.keys(PANEL_SHUT)) {
@@ -1445,45 +1446,67 @@ function bindGear(box) {
 }
 
 
-// 카드 한 장이 뒤집히기까지 기다리는 시간. 열 장이면 1.3초라, 한 장씩 뜨는 것이 보이면서도
-// 방치형에서 매번 참기 힘든 길이는 아니다. 급하면 트레이를 눌러 한 번에 연다.
-const REVEAL_MS = 130;
+/* 카드 한 장에 쓰는 시간. 뒤집기 0.34초가 끝나고도 앞면이 서 있어야 이름이 읽히므로
+   그보다 길어야 한다. 열 장이면 6.4초다. 상점 안 칩이 1.3초에 끝나던 것보다 길지만,
+   이 장르에서 뽑는 순간은 결과 통보가 아니라 파는 물건 자체다. 급하면 눌러서 건너뛴다.
+   명성 9 이상은 한 박자 더 세워 둔다. 마흔여섯 중 여덟이라 그 멈춤이 자주 오지 않는다. */
+const REVEAL_MS = 640;
+const RARE_HOLD_MS = 420;
+// 뒤집는 데 걸리는 시간. hud.css의 pullFlip과 같은 값이어야 앞면이 뒤집기 도중에 안 뜬다.
+const FLIP_MS = 340;
 
 // 한 장씩 연다. 예약을 하나만 들고 있으므로 다시 뽑으면 앞의 연출이 끊긴다.
 function revealNext() {
   revealTimer = 0;
   if (shown >= lastPull.length) return;
   shown += 1;
-  paintTray();
-  if (shown < lastPull.length) revealTimer = setTimeout(revealNext, REVEAL_MS);
+  paintPull();
+  if (shown < lastPull.length) {
+    const rare = lastPull[shown - 1].fame >= 9;
+    revealTimer = setTimeout(revealNext, REVEAL_MS + (rare ? RARE_HOLD_MS : 0));
+  }
 }
 
 // 남은 것을 한 번에 연다. 기다리는 것이 연출이지 벌은 아니다.
 function revealAll() {
   if (revealTimer) { clearTimeout(revealTimer); revealTimer = 0; }
   shown = lastPull.length;
-  paintTray();
+  paintPull();
 }
 
 function stopReveal() {
   if (revealTimer) { clearTimeout(revealTimer); revealTimer = 0; }
   lastPull = [];
   shown = 0;
+  el('pull').hidden = true;
 }
 
-/* 뽑은 카드를 담는 자리. 뒤집힌 카드만 이름을 보이고 나머지는 뒷면으로 서 있어,
-   몇 장이 남았는지가 보인다. 상점 전체를 다시 그리면 뒤집던 카드가 처음부터 다시 서므로
-   이 함수는 트레이 안쪽만 갈아 끼운다. */
-function paintTray() {
-  const tray = el('shop') && el('shop').querySelector('.tray');
-  if (!tray) return;
-  tray.innerHTML = lastPull.map((k, i) => {
-    const up = i < shown;
-    // 명성 9 이상은 뒤집히는 순간이 달라야 한다. 마흔여섯 중 여덟이라 자주 오지 않는다.
-    const rare = up && k.fame >= 9 ? ' rare' : '';
-    return '<i class="' + (up ? 'up' : 'down') + rare + '">' + (up ? k.name : '') + '</i>';
-  }).join('');
-  tray.dataset.shown = String(shown);
+/* 개봉 화면. 지금 서는 한 장과 이미 나온 줄과 남은 수를 그린다.
+   상점을 다시 그리지 않는다. 뒤에서 선반이 다시 서면 뒤집는 도중에 화면이 한 번 튄다. */
+function paintPull() {
+  const box = el('pull');
+  if (!lastPull.length) { box.hidden = true; return; }
+  const at = Math.max(0, shown - 1);
+  const k = lastPull[at];
+  const rare = k.fame >= 9;
+  const done = lastPull.slice(0, Math.max(0, shown - 1))
+    .map((c) => '<i class="' + (c.fame >= 9 ? 'rare' : '') + '">' + c.name + '</i>').join('');
+  // 마지막 장까지 열렸으면 넘길 것이 없다. 그때부터 이 화면은 닫는 화면이다.
+  const over = shown >= lastPull.length;
+  box.innerHTML = '<div class="count">' + shown + ' / ' + lastPull.length + '</div>'
+    /* 카드 안에 사람이 없으면 이름을 적은 빈 판이다. 선수단과 상점이 이미 쓰는 전신 그림을
+       그대로 굽는다. 걸친 것은 내 장비가 아니라 기본 차림이다. 아직 내 선수가 아니기 때문이다. */
+    + '<div class="now' + (rare ? ' rare' : '') + '"><u>' + k.fame + '</u>'
+    + '<img alt="' + k.name + '" src="' + thumbURL('card', k, lookOf({})) + '">'
+    + '<b>' + k.name + '</b></div>'
+    + '<div class="done">' + done + '</div>'
+    + '<div class="hint">' + (over ? '눌러서 닫기' : '눌러서 건너뛰기') + '</div>';
+  box.hidden = false;
+  // 애니메이션은 클래스를 다시 붙여야 다시 돈다. 같은 노드를 재사용하면 두 번째 장이 안 뒤집힌다.
+  const now = box.querySelector('.now');
+  void now.offsetWidth;
+  now.classList.add('turn');
+  box.onclick = () => { if (shown >= lastPull.length) stopReveal(); else revealAll(); };
 }
 
 function pullShelf(all) {
@@ -1515,14 +1538,12 @@ function pullShelf(all) {
     ? '<details class="odds"><summary>확률과 남은 카드</summary><em>' + shopOdds(pool)
       + '<br>남은 카드 ' + pool.length + '장</em></details>'
     : '';
-  // 트레이는 뽑은 카드가 없어도 자리를 만들지 않는다. 빈 상자가 서 있으면 뽑기 전부터 결과 칸이 보인다.
-  const got = lastPull.length ? '<div class="tray" data-shown="0"></div>' : '';
   /* 보유 이용권은 문장이 아니라 숫자다. 지금 몇 장 있다고 말하는 대신 아이콘 옆에 수를 세운다.
      이 갈래가 이용권을 안 받으면 그 줄을 안 세운다. 없는 자원을 설명하는 줄은 읽을 것만 는다. */
   const bank = kind.ticketable ? '<span class="held">' + IC_TICKET + '<b>' + state.tickets + '</b></span>' : '';
   return '<h4>이적시장</h4>' + tabs + '<div class="card">'
     + '<div class="lede"><em>' + kind.note + '</em>' + bank + '</div>' + odds
-    + '<div class="buys">' + rows + '</div>' + got
+    + '<div class="buys">' + rows + '</div>'
     + '</div>';
 }// 봇은 소모형이라 SHELVES에 못 넣는다. 등급을 갖는 게 아니라 분을 갖는다.
 function botShelf() {
@@ -1655,12 +1676,6 @@ function renderShop() {
     t.onclick = () => { shopTab = t.dataset.tab; renderShop(); };
   }
   bindSpec(box);
-  // 트레이를 누르면 남은 카드가 한 번에 열린다. 렌더가 트레이를 새로 만들 때마다 다시 건다.
-  const tray = box.querySelector('.tray');
-  if (tray) {
-    tray.onclick = revealAll;
-    paintTray();
-  }
   // 갈래를 바꾸면 값과 확률과 남은 장수가 통째로 갈리므로 선반을 다시 그린다.
   for (const k of box.querySelectorAll('.kind')) k.onclick = () => {
     pullTab = k.dataset.kind;
@@ -1698,7 +1713,8 @@ function renderShop() {
     persist();
     pips();
     renderShop();
-    revealTimer = setTimeout(revealNext, REVEAL_MS);
+    // 첫 장은 기다리지 않고 바로 선다. 값을 치른 직후에 빈 화면을 보는 구간이 없어야 한다.
+    revealNext();
   };
 }
 

@@ -34,11 +34,13 @@ try {
   const before = await p.evaluate(() => ({ coin: window.__wallet().coin, t: window.__tickets(), squad: window.__squad().squad.length }));
   await p.click('#shop .buy[data-want="' + PULL_BULK + '"]', { force: true });
 
-  // 뒤집는 동안 몇 번 들여다본다. 부하가 걸리면 더 느려질 뿐이라 이 축은 느린 기계에서 더 안전하다.
+  /* 뒤집는 동안 몇 번 들여다본다. 부하가 걸리면 더 느려질 뿐이라 이 축은 느린 기계에서 더 안전하다.
+     간격은 한 장에 쓰는 시간보다 짧고, 여섯 번을 합치면 두 장 넘게 지나야 한 장이 느는 것을 본다.
+     60ms 여섯 번은 0.36초라 640ms짜리 한 장 안에서 끝나 아무것도 안 늘었다. */
   const walk = [];
   for (let i = 0; i < 6; i += 1) {
     walk.push(await p.evaluate(() => window.__reveal()));
-    await p.waitForTimeout(60);
+    await p.waitForTimeout(400);
   }
   const mid = walk[0];
   check("instrument:the-draw-registered", mid.drawn === PULL_BULK, mid.drawn + " drawn");
@@ -53,27 +55,30 @@ try {
   check("reveal:the-bill-was-settled-before-the-flip", during.squad - before.squad === PULL_BULK && during.t < before.t,
     "squad " + before.squad + " to " + during.squad + ", tickets " + before.t + " to " + during.t);
 
-  // 눌러서 남은 것을 연다.
-  await p.click("#shop .card .tray", { force: true });
-  await p.waitForTimeout(120);
+  // 눌러서 남은 것을 연다. 개봉은 상점 카드 안이 아니라 화면 전체를 덮는 자리로 옮겼다.
+  await p.click("#pull", { force: true });
+  await p.waitForTimeout(160);
   const tapped = await p.evaluate(() => window.__reveal());
   check("reveal:a-tap-opens-the-rest-at-once", tapped.shown === tapped.drawn, tapped.shown + " of " + tapped.drawn);
   const faces = await p.evaluate(() => {
-    const up = [...document.querySelectorAll("#shop .card .tray i.up")];
+    // 지금 서 있는 한 장과 이미 쌓인 줄을 합치면 열린 장 수다. 뒷면은 남아 있으면 안 된다.
+    const stacked = [...document.querySelectorAll("#pull .done i")];
+    const now = document.querySelector("#pull .now b");
+    const up = stacked.concat(now ? [now] : []);
     return { up: up.length, named: up.filter((e) => e.textContent.trim().length > 0).length,
-      down: document.querySelectorAll("#shop .card .tray i.down").length };
+      down: document.querySelectorAll("#pull .now.back").length };
   });
   check("reveal:every-open-card-carries-a-name", faces.up === PULL_BULK && faces.named === faces.up && faces.down === 0,
     faces.up + " up, " + faces.named + " named, " + faces.down + " still down");
 
-  // 대조군. 상점을 닫으면 트레이가 사라지고 다음에 열었을 때 지난 결과가 안 남는다.
+  // 대조군. 상점을 닫으면 개봉도 걷히고 다음에 열었을 때 지난 결과가 안 남는다.
   await p.evaluate(() => window.__shop(false));
   await p.waitForTimeout(150);
   await p.evaluate(() => window.__shop(true));
   await p.waitForTimeout(300);
-  const reopened = await p.evaluate(() => ({ r: window.__reveal(), tray: document.querySelectorAll("#shop .card .tray").length }));
-  check("control:reopening-the-shop-shows-no-old-result", reopened.r.drawn === 0 && reopened.tray === 0,
-    reopened.r.drawn + " drawn, " + reopened.tray + " trays");
+  const reopened = await p.evaluate(() => ({ r: window.__reveal(), open: !document.getElementById("pull").hidden }));
+  check("control:reopening-the-shop-shows-no-old-result", reopened.r.drawn === 0 && reopened.open === false,
+    reopened.r.drawn + " drawn, reveal open " + reopened.open);
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
@@ -86,4 +91,3 @@ try {
   clearTimeout(t);
   if (b) await b.close();
 }
-
