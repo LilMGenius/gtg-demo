@@ -165,11 +165,15 @@ function courseOf(aimX, aimY) {
 
 // 한 판은 슛 다섯 개. 앞 두 개는 판독을 가르치고 마지막 한 개는 나가지 않으면 못 막는다.
 // 동네 등급은 슛을 바꾸지 않는다. 바꾸는 것은 눈에 띄는 행인이 지나갈 확률 하나뿐이다.
-export function buildSet(rng, level = 5, city = 0) {
+/* pool은 이번 판에 나올 수 있는 키커다. 안 주면 명단 전체에서 뽑는다.
+   주전 열하나를 고르는 화면이 생기기 전에는 그 전체가 유일한 답이었고, 그래서 스물이 넘는
+   계기가 인자 셋으로 이 자를 부른다. 넷째를 뒤에 붙여야 그 스물이 그대로 돈다. */
+export function buildSet(rng, level = 5, city = 0, pool) {
   const gazeChance = GAZE_BASE + CITY_GAZE * clamp(city, 0, 3);
   const shots = [];
+  const from = Array.isArray(pool) && pool.length ? pool : KICKERS;
   for (let i = 0; i < 5; i++) {
-    const k = scaleKicker(KICKERS[Math.floor(rng() * KICKERS.length)], level);
+    const k = scaleKicker(from[Math.floor(rng() * from.length)], level);
     let aimX, aimY, forced;
     if (i < 2) {
       aimX = (rng() < 0.5 ? -1 : 1) * (0.65 + rng() * 0.5);

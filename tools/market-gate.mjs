@@ -8,8 +8,8 @@ import { chromium } from "playwright";
 // 못 찾는 자와 없는 것은 같은 답을 주므로, 옛 이름을 한 번 심어 잡히는지를 대조군으로 둔다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
-const OLD = "\uce74\ub4dc\uae61";
-const NEW = "\uc774\uc801\uc2dc\uc7a5";
+const OLD = "카드깡";
+const NEW = "이적시장";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);
 t.unref();

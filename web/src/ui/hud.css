@@ -402,8 +402,14 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 
 /* 선수단. 명단이 길어 한 화면에 안 눕는다. 격자를 세로로 굴린다. */
 #roster{position:absolute;inset:0;pointer-events:auto;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  /* 포지션이 넷으로 갈리면서 한 칸이 화면보다 길어졌다. 넘치면 스크롤이 서야 아래 줄에 손이 닿고,
+     safe center는 짧을 때는 가운데, 길 때는 위쪽부터 세워 제목이 화면 밖으로 안 밀린다. */
+  display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:12px;
+  overflow:auto;padding:14px 0;
   background:#080b07c4}
+/* 세로 flex의 자식은 기본으로 줄어든다. 칸이 화면보다 길어지자 줄마다 눌려서 카드가 107px에서
+   45px로 잘리고 이름이 사라졌다. 넘치는 것은 스크롤이 받아야지 줄이 받으면 안 된다. */
+#roster > *{flex:none}
 #roster[hidden]{display:none}
 #roster h4{font-family:var(--disp);font-size:clamp(18px,2.4vw,26px);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;

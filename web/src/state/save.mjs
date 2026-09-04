@@ -28,10 +28,11 @@ export function load() {
 // 라포도 같이 나간다. 얼굴을 익힌 행인이 탭을 닫을 때 지워지면 반복해서 마주친 보람이 사라진다.
 // 이적시장 이용권도 같이 나간다. 완봉으로 받은 장이 탭을 닫을 때 사라지면 그 판을 다시 이겨야 한다.
 // 팔로우도 같이 나간다. 선팔과 맞팔이 탭을 닫을 때 지워지면 사람을 다시 처음부터 따라가야 한다.
-export function save(squad, pick, auto, fans, points, wallet, posts, record, gear, bot, buff, rapport, tickets, social) {
+// 키커 보유와 주전 열하나도 같이 나간다. 영입한 사람이 탭을 닫을 때 사라지면 그 육수가 증발한다.
+export function save(squad, pick, auto, fans, points, wallet, posts, record, gear, bot, buff, rapport, tickets, social, kickers, eleven) {
   try {
     const i = Number(pick) || 0;
-    localStorage.setItem(KEY, JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], record: record || {}, gear: gear || {}, bot: bot || {}, buff: buff || {}, rapport: rapport || {}, tickets: Number(tickets) || 0, social: social || {}, at: Date.now() }));
+    localStorage.setItem(KEY, JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], record: record || {}, gear: gear || {}, bot: bot || {}, buff: buff || {}, rapport: rapport || {}, tickets: Number(tickets) || 0, social: social || {}, kickers: Array.isArray(kickers) ? kickers : [], eleven: Array.isArray(eleven) ? eleven : [], at: Date.now() }));
   } catch {
     // 사파리 프라이빗 모드는 쓰기를 막는다. 저장이 안 되는 것과 게임이 죽는 것은 다른 일이다.
   }
@@ -67,6 +68,22 @@ export function readSquad(saved) {
 // 자리를 비운 시간은 훈련 기회로만 쌓인다. 경기를 대신 뛰어주지는 않는다.
 // 시계를 되돌린 사람과 몇 달 만에 돌아온 사람은 같은 상한을 받는다.
 export const OFFLINE_MS = 20 * 60 * 1000;
+
+/* 저장에서 키커 보유와 주전을 꺼낸다. 이전 배포본 저장에는 이 칸이 없고, 그때는 시작 주전으로 연다.
+   명단에 없는 이름은 버린다. 로스터가 바뀐 뒤에도 저장이 유령을 판에 세우면 안 된다.
+   주전이 정원을 안 채우면 보유에서 채워 넣는다. 열 명으로 도는 판은 없다. */
+export function readSquadKickers(saved, all, fallback, cap) {
+  const own = new Set(fallback);
+  if (Array.isArray(saved?.kickers)) for (const n of saved.kickers) if (all.includes(n)) own.add(n);
+  const kickers = [...own];
+  const seen = [];
+  if (Array.isArray(saved?.eleven)) {
+    for (const n of saved.eleven) if (own.has(n) && seen.indexOf(n) < 0 && seen.length < cap) seen.push(n);
+  }
+  for (const n of fallback) { if (seen.length >= cap) break; if (seen.indexOf(n) < 0) seen.push(n); }
+  for (const n of kickers) { if (seen.length >= cap) break; if (seen.indexOf(n) < 0) seen.push(n); }
+  return { kickers, eleven: seen };
+}
 export const OFFLINE_CAP = 12;
 
 export function offlineGain(at, now) {

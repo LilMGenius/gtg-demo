@@ -337,3 +337,34 @@ export function faceOf(name) {
   };
   return Object.assign(base, FACE_OVERRIDE[name] || {});
 }
+
+/* 포지션과 정원. 주전은 열하나이고 골키퍼는 그 밖에서 따로 한 명이 선다.
+   축구가 쓰는 4-4-3 그대로다. 이 표가 정원의 정본이라 화면과 판정이 같은 수를 읽는다. */
+export const ROLES = ['수비수', '미드필더', '공격수'];
+export const ROLE_SLOTS = { 수비수: 4, 미드필더: 4, 공격수: 3 };
+export const ELEVEN = 11;
+
+export function kickerByName(name) {
+  return KICKERS.find((k) => k.name === name) || null;
+}
+
+/* 키커 한 명의 값. 키퍼와 같은 식으로 능력치와 명성에서 나온다. 잘 차는 키커는 막기 어렵지만
+   골대 밖으로 덜 차므로, 비싼 키커를 세우는 것은 난도를 올려 보상 밀도를 사는 선택이다. */
+const KICK_STATS = ['finishing', 'power', 'composure', 'curve', 'flair'];
+export function kickerCost(k) {
+  let sum = 0;
+  for (const s of KICK_STATS) sum += Number(k[s]) || 0;
+  return COST_BASE + sum * COST_PER_STAT + (Number(k.fame) || 0) * COST_PER_FAME;
+}
+
+/* 시작 주전. 정원대로 각 포지션에서 가장 싼 쪽부터 채운다. 명성이 높은 열하나로 시작하면
+   영입이 살 것을 안 판다. 이름이 같은 값이면 명단 순서로 갈라 회차마다 안 흔들린다. */
+export function defaultEleven() {
+  const out = [];
+  for (const role of ROLES) {
+    const list = KICKERS.filter((k) => k.role === role)
+      .sort((a, b) => kickerCost(a) - kickerCost(b) || KICKERS.indexOf(a) - KICKERS.indexOf(b));
+    for (const k of list.slice(0, ROLE_SLOTS[role])) out.push(k.name);
+  }
+  return out;
+}

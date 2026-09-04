@@ -1,13 +1,13 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
 import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain, judgeWindow, GEAR_STEP } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
-import { KEEPERS, keeperCost, TRAITS, PULL_COST, PULL_BULK, TICKET_CAP, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
+import { KEEPERS, KICKERS, keeperCost, kickerCost, kickerByName, ROLES, ROLE_SLOTS, ELEVEN, defaultEleven, TRAITS, PULL_COST, PULL_BULK, TICKET_CAP, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dmLine } from './ui/lines.mjs';
-import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
+import { load, save, readSquad, offlineGain, readRecord, readSquadKickers } from './state/save.mjs';
 import { coinGain, readWallet, COIN_DRILL, COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
@@ -77,6 +77,15 @@ state.posts = Array.isArray(saved?.posts) ? saved.posts.slice(-FEED_CAP) : [];
 state.wallet = readWallet(saved?.wallet);
 // 상대 전적. 키커 이름을 열쇠로 막은 수와 먹힌 수를 따로 센다.
 state.record = readRecord(saved);
+/* 키커 보유와 주전 열하나. 지금까지 판에 나오는 키커는 명단 일흔일곱에서 매 구 무작위였고,
+   플레이어가 상대를 고를 방법이 없었다. 잘 차는 키커는 막기 어렵지만 골대 밖으로 덜 차므로,
+   주전을 고르는 것은 난도를 올려 보상 밀도를 사는 선택이다. */
+{
+  const names = KICKERS.map((k) => k.name);
+  const got = readSquadKickers(saved, names, defaultEleven(), ELEVEN);
+  state.kickers = got.kickers;
+  state.eleven = got.eleven;
+}
 // 장비. 몸에 걸치는 여섯은 그 키퍼가 들고, 서는 자리 둘은 계정이 든다.
 // 저장에 실린 하나짜리 장비는 옛 판이므로 모든 키퍼에게 같은 것을 입혀 이어 붙인다.
 const savedGear = readGear(saved?.gear);
@@ -357,7 +366,7 @@ function markDive(dive, mine) {
 
 // 저장은 항상 보유 목록 전체로 나간다. 뛰는 키퍼만 저장하면 나머지가 다음 저장에서 지워진다.
 function persist() {
-save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets, state.social);
+save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets, state.social, state.kickers, state.eleven);
 }
 
 // 봇 크레딧은 실시간으로 줄어든다. 구 수로 세면 탭을 열어두고 안 누르는 쪽이 이득이 된다.
@@ -449,7 +458,8 @@ function nextSet() {
   const form = rollForm(state.keeper, rng);
   state.form = form;
   formChip();
-  state.shots = buildSet(rng, state.keeper.level, state.gear.city);
+  // 주전 열하나만 이 판에 선다. 명단 전체가 아니라 플레이어가 세운 사람들이 차야 그 선택이 값을 한다.
+  state.shots = buildSet(rng, state.keeper.level, state.gear.city, state.eleven.map(kickerByName).filter(Boolean));
   state.i = 0;
   state.results = [];
   pips();
@@ -718,20 +728,33 @@ function renderRoster() {
       + '<img alt="' + entry.name + '" src="' + thumbURL('face', entry, lookOf({}, entry.name)) + '">'
       + entry.name + '<em>' + SW(cost) + '</em></button>';
   }).join('');
-  box.innerHTML = '<h4>선수단<small>보유 ' + state.squad.length + '명</small></h4>'
-    + '<div class="row mine">' + mine + '</div>'
-    + '<h5>명단에서 데려오기</h5>'
-    + (hire ? '<div class="row hire">' + hire + '</div>'
-      : '<div class="note dim"><span>명단을 다 모았다</span></div>')
+  /* 포지션 줄. 골키퍼 한 명과 필드 열하나는 다른 질문이라 같은 목록에 못 섞는다.
+     골키퍼는 세우는 사람이 하나뿐이고, 키커는 정원 안에서 열하나를 고른다. */
+  const tabs = '<div class="kinds">' + [['gk', '골키퍼']].concat(ROLES.map((r) => [r, r]))
+    .map(([id, label]) => '<button class="kind" data-pos="' + id + '"'
+      + (squadTab === id ? ' aria-current="true"' : '') + '>' + label + '</button>').join('') + '</div>';
+  const pane = squadTab === 'gk'
+    ? '<div class="row mine">' + mine + '</div>'
+      + '<h5>명단에서 데려오기</h5>'
+      + (hire ? '<div class="row hire">' + hire + '</div>'
+        : '<div class="note dim"><span>명단을 다 모았다</span></div>')
+    : kickerPane(squadTab);
+  const count = squadTab === 'gk' ? '보유 ' + state.squad.length + '명'
+    : '주전 ' + state.eleven.length + ' / ' + ELEVEN + '명';
+  box.innerHTML = '<h4>선수단<small>' + count + '</small></h4>' + tabs + pane
     + '<button class="close">닫기</button>';
+  for (const b of box.querySelectorAll('.kind')) b.onclick = () => { squadTab = b.dataset.pos; renderRoster(); };
+  bindKickerPane(box);
   box.querySelector('.close').onclick = closeRoster;
-  // 세우기. 이미 가진 사람이라 값이 안 나간다.
-  for (const b of box.querySelectorAll('.row.mine button')) b.onclick = () => {
+  /* 세우기. 이미 가진 사람이라 값이 안 나간다.
+     골키퍼 칸에서만 건다. 키커 칸도 같은 .row.mine을 쓰므로 조건 없이 걸면 이 줄이 뒤에 돌면서
+     키커 카드의 클릭을 덮어쓰고, 그 자리에서 swapTo(NaN)가 조용히 아무 일도 안 한다. */
+  for (const b of box.querySelectorAll('.row.mine button[data-at]')) b.onclick = () => {
     if (b.disabled) return;
     swapTo(Number(b.dataset.at));
   };
-  // 영입. 값을 치르고 명단 끝에 붙인 뒤 그 사람을 세운다.
-  for (const b of box.querySelectorAll('.row.hire button')) b.onclick = () => {
+  // 영입. 값을 치르고 명단 끝에 붙인 뒤 그 사람을 세운다. 여기도 골키퍼 칸의 것만 건다.
+  for (const b of box.querySelectorAll('.row.hire button[data-n]')) b.onclick = () => {
     if (b.disabled) return;
     const entry = KEEPERS.find((k) => k.name === b.dataset.n);
     if (!entry) return;
@@ -744,6 +767,72 @@ function renderRoster() {
 }
 
 // 세우는 자리 하나. 영입과 교체가 같은 길로 끝나야 한 쪽만 고쳐지는 일이 없다.
+
+// 선수단 창에서 보고 있는 포지션. 창 수명만 사는 값이라 저장에 안 싣는다.
+let squadTab = 'gk';
+
+/* 한 포지션의 칸. 위는 지금 세운 사람, 아래는 데려올 사람이다. 정원이 차 있으면 새로 세우기 전에
+   내려야 하므로, 정원과 지금 수를 칸 머리에 적어 누르기 전에 알 수 있게 한다. */
+function kickerPane(role) {
+  const slots = ROLE_SLOTS[role] || 0;
+  const inRole = (n) => { const k = kickerByName(n); return k && k.role === role; };
+  const starting = state.eleven.filter(inRole);
+  const owned = state.kickers.filter((n) => inRole(n) && starting.indexOf(n) < 0);
+  const card = (n, on) => {
+    const k = kickerByName(n);
+    if (!k) return "";
+    return '<button data-kick="' + n + '"' + (on ? ' class="here"' : '') + '>'
+      + '<img alt="' + n + '" src="' + thumbURL("face", k, lookOf({}, n)) + '">'
+      + n + '<em>결정력 ' + k.finishing + ', ' + (on ? "내리기" : "세우기") + '</em></button>';
+  };
+  const hire = KICKERS.filter((k) => k.role === role && state.kickers.indexOf(k.name) < 0).map((k) => {
+    const cost = kickerCost(k);
+    const off = state.wallet.coin < cost;
+    return '<button data-buy="' + k.name + '"' + (off ? ' disabled' : '') + '>'
+      + '<img alt="' + k.name + '" src="' + thumbURL("face", k, lookOf({}, k.name)) + '">'
+      + k.name + '<em>' + SW(cost) + '</em></button>';
+  }).join("");
+  return '<h5>주전 ' + starting.length + ' / ' + slots + '</h5>'
+    + '<div class="row mine">' + (starting.map((n) => card(n, true)).join("")
+      || '<span class="note dim">이 자리가 비었다</span>') + '</div>'
+    + '<h5>가진 사람</h5>'
+    + '<div class="row mine">' + (owned.map((n) => card(n, false)).join("")
+      || '<span class="note dim">벤치가 비었다</span>') + '</div>'
+    + '<h5>명단에서 데려오기</h5>'
+    + (hire ? '<div class="row hire">' + hire + '</div>'
+      : '<div class="note dim"><span>이 자리는 다 모았다</span></div>');
+}
+
+/* 세우기와 내리기와 영입. 셋 다 한 곳에서 끝나야 정원 검사가 한 번만 적힌다.
+   정원을 넘겨 세우는 것은 막는다. 넘긴 채로 판이 열리면 열둘이 도는 셈이 된다. */
+function bindKickerPane(box) {
+  for (const b of box.querySelectorAll("[data-kick]")) b.onclick = () => {
+    const n = b.dataset.kick;
+    const k = kickerByName(n);
+    if (!k) return;
+    const at = state.eleven.indexOf(n);
+    if (at >= 0) state.eleven.splice(at, 1);
+    else {
+      const here = state.eleven.filter((x) => { const e = kickerByName(x); return e && e.role === k.role; }).length;
+      if (here >= (ROLE_SLOTS[k.role] || 0)) return;
+      state.eleven.push(n);
+    }
+    persist();
+    renderRoster();
+  };
+  for (const b of box.querySelectorAll("[data-buy]")) b.onclick = () => {
+    if (b.disabled) return;
+    const k = kickerByName(b.dataset.buy);
+    if (!k) return;
+    const cost = kickerCost(k);
+    if (state.wallet.coin < cost) return;
+    state.wallet.coin -= cost;
+    state.kickers.push(k.name);
+    persist();
+    pips();
+    renderRoster();
+  };
+}
 function swapTo(at) {
   if (!(at >= 0 && at < state.squad.length)) return;
   // 참조 재대입이다. 값을 복사하면 훈련이 보유 목록에 안 남는다.
@@ -1815,6 +1904,9 @@ window.__shop = (open) => { if (open) openShop(); else closeShop(); };
 window.__earn = (open) => { if (open) openEarn(); else closeEarn(); };
 // 이용권 잔고. 완봉 보상과 뽑기 차감을 계기가 데이터에서 읽는다.
 window.__tickets = () => state.tickets;
+// 주전 열하나. 계기는 화면 글자가 아니라 장부를 읽어야 마크업이 바뀌어도 판정이 안 흔들린다.
+window.__eleven = () => state.eleven.slice();
+window.__kickers = () => state.kickers.slice();
 // 뒤집힌 카드 수와 뽑은 카드 수. 연출이 도는 동안 계기가 이 둘을 읽어 한 번에 안 열리는 것을 본다.
 window.__reveal = () => ({ shown, drawn: lastPull.length });
 // 누가 무엇을 걸쳤는가. 계기가 교체 전후로 이 둘을 읽어 착용이 사람을 따라가는지 본다.
