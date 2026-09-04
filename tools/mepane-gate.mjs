@@ -48,6 +48,16 @@ try {
       faces: box.querySelectorAll(".note .go").length,
       wear: box.querySelectorAll(".wear .on i").length,
       shot: box.querySelector(".wear .shot img") ? 1 : 0,
+      // 긁지 않고 보이는 능력치. 창을 연 이유가 능력치인데 절반이 접힘 아래면 그 창은 답을 반만 한다.
+      inView: (() => {
+        const pane = box.querySelector(".pane");
+        if (!pane) return 0;
+        const r = pane.getBoundingClientRect();
+        return [...box.querySelectorAll(".grid span")].filter((e) => {
+          const q = e.getBoundingClientRect();
+          return q.top >= r.top - 1 && q.bottom <= r.bottom + 1;
+        }).length;
+      })(),
       chars: box.textContent.trim().length
     };
   });
@@ -71,6 +81,10 @@ try {
     "stat " + seen.stat.faces + ", face " + seen.face.faces + ", log " + seen.log.faces);
   check("mepane:the-wardrobe-stays-in-every-pane", TABS.every((id) => seen[id].wear === 8 && seen[id].shot === 1),
     TABS.map((id) => id + " " + seen[id].wear + " lines, shot " + seen[id].shot).join(", "));
+  // 720p에서 능력치가 하나도 접힘 아래로 안 내려가야 한다. 실측으로 열다섯 중 아홉만 보이던 자리다.
+  // 이 축은 능력치가 늘어나는 날에도 운다. 칸이 늘면 격자나 창 높이가 같이 움직여야 한다는 뜻이다.
+  check("mepane:every-stat-is-visible-without-scrolling", seen.stat.inView === seen.stat.stats,
+    seen.stat.inView + " of " + seen.stat.stats + " in view");
   // 갈랐다면 한 칸의 글자 수가 셋을 합친 것보다 적다. 같으면 탭만 그리고 내용은 그대로 쌓인 것이다.
   const widest = Math.max(seen.stat.chars, seen.face.chars, seen.log.chars);
   const total = seen.stat.chars + seen.face.chars + seen.log.chars;

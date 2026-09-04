@@ -537,29 +537,32 @@ body.playing #hud{opacity:1}
    카드가 통째로 긁히면 지금 누구를 보고 있는지가 화면 밖으로 밀려난다. */
 #me .card{display:flex;flex-direction:column;gap:9px;
   width:min(94vw,720px);max-height:78vh;padding:4px 4px 10px}
-/* 38vh. 720px 화면에서 초상화 172px과 탭 줄을 뺀 나머지이고, 능력치 세 줄이 한 번에 들어간다.
+/* 46vh. 720px 화면에서 능력치 열다섯이 네 칸씩 네 줄로 한 번에 들어가는 높이다.
+   38vh였을 때는 열다섯 중 아홉만 보이고 나머지는 긁어야 나왔는데,
+   자기 선수의 능력치는 창을 연 이유 그 자체라 스크롤 아래에 두면 그 창이 답을 반만 한다.
    아래 여백 10px은 마지막 칸의 6px 그림자가 스크롤 경계에 잘리지 않게 둔 것이다. */
-#me .pane{display:flex;flex-direction:column;gap:9px;max-height:38vh;overflow-y:auto;padding:2px 2px 10px}
-/* 15칸은 다섯 줄로 끊어야 이름과 수치가 한눈에 붙어 읽힌다. */
-#me .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+#me .pane{display:flex;flex-direction:column;gap:9px;max-height:46vh;overflow-y:auto;padding:2px 2px 10px}
+/* 네 칸씩 네 줄. 세 칸이면 다섯 줄이 되어 한 화면에 안 들어간다. */
+#me .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
 #me .grid span{display:flex;justify-content:space-between;gap:8px;padding:7px 10px 9px;
   border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
   font-family:var(--body);font-size:14px;font-weight:400;
   box-shadow:6px 6px 0 var(--edge), var(--bevel)}
-#me .grid span:nth-child(3n+1){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
-#me .grid span:nth-child(3n){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
+#me .grid span:nth-child(4n+1){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
+#me .grid span:nth-child(4n){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
 #me .grid span b{color:#ffd83d;font-weight:400}
 /* 만렙 칸. 더 줄 곳이 없다는 것이 수치보다 먼저 보여야 한다. */
 #me .grid span.max b{color:var(--good)}
 /* 지금 걸친 것. 왼쪽은 그 차림 그대로 구운 그림이고 오른쪽은 무엇을 걸쳤는지의 목록이다.
-   140px. 상점 탈의실이 쓰는 200px보다 좁게 잡아야 오른쪽 여덟 줄이 두 칸으로 선다. */
-#me .wear{display:flex;gap:10px;padding:12px 12px 11px;
+   116px. 능력치가 한 화면에 들어가도록 이 블록에서 70px을 내주었다.
+   여기가 답하는 것은 무엇을 걸쳤는가 하나뿐이라, 능력치 여섯 칸과 바꿀 자리가 아니다. */
+#me .wear{display:flex;gap:10px;padding:9px 12px 9px;
   border:var(--line) solid var(--edge);background:#1b2318;
   box-shadow:6px 6px 0 var(--edge), var(--bevel)}
-#me .wear .shot{flex:0 0 140px;height:150px;background:#12180f;border:2px solid #ffffff14}
+#me .wear .shot{flex:0 0 116px;height:120px;background:#12180f;border:2px solid #ffffff14}
 #me .wear .shot img{width:100%;height:100%;object-fit:contain;display:block}
-/* 여덟 줄을 한 줄씩 쌓으면 능력치 격자보다 세로가 길어진다. 두 칸으로 접고 제목은 줄 전체를 쓴다. */
-#me .wear .on{flex:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px;align-content:start}
+/* 여덟 줄을 두 칸으로 접으면 네 줄이 되어 초상화보다 길어진다. 네 칸이면 두 줄이다. */
+#me .wear .on{flex:1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 12px;align-content:start}
 #me .wear .on h5{grid-column:1 / -1;margin:0;font-family:var(--disp);font-size:14px;font-weight:400;
   color:var(--dim);letter-spacing:.02em;line-height:1.25}
 #me .wear .on h5:not(:first-child){margin-top:6px}
