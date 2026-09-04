@@ -414,15 +414,30 @@ function buildBody(o) {
     joints['el' + k] = el;
     arms.push(sh);
     if (o.gloveSize) {
-      const s = o.gloveSize;
+      // 손 크기와 손목밴드와 빨판을 등급이 정한다. 색만 바꾸면 목장갑과 빨판 장갑이
+      // 같은 벙어리장갑으로 서고, 820을 치른 이유가 화면에 없다.
+      const gc = o.gloveCut || { bulk: 1, cuff: 1, pips: 0 };
+      const s = o.gloveSize * gc.bulk;
       // 정육면체는 어느 각도에서 봐도 노란 상자다. 벗겨져 날아가는 순간에는 카드 한 장으로 읽혔다.
       // 손바닥, 엄지, 손목밴드를 하나로 병합한다. 실루엣이 벙어리장갑이 되고 드로우콜은 그대로 하나다.
       const palm = new THREE.BoxGeometry(s, s * 1.15, s * 0.5);
       const thumb = new THREE.BoxGeometry(s * 0.44, s * 0.52, s * 0.46);
       thumb.translate(side * s * 0.6, s * 0.1, 0);
-      const cuff = new THREE.BoxGeometry(s * 1.12, s * 0.32, s * 0.58);
-      cuff.translate(0, s * 0.72, 0);
-      const gv = new THREE.Mesh(mergeGeos([palm, thumb, cuff]), flatMap(o.gloveTone || 0xf2d64b, clothTex()));
+      const cuffH = s * 0.32 * gc.cuff;
+      const cuff = new THREE.BoxGeometry(s * 1.12, cuffH, s * 0.58);
+      // 손바닥 위에서 시작해 위로 자란다. 가운데를 고정하면 밴드가 길수록 손을 파고든다.
+      cuff.translate(0, s * 0.575 + cuffH * 0.5, 0);
+      const hand = [palm, thumb, cuff];
+      // 빨판은 손바닥 바깥면에 붙는다. 공을 잡는 면이라 카메라가 보는 쪽이기도 하다.
+      for (let n = 0; n < gc.pips; n++) {
+        // 가운데 하나에 네 귀퉁이. 다섯을 한 줄로 깔면 손가락 자국으로 읽힌다.
+        const col = n === 0 ? 0 : (n % 2 === 0 ? 1 : -1);
+        const row = n === 0 ? 0 : (n <= 2 ? 1 : -1);
+        const pip = new THREE.BoxGeometry(s * 0.2, s * 0.2, s * 0.22);
+        pip.translate(col * s * 0.28, row * s * 0.3, s * 0.3);
+        hand.push(pip);
+      }
+      const gv = new THREE.Mesh(mergeGeos(hand), flatMap(o.gloveTone || 0xf2d64b, clothTex()));
       gv.name = tag;
       // 장갑은 화면에서 가장 자주 보는 물건이다. 직육면체 그대로면 여기서 티가 제일 크게 난다.
       jitterMesh(gv, 0.02, side < 0 ? 31 : 32);
@@ -521,6 +536,7 @@ export function buildKeeper(height, weight, look) {
     // 색상을 청록으로 꺾으면 밝기가 아니라 색이 팔을 세우고, 양말과 한 벌로 묶인다.
     shirt: (look && look.shirt) || 0x2f8f5b, sleeve: 0x073239, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: (look && look.sock) || 0x63d3e8,
     cuffSleeve: (look && look.ink) || 0x5f8f93, cuffSpan: (look && look.inkSpan) || 0.16, cuffShorts: 0x6d8898, gloveTone: (look && look.glove) || 0xf2d64b,
+    gloveCut: look && look.gloveCut,
     bootTone: (look && look.boot) || 0x2a241c, bootCut: look && look.bootCut,
     hair: look && look.hair, hairCut: look && look.hairCut,
     phase: 0.7, rest: POSES.ready

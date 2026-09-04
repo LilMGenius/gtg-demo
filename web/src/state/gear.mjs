@@ -4,11 +4,22 @@
 // 장갑 선반. 0번은 파는 물건이 아니라 아무것도 안 산 사람이 이미 끼고 있는 것이다.
 // 값은 카드깡 380 육수를 기준으로 잡았다. 첫 칸은 그보다 싸야 처음 지르는 자리가 되고,
 // 마지막 칸은 그보다 비싸야 카드깡이 선반에서 밀려나지 않는다.
+//
+// cut은 장갑의 형태다. bulk는 손 전체 배율, cuff는 손목밴드 길이 배율,
+// pips는 손바닥에 붙은 빨판 수다. 네 번째 칸의 이름이 빨판을 말하므로 그 돌기는
+// 지어낸 장식이 아니라 이름이 이미 선언한 것이다.
 export const GLOVES = [
-  { grip: 0, name: '장터 목장갑', cost: 0, tone: 0xf2d64b, note: '아무것도 안 샀을 때 끼고 있는 것' },
-  { grip: 1, name: '고무코팅 목장갑', cost: 140, tone: 0xd9552f, note: '젖은 공을 한 번은 붙잡는다' },
-  { grip: 2, name: '송진 범벅 장갑', cost: 360, tone: 0xbf8a2e, note: '손에서 공이 잘 안 떨어진다' },
-  { grip: 3, name: '문어 빨판 장갑', cost: 820, tone: 0x8f4fd1, note: '안 떨어진다. 벗겨지지도 않는다' }
+  // 목장갑은 얇다. 손목도 짧아 손이 그대로 드러난다.
+  { grip: 0, name: '장터 목장갑', cost: 0, tone: 0xf2d64b, note: '아무것도 안 샀을 때 끼고 있는 것',
+    cut: { bulk: 0.88, cuff: 0.62, pips: 0 } },
+  // 고무를 입히면 손바닥이 두꺼워진다.
+  { grip: 1, name: '고무코팅 목장갑', cost: 140, tone: 0xd9552f, note: '젖은 공을 한 번은 붙잡는다',
+    cut: { bulk: 1, cuff: 1, pips: 0 } },
+  // 송진을 바르면 손목까지 감아 올린다.
+  { grip: 2, name: '송진 범벅 장갑', cost: 360, tone: 0xbf8a2e, note: '손에서 공이 잘 안 떨어진다',
+    cut: { bulk: 1.14, cuff: 1.55, pips: 0 } },
+  { grip: 3, name: '문어 빨판 장갑', cost: 820, tone: 0x8f4fd1, note: '안 떨어진다. 벗겨지지도 않는다',
+    cut: { bulk: 1.22, cuff: 1.9, pips: 5 } }
 ];
 
 export const MAX_GRIP = GLOVES.length - 1;
@@ -200,7 +211,7 @@ export function lookOf(gear) {
   return {
     hair: hairAt(gear && gear.hair).tone, hairCut: hairAt(gear && gear.hair).cut,
     ink: t.ink_tone, inkSpan: t.span,
-    glove: gloveAt(gear && gear.grip).tone,
+    glove: gloveAt(gear && gear.grip).tone, gloveCut: gloveAt(gear && gear.grip).cut,
     boot: bootAt(gear && gear.studs).tone, bootCut: bootAt(gear && gear.studs).cut,
     shirt: kitAt(gear && gear.pads).tone, sock: sockAt(gear && gear.socks).tone
   };

@@ -22,7 +22,8 @@ const BAKE_H = 205;
 // part는 무엇을 겨냥하는지, dist는 그 부위가 칸을 채우는 거리, lift는 시선 높이 보정,
 // high는 눈높이 배율이다. 파는 면이 위에 있으면 내려다보고 밑에 있으면 올려다본다.
 const AIM = {
-  grip: { part: "glove", dist: 0.86, lift: -0.07 },
+  // 겨냥점이 장갑 아래를 보고 있어 손이 칸 위쪽 27퍼센트 지점에 걸려 있었다.
+  grip: { part: "glove", dist: 0.94, lift: 0.03, high: 0.12 },
   // 축구화가 파는 것은 밑창이다. 위에서 내려다보면 돌기가 갑피에 가려 여덟 개나 셋이나 같다.
   studs: { part: "boot", dist: 0.72, lift: -0.02, high: -0.34 },
   pads: { part: "torso", dist: 1.5, lift: 0 },
@@ -176,7 +177,7 @@ function frame(kind, keeper, look, yaw) {
   const aim = AIM[kind] || { part: "torso", dist: 1.3, lift: 0 };
   const at = partPoint(rig, aim.part);
   at.y += aim.lift;
-  const a = yaw === undefined ? -0.7 : yaw;
+  const a = yaw === undefined ? (aim.yaw === undefined ? -0.7 : aim.yaw) : yaw;
   const high = aim.high === undefined ? 0.22 : aim.high;
   cam.position.set(at.x + Math.sin(a) * aim.dist, at.y + aim.dist * high, at.z + Math.cos(a) * aim.dist);
   cam.lookAt(at);
