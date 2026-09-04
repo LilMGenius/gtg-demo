@@ -48,6 +48,35 @@
   animation:none}
 @keyframes bob{50%{transform:rotate(-2.6deg) translateY(-6px)}}
 @media (prefers-reduced-motion:reduce){#go{animation:none}}
+/* 계정 칸이 시작을 맡으면 이 버튼은 물러난다. display:block이 [hidden]보다 세서
+   숨기라고 적어도 그대로 서 있었고, 시작 버튼이 화면에 둘 있었다. */
+#go[hidden]{display:none}
+
+/* 계정 칸. 타이틀 위에 서고 시작 버튼과 같은 자리를 나눠 쓴다. 판을 열기 전에 누구인지부터
+   묻는 것이 순서라, 로그인이 끝나기 전에는 시작 버튼이 없다. */
+#gate{margin-top:clamp(14px,2vw,26px);display:flex;flex-direction:column;align-items:center;gap:9px;
+  width:min(86vw,320px)}
+#gate[hidden]{display:none}
+#gate input{width:100%;padding:10px 12px 12px;border:4px solid #12160e;background:#f6efdc;
+  color:#12160e;font-family:inherit;font-weight:400;font-size:clamp(15px,1.8vw,20px);
+  box-shadow:5px 6px 0 #12160e}
+#gate input[hidden]{display:none}
+#gate input::placeholder{color:#12160e8c}
+/* 지금 로그인한 사람. 이름이 서 있으면 이 기기에서 누구의 판이 열리는지가 누르기 전에 보인다. */
+#gate .who{width:100%;text-align:center;font-family:inherit;font-weight:400;
+  font-size:clamp(15px,1.9vw,21px);color:#12160e}
+#gate .who[hidden]{display:none}
+/* 이름은 판때기 위에 선다. 배경이 경기장이라 글자만 두면 흙바닥 위 검은 글씨가 되어 안 읽힌다. */
+#gate .who{padding:9px 12px 11px;border:4px solid #12160e;background:#f6efdc;
+  box-shadow:5px 6px 0 #12160e}
+#gate .acts{display:flex;gap:9px;width:100%}
+#gate button{flex:1;padding:10px 0 12px;border:4px solid #12160e;background:#ffd83d;color:#12160e;
+  font-family:inherit;font-weight:400;font-size:clamp(16px,2vw,22px);box-shadow:5px 6px 0 #12160e}
+#gate button:active{transform:translate(3px,4px);box-shadow:2px 2px 0 #12160e}
+/* 거절 사유. 아이디가 겹쳤는지 비밀번호가 틀렸는지를 말해야 다시 눌러 볼 수 있다. */
+#asay{margin:0;width:100%;text-align:center;font-size:clamp(12px,1.4vw,15px);font-weight:700;
+  color:#8f2020}
+#asay[hidden]{display:none}
 
 /* 조작법. 아래에 늘어놓지 않고 우측 위에서 펼친다. */
 #help{position:absolute;top:calc(14px + env(safe-area-inset-top));

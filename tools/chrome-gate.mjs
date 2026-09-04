@@ -127,6 +127,13 @@ try {
     return { id, left: r.left, right: r.right, off: r.right <= 0 || r.left >= innerWidth };
   }), IDS);
   const chipLum = async () => mean(await shot("top"));
+  /* 상태 칩은 반투명 판때기라 그 뒤 경기장이 비친다. 행인이 걷고 공이 도는 동안 재면
+     칩의 내용이 한 글자도 안 바뀌었는데 밝기가 흔들린다. 실측으로 대조군이 47.1에서
+     44.6으로 안 돌아왔고, 칩의 마크업은 두 시점이 바이트까지 같았다. 움직인 것은 배경이다.
+     판을 멈추고 세계시계를 얼린 뒤에 잰다. 조작 기둥은 전이라 얼려도 계속 물러난다. */
+  await p.evaluate(() => window.__lockRound());
+  await p.evaluate(() => window.__freeze(true));
+  await p.waitForTimeout(300);
   const baseChip = await chipLum();
   const baseBox = await boxes();
   const stayed = [], veiled = [], restored = [], vanished = [], shouted = [];

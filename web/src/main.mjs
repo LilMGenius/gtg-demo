@@ -7,7 +7,8 @@ import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dmLine } from './ui/lines.mjs';
-import { load, save, readSquad, offlineGain, readRecord, readSquadKickers } from './state/save.mjs';
+import { load, save, readSquad, offlineGain, readRecord, readSquadKickers, useAccount } from './state/save.mjs';
+import { currentId } from './state/account.mjs';
 import { coinGain, readWallet, COIN_DRILL, COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
@@ -50,6 +51,9 @@ window.__bgm = bgm;
 // 재현되지 않는 캐프처는 증거가 아니다. ?seed= 가 있으면 그 씨드로 고정한다.
 const seedParam = new URLSearchParams(location.search).get('seed');
 const rng = makeRng(seedParam === null ? ((Date.now() ^ 0x9e3779b9) >>> 0) : (Number(seedParam) >>> 0));
+/* 저장은 계정마다 갈리므로 읽기 전에 누구인지부터 정해야 한다. 이 모듈은 맨 위에서 한 번
+   읽고 그 값으로 상태를 세우므로, 계정을 여기서 안 걸면 로그인 전 자리를 읽고 시작한다. */
+useAccount(currentId());
 const saved = load();
 const restored = readSquad(saved);
 // 이전 배포본 저장에는 없던 칸이 있다. 신인 위에 덮어 읽어야 그 칸이 0이 아닌 3에서 시작한다.
@@ -1906,6 +1910,8 @@ window.__earn = (open) => { if (open) openEarn(); else closeEarn(); };
 window.__tickets = () => state.tickets;
 // 주전 열하나. 계기는 화면 글자가 아니라 장부를 읽어야 마크업이 바뀌어도 판정이 안 흔들린다.
 window.__eleven = () => state.eleven.slice();
+// 계기가 심은 값을 저장까지 밀어 넣는 자리. 계정이 갈리는지는 저장에 닿아야 재진다.
+window.__persist = () => { persist(); return true; };
 window.__kickers = () => state.kickers.slice();
 // 뒤집힌 카드 수와 뽑은 카드 수. 연출이 도는 동안 계기가 이 둘을 읽어 한 번에 안 열리는 것을 본다.
 window.__reveal = () => ({ shown, drawn: lastPull.length });

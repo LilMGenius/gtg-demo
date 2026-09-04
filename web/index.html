@@ -56,6 +56,17 @@
     <h1 id="word"><span>골키퍼</span><span>키우기</span></h1>
     <p id="tag">막아도 안 끝난다. 끝까지 봐야 안다</p>
     <button id="go">시작</button>
+    <form id="gate" hidden autocomplete="off">
+      <div class="who" hidden></div>
+      <input id="aid" name="aid" placeholder="아이디" maxlength="16" autocomplete="username">
+      <input id="apw" name="apw" type="password" placeholder="비밀번호" maxlength="32" autocomplete="current-password">
+      <input id="anick" name="anick" placeholder="닉네임" maxlength="12" hidden autocomplete="nickname">
+      <p id="asay" hidden></p>
+      <div class="acts">
+        <button id="ain" type="submit">로그인</button>
+        <button id="aup" type="button">가입</button>
+      </div>
+    </form>
   </div>
 
   <div id="help">

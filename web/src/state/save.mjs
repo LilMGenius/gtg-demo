@@ -1,10 +1,37 @@
 // 저장. 탭을 닫으면 키퍼가 사라지는 게임은 방치형이 아니다.
 // 자동은 손가락만 대신한다. 대기시간은 줄이지 않는다.
-const KEY = 'gtg.save.v1';
+/* 저장 자리가 브라우저 하나에 하나였다. 같은 기기를 쓰는 두 사람이 한 판을 나눠 썼다는 뜻이다.
+   이제 계정마다 갈린다. 계정이 없던 시절의 저장은 이름 없는 자리에 남아 있고, 첫 가입이
+   그 자리를 물려받는다. 처음 시작한 사람의 판이 가입했다고 사라지면 안 되기 때문이다. */
+const BASE = 'gtg.save.v1';
+let who = null;
+const KEY = () => (who ? BASE + ':' + who : BASE);
+
+export function useAccount(id) {
+  who = id || null;
+}
+
+// 이름 없던 자리에 판이 남아 있는가. 첫 가입이 그것을 가져갈지 정하는 데 쓴다.
+export function hasLegacy() {
+  try { return Boolean(localStorage.getItem(BASE)); } catch { return false; }
+}
+
+// 이름 없던 판을 이 계정으로 옮긴다. 옮긴 뒤 원래 자리를 비워 두 번 물려받지 않게 한다.
+export function adoptLegacy(id) {
+  try {
+    const raw = localStorage.getItem(BASE);
+    if (!raw || !id) return false;
+    localStorage.setItem(BASE + ':' + id, raw);
+    localStorage.removeItem(BASE);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function load() {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(KEY());
     if (!raw) return null;
     const s = JSON.parse(raw);
     // 구버전은 키퍼 하나만 저장했다. 보유 목록이 없어도 살려서 읽는다.
@@ -32,7 +59,7 @@ export function load() {
 export function save(squad, pick, auto, fans, points, wallet, posts, record, gear, bot, buff, rapport, tickets, social, kickers, eleven) {
   try {
     const i = Number(pick) || 0;
-    localStorage.setItem(KEY, JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], record: record || {}, gear: gear || {}, bot: bot || {}, buff: buff || {}, rapport: rapport || {}, tickets: Number(tickets) || 0, social: social || {}, kickers: Array.isArray(kickers) ? kickers : [], eleven: Array.isArray(eleven) ? eleven : [], at: Date.now() }));
+    localStorage.setItem(KEY(), JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], record: record || {}, gear: gear || {}, bot: bot || {}, buff: buff || {}, rapport: rapport || {}, tickets: Number(tickets) || 0, social: social || {}, kickers: Array.isArray(kickers) ? kickers : [], eleven: Array.isArray(eleven) ? eleven : [], at: Date.now() }));
   } catch {
     // 사파리 프라이빗 모드는 쓰기를 막는다. 저장이 안 되는 것과 게임이 죽는 것은 다른 일이다.
   }
@@ -94,5 +121,5 @@ export function offlineGain(at, now) {
 }
 
 export function wipe() {
-  try { localStorage.removeItem(KEY); } catch { /* 위와 같다 */ }
+  try { localStorage.removeItem(KEY()); } catch { /* 위와 같다 */ }
 }
