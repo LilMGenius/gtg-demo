@@ -262,3 +262,78 @@ export const TRAITS = {
   갓핸드:         { owner: 'handling', note: '핸들링이 일시적으로 최대치가 된다' },
   자쿰:           { owner: 'handling', note: '팔이 늘어난다. 핸들링이 일시적으로 최대치가 된다' }
 };
+
+/* 얼굴. 선수 마흔여섯과 키커 쉰여덟이 전부 같은 머리와 같은 피부로 서 있었다.
+   이름이 다른 사람 백 명이 한 얼굴이면 로스터는 이름표 목록이지 사람 목록이 아니다.
+   손으로 백 줄을 적는 대신 이름에서 뽑는다. 이름이 정본이므로 어느 화면에서 구워도 같은 얼굴이고
+   저장에 실을 것도 없다. 생김새가 농담의 일부인 몇은 아래 FACE_OVERRIDE가 못 박는다. */
+const SKINS = [0xf0cdb0, 0xdcae8a, 0xc08a5f, 0x8d5a34, 0x5d3a20];
+/* 고르게 뽑으면 다섯 중 둘이 가장 어두운 두 칸으로 가서, 어느 이름에 어느 피부가 붙는지가
+   무작위라는 것이 화면에서 주장처럼 읽힌다. 가운데를 두껍게 두고 양 끝을 얇게 둔다.
+   특정 선수를 가리키는 이름은 아래 FACE_OVERRIDE가 직접 정한다. */
+const SKIN_W = [24, 30, 22, 14, 10];
+// 검정, 진갈, 갈, 탈색금, 백발, 붉은. 뒤의 셋은 흔치 않아 가중치를 낮게 준다.
+const HAIRS = [0x1c1712, 0x2b1d14, 0x4a3320, 0xc7a75a, 0xbfc0bb, 0x7a3520];
+const HAIR_W = [26, 24, 18, 14, 10, 8];
+
+// 이름 한 줄에서 뽑는 난수. 같은 이름은 언제나 같은 흐름을 준다.
+function nameRng(name) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < name.length; i += 1) {
+    h ^= name.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return () => {
+    h ^= h << 13; h >>>= 0;
+    h ^= h >> 17;
+    h ^= h << 5; h >>>= 0;
+    return h / 4294967296;
+  };
+}
+
+function pickWeighted(list, weights, r) {
+  let total = 0;
+  for (const w of weights) total += w;
+  let x = r * total;
+  for (let i = 0; i < list.length; i += 1) {
+    x -= weights[i];
+    if (x < 0) return list[i];
+  }
+  return list[list.length - 1];
+}
+
+/* 이름을 비틀어 만든 선수라 원본이 떠오르는 한 가지가 있어야 하는 몇. 전부 적지 않는다.
+   백 명을 손으로 적으면 다음에 로스터가 늘 때 그 줄이 같이 안 는다. */
+const FACE_OVERRIDE = {
+  '올리브영': { skin: 0xf0cdb0, hair: 0xc7a75a, beard: 0 },
+  '노어이': { skin: 0xf0cdb0, hair: 0x4a3320, beard: 1 },
+  '즐라탄탄한이보라': { skin: 0xdcae8a, hair: 0x1c1712, beard: 2, tail: 1 },
+  '혹난두': { hair: 0x1c1712, beard: 0, skin: 0xdcae8a },
+  '쌀라': { skin: 0xc08a5f, hair: 0x1c1712, beard: 2 },
+  '아니이마르': { skin: 0xdcae8a, hair: 0xc7a75a, beard: 1 },
+  '음빼빼로': { hair: 0x1c1712, beard: 0, skin: 0x8d5a34 },
+  '김덕배': { skin: 0xf0cdb0, hair: 0xc7a75a, beard: 1 },
+  '체해': { skin: 0xf0cdb0, hair: 0x4a3320, beard: 0 },
+  '손흔든': { hair: 0x1c1712, beard: 0, skin: 0xf0cdb0 }
+};
+
+/* 한 사람의 얼굴. skin과 hair는 색, cut은 머리 껍데기의 모양,
+   beard는 수염 단계(0 없음, 1 짧음, 2 덥수룩), tail은 뒤로 묶은 머리다. */
+export function faceOf(name) {
+  const r = nameRng(String(name || ''));
+  const base = {
+    skin: pickWeighted(SKINS, SKIN_W, r()),
+    hair: pickWeighted(HAIRS, HAIR_W, r()),
+    cut: {
+      wide: 0.88 + r() * 0.3,
+      tall: 0.82 + r() * 0.46,
+      // 0.3은 바짝 민 머리, 0.62는 귀를 덮는 머리다. 그 밖은 모자나 헬멧으로 읽힌다.
+      phi: 0.3 + r() * 0.32,
+      tilt: (r() - 0.5) * 0.14
+    },
+    // 다섯에 둘꼴로 수염이 있고 그중 셋에 하나가 덥수룩하다.
+    beard: r() < 0.4 ? (r() < 0.33 ? 2 : 1) : 0,
+    tail: r() < 0.14 ? 1 : 0
+  };
+  return Object.assign(base, FACE_OVERRIDE[name] || {});
+}

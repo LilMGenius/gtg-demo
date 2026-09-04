@@ -2,6 +2,8 @@
 // 장비 한 칸이 스탯 한 칸보다 크면 훈련이 장식이 되고, 훈련이 장식인 방치형에는 남는 축이 없다.
 
 // 장갑 선반. 0번은 파는 물건이 아니라 아무것도 안 산 사람이 이미 끼고 있는 것이다.
+import { faceOf } from '../../../src/roster.mjs';
+
 // 값은 이적시장 380 육수를 기준으로 잡았다. 첫 칸은 그보다 싸야 처음 지르는 자리가 되고,
 // 마지막 칸은 그보다 비싸야 이적시장이 선반에서 밀려나지 않는다.
 //
@@ -368,15 +370,23 @@ export function inkAt(ink) {
 // 880 땅짜리 상품을 사도 그림이 같으면 그 선반은 숫자만 팔고 있는 것이다.
 // 0등급은 지금 색 그대로라 신규 저장의 그림은 안 바뀐다.
 // 렌더가 읽는 두 색을 한 곳에서 뽑는다. buildKeeper 인자와 상점 미리보기가 같은 값을 쓴다.
-export function lookOf(gear) {
+export function lookOf(gear, name) {
   const t = skinAt('ink', gear && gear.ink, gear && gear.inkSkin);
   const h = skinAt('hair', gear && gear.hair, gear && gear.hairSkin);
   const gl = skinAt('grip', gear && gear.grip, gear && gear.gripSkin);
   const bo = skinAt('studs', gear && gear.studs, gear && gear.studsSkin);
   const ki = skinAt('pads', gear && gear.pads, gear && gear.padsSkin);
   const so = skinAt('socks', gear && gear.socks, gear && gear.socksSkin);
+  /* 머리 선반에 손을 안 댄 사람은 그 선수 자신의 머리로 선다. 0등급도 색을 하나 돌려주므로
+     그 값을 그대로 실으면 산 사람과 안 산 사람이 똑같은 머리를 쓰고 얼굴이 하나로 뭉친다.
+     다만 0등급 안에서 변형을 고른 것도 선택이라 그때는 선반이 이긴다. 등급만 보고 판정했더니
+     0등급 변형 셋이 전부 얼굴로 떨어져 한 그림이 됐다. 고른 적이 없는 상태만 얼굴에 넘긴다. */
+  const bought = Number(gear && gear.hair) > 0 || Number(gear && gear.hairSkin) > 0;
   return {
-    hair: h.tone, hairCut: h.cut,
+    hair: bought ? h.tone : undefined,
+    hairCut: bought ? h.cut : undefined,
+    // 이름이 얼굴의 정본이다. 저장에 안 실으므로 옛 저장도 그대로 얼굴을 갖는다.
+    face: name === undefined ? undefined : faceOf(name),
     ink: t.tone, inkSpan: t.cut.span, inkGirth: t.cut.girth,
     glove: gl.tone, gloveCut: gl.cut,
     boot: bo.tone, bootCut: bo.cut,

@@ -288,6 +288,15 @@ function pips() {
     return '<i class=\"' + cls + '\"></i>';
   }).join('');
   el('lv').textContent = 'Lv ' + state.keeper.level;
+  /* 초상화 자리에 실제 그 키퍼의 얼굴을 굽는다. 픽셀로 그린 사람 모양 하나면 누구를 눌러도
+     같은 그림이라, 사람을 바꿔도 칩은 안 바뀐다. 뛰는 사람이 바뀌면 이 칸도 바뀌어야 한다.
+     매 구 부르는 자리라 이름이 그대로면 다시 굽지 않는다. */
+  const who = state.keeper.name;
+  const btn = el('meBtn');
+  if (btn.dataset.who !== who) {
+    btn.dataset.who = who;
+    btn.innerHTML = '<img alt="' + who + '" src="' + thumbURL('face', state.keeper, lookOf(state.gear, who)) + '">';
+  }
   el('fans').innerHTML = IC_FANS + '<b>' + state.fans.toLocaleString() + '</b>';
   // 육수와 스폰은 갈래가 다른 잔고다. 붙여 두면 한 줄의 숫자 띠로 읽혀 어느 것으로 사는지가
   // 상점을 열어야 아는 정보가 된다. 팔로워와 지갑을 가르는 것과 같은 세로선으로 둘을 가른다.
@@ -546,7 +555,7 @@ function rollCaptions(result) {
           t: photoLine(result.conceded, tier, Math.random),
           lb: gain, ct: state.gear.city, l: likesFor(gain, state.gear.city, Math.random()),
           ph: { city: state.gear.city, passer: seen, tier,
-            h: state.keeper.height, w: state.keeper.weight, look: lookOf(state.gear) } });
+            h: state.keeper.height, w: state.keeper.weight, look: lookOf(state.gear, state.keeper.name) } });
       }
       while (state.posts.length > FEED_CAP) state.posts.shift();
       pips();
@@ -654,7 +663,7 @@ function renderGym() {
       state.keeper[b.dataset.k] += growthGain(state.keeper, rng);
       state.points -= 1;
       persist();
-      stage.setKeeper(state.keeper, lookOf(state.gear));
+      stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
       pips();
       renderGym();
     };
@@ -695,6 +704,9 @@ function renderRoster() {
     const now = i === state.pick;
     const tail = now ? '지금 뛰는 중' : '세우기';
     return '<button data-at="' + i + '"' + (now ? ' class="here" disabled' : '') + '>'
+      /* 이름만 늘어놓으면 명단이 글자 목록이라 누가 누군지가 이름을 읽어야 안다.
+         얼굴을 앞에 세우면 세우려는 사람을 찾는 눈이 글자를 안 지난다. */
+      + '<img alt="' + k.name + '" src="' + thumbURL('face', k, lookOf({}, k.name)) + '">'
       + k.name + '<em>Lv ' + k.level + ', ' + tail + '</em></button>';
   }).join('');
   // 아직 없는 사람만 영입 줄에 선다. 가진 사람이 값과 함께 다시 뜨면 두 번 살 수 있는 것처럼 읽힌다.
@@ -703,6 +715,7 @@ function renderRoster() {
     const cost = keeperCost(entry);
     const off = state.wallet.coin < cost;
     return '<button data-n="' + entry.name + '"' + (off ? ' disabled' : '') + '>'
+      + '<img alt="' + entry.name + '" src="' + thumbURL('face', entry, lookOf({}, entry.name)) + '">'
       + entry.name + '<em>' + SW(cost) + '</em></button>';
   }).join('');
   box.innerHTML = '<h4>선수단<small>보유 ' + state.squad.length + '명</small></h4>'
@@ -737,7 +750,7 @@ function swapTo(at) {
   state.pick = at;
   state.keeper = state.squad[at];
   // state.gear는 지금 뛰는 키퍼를 따라가므로, 교체한 뒤에 읽어야 그 사람이 걸친 것이 실린다.
-  stage.setKeeper(state.keeper, lookOf(state.gear));
+  stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
   // 걸쳐 보던 것은 사람이 바뀌면 버린다. 남겨 두면 다른 사람 몸에 얹혀 산 것처럼 보인다.
   fitting = {};
   persist();
@@ -814,7 +827,11 @@ function renderGram() {
       return '<button class="dmOpen" data-key="' + key + '">' + passerName(city, passer, tier) + '<em>새 쪽지</em></button>';
     }).join('') + '</div>'
     : '';
-  box.innerHTML = '<h4>' + head + '</h4>' + inbox + '<div class="feed">' + feed + '</div><button class="close">닫기</button>';
+  /* 계정 머리에 프로필 사진을 세운다. SNS 화면에서 계정을 여는 첫 신호는 이름이 아니라 얼굴이고,
+     그 자리가 비어 있으면 이 창이 누구의 계정인지가 글자로만 서 있다. */
+  const avatar = '<img class="pfp" alt="' + state.keeper.name + '" src="'
+    + thumbURL('face', state.keeper, lookOf(state.gear, state.keeper.name)) + '">';
+  box.innerHTML = '<h4>' + avatar + head + '</h4>' + inbox + '<div class="feed">' + feed + '</div><button class="close">닫기</button>';
   for (const b of box.querySelectorAll('.dmOpen')) {
     b.onclick = () => { dmOpen = b.dataset.key; dmSaid = null; renderGram(); };
   }
@@ -958,7 +975,7 @@ function renderMe() {
     return '<i data-wear="' + s.field + '"><b>' + s.head + '</b>' + s.at(state.gear[s.field]).name + '</i>';
   };
   const wear = '<div class="wear"><span class="shot"><img alt="' + name + '" src="'
-    + thumbURL('body', k, lookOf(state.gear)) + '"></span>'
+    + thumbURL('body', k, lookOf(state.gear, state.keeper.name)) + '"></span>'
     + '<div class="on"><h5>몸에 걸친 것</h5>' + ['glove', 'boot', 'kit', 'sock', 'hair', 'ink'].map(wearRow).join('')
     + '<h5>서 있는 자리</h5>' + ['frame', 'city'].map(wearRow).join('') + '</div></div>';
   const grid = GROWABLE.map((s) => {
@@ -1056,7 +1073,7 @@ function takeSelfie(city, passer, tier) {
   state.posts.push({ n: passerName(city, passer, tier), c: false, g: fans,
     t: selfieLine(Math.random), lb: fans, ct: state.gear.city,
     l: likesFor(fans, state.gear.city, Math.random()),
-    sf: { city, passer, tier, h: state.keeper.height, w: state.keeper.weight, look: lookOf(state.gear) } });
+    sf: { city, passer, tier, h: state.keeper.height, w: state.keeper.weight, look: lookOf(state.gear, state.keeper.name) } });
   while (state.posts.length > FEED_CAP) state.posts.shift();
   persist();
   pips();
@@ -1142,7 +1159,7 @@ let fitting = {};
 
 // 지금 몸에 걸친 것과 걸쳐 본 것을 합친 모습. 탈의실 그림과 시착용 판정이 같은 값을 본다.
 function fittedLook() {
-  return lookOf(Object.assign({}, state.gear, fitting));
+  return lookOf(Object.assign({}, state.gear, fitting), state.keeper.name);
 }
 
 // 확률은 명단이 아니라 지금 남은 풀에서 다시 센다. 뽑을수록 남은 풀이 바뀌므로
@@ -1365,7 +1382,7 @@ function bindGear(box) {
     const s = SHELVES[shot.dataset.kind];
     if (!s) continue;
     const g = s.at(shot.dataset.rank);
-    const look = lookOf(Object.assign({}, state.gear, { [s.field]: g[s.field] }));
+    const look = lookOf(Object.assign({}, state.gear, { [s.field]: g[s.field] }), state.keeper.name);
     // 골대와 동네는 몸이 아니라 장면이라 외형 묶음이 아니라 등급 자체를 받는다.
     // 장면 칸은 외형 묶음이 아니라 등급과 변형 둘을 받는다. 걸쳐 본 변형이 있으면 그것으로 굽는다.
     const pickSkin = fitting[s.field + 'Skin'] !== undefined ? fitting[s.field + 'Skin'] : state.gear[s.field + 'Skin'];
@@ -1406,7 +1423,7 @@ function bindGear(box) {
         // 자리 칸은 몸이 아니라 장면이라 키퍼를 다시 세우는 것으로는 안 바뀐다.
         if (field === 'city') stage.setCity(state.gear.city, state.gear.citySkin);
         else if (field === 'frame') stage.setGoal(state.gear.frame, state.gear.frameSkin);
-        else stage.setKeeper(state.keeper, lookOf(state.gear));
+        else stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
         persist();
       } else {
         fitting[field] = rank;
@@ -1435,7 +1452,7 @@ function bindGear(box) {
       // 머리와 타투는 사면 그 자리에서 키퍼 껍데기 색이 바뀐다. 안 보이면 산 것이 아니다.
       // 머리와 잉크만 몸을 다시 세우고 있었다. 장갑과 축구화와 유니폼과 양말도
       // 이제 색을 가지므로 같이 다시 세운다. 골대와 동네는 몸이 아니라 빠진다.
-      if (['hair', 'ink', 'grip', 'studs', 'pads', 'socks'].includes(s.field)) stage.setKeeper(state.keeper, lookOf(state.gear));
+      if (['hair', 'ink', 'grip', 'studs', 'pads', 'socks'].includes(s.field)) stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
       // 산 것은 걸쳐 본 목록에서 빠진다. 안 빼면 이미 내 것이 장바구니에 남아 값이 두 번 잡힌다.
       if (fitting[s.field] !== undefined && fitting[s.field] <= state.gear[s.field]) delete fitting[s.field];
       persist();
@@ -1497,7 +1514,7 @@ function paintPull() {
     /* 카드 안에 사람이 없으면 이름을 적은 빈 판이다. 선수단과 상점이 이미 쓰는 전신 그림을
        그대로 굽는다. 걸친 것은 내 장비가 아니라 기본 차림이다. 아직 내 선수가 아니기 때문이다. */
     + '<div class="now' + (rare ? ' rare' : '') + '"><u>' + k.fame + '</u>'
-    + '<img alt="' + k.name + '" src="' + thumbURL('card', k, lookOf({})) + '">'
+    + '<img alt="' + k.name + '" src="' + thumbURL('card', k, lookOf({}, k.name)) + '">'
     + '<b>' + k.name + '</b></div>'
     + '<div class="done">' + done + '</div>'
     + '<div class="hint">' + (over ? '눌러서 닫기' : '눌러서 건너뛰기') + '</div>';
@@ -1667,7 +1684,7 @@ function renderShop() {
     fitting = {};
     if (state.gear.city !== undefined) stage.setCity(state.gear.city, state.gear.citySkin);
     if (state.gear.frame !== undefined) stage.setGoal(state.gear.frame, state.gear.frameSkin);
-    stage.setKeeper(state.keeper, lookOf(state.gear));
+    stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
     persist();
     pips();
     renderShop();
@@ -1851,7 +1868,7 @@ addEventListener('keydown', (e) => {
 pips();
 mountTitle(() => {
   stage.leaveTitle();
-  stage.setKeeper(state.keeper, lookOf(state.gear));
+  stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
 stage.setCity(state.gear.city, state.gear.citySkin);
 stage.setGoal(state.gear.frame, state.gear.frameSkin);
   // 밀린 훈련이 있어도 공부터 온다. 쓸지 말지는 훈련장 버튼이 들고 있다.

@@ -265,7 +265,7 @@ export function setPose(g, pose, time = 0) {
 // dir은 얼굴이 보는 쪽이다. 키퍼는 키커를 보고, 키커는 렌즈 쪽을 본다.
 // hairTone은 상점 헤어 등급의 색이고 hairCut은 그 등급의 형태다.
 // 안 넘기면 기본 갈색에 기본 반구로 선다.
-export function addFace(head, r, dir, skin, hairTone, hairCut) {
+export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
   const whiteMat = new THREE.MeshBasicMaterial({ color: 0xfbfbf5 });
   const darkMat = pupilMat;
   // 흰자 둘은 표정이 바뀌어도 자리가 그대로다. 한 장으로 붙여야 얼굴 하나가 드로우콜을 아홉 부르지 않는다.
@@ -314,6 +314,28 @@ export function addFace(head, r, dir, skin, hairTone, hairCut) {
   collar.translate(0, -r * 1.02, -dir * r * 0.1);
   const shellGeos = [hair, nape, neck, chin, collar];
   const shellColors = [hairTone || 0x2b1d14, 0x5a4030, 0x1a1712, 0x141110, 0xd7dfd2];
+  /* 수염과 묶은 머리. 머리색과 피부색만으로는 백 명이 다섯 얼굴로 뭉친다.
+     이 둘은 실루엣을 바꾸므로 카드 크기에서도, 경기장의 작은 머리에서도 갈린다.
+     수염은 턱을 감싸는 얇은 껍데기다. 1은 짧고 2는 덥수룩해서 볼까지 올라온다. */
+  const beard = face && face.beard ? face.beard : 0;
+  if (beard) {
+    const up = beard === 2 ? 0.62 : 0.44;
+    const b = new THREE.SphereGeometry(r * 1.02, 12, 8, Math.PI * (dir > 0 ? 0.62 : 1.62), Math.PI * 1.76,
+      Math.PI * (1 - up) * 0.5 + Math.PI * 0.22, Math.PI * up * 0.5);
+    b.scale(1, 1, 1.02);
+    b.translate(0, -r * 0.1, 0);
+    shellGeos.push(b);
+    // 수염은 머리보다 한 단 어둡다. 같은 색이면 턱과 머리가 한 덩어리로 붙는다.
+    shellColors.push(hairTone === undefined ? 0x1c1712 : hairTone);
+  }
+  // 뒤로 묶은 머리. 뒤통수에서 뒤로 뻗는 덩어리 하나면 실루엣이 갈린다.
+  if (face && face.tail) {
+    const tail = new THREE.SphereGeometry(r * 0.46, 8, 6);
+    tail.scale(0.72, 0.86, 1.5);
+    tail.translate(0, r * 0.1, -dir * r * 1.16);
+    shellGeos.push(tail);
+    shellColors.push(hairTone || 0x2b1d14);
+  }
   for (const s of [-1, 1]) {
     const ear = new THREE.SphereGeometry(r * 0.32, 8, 6);
     ear.scale(0.44, 1.05, 0.78);
@@ -400,7 +422,7 @@ function buildBody(o) {
   // 머리는 작다. 몸통과 같은 진폭을 주면 두개골이 찌그러진 것으로 읽힌다.
   jitterMesh(head, 0.008, 11);
   addOutline(head, 0.045);
-  addFace(head, o.headR, o.faceDir, o.skin, o.hair, o.hairCut);
+  addFace(head, o.headR, o.faceDir, o.skin, o.hair, o.hairCut, o.face);
   neck.add(head);
 
   const joints = { spine, neck };
@@ -580,19 +602,24 @@ export function buildKeeper(height, weight, look) {
     // 같은 초록을 어둡게만 내린 소매는 팔이 아니라 몸통에 진 그림자로 읽혔다.
     // 색상을 청록으로 꺾으면 밝기가 아니라 색이 팔을 세우고, 양말과 한 벌로 묶인다.
     shirt: (look && look.shirt) || 0x2f8f5b, kitCut: look && look.kitCut,
-    sleeve: 0x073239, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: (look && look.sock) || 0x63d3e8, sockCut: look && look.sockCut,
+    /* 피부와 머리는 걸치는 것이 아니라 그 사람이다. 상점 헤어 등급을 산 사람만 look이 그것을 덮고,
+       안 샀으면 그 선수 자신의 얼굴이 선다. face가 없으면 옛 기본값 그대로다. */
+    sleeve: 0x073239, skin: (look && look.face && look.face.skin) || 0xe8c39a,
+    shorts: 0x2b3b4e, socks: (look && look.sock) || 0x63d3e8, sockCut: look && look.sockCut,
     cuffSleeve: (look && look.ink) || 0x5f8f93, cuffSpan: (look && look.inkSpan) || 0.16, cuffGirth: (look && look.inkGirth) || 1,
     cuffShorts: 0x6d8898, gloveTone: (look && look.glove) || 0xf2d64b,
     gloveCut: look && look.gloveCut,
     bootTone: (look && look.boot) || 0x2a241c, bootCut: look && look.bootCut,
-    hair: look && look.hair, hairCut: look && look.hairCut,
+    hair: (look && look.hair) || (look && look.face && look.face.hair),
+    hairCut: (look && look.hairCut) || (look && look.face && look.face.cut),
+    face: look && look.face,
     phase: 0.7, rest: POSES.ready
   });
   g.userData.girth = w;
   return g;
 }
 
-export function buildKicker() {
+export function buildKicker(face) {
   const g = buildBody({
     tag: 'kicker',
     hipY: 0.88,
@@ -606,7 +633,10 @@ export function buildKicker() {
     // 카메라가 골대 뒤에 있어 크로스바가 키커의 다리를 가로로 자른다.
     // 흰 양말은 흰 바에, 남색 반바지는 어두운 그물 띠에 먹혀 잘린 조각이 다리로 안 읽힌다.
     // 배경 어느 띠에도 없는 색을 쓴다.
-    shirt: 0xc9483a, sleeve: 0x6d1c14, skin: 0xd8a877, shorts: 0xede7d8, socks: 0xf2b431,
+    // 키커도 사람이라 얼굴을 받는다. 안 주면 옛 기본값 그대로 선다.
+    shirt: 0xc9483a, sleeve: 0x6d1c14, skin: (face && face.skin) || 0xd8a877,
+    shorts: 0xede7d8, socks: 0xf2b431,
+    hair: face && face.hair, hairCut: face && face.cut, face,
     phase: 2.1, rest: POSES.windup
   });
   return g;
