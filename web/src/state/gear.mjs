@@ -146,6 +146,37 @@ export const HAIRS = [
 
 export const MAX_HAIR = HAIRS.length - 1;
 
+/* 선반 길이가 등급 수에 묶여 있었다. 등급을 늘리면 값 사다리와 팔로워 승수가 같이 늘어나
+   그 둘을 여는 결정이 날 때까지 콘텐츠 수가 넷에서 멈춘다.
+   변형은 그 매듭 밖이다. 같은 등급, 같은 값, 같은 승수에 모양과 색만 다르다.
+   등급을 사면 그 등급의 변형이 전부 열리고 바꾸는 데 값이 안 든다.
+   0번은 그 등급의 기본이라 위 표의 tone과 cut을 그대로 쓴다. */
+export const HAIR_SKINS = [
+  [{ name: '엄마 손 그대로', tone: 0x2b1d14, cut: { wide: 1, tall: 1.02, phi: 0.46, tilt: 0.09 } },
+   { name: '한쪽만 눌린 자국', tone: 0x3b2a1a, cut: { wide: 1.04, tall: 1, phi: 0.5, tilt: -0.14 } },
+   { name: '가위 안 든 날', tone: 0x241a12, cut: { wide: 1.08, tall: 1.08, phi: 0.58, tilt: 0.05 } }],
+  [{ name: '기본 투블럭', tone: 0x1b1410, cut: { wide: 1, tall: 1.03, phi: 0.28, tilt: 0 } },
+   { name: '올백 투블럭', tone: 0x2a2018, cut: { wide: 0.92, tall: 1.12, phi: 0.24, tilt: 0.11 } },
+   { name: '반삭 투블럭', tone: 0x141010, cut: { wide: 1.06, tall: 1, phi: 0.18, tilt: 0 } }],
+  [{ name: '탈색 노랑', tone: 0xd8b45c, cut: { wide: 1.08, tall: 1.22, phi: 0.52, tilt: 0 } },
+   { name: '물 빠진 은발', tone: 0xd6d8d2, cut: { wide: 1.14, tall: 1.16, phi: 0.56, tilt: 0 } },
+   { name: '탈색 실패 주황', tone: 0xd9762f, cut: { wide: 1.02, tall: 1.3, phi: 0.48, tilt: 0.06 } }],
+  [{ name: '빨간 모히칸', tone: 0xc4402c, cut: { wide: 0.34, tall: 1.8, phi: 0.6, tilt: 0 } },
+   { name: '파란 모히칸', tone: 0x2f6fd9, cut: { wide: 0.28, tall: 2.1, phi: 0.66, tilt: 0 } },
+   { name: '쓰러진 모히칸', tone: 0x8f2fd1, cut: { wide: 0.42, tall: 1.55, phi: 0.56, tilt: 0.24 } }]
+];
+
+export function hairSkinsAt(hair) {
+  return HAIR_SKINS[Math.min(MAX_HAIR, Math.max(0, Math.floor(Number(hair) || 0)))];
+}
+
+// 등급이 바뀌면 변형 번호가 그 등급의 범위를 넘을 수 있다. 넘으면 그 등급의 기본으로 돌아간다.
+export function hairSkinAt(hair, skin) {
+  const list = hairSkinsAt(hair);
+  const n = Math.floor(Number(skin) || 0);
+  return list[n >= 0 && n < list.length ? n : 0];
+}
+
 // 타투 선반. 헤어와 같은 축이고 보이는 자리만 다르다. ink는 소매 커프 색이라 팔에 드러난다.
 // 값 기준은 앞의 일곱과 같다. 첫 칸은 카드깡 380 육수보다 싸고 마지막 칸은 그보다 비싸다.
 // cut은 잉크의 형태다. span은 위팔을 덮는 비율, girth는 감는 두께 배율이다.
@@ -168,13 +199,13 @@ export const TATTOOS = [
 export const MAX_INK = TATTOOS.length - 1;
 
 export function newGear() {
-  return { grip: 0, studs: 0, pads: 0, socks: 0, frame: 0, city: 0, hair: 0, ink: 0 };
+  return { grip: 0, studs: 0, pads: 0, socks: 0, frame: 0, city: 0, hair: 0, hairSkin: 0, ink: 0 };
 }
 
 /* 갈래 둘. 몸에 걸치는 것은 그 키퍼의 것이고, 서는 자리는 계정의 것이다.
    장갑을 낀 것은 그 사람이지만 골대와 동네는 누가 뛰든 같은 곳이라, 키퍼를 바꿨을 때
    앞의 여섯은 따라 바뀌고 뒤의 둘은 그대로여야 한다. */
-export const WORN_FIELDS = ['grip', 'studs', 'pads', 'socks', 'hair', 'ink'];
+export const WORN_FIELDS = ['grip', 'studs', 'pads', 'socks', 'hair', 'hairSkin', 'ink'];
 export const PLACE_FIELDS = ['frame', 'city'];
 
 export function isWorn(field) {
@@ -193,6 +224,8 @@ export function readGear(raw) {
   if (Number.isFinite(raw.frame)) g.frame = Math.min(MAX_FRAME, Math.max(0, Math.floor(raw.frame)));
   if (Number.isFinite(raw.city)) g.city = Math.min(MAX_CITY, Math.max(0, Math.floor(raw.city)));
   if (Number.isFinite(raw.hair)) g.hair = Math.min(MAX_HAIR, Math.max(0, Math.floor(raw.hair)));
+  // 변형은 그 등급의 목록 안에서만 산다. 범위 밖 숫자는 기본으로 접는다.
+  if (Number.isFinite(raw.hairSkin)) g.hairSkin = Math.max(0, Math.min(hairSkinsAt(g.hair).length - 1, Math.floor(raw.hairSkin)));
   if (Number.isFinite(raw.ink)) g.ink = Math.min(MAX_INK, Math.max(0, Math.floor(raw.ink)));
   return g;
 }
@@ -236,7 +269,8 @@ export function inkAt(ink) {
 export function lookOf(gear) {
   const t = inkAt(gear && gear.ink);
   return {
-    hair: hairAt(gear && gear.hair).tone, hairCut: hairAt(gear && gear.hair).cut,
+    hair: hairSkinAt(gear && gear.hair, gear && gear.hairSkin).tone,
+    hairCut: hairSkinAt(gear && gear.hair, gear && gear.hairSkin).cut,
     ink: t.ink_tone, inkSpan: t.cut.span, inkGirth: t.cut.girth,
     glove: gloveAt(gear && gear.grip).tone, gloveCut: gloveAt(gear && gear.grip).cut,
     boot: bootAt(gear && gear.studs).tone, bootCut: bootAt(gear && gear.studs).cut,

@@ -10,7 +10,7 @@ import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dm
 import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
 import { coinGain, readWallet, COIN_DRILL, COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
-import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
+import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, hairSkinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
 import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds, photoOdds, selfieFans,
   DM_MOVES, dmOdds, dmOutcome, dmClock, dmWaiting, applyDm } from './state/gram.mjs';
@@ -1229,7 +1229,9 @@ function clearSpec() {
 // 값을 치르기 전에 자기 몸에서 확인할 수 있어야 꾸미는 재미가 산다.
 function fittingRoom() {
   const url = thumbURL('body', state.keeper, fittedLook());
-  const tried = Object.keys(fitting);
+  // 변형은 값이 없는 칸이라 청구서와 걸친 목록에서 빠진다. 값 0짜리 줄이 서면
+  // 전부 사기 버튼이 0원을 부르며 켜지고, 벗기 목록에 이름 없는 줄이 하나 생긴다.
+  const tried = Object.keys(fitting).filter((f) => shelfOfField(f));
   const bill = tried.reduce((n, f) => n + costOfField(f, fitting[f]), 0);
   // 걸친 줄마다 벗는 자리를 둔다. 다시 카드를 찾아 누르는 것이 유일한 길이면,
   // 무엇을 걸쳤는지 아는 자리와 그것을 무르는 자리가 갈려 있다.
@@ -1288,8 +1290,19 @@ function gearShelf(kind) {
     }
     // 썸네일 자리는 마크업에서 비워 두고 그림은 bindGear가 굽는다. 굽는 데 렌더러가 필요해서
     // 문자열을 만드는 자리에서는 그릴 수 없다. 자리가 없으면 카드 높이가 그림을 받고 나서 뛴다.
+    // 변형 조각. 등급 하나가 여러 모양을 들고 있으면 그 조각들을 값 버튼 위에 깐다.
+    // 색 견본이 아니라 지금 고른 것이 무엇인지를 알려야 하므로 켜진 조각에 표시를 남긴다.
+    let skins = '';
+    if (s.field === 'hair') {
+      const list = hairSkinsAt(rank);
+      const pickedRank = fitting.hair !== undefined ? fitting.hair : state.gear.hair;
+      const picked = fitting.hairSkin !== undefined ? fitting.hairSkin : state.gear.hairSkin;
+      skins = '<div class="skins">' + list.map((v, i) =>
+        '<button class="skin' + (rank === pickedRank && i === picked ? ' on' : '') + '" data-rank="' + rank
+        + '" data-skin="' + i + '" title="' + v.name + '" style="--sw:#' + v.tone.toString(16).padStart(6, '0') + '"></button>').join('') + '</div>';
+    }
     return '<div class="card gear" data-spec="' + kind + '" data-at="' + rank + '"><div class="shot" data-kind="' + kind + '" data-rank="' + rank + '"></div>'
-      + '<b>' + g.name + '</b><em>' + g.note + '</em>'
+      + '<b>' + g.name + '</b><em>' + g.note + '</em>' + skins
       + '<button class="buy" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
   });
   const top = have >= s.top ? '<span class="got">' + s.at(s.top).name + '까지 갔다. 더 살 게 없다</span>' : '';
@@ -1342,6 +1355,26 @@ function bindGear(box) {
     }
     if (fitting[s.field] === rank) card.classList.add('fit');
   }
+  // 변형 조각. 이미 가진 등급이면 눌러서 바로 바꾸고 값이 안 든다.
+  // 아직 안 산 등급이면 그 등급을 걸쳐 보면서 그 변형으로 미리 본다.
+  for (const sw of box.querySelectorAll('.skin[data-rank]')) {
+    sw.onclick = (e) => {
+      e.stopPropagation();
+      const rank = Number(sw.dataset.rank);
+      const at = Number(sw.dataset.skin);
+      if (rank <= state.gear.hair) {
+        state.gear.hair = rank;
+        state.gear.hairSkin = at;
+        stage.setKeeper(state.keeper, lookOf(state.gear));
+        persist();
+      } else {
+        fitting.hair = rank;
+        fitting.hairSkin = at;
+      }
+      stopSpin();
+      renderShop();
+    };
+  }
   for (const b of box.querySelectorAll('.buy[data-rank]')) {
     b.onclick = () => {
       if (b.disabled) return;
@@ -1350,6 +1383,11 @@ function bindGear(box) {
       if (state.wallet.coin < g.cost) return;
       state.wallet.coin -= g.cost;
       state.gear[s.field] = g[s.field];
+      // 걸쳐 보던 변형이 있으면 그 변형으로 산다. 안 옮기면 미리 본 것과 산 것이 다르다.
+      if (s.field === 'hair' && fitting.hairSkin !== undefined) {
+        state.gear.hairSkin = fitting.hairSkin;
+        delete fitting.hairSkin;
+      }
       // 동네를 사면 상점을 닫기 전에 배경이 바뀐다. 재시작을 요구하면 산 것이 안 읽힌다.
       if (s.field === 'city') stage.setCity(state.gear.city);
       if (s.field === 'frame') stage.setGoal(state.gear.frame);
@@ -1559,11 +1597,12 @@ function renderShop() {
   };
   if (all) all.onclick = () => {
     if (all.disabled) return;
-    const tried = Object.keys(fitting);
+    // 값이 붙는 칸만 청구서에 오르고, 옮기는 것은 걸쳐 본 전부다. 변형은 값이 없지만 같이 입는다.
+    const tried = Object.keys(fitting).filter((f) => shelfOfField(f));
     const bill = tried.reduce((n, f) => n + costOfField(f, fitting[f]), 0);
     if (bill > state.wallet.coin) return;
     state.wallet.coin -= bill;
-    for (const f of tried) state.gear[f] = fitting[f];
+    for (const f of Object.keys(fitting)) state.gear[f] = fitting[f];
     fitting = {};
     if (state.gear.city !== undefined) stage.setCity(state.gear.city);
     if (state.gear.frame !== undefined) stage.setGoal(state.gear.frame);

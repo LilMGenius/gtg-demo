@@ -694,6 +694,14 @@ body.playing #hud{opacity:1}
   border:2px solid #ffffff14;display:grid;place-items:center;overflow:hidden}
 #shop .shot img,#shop .shot canvas{width:100%;height:100%;object-fit:contain;display:block}
 #shop .card.gear em{margin-top:5px}
+/* 변형 조각. 한 등급이 여러 모양을 들고 있다는 것을 값 버튼 위에서 알린다.
+   18px는 손가락으로 누르기엔 작지만 카드 높이를 안 밀고, 눌리는 것은 조각이 아니라 그 줄 전체다. */
+#shop .skins{display:flex;gap:6px;margin-top:7px}
+#shop .skin{width:22px;height:18px;padding:0;border:2px solid var(--edge);background:var(--sw);
+  box-shadow:2px 2px 0 var(--edge);cursor:pointer}
+/* 고른 조각만 테를 밝힌다. 색만으로 표시하면 어두운 변형끼리 무엇이 켜졌는지가 안 보인다. */
+#shop .skin.on{border-color:#e8d463;box-shadow:0 0 0 2px #e8d46355, 2px 2px 0 var(--edge)}
+#shop .skin:active{transform:translate(2px,2px);box-shadow:none}
 #shop .card.gear .buy{margin-top:8px;padding:8px 0 10px;font-size:16px}
 #shop .card.gear:nth-child(2n){transform:rotate(.5deg)}
 #shop .buy{width:100%;margin-top:13px;padding:10px 0 12px;
