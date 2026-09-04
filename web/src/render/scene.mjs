@@ -496,6 +496,11 @@ const TOUCHED = new Set(['contact']);
   // 계측이 폴링으로 잡으면 피크는 프레임 사이로 빠져나간다. 그리는 쪽이 적어야 한다.
   let camOffPeak = 0;
   let squashPeak = 0;
+  /* 사건마다 리셋되는 최고값 옆에, 밖에서만 리셋하는 최고값을 하나 더 둔다.
+     선언한 사건 뒤에 그 구의 진짜 사건이 따라오면 앞의 값은 0으로 돌아가고,
+     밖에서 읽는 자는 사건이 있었는지조차 못 본다. 실측으로 선방은 1.119를 찍고 0이 됐다. */
+  let squashEver = 0;
+  let camEver = 0;
   // 손에 닿은 공이 모양 그대로 튀면 맞은 것이 아니라 스친 것으로 읽힌다.
   // 0.16초는 히트스톱 길이와 같다. 정지가 풀릴 때 공도 같이 원형으로 돌아온다.
   const SQ_DUR = 0.16;
@@ -1911,6 +1916,8 @@ const TOUCHED = new Set(['contact']);
       ball.scale.set(ballGain * (1 + e * 0.34), ballGain * (1 - e * 0.26), ballGain * (1 + e * 0.34));
     }
     squashPeak = Math.max(squashPeak, Math.abs(ball.scale.x / Math.max(0.001, ball.scale.y) - 1));
+    squashEver = Math.max(squashEver, squashPeak);
+    camEver = Math.max(camEver, camOffPeak);
     if (cue) { ballProbe.sample(tail ? tail.kind : 'flight'); stageProbe.sample(); }
     renderer.setRenderTarget(rt);
     renderer.render(scene, camera);
@@ -2211,9 +2218,14 @@ const TOUCHED = new Set(['contact']);
     shake: shakeLeft,
     camOff: camOffPeak,
     squash: squashPeak,
+    squashEver,
+    camEver,
     depth: lastDepth,
     ...impact.state()
   });
+
+  // 채취 구간의 시작을 밖에서 선언한다. 이 뒤로 도달한 최고값이 squashEver와 camEver다.
+  window.__impactArm = () => { squashEver = 0; camEver = 0; };
 
   // 임팩트를 뺀 같은 프레임. 차분이 임팩트의 화소다.
   window.__impactHide = (on) => impact.hide(on);

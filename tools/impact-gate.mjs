@@ -152,10 +152,16 @@ try {
       if (!armed) { console.log(kind + " retry " + a + ": no kick within 14s"); continue; }
       await p.keyboard.press("ArrowLeft");
       await p.waitForTimeout(700);
+      // 채취 구간을 연다. 이 뒤로 도달한 최고값만 이 사건의 것이다.
+      await p.evaluate(() => window.__impactArm());
       await p.evaluate((k) => window.__act(k), kind);
       const stall = await p.evaluate(measureStall, 90);
       const live = await p.evaluate(waitBurst);
       if (!live) { console.log(kind + " retry " + a + ": burst never lit"); continue; }
+      /* 찌그러짐 최고값은 선언한 사건이 리셋하고 그 구의 진짜 사건이 다시 리셋한다.
+         뒤늦게 두 번 읽는 완화책으로는 둘 다 리셋 뒤에 걸려 0이 잡혔다. 실측으로 선방은
+         접촉 직후 1.119를 찍고 사건이 끝나면서 0으로 되돌아간다. 불이 켜진 그 자리에서 한 번 읽는다. */
+      const hitVis = await p.evaluate(() => window.__impactVis());
       const peakShots = await shots(p);
       await p.evaluate(() => window.__freeze(false));
       const peak = await p.evaluate(diff, [peakShots.a, peakShots.b, LUM]);
@@ -175,7 +181,7 @@ try {
       // 계측: save만 cam과 squash가 동시에 0이고 나머지 셋은 정상이었다.
       // 두 시점의 최고값을 취하면 덮이기 전 표본이 남는다.
       const camOff = Math.max(vis.camOff, lateState.camOff);
-      const squash = Math.max(vis.squash, lateState.squash);
+      const squash = Math.max(vis.squashEver, lateState.squashEver, hitVis.squashEver);
       row = { kind, peak: peak.n, late: late.n, noise: noise.n, stall: stall.ratio,
         cam: camOff, squash, u: live.u, lateU: lateState.u };
       rows.push(row);
