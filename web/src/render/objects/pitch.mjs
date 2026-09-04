@@ -451,11 +451,23 @@ export function buildPitch(scene) {
     skyline.add(b);
     cursor += w + 0.4 + rnd() * 1.6;
   }
+  // 이름을 달아 둔다. GLB가 서면 이 그룹이 씬에서 빠지므로, 높이 배율은 참조가 아니라
+  // 지금 씬에 서 있는 이름으로 찾아 걸어야 한다.
+  skyline.name = 'skyline';
   scene.add(skyline);
   // 지오메트리와 재질을 그대로 나눠 쓴다. 반 바퀴 돌리면 (x,z)가 뒤집혀 z가 -38~-45로 간다.
   const backCity = skyline.clone();
   backCity.rotation.y = Math.PI;
+  backCity.name = 'skyline-back';
   scene.add(backCity);
+  /* 지평선 높이 배율. 지금 씬에 서 있는 것을 이름으로 찾아 건다. 참조로 잡으면 GLB가 선 뒤에
+     빠진 그룹을 계속 늘리게 되고, 화면은 처음 높이 그대로 남는다. */
+  let lastRise = 1;
+  const applyRise = () => {
+    for (const o of scene.children) {
+      if (o.name === 'skyline' || o.name === 'skyline-back') o.scale.y = lastRise;
+    }
+  };
   // GLB가 서면 이 사본도 GLB 사본으로 갈린다. loadDecor가 여기를 본다.
   skyline.userData.mirror = backCity;
   // 라인은 흔들지 않는다. 바닥 선이 물결치면 거리를 못 읽는다. 건물만 흔든다.
@@ -463,7 +475,7 @@ export function buildPitch(scene) {
   // 창 무늬도 벽색도 동마다 갈라야 열네 동이 열네 동으로 읽힌다.
   loadDecor(scene, 'skyline', skyline, 0.18, (c, nth) => new THREE.MeshLambertMaterial({
     color: wallColor(nth), map: windowTex(nth, nth)
-  }));
+  }), applyRise);
 
   // punch는 패널의 로컬 좌표로 민다. 뒷그물 원점은 바닥이 아니라 BACK_H/2 + NET_LIFT다.
   // 이 값을 밖에서 짐작하면 밀리는 자리가 공이 지나간 자리와 어긋난다.
@@ -478,6 +490,27 @@ export function buildPitch(scene) {
         from: p.thetaStart, span: p.thetaLength };
     }),
     setGoal: (rank, skin) => weave(skinAt('frame', rank, skin)),
+    /* 동네 등급이 바꾸는 자리. 밟는 면과 두르는 철망과 지평선 높이 셋이다.
+       하늘색만 바꾸던 동안 공터와 번화가가 같은 흙바닥에 같은 지평선이었다.
+       값은 선반 데이터가 소유한다. 여기 배열을 따로 두면 상점 썸네일과 경기장이 갈린다. */
+    setPlace: (place) => {
+      ground.material.color.setHex(place.ground);
+      /* 골문 앞 밟힌 자리도 같은 면이다. 이것만 흙으로 두었더니 잔디와 아스팔트 위에
+         흙 사각형이 하나 떠 있었다. 색을 따로 적지 않고 바닥에서 밝기만 올려 만든다.
+         밟혀서 벗겨진 자리라 원래 면보다 밝고 채도가 낮다. 그러면 등급이 늘어도 값이 하나다. */
+      {
+        const c = new THREE.Color(place.ground);
+        const h = {};
+        c.getHSL(h);
+        c.setHSL(h.h, h.s * 0.72, Math.min(1, h.l * 1.28 + 0.06));
+        box.material.color.copy(c);
+      }
+      for (const f of [fence, backFence]) f.material.color.setHex(place.fence);
+      // 건물은 y가 h/2에 서 있어서 그룹을 세로로 늘리면 크기와 자리가 같이 늘어난다.
+      // 밑동은 바닥에 붙은 채로 높이만 자란다. 거울 사본도 같은 배율을 받아야 앞뒤가 안 갈린다.
+      lastRise = place.rise;
+      applyRise();
+    },
     // 그물 넉 장을 한 번에 여닫는다. 뒷면만 감추면 옆면과 지붕이 남아,
     // 그물을 껐다는 대조군이 실제로는 그물 넷 중 하나만 끈 것이 된다.
     setNets: (on) => { for (const n of nets) n.visible = on; },

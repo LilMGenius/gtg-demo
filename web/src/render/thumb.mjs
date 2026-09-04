@@ -6,7 +6,7 @@
 import * as THREE from "../../vendor/three.module.min.js";
 import { buildKeeper } from "./objects/actors.mjs";
 import { meshPanel, buildPassers } from "./objects/pitch.mjs";
-import { skinAt } from "../state/gear.mjs";
+import { skinAt, placeAt } from "../state/gear.mjs";
 
 // 행인 수는 경기장이 쓰는 그 규칙이다. 다섯에서 시작해 등급마다 둘이 는다.
 const PASSER_BASE = 5;
@@ -98,11 +98,23 @@ function goalRig(pick) {
 function cityRig(pick) {
   const rank = Math.floor(Number(pick && pick.rank) || 0);
   const c = skinAt("city", rank, pick && pick.skin);
+  // 밟는 면과 지평선은 등급이 소유한다. 여기서 색을 다시 적으면 진열과 경기장이 갈린다.
+  const place = placeAt(rank);
   const grp = new THREE.Group();
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30),
-    new THREE.MeshLambertMaterial({ color: 0x8d6a41 }));
+    new THREE.MeshLambertMaterial({ color: place.ground }));
   ground.rotation.x = -Math.PI / 2;
   grp.add(ground);
+  /* 지평선 한 조각. 인원과 하늘만으로는 네 칸이 같은 장소의 다른 시간대로 읽혔다.
+     경기장과 같은 규칙으로 등급이 높을수록 건물이 솟는다. 다섯 동이면 칸 폭을 채우고,
+     행인 뒤에 서므로 사람을 안 가린다. */
+  for (let i = 0; i < 5; i += 1) {
+    const h = (1.6 + (i % 3) * 0.7) * place.rise;
+    const b = new THREE.Mesh(new THREE.BoxGeometry(1.5, h, 1.2),
+      new THREE.MeshLambertMaterial({ color: place.fence }));
+    b.position.set(-3.2 + i * 1.6, h / 2, -4.6);
+    grp.add(b);
+  }
   // 행인 수는 경기장과 같은 식으로 센다. 다섯에서 시작해 등급마다 둘씩 는다.
   const n = PASSER_BASE + PASSER_STEP * rank;
   const who = buildPassers(grp, n);

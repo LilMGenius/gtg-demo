@@ -11,7 +11,7 @@ import {
 } from './units.mjs';
 import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, pushPose, setPose } from './objects/actors.mjs';
 import { buildPitch, buildPassers } from './objects/pitch.mjs';
-import { skinAt } from '../state/gear.mjs';
+import { skinAt, placeAt } from '../state/gear.mjs';
 import { createImpact } from './objects/impact.mjs';
 import { jitterMesh, addOutline, blobGeo, ballGeo } from './handmade.mjs';
 
@@ -467,6 +467,8 @@ const TOUCHED = new Set(['contact']);
     const look = skinAt('city', c, skin);
     scene.background.setHex(look.sky);
     scene.fog.color.setHex(look.haze);
+    // 시간대는 변형이 정하고 장소는 등급이 정한다. 하늘만 바꾸면 이름이 말하는 곳이 화면에 없다.
+    pitch.setPlace(placeAt(c));
   }
 
   function setKeeper(k, look) {

@@ -78,7 +78,7 @@ function relight(root, jitter, mat) {
   });
 }
 
-export function loadDecor(scene, name, fallback, jitter = 0, mat = null) {
+export function loadDecor(scene, name, fallback, jitter = 0, mat = null, onSwap = null) {
   loader.load(
     'assets/models/' + name + '.glb',
     (gltf) => {
@@ -103,6 +103,9 @@ export function loadDecor(scene, name, fallback, jitter = 0, mat = null) {
       if (fallback && fallback.parent) fallback.parent.remove(fallback);
       if (sub !== undefined) root.userData.sub = sub;
       scene.add(root);
+      // 갈린 물건은 앞서 걸어 둔 설정을 안 들고 온다. 동네 등급이 준 높이 배율이 여기서
+      // 조용히 사라져 있었다. 세운 쪽에 다시 걸 기회를 준다.
+      if (onSwap) onSwap(root);
     },
     undefined,
     () => { /* 코드가 세운 것이 남는다 */ }
