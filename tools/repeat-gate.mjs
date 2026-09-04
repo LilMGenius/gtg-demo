@@ -7,8 +7,12 @@ import { chromium } from "playwright";
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
 const KINDS = ["save", "catch", "carriedIn", "downed", "lost", "openGoalScored", "gloveGone", "spill", "rebound", "reboundMiss", "charge", "beat", "talked", "distracted", "skied"];
-// 회차 셋이면 쌍이 셋이라 최솟값이 우연히 한 쌍만 가까운 경우를 걸러낸다. 둘이면 쌍이 하나라 그게 안 된다.
-const ROUNDS = 3;
+/* 회차 다섯이면 쌍이 열이다. 셋일 때는 쌍이 셋뿐이라 최솟값도 중앙값도 실행마다 흔들렸고,
+   산출물이 그대로인데 빨간 종류가 실행마다 갈렸다. 실측으로 한 실행은 save와 beat,
+   다음 실행은 catch였고 그 사이 코드는 안 바뀌었다. 바를 만드는 대조군 중앙값도 두 배 움직였다.
+   쌍을 늘리는 것은 문턱을 낮추는 것이 아니다. 처치군은 최솟값이라 쌍이 늘수록 낮아져 더 엄해지고,
+   대조군은 중앙값이라 쌍이 늘수록 잡음을 더 잘 대표한다. */
+const ROUNDS = 5;
 // 채취 시점은 잠이 아니라 프레임 수로 잡는다. 폭은 60분의 1초다.
 // 다이빙 42프레임은 0.700초, 꼬리 31프레임은 0.517초로 이전의 잠과 거의 같은 자리다.
 // 다른 것은 그 자리가 기계 사정과 무관하게 매번 같다는 점이다.
@@ -23,7 +27,8 @@ const FLOOR = 3;
 // 다양성이 아니라 사건이 다른 사건으로 읽히기 시작한 것이다.
 const KIND_BAR = 0.35;
 // 열다섯 종류 곱하기 세 회차. 한 채취가 4초대이므로 넉넉히 잡는다.
-const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 600000);
+// 열다섯 종류에 처치군과 대조군 다섯 회차씩. 한 채취가 4초대라 앞의 600초로는 중간에 끊긴다.
+const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 900000);
 t.unref();
 
 // 회차가 다른가를 물을 때의 주어는 사건마다 다르다. 선방과 실점은 키퍼가 주어이고,
@@ -113,9 +118,12 @@ try {
     return out;
   };
   const shots = await sample("", ROUNDS);
-  // 대조군도 세 회차다. 쌍이 셋이라야 중앙값이 서고, 쌍 하나로는 잡음을 대표할 수 없다.
-  const ctl = await sample("&vary=0", 3);
-  const ctlSpread = mid(ctl, 3);
+  /* 대조군도 같은 회차 수를 쓰고 같은 통계를 쓴다. 처치군은 가장 닮은 쌍을 보는데
+     대조군만 중앙값을 보면 두 수가 같은 것을 안 재고, 회차를 늘릴수록 처치군만 낮아져
+     산출물이 그대로인데 바가 저절로 높아진다. 실측으로 회차를 셋에서 다섯으로 늘리자
+     같은 코드에서 빨간 종류가 둘에서 아홉으로 늘었다. 둘 다 가장 닮은 쌍으로 맞댄다. */
+  const ctl = await sample("&vary=0", ROUNDS);
+  const ctlSpread = low(ctl, ROUNDS);
   const spread = low(shots, ROUNDS);
   const ctlMax = Math.max(...KINDS.map((k) => ctlSpread[k]));
   const ctlWho = KINDS.find((k) => ctlSpread[k] === ctlMax);
