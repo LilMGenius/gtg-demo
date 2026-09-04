@@ -34,6 +34,8 @@ window.__ballPos = stage.ballPos;
 window.__ballSize = stage.ballSize;
 window.__kickerPos = stage.kickerPos;
 window.__tailKind = stage.tailKind;
+window.__marks = stage.marks;
+window.__project = stage.project;
 // 화면 한 점의 임자를 되묻는 훅. 어느 면이 그 화소를 차지했는지 모르면
 // 화면이 죽었다는 말은 고칠 대상을 가리키지 못한다.
 window.__pick = (nx, ny) => stage.ballProbe.pickAt(nx, ny);

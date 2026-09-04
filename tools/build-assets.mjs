@@ -7,6 +7,7 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { NodeIO } from '@gltf-transform/core';
 import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions';
 import { prune, dedup, weld, flatten, join } from '@gltf-transform/functions';
+import { MARK_LINES, ARC_R, ARC_HALF, SPOT_Z, FAR_W } from '../web/src/render/objects/markspec.mjs';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -48,17 +49,18 @@ function markings() {
     s.position.set(x, 0.02, z);
     g.add(s);
   };
-  const BOX_W = 16.5; const BOX_D = 16.5; const GA_W = 9.16; const GA_D = 5.5;
-  stripe(40, 0.12, 0, 0);
-  stripe(0.12, BOX_D, -BOX_W / 2, BOX_D / 2);
-  stripe(0.12, BOX_D, BOX_W / 2, BOX_D / 2);
-  stripe(BOX_W, 0.12, 0, BOX_D);
-  stripe(0.12, GA_D, -GA_W / 2, GA_D / 2);
-  stripe(0.12, GA_D, GA_W / 2, GA_D / 2);
-  stripe(GA_W, 0.12, 0, GA_D);
+  // 규격은 markspec이 소유한다. 굽는 쪽이 제 수를 들고 있으면 화면과 GLB가 다른 경기장을 그린다.
+  // 실제로 그렇게 갈려 있었다. 코드의 선을 고쳐도 화면에는 옛 GLB가 서 있었다.
+  for (const s of MARK_LINES) stripe(s.w, s.d, s.x, s.z);
+  // 페널티 아크. 박스 밖으로 나온 몫만 반달로 남는다.
+  const arc = new THREE.Mesh(
+    new THREE.RingGeometry(ARC_R - FAR_W / 2, ARC_R + FAR_W / 2, 48, 1, -Math.PI / 2 - ARC_HALF, ARC_HALF * 2), m);
+  arc.rotation.x = -Math.PI / 2;
+  arc.position.set(0, 0.02, SPOT_Z);
+  g.add(arc);
   const spot = new THREE.Mesh(new THREE.CircleGeometry(0.16, 12), m);
   spot.rotation.x = -Math.PI / 2;
-  spot.position.set(0, 0.02, 11);
+  spot.position.set(0, 0.02, SPOT_Z);
   g.add(spot);
   return g;
 }

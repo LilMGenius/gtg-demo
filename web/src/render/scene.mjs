@@ -2317,6 +2317,13 @@ const TOUCHED = new Set(['contact']);
     kickerPos: () => ({ x: kicker.position.x, y: kicker.position.y, z: kicker.position.z }),
     // 지금 어떤 꼬리가 도는가. 사건이 언제 시작했는지는 이 값이 null에서 바뀌는 프레임이다.
     tailKind: () => (tail ? tail.kind : null),
+    // 경기장 선의 실제 좌표와 크기. 규격은 선언이 아니라 그은 물건에서 잰다.
+    marks: () => pitch.marks(),
+    // 월드 한 점이 화면 어디에 찍히는지. 그은 것과 찍힌 것은 다른 주장이라 계기가 둘을 잇는 다리다.
+    project: (x, y, z) => {
+      const v = new THREE.Vector3(x, y, z).project(camera);
+      return { x: v.x, y: v.y, z: v.z };
+    },
     // 세계시계. 히트스톱과 정지가 여기서 멈추므로, 화면에 숫자를 쓰는 쪽은 실시간 대신 이걸 읽는다.
     now: () => vnow,
     after,

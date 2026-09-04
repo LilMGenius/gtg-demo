@@ -4,6 +4,7 @@ import { flat, flatMap, flatVertex, mergeGeos, R_HALF_W, R_H } from '../units.mj
 import { dirtTex, scuffTex, paintScuffBase, clothTex, chippedTex, cloudTex, windowTex, windowTexFor } from '../texture.mjs';
 import { loadDecor } from '../decor.mjs';
 import { jitterMesh, seeded, addOutline } from '../handmade.mjs';
+import { MARK_LINES, ARC_R, ARC_HALF, SPOT_Z, FAR_W } from './markspec.mjs';
 import { addFace } from './actors.mjs';
 import { frameAt } from '../../state/gear.mjs';
 
@@ -183,7 +184,7 @@ export function buildPitch(scene) {
   // 일곱 줄이 같은 흰색으로 같은 굵기면 인쇄물이다. 석회는 줄마다 다르게 닳는다.
   // 자리와 방향은 건드리지 않는다. 선이 움직이면 거리를 못 읽는다. 진하기와 굵기만 흔든다.
   const lrnd = seeded(0x4d21a9);
-  const stripe = (w, d, x, z) => {
+  const stripe = (w, d, x, z, tag) => {
     const thin = 1 + (lrnd() - 0.5) * 0.5;
     const mat = lineMat.clone();
     mat.opacity = 0.52 + lrnd() * 0.26;
@@ -191,24 +192,30 @@ export function buildPitch(scene) {
     m.rotation.x = -Math.PI / 2;
     m.position.set(x, 0.02, z);
     m.userData.probeIgnore = true;
+    // 계기가 어느 선인지 물을 수 있어야 한다. 화면에서 흰 띠 일곱은 다 같은 그림이라,
+    // 이름이 없으면 규격을 재는 자가 선을 좌표로 되짚어 추측하게 된다.
+    m.userData.mark = tag;
     marks.add(m);
   };
-  const BOX_W = 16.5;
-  const BOX_D = 16.5;
-  const GA_W = 9.16;
-  const GA_D = 5.5;
-  stripe(40, 0.12, 0, 0);
-  stripe(0.12, BOX_D, -BOX_W / 2, BOX_D / 2);
-  stripe(0.12, BOX_D, BOX_W / 2, BOX_D / 2);
-  stripe(BOX_W, 0.12, 0, BOX_D);
-  stripe(0.12, GA_D, -GA_W / 2, GA_D / 2);
-  stripe(0.12, GA_D, GA_W / 2, GA_D / 2);
-  stripe(GA_W, 0.12, 0, GA_D);
+  // 규격은 markspec이 소유한다. 여기서 수를 다시 적으면 굽는 쪽과 또 갈린다.
+  for (const s of MARK_LINES) stripe(s.w, s.d, s.x, s.z, s.mark);
+  /* 페널티 아크. 반달이 없으면 박스 앞이 그냥 흙이라 중거리를 차는 자리가 화면에 없다.
+     rotation.x = -PI/2에서 로컬 +y는 월드 -z로 가므로, 키커 쪽으로 부풀리려면 -PI/2에서 시작한다. */
+  const arcMat = lineMat.clone();
+  arcMat.opacity = 0.6;
+  const arc = new THREE.Mesh(
+    new THREE.RingGeometry(ARC_R - FAR_W / 2, ARC_R + FAR_W / 2, 48, 1, -Math.PI / 2 - ARC_HALF, ARC_HALF * 2), arcMat);
+  arc.rotation.x = -Math.PI / 2;
+  arc.position.set(0, 0.02, SPOT_Z);
+  arc.userData.probeIgnore = true;
+  arc.userData.mark = 'arc';
+  marks.add(arc);
   // 페널티 스팟. 키커가 공을 놓는 자리다.
   const spot = new THREE.Mesh(new THREE.CircleGeometry(0.16, 12), lineMat);
   spot.rotation.x = -Math.PI / 2;
-  spot.position.set(0, 0.02, 11);
+  spot.position.set(0, 0.02, SPOT_Z);
   spot.userData.probeIgnore = true;
+  spot.userData.mark = 'spot';
   marks.add(spot);
   scene.add(marks);
   loadDecor(scene, 'markings', marks);
@@ -463,6 +470,13 @@ export function buildPitch(scene) {
   // net은 게터다. 등급이 바뀌면 뒷그물 객체가 통째로 갈리므로, 한 번 받아 든 참조를 계속 쓰면
   // 화면에서 사라진 옛 그물을 두드리게 된다.
   return { ground, box, bar, get net() { return back; }, netZ: -NET_D, netY0: BACK_H / 2 + NET_LIFT,
+    // 그은 선을 이름으로 돌려준다. 규격은 코드가 아니라 화면에 선 물건에서 재야 한다.
+    marks: () => marks.children.filter((m) => m.userData.mark).map((m) => {
+      const p = m.geometry.parameters || {};
+      return { mark: m.userData.mark, x: m.position.x, z: m.position.z,
+        w: p.width, d: p.height, inner: p.innerRadius, outer: p.outerRadius,
+        from: p.thetaStart, span: p.thetaLength };
+    }),
     setGoal: (rank) => weave(frameAt(rank)),
     // 그물 넉 장을 한 번에 여닫는다. 뒷면만 감추면 옆면과 지붕이 남아,
     // 그물을 껐다는 대조군이 실제로는 그물 넷 중 하나만 끈 것이 된다.
