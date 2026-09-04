@@ -369,8 +369,11 @@ function buildBody(o) {
   const hip = joint(g, 0, o.hipY, 0);
   const spine = joint(hip, 0, 0, 0);
 
+  // 품과 기장을 등급이 정한다. 뼈대는 안 건드린다. 관절을 같이 늘리면 팔이 몸통에서 떨어진다.
+  const kc = o.kitCut || { girth: 1, len: 1, pad: 0 };
   const torsoGeo = new THREE.CapsuleGeometry(o.torsoR, o.torsoLen, 3, 8);
   torsoGeo.translate(0, o.torsoLen / 2, 0);
+  torsoGeo.scale(kc.girth, kc.len, kc.girth);
   // 유니폼 한 장이 단색이면 사람이 아니라 색 견본이다. 구겨진 명암이 옷을 옷으로 만든다.
   const torso = new THREE.Mesh(torsoGeo, flatMap(o.shirt, clothTex()));
   torso.name = tag;
@@ -405,6 +408,17 @@ function buildBody(o) {
     delt.name = tag;
     jitterMesh(delt, 0.015, side < 0 ? 25 : 26);
     sh.add(delt);
+    // 어깨 스펀지. 상의 색이라 무엇이 두꺼워졌는지가 그 옷의 색으로 읽힌다.
+    // 어깨 삼각근 구가 반지름 1.45라, 그 안에 넣으면 스펀지를 사도 화면이 그대로다.
+    // 구 위로 올려 얹어야 어깨선이 각지고 넓어진 것이 보인다.
+    if (kc.pad) {
+      const th = o.armR * 1.1 * kc.pad;
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(o.armR * 2.7, th, o.armR * 2.7), flat(o.shirt));
+      pad.name = tag;
+      jitterMesh(pad, 0.015, side < 0 ? 27 : 28);
+      pad.position.set(side * o.armR * 0.45, o.armR * 1.15 + th * 0.3, 0);
+      sh.add(pad);
+    }
     const upper = seg(o.armR, o.upperLen, o.sleeve, tag, side < 0 ? 21 : 22, o.cuffSleeve, o.cuffSpan);
     sh.add(upper);
     const el = joint(sh, 0, -o.upperLen, 0);
@@ -469,9 +483,10 @@ function buildBody(o) {
       // 0x14100c는 화면에 (41,2,2) 순적색으로 나왔고, 0x2a241c부터 (26,17,17) 가죽 갈색이 보존된다.
       // 밑창과 돌기를 등급이 정한다. 색만 바꾸면 스터드 여섯 개라고 이름 붙은 신발과
       // 실내화가 같은 상자로 서고, 화면에서 880을 치른 이유가 안 보인다.
-      const bc = o.bootCut || { sole: 1, pips: 0, pip: 0, girth: 1 };
+      const bc = o.bootCut || { sole: 1, long: 1, wide: 1, pips: 0, pip: 0, girth: 1 };
       const sole = o.legR * 0.9 * bc.sole;
-      const parts = [new THREE.BoxGeometry(o.legR * 1.5, sole, o.bootLen)];
+      const span = o.bootLen * (bc.long || 1);
+      const parts = [new THREE.BoxGeometry(o.legR * 1.5 * (bc.wide || 1), sole, span)];
       // 돌기는 두 줄로 깐다. 한 줄이면 발바닥이 아니라 톱니로 읽힌다.
       const rows = Math.ceil(bc.pips / 2);
       for (let n = 0; n < bc.pips; n++) {
@@ -481,7 +496,7 @@ function buildBody(o) {
         const th = o.legR * 0.2 * (bc.girth || 1);
         const pip = new THREE.BoxGeometry(th, len, th);
         // 앞뒤로 고르게 편다. rows가 1이면 가운데 하나다.
-        const z = rows > 1 ? (row / (rows - 1) - 0.5) * o.bootLen * 0.72 : 0;
+        const z = rows > 1 ? (row / (rows - 1) - 0.5) * span * 0.72 : 0;
         pip.translate(col * o.legR * 0.4, -(sole + len) * 0.5, z);
         parts.push(pip);
       }
@@ -534,7 +549,8 @@ export function buildKeeper(height, weight, look) {
     // 반바지는 무릎 위치를 알려줄 정도로만 밝힌다.
     // 같은 초록을 어둡게만 내린 소매는 팔이 아니라 몸통에 진 그림자로 읽혔다.
     // 색상을 청록으로 꺾으면 밝기가 아니라 색이 팔을 세우고, 양말과 한 벌로 묶인다.
-    shirt: (look && look.shirt) || 0x2f8f5b, sleeve: 0x073239, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: (look && look.sock) || 0x63d3e8,
+    shirt: (look && look.shirt) || 0x2f8f5b, kitCut: look && look.kitCut,
+    sleeve: 0x073239, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: (look && look.sock) || 0x63d3e8,
     cuffSleeve: (look && look.ink) || 0x5f8f93, cuffSpan: (look && look.inkSpan) || 0.16, cuffShorts: 0x6d8898, gloveTone: (look && look.glove) || 0xf2d64b,
     gloveCut: look && look.gloveCut,
     bootTone: (look && look.boot) || 0x2a241c, bootCut: look && look.bootCut,

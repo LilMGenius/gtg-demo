@@ -27,34 +27,44 @@ export const MAX_GRIP = GLOVES.length - 1;
 // 축구화 선반. 손이 아니라 발이고, 깎는 것은 반경이 아니라 출발이다.
 // 장갑과 같은 값 기준을 쓴다. 첫 칸은 카드깡 380 육수보다 싸고 마지막 칸은 그보다 비싸다.
 //
-// cut은 밑창이다. pips는 바닥에 박힌 돌기 수, sole은 밑창 두께 배율,
-// pip은 돌기 하나의 길이 배율, girth는 돌기 굵기 배율이다. 세 번째 칸의 이름이
+// cut은 신발이다. pips는 바닥에 박힌 돌기 수, sole은 밑창 두께 배율,
+// long과 wide는 갑피의 길이와 폭 배율, pip은 돌기 하나의 길이 배율,
+// girth는 돌기 굵기 배율이다. 세 번째 칸의 이름이
 // 돌기 수를 대놓고 말하므로 그 수는 지어낸 값이 아니라 이름이 이미 선언한 값이다.
 // 수만 바꾸면 세 개짜리와 여섯 개짜리가 화면에서 거의 같은 밑창이 된다. 길이와 굵기까지 갈라야
 // 닳은 축구화와 스터드 축구화와 스파이크가 서로 다른 신발로 읽힌다.
 export const BOOTS = [
   // 실내화는 바닥이 평평하다. 그래서 안 산 사람이 흙에서 미끄러진다.
   { studs: 0, name: '학교 앞 실내화', cost: 0, tone: 0x2a241c, note: '아무것도 안 샀을 때 신고 있는 것',
-    cut: { sole: 0.8, pips: 0, pip: 0, girth: 1 } },
+    cut: { sole: 0.7, long: 0.88, wide: 0.92, pips: 0, pip: 0, girth: 1 } },
   // 닳은 축구화라 돌기가 셋만 남았다.
   { studs: 1, name: '바닥 닳은 조기축구화', cost: 160, tone: 0x4a3b2a, note: '그래도 미끄러지지는 않는다',
-    cut: { sole: 1, pips: 3, pip: 0.5, girth: 1 } },
+    cut: { sole: 1, long: 1, wide: 1, pips: 3, pip: 0.5, girth: 1 } },
   { studs: 2, name: '스터드 여섯 개 축구화', cost: 400, tone: 0x1f4f8f, note: '흙을 물고 첫 발이 빨리 뜬다',
-    cut: { sole: 1.2, pips: 6, pip: 1.05, girth: 1.2 } },
+    cut: { sole: 1.28, long: 1.08, wide: 1.1, pips: 6, pip: 1.05, girth: 1.2 } },
   // 스파이크는 수보다 길이다. 여덟 개가 더 길게 박혀 있다.
   { studs: 3, name: '육상용 스파이크', cost: 880, tone: 0xd94f2a, note: '축구화는 아니다. 제일 빨리 뜬다',
-    cut: { sole: 0.88, pips: 8, pip: 1.8, girth: 0.6 } }
+    cut: { sole: 0.8, long: 1.2, wide: 0.86, pips: 8, pip: 1.9, girth: 0.6 } }
 ];
 
 export const MAX_STUD = BOOTS.length - 1;
 
 // 유니폼 선반. 손도 발도 아니라 몸이고, 깎는 것은 정면 강슛에 같이 밀려 들어가는 사고다.
 // 값 기준은 앞의 둘과 같다. 첫 칸은 카드깡 380 육수보다 싸고 마지막 칸은 그보다 비싸다.
+//
+// cut은 상의의 형태다. girth는 품 배율, len은 기장 배율, pad는 어깨에 박힌 스펀지 두께다.
+// 마지막 칸의 이름이 어깨 스펀지를 말하므로 그 두께는 이름이 이미 선언한 것이다.
 export const KITS = [
-  { pads: 0, name: '아빠 옷장 면티', cost: 0, tone: 0x2f8f5b, note: '아무것도 안 샀을 때 입고 있는 것' },
-  { pads: 1, name: '학교 체육복 상의', cost: 150, tone: 0x2f6f8f, note: '적어도 땀은 먹는다' },
-  { pads: 2, name: '조기회 단체복', cost: 370, tone: 0x8f2f5b, note: '등에 동네 철물점 이름이 박혀 있다' },
-  { pads: 3, name: '패드 박은 골키퍼 저지', cost: 850, tone: 0x1c1f2b, note: '어깨에 스펀지가 들었다. 밀려도 덜 밀린다' }
+  // 아빠 옷은 품도 기장도 남는다.
+  { pads: 0, name: '아빠 옷장 면티', cost: 0, tone: 0x2f8f5b, note: '아무것도 안 샀을 때 입고 있는 것',
+    cut: { girth: 1.3, len: 1.26, pad: 0 } },
+  { pads: 1, name: '학교 체육복 상의', cost: 150, tone: 0x2f6f8f, note: '적어도 땀은 먹는다',
+    cut: { girth: 1, len: 1, pad: 0 } },
+  // 단체복은 어깨선이 각져 있다.
+  { pads: 2, name: '조기회 단체복', cost: 370, tone: 0x8f2f5b, note: '등에 동네 철물점 이름이 박혀 있다',
+    cut: { girth: 1.14, len: 0.78, pad: 0.8 } },
+  { pads: 3, name: '패드 박은 골키퍼 저지', cost: 850, tone: 0x1c1f2b, note: '어깨에 스펀지가 들었다. 밀려도 덜 밀린다',
+    cut: { girth: 0.88, len: 1.04, pad: 2.1 } }
 ];
 
 export const MAX_KIT = KITS.length - 1;
@@ -213,7 +223,8 @@ export function lookOf(gear) {
     ink: t.ink_tone, inkSpan: t.span,
     glove: gloveAt(gear && gear.grip).tone, gloveCut: gloveAt(gear && gear.grip).cut,
     boot: bootAt(gear && gear.studs).tone, bootCut: bootAt(gear && gear.studs).cut,
-    shirt: kitAt(gear && gear.pads).tone, sock: sockAt(gear && gear.socks).tone
+    shirt: kitAt(gear && gear.pads).tone, kitCut: kitAt(gear && gear.pads).cut,
+    sock: sockAt(gear && gear.socks).tone
   };
 }
 
