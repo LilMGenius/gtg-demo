@@ -1447,8 +1447,17 @@ const TOUCHED = new Set(['contact']);
           const side = Math.sign(tail.aimX || 1);
           const ru = Math.min(1, (vnow - tail.t0) / 1.25);
           // 흘러나온 공이 서는 자리. 골문 앞을 벗어나 키커 쪽으로 나와야 달려와 찰 거리가 생긴다.
-          const looseX = side * (0.6 + vy.b * 0.9);
-          const looseZ = 4.4 + vy.a * 1.2;
+          /* 이 자리는 공과 키커가 같이 쓰는 계약이다. 프레임마다 시선 보정을 걸면 공만 옆으로
+             비키고 키커는 원래 자리로 달려가 둘이 만나지 못한다. 실측으로 키커가 4.3m를 달리고도
+             1.44m 밖에 섰다. 그래서 꼬리가 열릴 때 한 번만 보정하고 그 값을 둘 다 읽는다. */
+          if (!tail.loose) {
+            const spot = new THREE.Vector3(side * (0.6 + vy.b * 0.9), BALL_R, 4.4 + vy.a * 1.2);
+            clearRear(spot);
+            clearKeeper(spot);
+            tail.loose = { x: spot.x, z: spot.z };
+          }
+          const looseX = tail.loose.x;
+          const looseZ = tail.loose.z;
           // 0.34에 공이 서고 키커가 닿는다. 0.44에 두 번째 임팩트가 터진다.
           const RUN = 0.34;
           const HIT = 0.44;
