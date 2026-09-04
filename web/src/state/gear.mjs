@@ -71,11 +71,20 @@ export const MAX_KIT = KITS.length - 1;
 
 // 양말 선반. 손도 발도 몸도 아니라 착지고, 깎는 것은 흘린 뒤 못 일어나는 사고다.
 // 값 기준은 앞의 셋과 같다. 첫 칸은 카드깡 380 육수보다 싸고 마지막 칸은 그보다 비싸다.
+//
+// cut은 양말의 형태다. girth는 정강이를 감는 두께 배율, guard는 정강이 앞에 덧댄 보호대 두께,
+// band는 발목에 감기는 그립 밴드 두께다. 세 번째와 네 번째 이름이 보호대와 그립을 말하므로
+// 그 둘은 이름이 이미 선언한 것이다.
 export const SOCKS = [
-  { socks: 0, name: '목 늘어난 흰 양말', cost: 0, tone: 0x63d3e8, note: '아무것도 안 샀을 때 신고 있는 것' },
-  { socks: 1, name: '축구 스타킹', cost: 130, tone: 0xe8d463, note: '적어도 흘러내리지는 않는다' },
-  { socks: 2, name: '정강이 보호대 낀 스타킹', cost: 350, tone: 0xe86363, note: '까져도 덜 아파서 덜 눕는다' },
-  { socks: 3, name: '미끄럼방지 그립 양말', cost: 830, tone: 0xf2f2f2, note: '발이 신발 안에서 안 논다. 넘어져도 금방 선다' }
+  // 목이 늘어난 양말은 종아리에 안 붙고 흘러내려 얇게 남는다.
+  { socks: 0, name: '목 늘어난 흰 양말', cost: 0, tone: 0x63d3e8, note: '아무것도 안 샀을 때 신고 있는 것',
+    cut: { girth: 0.78, guard: 0, band: 0 } },
+  { socks: 1, name: '축구 스타킹', cost: 130, tone: 0xe8d463, note: '적어도 흘러내리지는 않는다',
+    cut: { girth: 1.06, guard: 0, band: 0 } },
+  { socks: 2, name: '정강이 보호대 낀 스타킹', cost: 350, tone: 0xe86363, note: '까져도 덜 아파서 덜 눕는다',
+    cut: { girth: 1.2, guard: 1.5, band: 0 } },
+  { socks: 3, name: '미끄럼방지 그립 양말', cost: 830, tone: 0xf2f2f2, note: '발이 신발 안에서 안 논다. 넘어져도 금방 선다',
+    cut: { girth: 0.92, guard: 0, band: 1.3 } }
 ];
 
 export const MAX_SOCK = SOCKS.length - 1;
@@ -224,7 +233,7 @@ export function lookOf(gear) {
     glove: gloveAt(gear && gear.grip).tone, gloveCut: gloveAt(gear && gear.grip).cut,
     boot: bootAt(gear && gear.studs).tone, bootCut: bootAt(gear && gear.studs).cut,
     shirt: kitAt(gear && gear.pads).tone, kitCut: kitAt(gear && gear.pads).cut,
-    sock: sockAt(gear && gear.socks).tone
+    sock: sockAt(gear && gear.socks).tone, sockCut: sockAt(gear && gear.socks).cut
   };
 }
 

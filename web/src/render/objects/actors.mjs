@@ -475,8 +475,26 @@ function buildBody(o) {
     const thigh = seg(o.legR, o.thighLen, o.shorts, tag, side < 0 ? 41 : 42, o.cuffShorts);
     hp.add(thigh);
     const kn = joint(hp, 0, -o.thighLen, 0);
-    const shin = seg(o.legR * 0.82, o.shinLen, o.socks, tag, side < 0 ? 43 : 44);
+    // 양말 두께와 덧댄 것을 등급이 정한다. 색만 바꾸면 보호대를 사도 정강이가 그대로다.
+    const sc = o.sockCut || { girth: 1, guard: 0, band: 0 };
+    const shin = seg(o.legR * 0.82 * sc.girth, o.shinLen, o.socks, tag, side < 0 ? 43 : 44);
     kn.add(shin);
+    // 보호대는 정강이 앞면에 덧댄 판이다. 얼굴이 보는 쪽이 앞이다.
+    if (sc.guard) {
+      const gd = new THREE.Mesh(new THREE.BoxGeometry(o.legR * 1.3, o.shinLen * 0.62, o.legR * 0.5 * sc.guard), flat(o.socks));
+      gd.name = tag;
+      jitterMesh(gd, 0.012, side < 0 ? 45 : 46);
+      gd.position.set(0, -o.shinLen * 0.46, o.faceDir * o.legR * 0.78);
+      kn.add(gd);
+    }
+    // 그립 밴드는 발목을 한 바퀴 감는다.
+    if (sc.band) {
+      const bd = new THREE.Mesh(new THREE.CylinderGeometry(o.legR * 1.15 * sc.band, o.legR * 1.15 * sc.band, o.shinLen * 0.22, 8), flat(o.socks));
+      bd.name = tag;
+      jitterMesh(bd, 0.012, side < 0 ? 47 : 48);
+      bd.position.set(0, -o.shinLen * 0.86, 0);
+      kn.add(bd);
+    }
     // 축구화가 없으면 다리가 잘린 막대로 끝난다. 발은 실루엣에서 가장 아래에 있고 제일 먼저 보인다.
     if (o.bootLen) {
       // 포스트 렌더타깃이 8비트 선형이라 이보다 어두우면 세 채널이 각기 다른 정수로 반올림돼 색비가 깨진다.
@@ -550,7 +568,7 @@ export function buildKeeper(height, weight, look) {
     // 같은 초록을 어둡게만 내린 소매는 팔이 아니라 몸통에 진 그림자로 읽혔다.
     // 색상을 청록으로 꺾으면 밝기가 아니라 색이 팔을 세우고, 양말과 한 벌로 묶인다.
     shirt: (look && look.shirt) || 0x2f8f5b, kitCut: look && look.kitCut,
-    sleeve: 0x073239, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: (look && look.sock) || 0x63d3e8,
+    sleeve: 0x073239, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: (look && look.sock) || 0x63d3e8, sockCut: look && look.sockCut,
     cuffSleeve: (look && look.ink) || 0x5f8f93, cuffSpan: (look && look.inkSpan) || 0.16, cuffShorts: 0x6d8898, gloveTone: (look && look.glove) || 0xf2d64b,
     gloveCut: look && look.gloveCut,
     bootTone: (look && look.boot) || 0x2a241c, bootCut: look && look.bootCut,
