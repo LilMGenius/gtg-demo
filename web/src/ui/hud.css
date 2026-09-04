@@ -180,6 +180,23 @@ body.playing #hud{opacity:1}
   bottom:calc(clamp(24px,3.4vh,38px) + 72px + env(safe-area-inset-bottom));
   pointer-events:none;width:min(392px,46vw)}
 #beat[hidden]{display:none}
+/* 지금 걸린 것. 박자 띠 30px 위에 서서 키퍼 발치와 띠 사이의 빈 칸을 쓴다.
+   더 올리면 키퍼가 좌우로 뻗는 통로를 덮고, 더 내리면 띠와 그림자가 겹친다. */
+#aura{position:absolute;left:50%;transform:translateX(-50%);
+  bottom:calc(clamp(24px,3.4vh,38px) + 102px + env(safe-area-inset-bottom));
+  display:flex;gap:8px;pointer-events:none}
+#aura[hidden]{display:none}
+#aura .tag{display:inline-flex;align-items:center;gap:5px;padding:4px 9px 6px;
+  border:var(--line) solid var(--edge);background:var(--panel);color:var(--ink);
+  font-family:var(--body);font-size:12px;font-weight:700;line-height:1;
+  box-shadow:4px 4px 0 var(--edge), var(--bevel);transform:rotate(-1.2deg)}
+#aura .tag:nth-child(2n){transform:rotate(1deg)}
+#aura .tag svg{width:14px;height:14px;flex:none}
+/* 남은 슛은 노랑, 이름은 흐리게. 둘이 같은 밝기면 이 배지가 무엇을 세는지가 안 읽힌다. */
+#aura .tag b{color:#ffd83d;font-weight:700}
+#aura .tag i{font-style:normal;font-weight:400;color:var(--dim)}
+#aura .tag.up svg{color:var(--good)}
+#aura .tag.dn svg{color:var(--bad)}
 #beat .lane{position:relative;display:block;height:19px;overflow:hidden;
   background:#161c14;border:var(--line) solid var(--edge);
   box-shadow:5px 4px 0 var(--edge), var(--bevel);transform:rotate(-.9deg)}

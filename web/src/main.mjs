@@ -169,6 +169,20 @@ const IC_DOWN = G('컨디션 나쁨', R(9, 0, 6, 12) + R(4.5, 12, 15, 3) + R(7.5
 // 버프. 목이 좁고 배가 넓은 병 하나면 마시는 물건인 것이 문장 없이 선다.
 const IC_BUFF = G('버프', R(9, 0, 6, 3) + R(9, 3, 6, 3) + R(6, 6, 12, 3) + R(4.5, 9, 15, 12)
   + R(6, 21, 12, 3));
+/* 종류마다 다른 그림. 병 하나로 셋을 다 그리면 지금 무엇이 걸려 있는지가 상점을 열어야 아는 값이 된다.
+   자양강장제는 마시는 물건이라 병을 그대로 쓴다. 나머지 둘은 3px 격자에서 실루엣이 안 겹치게 골랐다. */
+const BUFF_ICON = {
+  // 병 모양은 상점 탭이 쓰는 그것과 같다. 이름만 그 종류의 이름이라 배지가 무엇이 걸렸는지를 말한다.
+  tonic: G('자양강장제', R(9, 0, 6, 3) + R(9, 3, 6, 3) + R(6, 6, 12, 3) + R(4.5, 9, 15, 12)
+    + R(6, 21, 12, 3)),
+  // 확성기. 소리가 아니라 소문이라 파동 둘을 오른쪽에 띄워 소리 버튼의 붙은 파동과 안 겹친다.
+  hype: G('바이럴 떡밥', R(3, 9, 3, 6) + R(6, 6, 3, 12) + R(9, 3, 3, 18)
+    + R(15, 9, 3, 3) + R(18, 6, 3, 9)),
+  // 분무 캔. 몸통 위에 누름 버튼 하나와 흩어지는 방울 둘이면 뿌리는 물건으로 읽힌다.
+  rosin: G('송진 스프레이', R(9, 0, 3, 3) + R(12, 3, 3, 3) + R(6, 6, 9, 18)
+    + R(18, 3, 3, 3) + R(21, 0, 3, 3))
+};
+const buffIcon = (kind) => BUFF_ICON[kind] || IC_BUFF;
 
 /* 상점 탭 아이콘. 열한 개가 글자로만 서 있으면 어느 칸이 무엇을 파는지 매번 읽어야 한다.
    위 칩과 우측 기둥이 쓰는 3px 격자 픽셀 SVG 관례를 그대로 쓴다. 손그림 톤이 갈리면 안 붙어 보인다. */
@@ -254,7 +268,7 @@ function pips() {
   el('purse').innerHTML = '<span class="cur">' + IC_SWEAT + '<b>' + state.wallet.coin.toLocaleString() + '</b></span>'
     + '<span class="cur">' + IC_SPON + '<i>' + state.wallet.cash.toLocaleString() + '</i></span>'
     // 남은 버프도 같은 줄에 선다. 몇 판 뒤에 꺼지는지를 상점을 열어야 알면 계획이 안 선다.
-    + (state.buff.shots > 0 ? '<span class="cur">' + IC_BUFF + '<u>' + state.buff.shots + '</u></span>' : '');
+    + (state.buff.shots > 0 ? '<span class="cur">' + buffIcon(state.buff.kind) + '<u>' + state.buff.shots + '</u></span>' : '');
   // 남은 훈련 횟수는 버튼 위에 붙는다. 열어봐야 아는 숫자는 방치형에서 안 열린다.
   const badge = el('gymDot');
   badge.textContent = state.points > 9 ? '9+' : String(state.points);
@@ -264,6 +278,25 @@ function pips() {
   const left = Math.ceil(state.bot.ms / 60000);
   clone.textContent = left > 9 ? '9+' : String(left);
   clone.hidden = left <= 0;
+  aura();
+}
+
+/* 지금 몸에 걸린 것. 잔고 줄의 숫자는 다음 판을 계획하는 값이고, 이 배지는 이번 판이 왜 이렇게
+   굴러가는지다. 판을 보는 눈이 화면 아래에 있으므로 배지도 키퍼 옆에 선다. 상단 칩까지 눈을 올리면
+   그 사이에 공이 지나간다. */
+function aura() {
+  const box = el('aura');
+  const rows = [];
+  if (state.buff.shots > 0) {
+    const spec = buffAt(state.buff.kind);
+    rows.push('<span class="tag buff" data-kind="' + state.buff.kind + '">' + buffIcon(state.buff.kind)
+      + '<b>' + state.buff.shots + '</b><i>' + (spec ? spec.name : '') + '</i></span>');
+  }
+  // 0.4는 상단 칩이 컨디션 화살표를 세우는 그 문턱이다. 두 자리가 다른 수를 쓰면 한쪽만 뜨는 판이 생긴다.
+  if (state.form > 0.4) rows.push('<span class="tag up" data-kind="form-up">' + IC_UP + '<i>몸이 가볍다</i></span>');
+  else if (state.form < -0.4) rows.push('<span class="tag dn" data-kind="form-dn">' + IC_DOWN + '<i>몸이 무겁다</i></span>');
+  box.innerHTML = rows.join('');
+  box.hidden = rows.length === 0;
 }
 
 function setPad(on) {
@@ -346,6 +379,8 @@ function beatStop(byHand) {
 function nextSet() {
   // 기복은 판당 한 번 굴러서 그 판 내내 같은 값으로 선다.
   const form = rollForm(state.keeper, rng);
+  // 배지도 같은 값을 읽어야 한다. 화면 두 곳이 각자 굴리면 칩과 배지가 다른 컨디션을 말한다.
+  state.form = form;
   el('form').innerHTML = form > 0.4 ? '<span class="up">' + IC_UP + '</span>'
     : form < -0.4 ? '<span class="dn">' + IC_DOWN + '</span>' : '';
   state.shots = buildSet(rng, state.keeper.level, state.gear.city);
