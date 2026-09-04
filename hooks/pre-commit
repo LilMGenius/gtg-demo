@@ -5,7 +5,18 @@ node tools/run-gates.mjs fast || echo "  (fast gates are red; commit continues)"
 
 # 직전 커밋이 띄운 느린 쓸기의 결과를 여기서 읽는다. 11분짜리를 커밋 앞에 세울 수는 없고,
 # 읽지 않으면 그 쓸기는 아무에게도 도달하지 않는다.
+#
+# 마지막 줄을 그대로 찍으면 아직 도는 쓸기에서는 머리글이 나온다. 실측으로 여러 커밋이
+# "slow: 71 of 92 gates"만 보고 지나갔고, 그동안 빨간 게이트 일곱이 아무에게도 안 닿았다.
+# 판정 줄만 골라 찍고, 판정이 아직 없으면 없다고 말한다.
 if [ -f sweep.local.txt ]; then
-  tail -1 sweep.local.txt | sed "s/^/  last slow sweep: /"
+  verdict=$(grep "^gates " sweep.local.txt | tail -1)
+  if [ -n "$verdict" ]; then
+    echo "  last slow sweep: $verdict"
+  elif [ -f sweep.local.lock ]; then
+    echo "  last slow sweep: still running, no verdict yet"
+  else
+    echo "  last slow sweep: died without a verdict"
+  fi
 fi
 exit 0
