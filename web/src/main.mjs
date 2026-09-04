@@ -330,6 +330,18 @@ function setPad(on) {
   for (const b of document.querySelectorAll('.zone')) b.disabled = !on;
 }
 
+/* 어느 쪽으로 떴는지를 화면에 남긴다. 세 버튼은 눌리는 순간에만 색이 변하고 그 뒤에는
+   아무 표시가 없어서, 플레이어가 고른 방향과 안 눌러서 대신 굴려진 방향이 구별되지 않았다.
+   안 누르면 판정이 알아서 한 쪽을 고르므로, 그 경우도 누구의 선택인지가 화면에 있어야 한다.
+   dive가 null이면 셋 다 비운다. 다음 구가 시작될 때 부르는 자리다. */
+function markDive(dive, mine) {
+  for (const b of document.querySelectorAll('.zone')) {
+    const on = dive !== null && Number(b.dataset.dive) === dive;
+    b.classList.toggle('chose', on && mine);
+    b.classList.toggle('drawn', on && !mine);
+  }
+}
+
 // 저장은 항상 보유 목록 전체로 나간다. 뛰는 키퍼만 저장하면 나머지가 다음 저장에서 지워진다.
 function persist() {
 save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets, state.social);
@@ -440,6 +452,8 @@ function nextShot() {
   // 자막 종료 시점의 pips()는 state.i가 오르기 전에 돌아서 마커가 한 칸 뒤에 남는다.
   pips();
   setPad(true);
+  // 지난 구의 표시를 지운다. 남겨 두면 이번 구를 안 눌렀을 때 지난 선택이 이번 것으로 읽힌다.
+  markDive(null, false);
   beatStart(shot);
   stage.reset();
   pressAt = performance.now() + shot.flight * 1000 * 0.72;
@@ -469,6 +483,8 @@ function commit(dive) {
   const input = dive === null
     ? autoInput(ran ? botKeeper(state.keeper, state.bot) : state.keeper, shot, rng)
     : { dive, errMs: performance.now() - pressAt, advance, auto: false };
+  // 판정이 고른 쪽까지 정해진 뒤에 표시한다. 누른 값으로 표시하면 안 누른 구가 빈 채로 남는다.
+  markDive(input.dive, dive !== null);
   stage.diving = state.keeper.diving;
   const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads, socks: state.gear.socks, frame: state.gear.frame, focusAid: state.buff.kind === 'tonic' ? TONIC_FOCUS : 1, rosin: state.buff.kind === 'rosin', gazeAid: rapportGazeAid(state.rapport, state.gear.city, shot.passer) });
   state.results[state.i] = result.conceded;
