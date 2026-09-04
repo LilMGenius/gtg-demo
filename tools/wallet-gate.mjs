@@ -40,7 +40,7 @@ try {
   check("coin:play-grants-coin", played.coin > 0, JSON.stringify(played));
   // 이 랩의 산출물은 스폰을 올리는 경로가 없다는 것이다. 플레이로 스폰이 오르면 두 갈래가 한 갈래다.
   check("cash:play-never-grants-cash", played.cash === 0, String(played.cash));
-  // 육수이 선언한 단가로만 들어왔는가. 단가는 실점 4와 세이브 12~30이고 전부 짝수이므로,
+  // 육수가 선언한 단가로만 들어왔는가. 단가는 실점 4와 세이브 12~30이고 전부 짝수이므로,
   // 다른 경로가 잔고를 건드리면 나머지가 남는다. 굴러간 구의 수를 몰라도 서는 축이다.
   // 4에서 2로 내린 것은 문턱 인하가 아니라 선언이 단가 집합을 넓혔기 때문이다.
   // 정확한 값 검증은 reward-gate.mjs가 가져간다.

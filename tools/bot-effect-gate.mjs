@@ -56,7 +56,7 @@ check("mono-bot-save-floor", rate[1] >= rate[0], line);
 // 값이 오르는 구간은 1에서 3이다. 여기서는 동률을 허용하지 않는다.
 check("mono-bot-save", rate[2] > rate[1] && rate[3] > rate[2], line);
 
-// 값당. 1육수이 사는 자동 세이브량은 등급 길이까지 곱한다. 90분짜리는 20분짜리보다 오래 서 있다.
+// 값당. 1육수가 사는 자동 세이브량은 등급 길이까지 곱한다. 90분짜리는 20분짜리보다 오래 서 있다.
 const spec = (t) => BOTS.find((b) => b.tier === t);
 const VALUE_FLOOR = 0.4;
 // 기준선은 rate[0]이 아니라 rate[t] 전체다. 봇이 파는 물건은 세이브율 증분이 아니라 그 시간 동안 서 있어 주는 것 자체다.
@@ -67,7 +67,7 @@ const ratio = p3 / p1;
 check("value-bot-save", p1 > 0 && ratio >= VALUE_FLOOR,
   "r1 " + p1.toExponential(2) + " r3 " + p3.toExponential(2) + " ratio " + ratio.toFixed(2));
 
-// 선반의 첫 등급도 값을 해야 한다. 1등급이 맨몸 자동과 같은 수를 내면 그 150 육수이 사는 것은
+// 선반의 첫 등급도 값을 해야 한다. 1등급이 맨몸 자동과 같은 수를 내면 그 150 육수가 사는 것은
 // 성능이 아니라 자동 접근권뿐이고, 접근권은 크레딧이 파는 것이지 등급이 파는 것이 아니다.
 // 위 값당 축은 이 동률을 분모 0 문제로 우회했다. 우회는 사실을 설명할 뿐 고치지 않는다.
 check("tier1:buys-something", rate[1] > rate[0], F(rate[0]) + " -> " + F(rate[1]));

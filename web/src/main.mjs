@@ -249,7 +249,7 @@ function pips() {
   }).join('');
   el('lv').textContent = 'Lv ' + state.keeper.level;
   el('fans').innerHTML = IC_FANS + '<b>' + state.fans.toLocaleString() + '</b>';
-  // 육수과 스폰은 갈래가 다른 잔고다. 붙여 두면 한 줄의 숫자 띠로 읽혀 어느 것으로 사는지가
+  // 육수와 스폰은 갈래가 다른 잔고다. 붙여 두면 한 줄의 숫자 띠로 읽혀 어느 것으로 사는지가
   // 상점을 열어야 아는 정보가 된다. 팔로워와 지갑을 가르는 것과 같은 세로선으로 둘을 가른다.
   el('purse').innerHTML = '<span class="cur">' + IC_SWEAT + '<b>' + state.wallet.coin.toLocaleString() + '</b></span>'
     + '<span class="cur">' + IC_SPON + '<i>' + state.wallet.cash.toLocaleString() + '</i></span>'
@@ -301,7 +301,7 @@ function tally(name, conceded) {
   else row.saved += 1;
 }
 
-// 이번 구에 들어온 육수을 잔고 옆에 한 번 띄운다.
+// 이번 구에 들어온 육수를 잔고 옆에 한 번 띄운다.
 // 총액만 갱신하면 유명한 키커를 막아 더 벌었다는 사실이 화면에 남지 않는다.
 // pips()가 지갑 칸을 통째로 다시 그리므로 반드시 그 뒤에 붙인다.
 function coinPop(n) {
@@ -421,7 +421,7 @@ function rollCaptions(result) {
       // 라포는 말을 섞은 구에서만 쌓인다. 스쳐 지나간 얼굴은 다음에도 남이다.
       // 봇이 뛴 구는 팔로워와 같은 규칙으로 0이다. 봇이 서 있었으니 얼굴이 익을 리 없다.
       if (!state.botRan && result.events.some((e) => e.t === 'talked')) state.rapport = addRapport(state.rapport, state.gear.city, state.shots[state.i].passer);
-      // 육수은 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
+      // 육수는 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
       // 유명한 키커를 막을수록 더 들어온다. 팔로워와 같은 fame 값을 쓴다.
       const coin = coinGain(result.conceded, result.fame);
       state.wallet.coin += coin;
@@ -840,7 +840,7 @@ function commitDate(city, passer, moveId) {
   persist();
   pips();
   renderDate(city, passer, out);
-  // 뒤에 열려 있는 내 정보도 같이 그린다. 안 그리면 방금 쓴 육수과 내려간 라포가
+  // 뒤에 열려 있는 내 정보도 같이 그린다. 안 그리면 방금 쓴 육수와 내려간 라포가
   // 반투명 배경 너머에서 옛 값으로 남아 만남 버튼이 아직 열린 것처럼 보인다.
   renderMe();
 }

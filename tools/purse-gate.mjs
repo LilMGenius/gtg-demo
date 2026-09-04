@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 import { COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from "../web/src/state/wallet.mjs";
 
-// 한 구가 벌어들인 육수이 화면에 뜨는지 잰다. 총액만 갱신하면 유명한 키커를 막아 더 벌었다는
+// 한 구가 벌어들인 육수가 화면에 뜨는지 잰다. 총액만 갱신하면 유명한 키커를 막아 더 벌었다는
 // 사실이 어디에도 안 남고, 보상이 난이도를 탄다는 설계가 플레이어에게 도달하지 않는다.
 // 팝업은 1.1초 뒤 스스로 사라지므로 상태가 아니라 사건이고, 폴링으로만 잡힌다.
 
