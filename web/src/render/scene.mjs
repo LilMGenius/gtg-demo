@@ -1267,8 +1267,16 @@ const TOUCHED = new Set(['contact']);
             // 6배는 130ms다. 충돌 정지 프레임은 22ms에서 잡히므로 그 프레임에서 공이 아직
             // 비행 종료점, 즉 얼굴 높이에 있다. 포즈 램프와 같은 속도로 붙여야 손이 접촉점이 된다.
             const grab = ease(Math.min(1, u * 30));
-            // 장갑 중심에 공 중심을 맞추면 공이 손 안으로 파묻힌다. 공 반경만큼 카메라 쪽으로 내놓는다.
-            ball.position.set(lerp(tail.from.x, gw.x, grab), lerp(tail.from.y, gw.y, grab), lerp(tail.from.z, gw.z - BALL_R, grab));
+            /* 장갑 중심에 공 중심을 맞추면 공이 손 안으로 파묻힌다. 공 반경만큼 카메라 쪽으로 내놓는다.
+               다만 장갑이 몸 뒤로 넘어가는 자세가 있어서 그것만으로는 부족했다. 실측으로 잡은 공이
+               스물두 프레임 중 열아홉 프레임 동안 키퍼에게 가려 중심이 안 보였다.
+               잡았다는 말이 화면에서 사실이 되려면 공이 몸보다 카메라 쪽에 있어야 한다.
+               몸을 벗어나게만 하면 이번에는 뒷틀 가로대가 그 자리를 가로질렀다. 실측으로 가림의 주어가
+               키퍼에서 쇠로 바뀌었을 뿐 열아홉 프레임은 그대로였다. 카메라 쪽으로 더 내놓으면
+               투영이 내려와 그 쇠를 벗어난다. 0.75는 돌진 갈래가 같은 이유로 쓰는 0.9보다 짧아
+               손에서 떨어져 보이지 않으면서 가로대 아래로 내려온다. */
+            const front = Math.min(gw.z - BALL_R, keeper.position.z - 0.75);
+            ball.position.set(lerp(tail.from.x, gw.x, grab), lerp(tail.from.y, gw.y, grab), lerp(tail.from.z, front, grab));
           }
           keeper.rotation.z = lerp(keeper.rotation.z, 0, damp(0.08));
           break;
@@ -1480,7 +1488,10 @@ const TOUCHED = new Set(['contact']);
           keeper.position.z = lerp(CHARGE_Z, CHARGE_Z + 5.2 + (tail.vary.b - 0.5) * 1.6, e);
           keeper.rotation.z = lerp(keeper.rotation.z,
             Math.sin(u * (16 + tail.vary.c * 8)) * (0.12 + (tail.vary.a - 0.5) * 0.06), damp(0.34));
-          ball.position.set(keeper.position.x, 0.14, keeper.position.z + 0.7);
+          /* 공을 키퍼 뒤에 두면 카메라가 골대 뒤에 있으므로 몸에 가린다.
+             실측으로 스물다섯 프레임 중 스무 프레임이 그렇게 가려졌다.
+             돌진 갈래가 이미 쓰는 자리를 그대로 쓴다. 카메라 쪽으로 0.9, 옆으로 0.78이다. */
+          ball.position.set(keeper.position.x + 0.78, 0.14, keeper.position.z - 0.9);
           kicker.rotation.z = lerp(0, 1.3 + (tail.vary.a - 0.5) * 0.5, e);
           break;
         case 'lost':
