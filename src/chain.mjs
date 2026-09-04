@@ -462,8 +462,16 @@ export function resolve(input) {
     return done(true, "handling");
   }
   const taken = carryP + gloveP;
-  if (d2 < taken + spillP * (100 - taken) / 100) {
-    say("spill", "흘렸습니다. 공이 아직 살아 있습니다.", "handling");
+  /* 손으로 잡는 것은 손이 공 쪽으로 갔을 때만이다. 반대로 뛰었는데 공이 멈췄다면 그것을
+     멈춘 것은 뻗은 발이거나 몸이거나 머리이고, 그렇게 맞은 공은 손에 안 들어온다.
+     그동안 이 갈래가 전부 잡았다로 끝나서, 화면은 키퍼가 한쪽으로 날아간 뒤 공이 반대편
+     장갑으로 순간이동하는 그림을 그렸다. 실측으로 손에 들어온 구의 15.1퍼센트(1레벨),
+     10.0퍼센트(10레벨), 1.7퍼센트(30레벨)가 반대로 뛴 구였다. 판단력이 오르면 저절로 준다.
+     맞은 공은 살아 있으므로 아래 리바운드 단계를 흘린 공과 그대로 공유한다. */
+  const offDir = inp.dive !== shot.side;
+  if (d2 < taken + spillP * (100 - taken) / 100 || offDir) {
+    if (offDir) say("bodyBlock", "반대로 뛰었는데 몸에 맞고 튕겼습니다. 공이 아직 살아 있습니다.", null);
+    else say("spill", "흘렸습니다. 공이 아직 살아 있습니다.", "handling");
 
     // 3단 리바운드. 착지에 실패했으면 두 번째 창이 아예 없다.
     state.stage = 3;

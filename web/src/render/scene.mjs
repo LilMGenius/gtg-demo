@@ -790,13 +790,17 @@ const TOUCHED = new Set(['contact']);
        고개가 옆얼굴에서 멈춰 표정이 렌즈에 안 닿는다. 어깨 너머로 더 돌려야 그 사건이
        정지 화면 한 장에서도 읽힌다. 나머지 열셋은 이미 몸이 반쯤 돌아 있어 이 값이면 충분하다. */
     downed: 0.88, rebound: 0.6, reboundMiss: 0.62, charge: 0.9, beat: 0.92,
-    lost: 0.66, skied: 0.58, talked: 0.9, distracted: 0.8, openGoalScored: 0.8
+    lost: 0.66, skied: 0.58, talked: 0.9, distracted: 0.8, openGoalScored: 0.8,
+    // 반대로 뛴 몸이라 이미 등을 보이고 누워 있다. 흘린 공과 같은 섞음량이면 표정이 렌즈에 닿는다.
+    bodyBlock: 0.6
   };
   const FACE_MOOD = {
     catch: 'grin', save: 'grin', carriedIn: 'shock', gloveGone: 'shock',
     spill: 'shock', downed: 'shock', rebound: 'shock', reboundMiss: 'shock',
     charge: 'grin', beat: 'shock', lost: 'shock', skied: 'shock',
-    talked: 'heart', distracted: 'heart', openGoalScored: 'shock'
+    talked: 'heart', distracted: 'heart', openGoalScored: 'shock',
+    // 잡을 생각이 없던 자리에서 공이 몸에 맞았다. 기뻐할 일이 아니라 놀랄 일이다.
+    bodyBlock: 'shock'
   };
   // 머리 위로 떠오르는 하트 셋. 눈동자만 하트로 바꾸면 고개가 돌아간 순간 얼굴이 뒤를 보고 있어 안 읽힌다.
   // 정지 화면 한 장에서 한눈팔림을 알리는 픽셀은 이것뿐이다.
@@ -864,7 +868,8 @@ const TOUCHED = new Set(['contact']);
   // 슛 소리 다음 결과 연출 5초가 통째로 무음이었다. 효과음이 안 난다는 신고의 정체는 그것이다.
   const GRAB = new Set(['catch', 'save', 'spill', 'gloveGone', 'charge']);
   const SHOT = new Set(['rebound', 'reboundMiss', 'skied', 'openGoalScored']);
-  const THUD = new Set(['carriedIn', 'downed', 'lost']);
+  // 몸에 맞고 튕긴 공은 가죽이 눌리는 소리가 아니라 마른 충격음이다. 넘어지는 소리와 같은 재질이다.
+  const THUD = new Set(['carriedIn', 'downed', 'lost', 'bodyBlock']);
   const DRIB = new Set(['charge', 'beat']);
   // 손을 안 대고 그냥 들어간 공. 가장 흔한 결과인데 여기가 통째로 무음이었다.
   // 손끝을 스치는 사건이라 박히는 소리는 안 난다. 그물이 받는 소리 하나다.
@@ -909,7 +914,9 @@ const TOUCHED = new Set(['contact']);
     const BURST = { save: 1.0, catch: 0.8, gloveGone: 1.15, carriedIn: 1.1, spill: 0.85, downed: 1.0 };
     // 사건 이름을 모르면 화면만 보고는 무슨 일이 난 건지 모른다. 한 단어로 적어준다.
     // 문장을 넣으면 자막과 같은 것이 두 개가 되어 둘 다 안 읽힌다.
-    const WORD = { save: '퍽!', catch: '꽉!', gloveGone: '어?', carriedIn: '으어', spill: '툭', downed: '으악' };
+    // 흘림은 손에서 빠지는 툭이고, 몸에 맞는 것은 더 둔한 소리다. 두 사건이 같은 글자를 쓰면
+    // 화면에서 갈리지 않는다.
+    const WORD = { save: '퍽!', catch: '꽉!', gloveGone: '어?', carriedIn: '으어', spill: '툭', downed: '으악', bodyBlock: '퉁' };
     // 손이 안 닿은 사건. 장갑 좌표에 띄우면 닿지도 않은 자리에서 흙이 뜬다.
     // 흙 없이 공 옆에 단어만 얹는다. charge 프레임은 화면에 글자가 하나도 없었다.
     const CALL = { charge: '나간다!', beat: '제꼈다', lost: '뺏겼다', skied: '넘겼다', rebound: '튕김', reboundMiss: '흘렀다' };
@@ -1245,6 +1252,8 @@ const TOUCHED = new Set(['contact']);
         catch: POSES.clutch, save: POSES.snatch, carriedIn: POSES.hugfall,
         gloveGone: bySide(POSES.reachR, POSES.reachL),
         spill: bySide(POSES.swatR, POSES.swatL),
+        // 반대편으로 뻗은 몸에 공이 맞았다. 뻗은 자세는 흘린 공과 같고, 방향만 공 반대쪽이다.
+        bodyBlock: bySide(POSES.sprawlR, POSES.sprawlL),
         downed: POSES.faceplant,
         rebound: bySide(POSES.shoveR, POSES.shoveL),
         reboundMiss: bySide(POSES.sprawlR, POSES.sprawlL),
@@ -1300,6 +1309,8 @@ const TOUCHED = new Set(['contact']);
         catch: POSES.despair, save: POSES.despair, skied: POSES.despair,
         rebound: POSES.despair, lost: POSES.dribble, beat: POSES.dribble,
         carriedIn: POSES.cheer, gloveGone: POSES.cheer, spill: POSES.cheer,
+        // 몸에 맞고 튄 공은 아직 살아 있다. 키커에게는 흘린 공과 같은 상황이다.
+        bodyBlock: POSES.cheer,
         downed: POSES.cheer, reboundMiss: POSES.cheer,
         talked: POSES.cheer, distracted: POSES.cheer, openGoalScored: POSES.cheer
       };
@@ -1417,6 +1428,17 @@ const TOUCHED = new Set(['contact']);
           // 8.7%만 남아 흘렸다는 사건이 화면에서 아예 안 읽혔다. 자막만 뜨고 공이 없었다.
           // 살아 있는 공은 키퍼 곁으로 와야 한다. 같은 규칙을 드리블하는 공에 이미 쓰고 있다.
           ball.position.set(lerp(tail.from.x, tail.from.x + (tail.kx >= 0 ? 1 : -1) * (1.2 + tail.vary.c * 0.6), e), 0.14 + Math.abs(Math.sin(u * 9)) * 0.5 * (1 - u), lerp(tail.from.z, 1.8, e));
+          break;
+        case 'bodyBlock':
+          /* 반대로 뛴 몸에 공이 맞았다. 흘린 공과 같은 자리로 가되 부호가 반대다. 몸이 간 쪽과
+             공이 튀는 쪽이 같으면 손으로 쳐낸 그림이 되어 이 사건이 흘림과 구별되지 않는다.
+             맞고 튄 공이라 손으로 쳐낸 것보다 멀리 가고 덜 튄다. 발이나 정강이에 맞은 공은
+             회전이 안 걸려 낮게 굴러 나간다. */
+          ball.position.set(
+            lerp(tail.from.x, tail.from.x - (tail.kx >= 0 ? 1 : -1) * (1.6 + tail.vary.c * 0.8), e),
+            0.14 + Math.abs(Math.sin(u * 6)) * 0.28 * (1 - u),
+            lerp(tail.from.z, 2.4, e)
+          );
           break;
         case 'downed': {
           keeper.rotation.z = lerp(keeper.rotation.z, Math.sign(keeper.rotation.z || 1) * 1.5, damp(0.06));
