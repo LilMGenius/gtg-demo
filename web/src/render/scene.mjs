@@ -367,9 +367,19 @@ export function createScene(canvas) {
   // 공이 화면에서 차지하는 높이 비율. 화소가 아니라 비율로 잡아야 해상도가 바뀌어도 같은 그림이 나온다.
   // 0.047은 720p에서 지름 34px이다. 실측으로 비행 중 최소 17.7px까지 내려갔고 그 크기에서는
   // 공이 오는지 서 있는지가 안 읽혔다. 잔상도 그 점 안에 갇혀 같이 죽었다.
-  const BALL_MIN_H = 0.047;
-  const BALL_GAIN_CAP = 2.4;
-  let ballGain = 1;
+const BALL_MIN_H = 0.047;
+const BALL_GAIN_CAP = 2.4;
+let ballGain = 1;
+/* 공 크기는 카메라까지의 거리 하나로 정해진다. 이 함수를 비행 프레임에서만 걸어 놓아서
+   놓여 있던 공이 발에 닿는 한 프레임에 크기가 튀었고, 서 있던 공과 날아가는 공이
+   다른 물건으로 읽혔다. 같은 함수를 매 프레임 걸어 앞뒤를 잇는다. */
+function ballGainAt(pos) {
+  const dist = Math.max(0.01, pos.distanceTo(CAM_BASE));
+  const angular = (2 * BALL_R / dist) / (2 * Math.tan(BASE_FOV * Math.PI / 360));
+  return Math.max(1, Math.min(BALL_GAIN_CAP, BALL_MIN_H / angular));
+}
+// 이번 프레임에 비행 쪽이 이미 크기를 걸었는가. 두 곳이 같은 프레임에 걸면 짜부라짐이 지워진다.
+let ballScaled = false;
   // 골대 접촉을 판정하는 비행 진행도. 조준점이 골포스트나 크로스바를 스치는 코스일 때
   // 공이 실제로 그 높이에 닿는 지점이다. 1.0은 조준점 도달이니 그보다 조금 앞이어야
   // 튕김이 도달 전에 일어난 것으로 읽힌다. 소리와 그림이 같은 상수를 봐야 한 사건이 된다.
@@ -934,6 +944,7 @@ export function createScene(canvas) {
     }
     vnow += dt;
     stepDt = dt;
+    ballScaled = false;
     // 구름은 세계시계로만 흐른다. 실시간을 쓰면 정지 프레임에서 하늘만 계속 움직인다.
     // 0.004는 한 바퀴에 4분이 조금 넘는다. 눈에 띄면 배경이 주인공을 뺏는다.
     pitch.drift.value = vnow * 0.004;
@@ -1071,12 +1082,11 @@ export function createScene(canvas) {
         // 실측으로 비행 중 공 지름이 17.7px까지 내려갔다. 720p 화면 폭의 1.4%다.
         // 그 크기에서는 공이 오는지 서 있는지가 안 읽히고 잔상도 그 점 안에 갇혀 같이 죽는다.
         // 만화는 이럴 때 원근을 포기하고 공을 키운다. 화면 높이 비율로 하한을 두고 모자란 만큼만 곱한다.
-        const dist = Math.max(0.01, ball.position.distanceTo(CAM_BASE));
-        const angular = (2 * BALL_R / dist) / (2 * Math.tan(BASE_FOV * Math.PI / 360));
         // 0.12초에 걸쳐 올려봤더니 그 구간이 최소 크기를 만들어 25px에서 걸렸다.
         // 발에 맞는 순간 커지는 것은 오류가 아니라 임팩트다. 같은 프레임의 짜부라짐과 한 사건으로 읽힌다.
-        ballGain = Math.max(1, Math.min(BALL_GAIN_CAP, BALL_MIN_H / angular));
+        ballGain = ballGainAt(ball.position);
         ball.scale.set((1 + sq * 0.5) * ballGain, (1 - sq * 0.34) * ballGain, (1 + sq * 0.5) * ballGain);
+        ballScaled = true;
         // 골포스트와 크로스바를 스치는 코스만 금속음이 난다.
         // 판정은 이미 끝났고 여기서 읽는 것은 확정된 조준점의 기하뿐이다.
         if (!cue.framed && q >= Q_FRAME) {
@@ -1807,6 +1817,11 @@ export function createScene(canvas) {
       pitch.net.userData.punch(0, 0, 0);
     }
     impact.update(dt, camera);
+    // 비행이 아닌 프레임도 같은 배율을 쓴다. 놓인 공과 구르는 공과 잡힌 공이 전부 여기를 지난다.
+    if (!ballScaled) {
+      ballGain = ballGainAt(ball.position);
+      ball.scale.setScalar(ballGain);
+    }
     // 세계시계로 줄인다. 히트스톱이 걸린 사건에서는 짜부라짐도 같이 늘어져 보인다.
     // 진행축이 아니라 화면축으로 눌린다. 공은 카메라를 향해 오므로 진행축 변형은 크기 변화로만 보인다.
     if (sqLeft > 0) {
@@ -2252,6 +2267,9 @@ export function createScene(canvas) {
   }
   return { play, act, reset, setKeeper, setCity, setGoal, sfx, ballProbe, stageProbe, goalFrame, goalShape, crowd, shadowRect, shadowPair,
     ballPos: () => ({ x: ball.position.x, y: ball.position.y, z: ball.position.z }),
+    // 크기는 거리 배율과 짜부라짐 둘로 갈린다. 둘을 한 수로 돌려주면 임팩트의 튐과
+    // 거리의 튐이 구분되지 않아, 이어져야 할 것과 튀어야 할 것을 같은 자로 재게 된다.
+    ballSize: () => ({ gain: ballGain, x: ball.scale.x, y: ball.scale.y, z: ball.position.z }),
     // 세계시계. 히트스톱과 정지가 여기서 멈추므로, 화면에 숫자를 쓰는 쪽은 실시간 대신 이걸 읽는다.
     now: () => vnow,
     after,
