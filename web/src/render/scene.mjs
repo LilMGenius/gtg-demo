@@ -383,7 +383,11 @@ let ballScaled = false;
   // 골대 접촉을 판정하는 비행 진행도. 조준점이 골포스트나 크로스바를 스치는 코스일 때
   // 공이 실제로 그 높이에 닿는 지점이다. 1.0은 조준점 도달이니 그보다 조금 앞이어야
   // 튕김이 도달 전에 일어난 것으로 읽힌다. 소리와 그림이 같은 상수를 봐야 한 사건이 된다.
-  const Q_FRAME = 0.97;
+const Q_FRAME = 0.97;
+/* 손이 공에 닿은 사건. 체인의 첫 줄이 이것이면 공은 골라인을 넘지 않으므로 꼬리가 착탄에서 시작한다.
+   잡았는지 흘렸는지는 그다음 줄이 말한다. 못 닿은 구는 공이 그물까지 가야 하고,
+   그물이 부푸는 시간이 곧 그 사건이라 기다린다. */
+const TOUCHED = new Set(['contact']);
 
   // 공 그림자. 공이 어디쯤인지 바닥이 알려주면 궤적을 놓치지 않는다.
   // 흙과 같은 갈색으로 칠한 그늘은 흙 얼룩 하나로 읽혔다. 바닥에는 이만큼 짙은 얼룩이 이미 널려 있다.
@@ -914,6 +918,13 @@ let ballScaled = false;
     // 파워는 판정에서 1~10으로 잘려 나오니 (power-1)/9가 0..1이다. 여기에 0.75를 준다.
     // strong은 코스를 안 보고 때린 구라 나머지 0.25를 얹는다. 파워 10 강슛만 1.0에 닿는다.
     cue.force = Math.min(1, (shot.kicker.power - 1) / 9 * 0.75 + (shot.strong ? 0.25 : 0));
+    /* 첫 사건이 언제 시작하는가. 접촉으로 끝나는 사건은 공이 어딘가에 내려앉기 전에 시작해야 한다.
+       0.9초를 기다리면 막은 공도 이미 흙에 서 있고 먹힌 공은 그물 안에 있어서, 그 뒤에 장갑으로
+       옮겨지는 그림이 판정이 뒤늦게 발동해 공을 순간이동시킨 것으로 읽힌다.
+       공이 아무에게도 안 닿고 지나가는 사건만 그 0.9초를 그대로 쓴다. 거기서는 그물이 부푸는 것과
+       공이 바 위로 넘어가는 것이 사건 자체라 잘라내면 결과가 화면에서 사라진다. */
+    const first = (result.events || []).find((e) => e.t !== 'result');
+    cue.wait = TOUCHED.has(first && first.t) ? 0 : 0.9;
 
     // 눈에 띄는 행인은 매 구 있지 않다. 그 구에만 앞줄로 걸어온다.
     for (const p of passers) { p.position.z = p.userData.homeZ; p.userData.gaze = 0; }
@@ -1136,7 +1147,7 @@ let ballScaled = false;
           hover = Math.sin(ease(dp) * Math.PI * 0.62) * (input.dive === 0 ? 0.05 : 0.40);
         }
 
-        if (p >= 1 && !cue.ended && t - runup > flight + 0.9) {
+        if (p >= 1 && !cue.ended && t - runup > flight + cue.wait) {
           cue.ended = true;
           cue.onEnd();
         }
@@ -2304,6 +2315,8 @@ let ballScaled = false;
     ballSize: () => ({ gain: ballGain, x: ball.scale.x, y: ball.scale.y, z: ball.position.z }),
     // 키커가 어디 서 있는지. 리바운드를 다시 차는 마디가 실제로 몸을 옮기는지는 좌표로만 갈린다.
     kickerPos: () => ({ x: kicker.position.x, y: kicker.position.y, z: kicker.position.z }),
+    // 지금 어떤 꼬리가 도는가. 사건이 언제 시작했는지는 이 값이 null에서 바뀌는 프레임이다.
+    tailKind: () => (tail ? tail.kind : null),
     // 세계시계. 히트스톱과 정지가 여기서 멈추므로, 화면에 숫자를 쓰는 쪽은 실시간 대신 이걸 읽는다.
     now: () => vnow,
     after,
