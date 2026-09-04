@@ -541,7 +541,20 @@ function renderGym() {
   }
 }
 
+// 창은 한 번에 하나만 선다. 닫기 전에 겹쳐 열리면 뒤엣것이 앞엣것을 덮고,
+// 닫았을 때 무엇이 남는지가 닫아 봐야 안다. 만남만 예외다. 내 정보 안의 버튼으로만
+// 열리고 닫으면 그 자리로 돌아가는 한 단계라 부모를 같이 닫으면 길이 끊긴다.
+const PANEL_SHUT = { gym: closeGym, roster: closeRoster, gram: closeGram, me: closeMe, date: closeDate, shop: closeShop, earn: closeEarn };
+function shutOthers(keep) {
+  const spare = keep === 'date' ? ['me', 'date'] : [keep];
+  for (const id of Object.keys(PANEL_SHUT)) {
+    if (spare.includes(id)) continue;
+    if (!el(id).hidden) PANEL_SHUT[id]();
+  }
+}
+
 function openGym() {
+  shutOthers('gym');
   el('gym').hidden = false;
   renderGym();
 }
@@ -611,6 +624,7 @@ function swapTo(at) {
   renderRoster();
 }
 function openRoster() {
+  shutOthers('roster');
   el('roster').hidden = false;
   renderRoster();
 }
@@ -631,6 +645,7 @@ function renderGram() {
 }
 
 function openGram() {
+  shutOthers('gram');
   el('gram').hidden = false;
   renderGram();
 }
@@ -652,6 +667,7 @@ function renderEarn() {
 }
 
 function openEarn() {
+  shutOthers('earn');
   el('earn').hidden = false;
   renderEarn();
 }
@@ -757,6 +773,7 @@ function renderMe() {
 }
 
 function openMe() {
+  shutOthers('me');
   el('me').hidden = false;
   renderMe();
 }
@@ -802,6 +819,7 @@ function commitDate(city, passer, moveId) {
 }
 
 function openDate(city, passer) {
+  shutOthers('date');
   el('date').hidden = false;
   renderDate(city, passer, null);
 }
@@ -1347,13 +1365,12 @@ function renderShop() {
 }
 
 function openShop() {
-  document.body.classList.add('panelOpen');
+  shutOthers('shop');
   el('shop').hidden = false;
   renderShop();
 }
 
 function closeShop() {
-  document.body.classList.remove('panelOpen');
   el('shop').hidden = true;
   // 지난번 결과를 들고 다시 열면 방금 뽑은 것처럼 읽힌다. 예약도 같이 끊는다.
   stopReveal();
@@ -1411,6 +1428,7 @@ el('purse').onpointerdown = (e) => {
 // 진단용. __pick은 화소 피킹이 이미 쓴다.
 window.__squad = () => ({ squad: state.squad.map((k) => k.name), pick: state.pick, coin: state.wallet.coin });
 window.__roster = (open) => { if (open) openRoster(); else closeRoster(); };
+window.__gym = (open) => { if (open) openGym(); else closeGym(); };
 window.__gram = (open) => { if (open) openGram(); else closeGram(); };
 window.__me = (open) => { if (open) openMe(); else closeMe(); };
 // 만남은 내 정보 안의 버튼으로만 열린다. 게이트가 그 버튼까지 클릭해서 오게 하려면 좌표가 필요하다.

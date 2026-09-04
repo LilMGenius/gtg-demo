@@ -104,26 +104,57 @@ try {
     im.src = "data:image/png;base64," + s;
   }), a);
 
-  const before = {};
-  for (const id of IDS) before[id] = await mean(await shot(id));
-  await p.evaluate(() => window.__shop(true));
-  await p.waitForTimeout(400);
-  const after = {};
-  for (const id of IDS) after[id] = await mean(await shot(id));
-  await p.evaluate(() => window.__shop(false));
-  await p.waitForTimeout(250);
-  const back = {};
-  for (const id of IDS) back[id] = await mean(await shot(id));
-
-  // 덮개가 얹히면 밝기가 내려간다. 10%는 배경 #080b07c4가 판때기 위에 앉을 때의 실측 하한이다.
-  const lit = IDS.filter((id) => after[id] > before[id] * 0.9);
-  check("chrome:opening-a-panel-veils-every-control", lit.length === 0,
-    lit.map((id) => id + " " + before[id].toFixed(1) + " to " + after[id].toFixed(1)).join(", ")
-    || IDS.map((id) => id + " " + (100 - 100 * after[id] / before[id]).toFixed(0) + "%").join(" "));
+  // 창 하나로만 재면 나머지 창은 아무도 안 본 채로 남는다. 상점만 덮개가 돌고
+  // 훈련장과 선수단은 우측 조작 몇이 덮개 위에 남아 있던 것이 그렇게 백 랩을 살아남았다.
+  // 상태 칩 #top은 조작이 아니라 표시지만 덮임은 같이 재야 한다. 칩만 안 덮이면
+  // 창이 열린 화면에서 그 칩만 지금 누를 수 있는 것처럼 보인다.
+  const WINDOWS = ["shop", "gym", "roster", "gram", "me", "earn"];
+  const SKINS = IDS.concat("top");
+  const sweep = async () => {
+    const m = {};
+    for (const id of SKINS) m[id] = await mean(await shot(id));
+    return m;
+  };
+  const before = await sweep();
+  const veiled = [], restored = [], vanished = [];
+  for (const win of WINDOWS) {
+    await p.evaluate((w) => window["__" + w](true), win);
+    await p.waitForTimeout(400);
+    const after = await sweep();
+    // 칩이 화면에서 사라지면 밝기 비교가 무의미해진다. 잔고를 보며 사는 자리에서
+    // 잔고가 없어지는 것이 그 자체로 결함이라 자리부터 확인한다.
+    const chip = await p.evaluate(() => {
+      const e = document.getElementById("top");
+      const r = e.getBoundingClientRect();
+      return { w: e.offsetWidth, o: Number(getComputedStyle(e).opacity), on: r.width > 0 && r.height > 0 };
+    });
+    if (!(chip.w > 0 && chip.o > 0 && chip.on)) vanished.push(win + " " + chip.w + "px opacity " + chip.o);
+    // 덮개가 얹히면 밝기가 내려간다. 10%는 배경 #080b07c4가 판때기 위에 앉을 때의 실측 하한이다.
+    for (const id of SKINS) if (after[id] > before[id] * 0.9) veiled.push(win + "/" + id + " " + before[id].toFixed(1) + " to " + after[id].toFixed(1));
+    await p.evaluate((w) => window["__" + w](false), win);
+    await p.waitForTimeout(250);
+    const back = await sweep();
+    for (const id of SKINS) if (Math.abs(back[id] - before[id]) > before[id] * 0.05) restored.push(win + "/" + id + " " + before[id].toFixed(1) + " to " + back[id].toFixed(1));
+  }
+  check("chrome:every-window-veils-every-control-and-chip", veiled.length === 0,
+    veiled.slice(0, 6).join(", ") || WINDOWS.length + " windows over " + SKINS.length + " surfaces");
+  check("chrome:the-status-chip-stays-on-screen-in-every-window", vanished.length === 0,
+    vanished.join(", ") || "chip present in all " + WINDOWS.length);
   // 대조군. 창을 닫으면 밝기가 돌아와야 한다. 안 돌아오면 위의 하락은 창 때문이 아니다.
-  const stuck = IDS.filter((id) => Math.abs(back[id] - before[id]) > before[id] * 0.05);
-  check("control:closing-the-panel-restores-every-control", stuck.length === 0,
-    stuck.map((id) => id + " " + before[id].toFixed(1) + " to " + back[id].toFixed(1)).join(", ") || "all restored");
+  check("control:closing-any-window-restores-every-surface", restored.length === 0,
+    restored.slice(0, 6).join(", ") || "all restored");
+
+  // 창은 한 번에 하나만 선다. 겹쳐 열면 닫았을 때 무엇이 남는지가 닫아 봐야 안다.
+  await p.evaluate(() => window.__shop(true));
+  await p.evaluate(() => window.__gym(true));
+  await p.waitForTimeout(300);
+  const stacked = await p.evaluate((w) => w.filter((id) => !document.getElementById(id).hidden), WINDOWS);
+  await p.evaluate((w) => w.forEach((id) => window["__" + id](false)), WINDOWS);
+  await p.waitForTimeout(200);
+  const leftOpen = await p.evaluate((w) => w.filter((id) => !document.getElementById(id).hidden), WINDOWS);
+  check("chrome:opening-a-second-window-closes-the-first", stacked.length === 1 && stacked[0] === "gym",
+    stacked.join(", ") || "none open");
+  check("control:the-windows-all-shut-again", leftOpen.length === 0, leftOpen.join(", ") || "all shut");
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
 

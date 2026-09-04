@@ -32,6 +32,12 @@ body.frozen *,body.frozen *::before,body.frozen *::after{animation-play-state:pa
 #hud{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .3s}
 body.playing #hud{opacity:1}
 
+/* 창은 조작과 상태 칩보다 한 층 위다. #top이 z-index 2를 들고 있어서 층을 안 올리면
+   창을 열어도 칩만 덮개 밖에 남아 지금 누를 수 있는 것처럼 보인다. 만남은 내 정보 안에서
+   이어지는 한 단계라 그 위 5층을 쓴다. */
+#gym,#roster,#gram,#me,#shop,#earn{z-index:4}
+#date{z-index:5}
+
 /* 상단 좌측. 네 항목을 한 줄에 늘어놓으면 라벨 없는 덩어리 넷이 되어 어디를 봐야 할지가 없다.
    위칸은 지금 이 판이 어떻게 굴러가는지(레벨, 구 결과), 아래칸은 판 밖에서 쌓이는 값이다. */
 #top{position:absolute;top:calc(12px + env(safe-area-inset-top));left:var(--pad-l);
@@ -625,7 +631,7 @@ body.playing #hud{opacity:1}
 
 /* 만남 패널. 내 정보 위에 겹쳐 뜨므로 z-index가 그보다 높아야 한다. */
 /* 뒤에 내 정보가 열린 채로 겹치므로 배경이 반투명하면 두 제목이 한 줄로 읽힌다. */
-#date{position:absolute;inset:0;pointer-events:auto;z-index:3;
+#date{position:absolute;inset:0;pointer-events:auto;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;
   background:#080b07f5;padding:5vh 4vw}
 #date[hidden]{display:none}
@@ -658,8 +664,3 @@ body.playing #hud{opacity:1}
    keep-all은 띄어쓰기에서만 넘긴다. 한 낱말이 상자보다 길 때만 break-word가 받는다. */
 #hud, #hud *, .panel, .panel * { word-break: keep-all; overflow-wrap: break-word; }
 body { word-break: keep-all; overflow-wrap: break-word; }
-
-/* 패널이 열리면 왼쪽 위 HUD 띄가 비킨다. 하단 버튼을 밀어내는 여백으로 푸려다가
-   손에 든 폭에서 닫기 버튼이 화면 밖으로 나갔다. 높이를 먹지 않는 쪽으로 고친다.
-   패널이 열려 있는 동안 레벨과 지갑은 읽을 일이 없고, 패널이 그 수를 자기 안에 다시 적는다. */
-body.panelOpen #top, body.panelOpen #top *{opacity:0;pointer-events:none}
