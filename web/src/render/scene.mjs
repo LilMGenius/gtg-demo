@@ -1165,6 +1165,15 @@ const TOUCHED = new Set(['contact']);
     if (tail) {
       const u = Math.min(1, (vnow - tail.t0) / 0.8);
       const e = ease(u);
+      /* 꼬리는 키퍼를 골문 밖으로 데려간다. 한눈판 갈래는 골대 반폭 너머로 걸어 나가고
+         돌진 갈래는 5미터를 달려 나간다. 그를 제자리로 되돌리는 것이 그동안 리셋이었고,
+         리셋은 한 프레임에 좌표를 바꾸므로 화면에서는 순간이동으로 보였다. 실측 2.51미터다.
+         4.6초는 꼬리가 사는 8초대의 절반을 넘긴 시점이라 사건을 다 보여 준 뒤이고,
+         1.4초는 나가는 데 쓴 0.8초보다 길어 돌아오는 걸음이 도망처럼 안 보인다.
+         둘을 더해도 다음 킥까지의 대기보다 짧아서 다음 구는 제자리에 선 키퍼로 시작한다. */
+      const HOME_AT = 4.6;
+      const HOME_FOR = 1.4;
+      const homeBack = 1 - ease(Math.min(1, Math.max(0, (vnow - tail.t0 - HOME_AT) / HOME_FOR)));
       // 잡는 사건은 접촉이 순간이다. 정지 프레임은 충돌 직후 22ms에서 잡히는데
       // 0.32초 램프로는 그때 포즈가 아직 대기 자세라 손이 아니라 얼굴에 공이 붙어 보인다.
       tailRamp = ease(Math.min(1, u * (INSTANT.has(tail.kind) ? 40 : 2.5)));
@@ -1494,7 +1503,12 @@ const TOUCHED = new Set(['contact']);
           // 버리고 화면을 가로질러야 해서 방금 하던 동작과 끊긴다.
           const side = tail.kx >= 0 ? 1 : -1;
           // 걸음 속도까지 같으면 두 번째 재생부터는 같은 화면이 된다.
-          const walk = Math.min(1, e * (1.35 + vy.a * 0.4));
+          /* 나가는 걸음만 있고 돌아오는 걸음이 없었다. 그를 제자리로 되돌리는 것이 리셋이었고,
+             리셋은 한 프레임에 좌표를 바꾸므로 화면에서는 순간이동으로 보였다. 실측 2.51미터다.
+             4.6초는 꼬리가 사는 8초대의 절반을 넘긴 시점이라 사건을 다 보여 준 뒤이고,
+             1.4초는 나가는 데 쓴 0.8초보다 길어 돌아오는 걸음이 도망처럼 안 보인다.
+             이 계수 하나가 키퍼와 행인과 두 회전을 같이 되돌리므로 행인도 걸어서 나간다. */
+          const walk = Math.min(1, e * (1.35 + vy.a * 0.4)) * homeBack;
           // 2.1~2.7은 골대 반폭 2.2 언저리라 키퍼가 골문을 비운 것이 화면에 남으면서 프레임을 안 벗어난다.
           const endX = side * (2.1 + vy.b * 0.6);
           const endZ = 2.9 + vy.c * 0.5;
@@ -1591,6 +1605,16 @@ const TOUCHED = new Set(['contact']);
       const rzWant = Math.min(1, (vnow - tail.t0) / 0.18) * (tail.vary.a - 0.5) * 0.13;
       keeper.rotation.z += rzWant - (tail.rzAdd || 0);
       tail.rzAdd = rzWant;
+      /* 갈래마다 자기 좌표를 매 프레임 절대값으로 쓴다. 그 값을 집으로 섞어 되돌린다.
+         뒤에서 섞으므로 앞의 계산을 안 건드리고, 매 프레임 새 값에 섞으니 쌓이지도 않는다. */
+      /* 집은 골문 한가운데다. 꼬리가 시작된 자리로 되돌리면 그 자리가 다이빙으로 벌어져 있던
+         회차에서는 리셋이 그 폭만큼 다시 순간이동한다. 실측 1.23미터다. */
+      if (homeBack < 1) {
+        keeper.position.x = lerp(0, keeper.position.x, homeBack);
+        keeper.position.z = lerp(KEEPER_Z, keeper.position.z, homeBack);
+        keeper.rotation.y = lerp(0, keeper.rotation.y, homeBack);
+        if (homeBack < 0.5) for (const heart of hearts) heart.visible = false;
+      }
       // 공과 장갑이 실제로 만난 프레임에서 한 번만 터진다. 좌표는 둘의 중점이다.
       // u 상한은 접촉이 끝내 안 나는 사건의 안전판이다. 없으면 폭발이 아예 사라진다.
       if (pendingBurst) {
@@ -2330,6 +2354,11 @@ const TOUCHED = new Set(['contact']);
     ballSize: () => ({ gain: ballGain, x: ball.scale.x, y: ball.scale.y, z: ball.position.z }),
     // 키커가 어디 서 있는지. 리바운드를 다시 차는 마디가 실제로 몸을 옮기는지는 좌표로만 갈린다.
     kickerPos: () => ({ x: kicker.position.x, y: kicker.position.y, z: kicker.position.z }),
+    // 키퍼가 지금 어디 서 있는지. 연출이 그를 옮겨 놓고 안 돌려놓으면 다음 구가 그 자리에서 시작한다.
+    // 화면만 보면 옮겨진 것인지 원래 그 자리인지 못 가르므로 좌표로 물어야 한다.
+    keeperPos: () => ({ x: keeper.position.x, y: keeper.position.y, z: keeper.position.z }),
+    // 꼬리가 시작된 뒤 흐른 세계시간. 돌아오는 걸음이 언제 시작하는지를 밖에서 물으려면 이 수가 필요하다.
+    tailAge: () => (tail ? vnow - tail.t0 : -1),
     // 지금 어떤 꼬리가 도는가. 사건이 언제 시작했는지는 이 값이 null에서 바뀌는 프레임이다.
     tailKind: () => (tail ? tail.kind : null),
     // 경기장 선의 실제 좌표와 크기. 규격은 선언이 아니라 그은 물건에서 잰다.
