@@ -2129,6 +2129,66 @@ const TOUCHED = new Set(['contact']);
     return { arm, body, ratio: arm / Math.max(1, arm + body), cells: N * N };
   };
 
+  /* 팔은 재면서 머리는 안 쟀다. 상의 등급이 몸통을 세로로 늘리는데 목 관절은 안 따라가서
+     머리가 몸통에 파묻혔고, 헤어와 얼굴이 실루엣에서 사라져도 어느 자도 말을 안 했다.
+     같은 격자를 머리에 대고 되묻는다. 머리 몫과 몸 몫을 원수로 같이 낸다. */
+  window.__headVis = (n) => {
+    const N = n || 40;
+    keeper.updateMatrixWorld(true);
+    camera.updateMatrixWorld();
+    const headSet = new Set();
+    keeper.userData.head.traverse((o) => { if (o.isMesh) headSet.add(o); });
+    const bodySet = new Set();
+    keeper.traverse((o) => { if (o.isMesh) bodySet.add(o); });
+    const box = new THREE.Box3().setFromObject(keeper);
+    const v = new THREE.Vector3();
+    let x0 = 1, x1 = -1, y0 = 1, y1 = -1;
+    for (let i = 0; i < 8; i++) {
+      v.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).project(camera);
+      x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x);
+      y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y);
+    }
+    const ray = new THREE.Raycaster();
+    ray.near = 0.01;
+    ray.far = 500;
+    let head = 0;
+    let body = 0;
+    for (let iy = 0; iy < N; iy++) {
+      for (let ix = 0; ix < N; ix++) {
+        ray.setFromCamera({ x: x0 + (x1 - x0) * ((ix + 0.5) / N), y: y0 + (y1 - y0) * ((iy + 0.5) / N) }, camera);
+        const hit = ray.intersectObjects(scene.children, true).find((h) => opaqueBlocker(h.object));
+        if (!hit) continue;
+        if (headSet.has(hit.object)) head += 1;
+        else if (bodySet.has(hit.object)) body += 1;
+      }
+    }
+    // 머리 밑동이 옷깃에 가려 몸이 되는 것은 정상이다. 축은 정수리부터 턱까지가 남는가다.
+    const wp = new THREE.Vector3();
+    keeper.userData.head.getWorldPosition(wp);
+    const hb = new THREE.Box3().setFromObject(keeper.userData.head);
+    const tb = new THREE.Box3();
+    keeper.userData.torso ? tb.setFromObject(keeper.userData.torso) : tb.copy(hb);
+    /* 정수리만으로는 부족하다. 파운더가 읽지 못한 것은 머리가 아니라 얼굴이고,
+       눈이 옷 위로 안 나오면 정수리가 조금 솟아도 여전히 옷깃에 잠긴 머리다.
+       눈 좌표는 화면 몫과 달리 상자 크기에 안 흔들려서 옷 품이 바뀌어도 같은 말을 한다. */
+    // 눈은 둘이고 같은 높이에 선다. 한쪽만 읽으면 된다.
+    const eyes = keeper.userData.head.userData.eyes;
+    const eye = Array.isArray(eyes) ? eyes[0] : eyes;
+    const ev = new THREE.Vector3();
+    if (eye) eye.getWorldPosition(ev); else ev.copy(wp);
+    return { head, body, ratio: head / Math.max(1, head + body), cells: N * N,
+      // 목 위로 머리가 몇 미터 솟았는지. 화면 몫이 왜 줄었는지를 가르는 두 번째 눈이다.
+      rise: hb.max.y - tb.max.y, eyeRise: ev.y - tb.max.y, headR: hb.max.y - hb.min.y };
+  };
+
+  // 머리 몫이 머리의 것인지는 머리만 끈 프레임과 비교해야 안다. 그물 토글과 같은 취급이다.
+  // visible로는 안 된다. 레이캐스터는 그 값을 안 보므로 끈 머리에 광선이 계속 맞는다.
+  // 레이어를 옮기면 카메라도 레이캐스터도 같이 건너뛴다.
+  window.__headHide = (on) => {
+    keeper.userData.head.traverse((o) => o.layers.set(on ? 1 : 0));
+    return !on;
+  };
+
   window.__renderInfo = () => ({
     calls: sceneCalls + 1,
     triangles: sceneTris + 2,

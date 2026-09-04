@@ -384,7 +384,16 @@ function buildBody(o) {
   addOutline(torso, 0.05);
   spine.add(torso);
 
-  const neck = joint(spine, 0, o.torsoLen + o.torsoR * 0.35, 0);
+  /* 목은 몸통 위에 선다. 상의 등급이 몸통을 세로 kc.len으로 늘리는데 이 자리를 원래
+     기장으로 두었더니 머리가 통째로 옷 안에 잠겼다. 실측으로 시작 상의(len 1.26)에서
+     정수리가 몸통 꼭대기보다 0.05m 아래였고, 머리가 화면에서 가진 칸이 312칸 중 21칸이었다.
+     팔은 그대로 둔다. 어깨는 몸통 옆면에 붙지 윗면에 붙지 않아 기장을 안 탄다. */
+  /* 그래서 기준을 기장이 아니라 몸통 꼭대기로 옮긴다. 목은 꼭대기에서 몸통 반경의 0.65만큼
+     아래이고 그 거리는 옷을 안 탄다. kc.len이 1이면 원래 값 torsoLen + 0.35 torsoR과 같다. */
+  /* 0.65로는 정수리만 솟고 눈은 여전히 옷깃 아래였다(실측 -0.067m). 파운더가 못 읽은 것은
+     머리가 아니라 얼굴이므로 눈이 기준이다. 0.05는 네 등급 모두에서 눈이 옷 위로 나오면서
+     머리 밑동이 몸통에 겹쳐 목이 끊겨 보이지 않는 자리다. */
+  const neck = joint(spine, 0, (o.torsoLen + o.torsoR) * kc.len - o.torsoR * 0.05, 0);
   const head = new THREE.Mesh(new THREE.SphereGeometry(o.headR, 10, 8), flat(o.skin));
   head.name = tag;
   head.position.y = o.headR * 0.92;
