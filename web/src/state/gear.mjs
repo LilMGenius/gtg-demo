@@ -148,13 +148,21 @@ export const MAX_HAIR = HAIRS.length - 1;
 
 // 타투 선반. 헤어와 같은 축이고 보이는 자리만 다르다. ink는 소매 커프 색이라 팔에 드러난다.
 // 값 기준은 앞의 일곱과 같다. 첫 칸은 카드깡 380 육수보다 싸고 마지막 칸은 그보다 비싸다.
-// span은 그 잉크가 위팔을 덮는 비율이다. 색만 바꾸면 이름이 약속한 면적이 화면에 안 선다.
+// cut은 잉크의 형태다. span은 위팔을 덮는 비율, girth는 감는 두께 배율이다.
+// 다른 선반과 같은 이름을 쓴다. 선반마다 형태를 다른 열 이름으로 선언하면
+// 형태를 재는 자가 선반 목록을 손으로 들고 있어야 한다.
+// 색만 바꾸면 이름이 약속한 면적이 화면에 안 선다.
 // 실측으로 색만 다른 2등급과 3등급의 그림 차이가 236화소였고, 그 둘은 사실상 같은 상품이었다.
 export const TATTOOS = [
-  { ink: 0, name: '맨살', cost: 0, ink_tone: 0x5f8f93, span: 0.16, note: '아무것도 안 새겼을 때 팔' },
-  { ink: 1, name: '지워지는 문신 스티커', cost: 140, ink_tone: 0x3a4f7a, span: 0.22, note: '땀에 번진다. 그래도 있어 보인다' },
-  { ink: 2, name: '팔뚝에 새긴 이름 석 자', cost: 380, ink_tone: 0x2a2f3a, span: 0.40, note: '누구 이름인지는 안 밝힌다' },
-  { ink: 3, name: '어깨까지 채운 먹토시', cost: 870, ink_tone: 0x14161c, span: 0.72, note: '반팔을 입으면 소매가 하나 더 있다' }
+  { ink: 0, name: '맨살', cost: 0, ink_tone: 0x5f8f93, note: '아무것도 안 새겼을 때 팔',
+    cut: { span: 0.14, girth: 1 } },
+  { ink: 1, name: '지워지는 문신 스티커', cost: 140, ink_tone: 0x3a4f7a, note: '땀에 번진다. 그래도 있어 보인다',
+    cut: { span: 0.26, girth: 1.03 } },
+  { ink: 2, name: '팔뚝에 새긴 이름 석 자', cost: 380, ink_tone: 0x2a2f3a, note: '누구 이름인지는 안 밝힌다',
+    cut: { span: 0.38, girth: 1.04 } },
+  // 먹토시는 위팔을 통째로 덮는다. 소매가 하나 더 있다는 이름이 그 뜻이다.
+  { ink: 3, name: '어깨까지 채운 먹토시', cost: 870, ink_tone: 0x14161c, note: '반팔을 입으면 소매가 하나 더 있다',
+    cut: { span: 0.98, girth: 1.2 } }
 ];
 
 export const MAX_INK = TATTOOS.length - 1;
@@ -229,7 +237,7 @@ export function lookOf(gear) {
   const t = inkAt(gear && gear.ink);
   return {
     hair: hairAt(gear && gear.hair).tone, hairCut: hairAt(gear && gear.hair).cut,
-    ink: t.ink_tone, inkSpan: t.span,
+    ink: t.ink_tone, inkSpan: t.cut.span, inkGirth: t.cut.girth,
     glove: gloveAt(gear && gear.grip).tone, gloveCut: gloveAt(gear && gear.grip).cut,
     boot: bootAt(gear && gear.studs).tone, bootCut: bootAt(gear && gear.studs).cut,
     shirt: kitAt(gear && gear.pads).tone, kitCut: kitAt(gear && gear.pads).cut,

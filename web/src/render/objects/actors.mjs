@@ -334,7 +334,7 @@ export function addFace(head, r, dir, skin, hairTone, hairCut) {
 // 캡슐을 중앙 피벗으로 두면 어깨를 돌렸을 때 팔이 몸통을 관통한다.
 // 사지에는 외곽선을 안 건다. 팔 여덟 개가 각자 복제본을 달면 드로우콜이 두 배가 되고,
 // 가늘어서 어차피 선만 남는다. 실루엣을 만드는 건 몸통과 머리다.
-function seg(radius, len, color, tag, salt, cuff, span) {
+function seg(radius, len, color, tag, salt, cuff, span, girth) {
   const geo = new THREE.CapsuleGeometry(radius, len, 3, 6);
   geo.translate(0, -len / 2, 0);
   // 마디 중간에 밝은 띠를 하나 병합한다. 드로우콜은 그대로다.
@@ -343,8 +343,11 @@ function seg(radius, len, color, tag, salt, cuff, span) {
   if (cuff) {
     // 띄의 높이를 데이터가 정한다. 아랫단은 그대로 두고 위로만 자라 어깨를 향해 덮는다.
     const h = len * (span || 0.16);
-    const ring = new THREE.CylinderGeometry(radius * 1.18, radius * 1.18, h, 8);
-    ring.translate(0, -(0.63 * len - h / 2), 0);
+    // 감는 두께도 등급이 정한다. 면적만 늘리면 먹토시가 스티커를 길게 늘인 것으로 읽힌다.
+    const rr = radius * 1.18 * (girth || 1);
+    const ring = new THREE.CylinderGeometry(rr, rr, h, 8);
+    // 아랫단을 팔꿈치 쪽에 고정하고 위로 자란다. 가운데를 고정하면 넓은 등급이 팔 밖으로 나간다.
+    ring.translate(0, -(0.86 * len - h / 2), 0);
     m = new THREE.Mesh(mergeGeos([geo, ring], [color, cuff]), flatVertex(0xffffff));
   } else {
     m = new THREE.Mesh(geo, flat(color));
@@ -419,7 +422,7 @@ function buildBody(o) {
       pad.position.set(side * o.armR * 0.45, o.armR * 1.15 + th * 0.3, 0);
       sh.add(pad);
     }
-    const upper = seg(o.armR, o.upperLen, o.sleeve, tag, side < 0 ? 21 : 22, o.cuffSleeve, o.cuffSpan);
+    const upper = seg(o.armR, o.upperLen, o.sleeve, tag, side < 0 ? 21 : 22, o.cuffSleeve, o.cuffSpan, o.cuffGirth);
     sh.add(upper);
     const el = joint(sh, 0, -o.upperLen, 0);
     const fore = seg(o.armR * 0.92, o.foreLen, o.skin, tag, side < 0 ? 23 : 24);
@@ -569,7 +572,8 @@ export function buildKeeper(height, weight, look) {
     // 색상을 청록으로 꺾으면 밝기가 아니라 색이 팔을 세우고, 양말과 한 벌로 묶인다.
     shirt: (look && look.shirt) || 0x2f8f5b, kitCut: look && look.kitCut,
     sleeve: 0x073239, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: (look && look.sock) || 0x63d3e8, sockCut: look && look.sockCut,
-    cuffSleeve: (look && look.ink) || 0x5f8f93, cuffSpan: (look && look.inkSpan) || 0.16, cuffShorts: 0x6d8898, gloveTone: (look && look.glove) || 0xf2d64b,
+    cuffSleeve: (look && look.ink) || 0x5f8f93, cuffSpan: (look && look.inkSpan) || 0.16, cuffGirth: (look && look.inkGirth) || 1,
+    cuffShorts: 0x6d8898, gloveTone: (look && look.glove) || 0xf2d64b,
     gloveCut: look && look.gloveCut,
     bootTone: (look && look.boot) || 0x2a241c, bootCut: look && look.bootCut,
     hair: look && look.hair, hairCut: look && look.hairCut,

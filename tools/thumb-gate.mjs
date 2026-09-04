@@ -91,7 +91,8 @@ try {
       { tab: "studs", field: "studs", look: "boot", rows: g.BOOTS },
       { tab: "grip", field: "grip", look: "glove", rows: g.GLOVES },
       { tab: "pads", field: "pads", look: "shirt", rows: g.KITS },
-      { tab: "socks", field: "socks", look: "sock", rows: g.SOCKS }
+      { tab: "socks", field: "socks", look: "sock", rows: g.SOCKS },
+      { tab: "ink", field: "ink", look: "ink", rows: g.TATTOOS }
     ].filter((s) => s.rows.every((r) => r.cut));
     const out = [];
     for (const s of TABLE) {
