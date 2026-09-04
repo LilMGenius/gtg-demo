@@ -65,7 +65,7 @@ try {
   check("exit:swap-row-is-open-at-the-ceiling", maxed.swap !== null && !maxed.swap.off, maxed.swap ? maxed.swap.text + " off=" + maxed.swap.off : "absent");
   // 못 누르는 사유든 값이든 버튼 글자가 들고 있어야 한다. 환율을 화면 밖에서 알아낼 길은 없다.
   const want = String(before.points * COIN_DRILL);
-  check("exit:swap-row-states-the-rate-in-its-own-text", !!maxed.swap && maxed.swap.text.includes("땀") && maxed.swap.text.includes(want), (maxed.swap ? maxed.swap.text : "absent") + " want " + want);
+  check("exit:swap-row-states-the-rate-in-its-own-text", !!maxed.swap && maxed.swap.text.includes("육수") && maxed.swap.text.includes(want), (maxed.swap ? maxed.swap.text : "absent") + " want " + want);
 
   await p.click("#gym .swap", { force: true });
   await p.waitForTimeout(400);

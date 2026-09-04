@@ -150,10 +150,11 @@ const G = (t, body) => '<svg viewBox="0 0 24 24" fill="currentColor" shape-rende
 const R = (x, y, w, h) => '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '"/>';
 // 팔로워. 이름 대신 사람 하나를 세운다. Outmoongram이라는 이름은 관리창 안에서만 쓴다.
 const IC_FANS = G('팔로워', R(9, 3, 6, 6) + R(6, 12, 12, 3) + R(3, 15, 18, 6));
-// 땀. 시간으로 버는 재화라 땀방울이다. 뾰족한 위와 둥근 아래라 별 실루엣과 안 겹친다.
-const IC_SWEAT = G('땀', R(10.5, 3, 3, 3) + R(7.5, 6, 9, 3) + R(6, 9, 12, 3) + R(4.5, 12, 15, 3)
+// 육수. 시간으로 버는 재화다. 땀을 뺀 결과를 부르는 입말이라 물방울 하나가 그대로 단위로 읽히고,
+// 뾰족한 위와 둥근 아래라 별 실루엣과 안 겹친다. 판을 세던 옛 단위 '구'와 글자가 안 겹친다.
+const IC_SWEAT = G('육수', R(10.5, 3, 3, 3) + R(7.5, 6, 9, 3) + R(6, 9, 12, 3) + R(4.5, 12, 15, 3)
   + R(4.5, 15, 15, 3) + R(6, 18, 12, 3) + R(7.5, 21, 9, 3));
-/* 값을 말하는 자리는 전부 이 함수를 지난다. 상단 잔고는 아이콘인데 상점 버튼만 '140 땀'처럼
+/* 값을 말하는 자리는 전부 이 함수를 지난다. 상단 잔고는 아이콘인데 상점 버튼만 '140 육수'처럼
    글자로 적으면 같은 재화가 두 표기로 갈리고, 어느 재화로 사는지를 글자를 읽어야 안다. */
 // data-coin은 계기가 읽는 자리다. 그려진 숫자는 천 단위 쉼표가 붙고 아이콘 이름이 섞여 들어와,
 // 글자를 파싱하면 계기가 값을 못 읽거나 잘못 읽는다. 값은 데이터에서 꺼내 쓴다.
@@ -248,7 +249,7 @@ function pips() {
   }).join('');
   el('lv').textContent = 'Lv ' + state.keeper.level;
   el('fans').innerHTML = IC_FANS + '<b>' + state.fans.toLocaleString() + '</b>';
-  // 땀과 스폰은 갈래가 다른 잔고다. 붙여 두면 한 줄의 숫자 띠로 읽혀 어느 것으로 사는지가
+  // 육수과 스폰은 갈래가 다른 잔고다. 붙여 두면 한 줄의 숫자 띠로 읽혀 어느 것으로 사는지가
   // 상점을 열어야 아는 정보가 된다. 팔로워와 지갑을 가르는 것과 같은 세로선으로 둘을 가른다.
   el('purse').innerHTML = '<span class="cur">' + IC_SWEAT + '<b>' + state.wallet.coin.toLocaleString() + '</b></span>'
     + '<span class="cur">' + IC_SPON + '<i>' + state.wallet.cash.toLocaleString() + '</i></span>'
@@ -300,7 +301,7 @@ function tally(name, conceded) {
   else row.saved += 1;
 }
 
-// 이번 구에 들어온 땀을 잔고 옆에 한 번 띄운다.
+// 이번 구에 들어온 육수을 잔고 옆에 한 번 띄운다.
 // 총액만 갱신하면 유명한 키커를 막아 더 벌었다는 사실이 화면에 남지 않는다.
 // pips()가 지갑 칸을 통째로 다시 그리므로 반드시 그 뒤에 붙인다.
 function coinPop(n) {
@@ -420,7 +421,7 @@ function rollCaptions(result) {
       // 라포는 말을 섞은 구에서만 쌓인다. 스쳐 지나간 얼굴은 다음에도 남이다.
       // 봇이 뛴 구는 팔로워와 같은 규칙으로 0이다. 봇이 서 있었으니 얼굴이 익을 리 없다.
       if (!state.botRan && result.events.some((e) => e.t === 'talked')) state.rapport = addRapport(state.rapport, state.gear.city, state.shots[state.i].passer);
-      // 땀은 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
+      // 육수은 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
       // 유명한 키커를 막을수록 더 들어온다. 팔로워와 같은 fame 값을 쓴다.
       const coin = coinGain(result.conceded, result.fame);
       state.wallet.coin += coin;
@@ -813,7 +814,7 @@ function commitDate(city, passer, moveId) {
   persist();
   pips();
   renderDate(city, passer, out);
-  // 뒤에 열려 있는 내 정보도 같이 그린다. 안 그리면 방금 쓴 땀과 내려간 라포가
+  // 뒤에 열려 있는 내 정보도 같이 그린다. 안 그리면 방금 쓴 육수과 내려간 라포가
   // 반투명 배경 너머에서 옛 값으로 남아 만남 버튼이 아직 열린 것처럼 보인다.
   renderMe();
 }
@@ -1260,7 +1261,7 @@ function bindBuff(box) {
       const spec = buffAt(b.dataset.buff);
       if (!spec || state.wallet.coin < spec.cost) return;
       const next = addBuff(state.buff, spec.kind);
-      // 다른 종류가 살아 있으면 addBuff가 원본을 그대로 돌려준다. 그때 값을 치르면 땀만 사라진다.
+      // 다른 종류가 살아 있으면 addBuff가 원본을 그대로 돌려준다. 그때 값을 치르면 육수만 사라진다.
       if (next === state.buff) return;
       state.wallet.coin -= spec.cost;
       state.buff = next;

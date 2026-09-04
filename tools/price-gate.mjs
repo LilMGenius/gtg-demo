@@ -1,18 +1,18 @@
 import { chromium } from "playwright";
 
-// 값 표기의 자. 상단 잔고는 아이콘인데 상점 버튼은 '140 땀'처럼 글자였다.
+// 값 표기의 자. 상단 잔고는 아이콘인데 상점 버튼은 '140 육수'처럼 글자였다.
 // 같은 재화가 두 표기로 갈리면 어느 재화로 사는지가 글자를 읽어야 아는 정보가 된다.
 //
 // 재는 것은 셋이다. 값을 말하는 판에 재화 이름이 글자로 남지 않는가, 값마다 아이콘이 하나씩
 // 붙어 있는가, 그 아이콘이 DOM에만 있는 게 아니라 화소로 찍혔는가.
-// 앞의 둘은 대조군을 달고 온다. 판에 '땀' 글자를 심어서 자가 그것을 잡는지 먼저 본다.
+// 앞의 둘은 대조군을 달고 온다. 판에 '육수' 글자를 심어서 자가 그것을 잡는지 먼저 본다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 // maxed는 훈련장의 잉여 훈련 환전 줄을 열고, rich는 상점 값이 전부 모자람 문구로 덮이는 것을 막는다.
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=maxed,rich";
 const LINE = String.fromCharCode(10);
-// U+B540. 재화 이름을 소스에 글자로 두면 이 파일 자신이 잔여 검색에 걸린다.
+// U+C721 U+C218. 재화 이름을 소스에 글자로 두면 이 파일 자신이 잔여 검색에 걸린다.
 // 값은 아래 대조군이 검증한다. 코드포인트를 잘못 적으면 이 자는 엉뚱한 글자를 재고 조용히 초록을 낸다.
-const WORD = String.fromCharCode(0xB540);
+const WORD = String.fromCharCode(0xC721, 0xC218);
 // U+AD6C. 판을 세던 옛 단위이고 U+D55C은 그 앞에 붙던 관형사다.
 // 소스에 글자로 두는 것을 피하는 이유는 위와 같다.
 const SHOT = String.fromCharCode(0xAD6C);

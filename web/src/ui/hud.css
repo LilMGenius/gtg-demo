@@ -80,7 +80,7 @@ body.playing #hud{opacity:1}
 #fans{grid-area:fans;padding-left:11px;border-left:2px solid #ffffff24;margin-left:-11px}
 #fans b{font-weight:700;font-style:normal;opacity:1;color:#ffd83d}
 /* 지갑도 판 밖에서 쌓이는 값이라 팔로워와 같은 등급으로 둔다.
-   땀과 스폰은 같은 칸에 나란히 선다. 두 갈래라는 사실이 화면에서도 한 번에 읽혀야
+   육수과 스폰은 같은 칸에 나란히 선다. 두 갈래라는 사실이 화면에서도 한 번에 읽혀야
    상점이 열렸을 때 어느 잔고로 사는지가 새 정보가 되지 않는다. */
 /* 재화 칩은 버는 법을 연다. 재화를 눌러 상점이 열리는 것은 어느 게임의 문법도 아니다.
    상점은 왼쪽 기둥의 제 버튼이 소유한다. 오른쪽 기둥은 크로스바 325px에 막혀 자리가 없다. */
@@ -110,9 +110,9 @@ body.playing #hud{opacity:1}
   /* 60%까지 불투명하게 버틴다. 곧바로 흐려지기 시작하면 눈이 옮겨오기 전에 값이 지워진다. */
   60%{opacity:1;transform:translateY(-4px) scale(1)}
   100%{opacity:0;transform:translateY(-15px) scale(1)}}
-/* 스폰은 결제로만 들어온다. 시간으로 버는 땀과 색이 같으면 둘이 한 갈래로 읽힌다. */
+/* 스폰은 결제로만 들어온다. 시간으로 버는 육수과 색이 같으면 둘이 한 갈래로 읽힌다. */
 #purse i{font-style:normal;font-weight:700;opacity:1;color:#7fe3ff}
-/* 버프 잔량은 벌어 둔 값이 아니라 줄어드는 값이다. 땀 노랑과 스폰 하늘색 사이에 없는
+/* 버프 잔량은 벌어 둔 값이 아니라 줄어드는 값이다. 육수 노랑과 스폰 하늘색 사이에 없는
    연두를 써야 세 번째 칸이 잔고의 일종으로 안 읽힌다. u 기본 밑줄은 지운다. */
 #purse u{text-decoration:none;font-weight:700;opacity:1;color:#9be86a}
 #pips{grid-area:pips;display:flex;gap:6px}
@@ -380,7 +380,7 @@ body.playing #hud{opacity:1}
 #roster .row button:nth-child(3n){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
 #roster .row button em{display:block;font-style:normal;font-size:12px;font-weight:700;
   color:var(--good);margin-top:3px}
-/* 지금 뛰는 자리와 땀이 모자란 카드. 눌러도 아무 일이 없다는 것이 먼저 보여야 한다. */
+/* 지금 뛰는 자리와 육수이 모자란 카드. 눌러도 아무 일이 없다는 것이 먼저 보여야 한다. */
 #roster .row button:disabled{color:#f6efdc5c;background:#141a12;cursor:default}
 #roster .row button:disabled em{color:#f6efdc44}
 /* 출전 중인 한 장은 죽은 카드와 다른 색이어야 한다. 둘 다 안 눌리기 때문이다. */
