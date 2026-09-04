@@ -72,6 +72,12 @@ try {
     return {
       cur: (document.querySelector("#shop .kind[aria-current]") || {}).dataset?.kind || "",
       coin: Number((card.querySelector(".px[data-coin]") || {}).dataset?.coin || 0),
+      /* 이용권이 값을 다 덮는 회차는 육수 칩 대신 이용권 칩을 세운다. 그때 값은 0이 맞고,
+         선반이 값을 안 적은 것이 아니다. 열 장 버튼은 이용권으로 다 못 덮으므로 육수를 든다.
+         값 축은 그 버튼에서 읽어야 이용권 보유량이 판정을 흔들지 않는다. */
+      bulkCoin: Number(([...card.querySelectorAll(".buy.pull .px[data-coin]")].pop() || {}).dataset?.coin || 0),
+      // 이 갈래가 이용권을 받는지는 이제 문장이 아니라 칩의 유무가 말한다.
+      ticketChip: Boolean(card.querySelector(".held")),
       text: card.innerText.replace(/\n/g, " ")
     };
   });
@@ -81,9 +87,18 @@ try {
   const c = await read();
   check("pullkind:choosing-a-kind-changes-the-shelf", a.cur === "town" && c.cur === "legend" && c.coin !== a.coin,
     a.cur + " at " + a.coin + " then " + c.cur + " at " + c.coin);
-  check("pullkind:the-shown-price-is-the-one-the-judgement-derived", c.coin === costs[1] && a.coin === costs[0],
-    a.coin + " and " + c.coin + " against " + costs.join(" and "));
-  check("pullkind:the-kind-that-takes-no-ticket-says-so", c.text.indexOf("이용권을 안 받는다") >= 0, JSON.stringify(c.text.slice(0, 60)));
+  /* 화면에 선 값이 판정이 계산한 청구서와 같은가. 이용권이 값을 다 덮는 회차는 육수가 0인 것이
+     맞는 답이라, 원가와 비교하면 계기가 이용권 보유량을 결함으로 읽는다.
+     지금 보유한 이용권을 넣어 청구서를 다시 세우고 그 육수와 대조한다. */
+  const held = await p.evaluate(() => window.__tickets());
+  const wantTown = pullBill(10, held, 9e9, costs[0]).cost;
+  const wantLegend = pullBill(10, 0, 9e9, costs[1]).cost;
+  check("pullkind:the-shown-price-is-the-one-the-judgement-derived",
+    a.bulkCoin === wantTown && c.bulkCoin === wantLegend,
+    a.bulkCoin + " and " + c.bulkCoin + " against " + wantTown + " and " + wantLegend + " with " + held + " tickets");
+  check("pullkind:only-the-kind-that-takes-tickets-shows-the-ticket-chip",
+    a.ticketChip === true && c.ticketChip === false,
+    "town chip " + a.ticketChip + ", legend chip " + c.ticketChip);
 
   // 전설 갈래에서 열 장. 나온 이름이 전부 하한 위여야 한다.
   const before = await p.evaluate(() => window.__squad().squad.slice());

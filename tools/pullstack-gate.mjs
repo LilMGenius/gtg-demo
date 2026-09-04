@@ -53,6 +53,16 @@ try {
   await p.evaluate(() => window.__shop(true));
   await p.waitForSelector("#shop .buy[data-want]", { timeout: 8000 });
   const wants = await p.evaluate(() => [...document.querySelectorAll("#shop .buy[data-want]")].map((e) => Number(e.dataset.want)));
+  /* 뽑으면 개봉 화면이 상점 위를 통째로 덮는다. 사람도 그것을 닫아야 다음 버튼에 닿으므로
+     계기도 같은 문을 쓴다. 안 닫고 다음 클릭을 보내면 덮개가 먹어 아무 일도 안 일어나고,
+     그 침묵이 값이 안 나갔다는 판정으로 잘못 읽힌다. */
+  const dismiss = async () => {
+    for (let i = 0; i < 3; i += 1) {
+      if (await p.evaluate(() => document.getElementById("pull").hidden)) return;
+      await p.click("#pull", { force: true });
+      await p.waitForTimeout(200);
+    }
+  };
   check("pullstack:both-sizes-stand", wants.length === 2 && wants[0] === 1 && wants[1] === PULL_BULK, wants.join(" and "));
   const shown = await p.evaluate(() => {
     const e = document.querySelector("#shop .card .held");
@@ -64,6 +74,7 @@ try {
 
   const before = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin, squad: window.__squad().squad.length }));
   await p.click('#shop .buy[data-want="' + PULL_BULK + '"]', { force: true });
+  await dismiss();
   await p.waitForTimeout(500);
   const after = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin, squad: window.__squad().squad.slice() }));
   const want = pullBill(PULL_BULK, before.t, before.coin);
@@ -79,6 +90,7 @@ try {
   // 낱장은 남은 이용권으로 돌아간다. 값이 안 나가야 이용권이 먼저 쓰인 것이다.
   const mid = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin }));
   await p.click('#shop .buy[data-want="1"]', { force: true });
+  await dismiss();
   await p.waitForTimeout(400);
   const one = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin }));
   check("pullstack:a-single-draw-uses-the-leftover-ticket", mid.t - one.t === 1 && one.coin === mid.coin,
@@ -86,9 +98,11 @@ try {
 
   // 대조군. 이용권이 바닥나면 같은 자리가 값을 치른다. 안 그러면 위의 0원은 공짜 뽑기다.
   await p.evaluate(() => { while (window.__tickets() > 0) document.querySelector('#shop .buy[data-want="1"]').click(); });
+  await dismiss();
   await p.waitForTimeout(600);
   const dry = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin }));
   await p.click('#shop .buy[data-want="1"]', { force: true });
+  await dismiss();
   await p.waitForTimeout(400);
   const paid = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin }));
   check("control:with-no-ticket-left-the-same-button-charges", dry.t === 0 && dry.coin - paid.coin === PULL_COST,
