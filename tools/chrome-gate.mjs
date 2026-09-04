@@ -114,23 +114,27 @@ try {
     im.src = "data:image/png;base64," + s;
   }), a);
 
-  // 창 하나로만 재면 나머지 창은 아무도 안 본 채로 남는다. 상점만 덮개가 돌고
-  // 훈련장과 선수단은 우측 조작 몇이 덮개 위에 남아 있던 것이 그렇게 백 랩을 살아남았다.
-  // 상태 칩 #top은 조작이 아니라 표시지만 덮임은 같이 재야 한다. 칩만 안 덮이면
-  // 창이 열린 화면에서 그 칩만 지금 누를 수 있는 것처럼 보인다.
+  // 창 하나로만 재면 나머지 창은 아무도 안 본 채로 남는다. 창마다 전부 돈다.
+  //
+  // 조작과 칩은 창이 열렸을 때 하는 일이 다르다. 조작은 물러나고 칩은 남는다.
+  // 밝기를 40퍼센트로 낮추는 덮개만으로는, 판이 큰 상점에서는 조작이 판에 가려 사라지고
+  // 판이 작은 훈련장에서는 그대로 읽혀서 같은 덮개가 창마다 다른 말을 했다.
+  // 그래서 조작은 밝기가 아니라 좌표로 잰다. 뷰포트를 벗어나면 창마다 같은 말이 된다.
+  // 칩은 잔고를 보며 사는 자리라 남아야 하고, 남는 이상 덮여야 한다.
   const WINDOWS = ["shop", "gym", "roster", "gram", "me", "earn"];
-  const SKINS = IDS.concat("top");
-  const sweep = async () => {
-    const m = {};
-    for (const id of SKINS) m[id] = await mean(await shot(id));
-    return m;
-  };
-  const before = await sweep();
-  const veiled = [], restored = [], vanished = [];
+  const boxes = () => p.evaluate((ids) => ids.map((id) => {
+    const r = document.getElementById(id).getBoundingClientRect();
+    return { id, left: r.left, right: r.right, off: r.right <= 0 || r.left >= innerWidth };
+  }), IDS);
+  const chipLum = async () => mean(await shot("top"));
+  const baseChip = await chipLum();
+  const baseBox = await boxes();
+  const stayed = [], veiled = [], restored = [], vanished = [];
   for (const win of WINDOWS) {
     await p.evaluate((w) => window["__" + w](true), win);
+    // 400ms는 물러나는 데 쓰는 240ms보다 길다. 움직이는 중간을 재면 좌표가 회차마다 갈린다.
     await p.waitForTimeout(400);
-    const after = await sweep();
+    for (const b of await boxes()) if (!b.off) stayed.push(win + "/" + b.id + " " + b.left.toFixed(0) + " to " + b.right.toFixed(0));
     // 칩이 화면에서 사라지면 밝기 비교가 무의미해진다. 잔고를 보며 사는 자리에서
     // 잔고가 없어지는 것이 그 자체로 결함이라 자리부터 확인한다.
     const chip = await p.evaluate(() => {
@@ -140,18 +144,23 @@ try {
     });
     if (!(chip.w > 0 && chip.o > 0 && chip.on)) vanished.push(win + " " + chip.w + "px opacity " + chip.o);
     // 덮개가 얹히면 밝기가 내려간다. 10%는 배경 #080b07c4가 판때기 위에 앉을 때의 실측 하한이다.
-    for (const id of SKINS) if (after[id] > before[id] * 0.9) veiled.push(win + "/" + id + " " + before[id].toFixed(1) + " to " + after[id].toFixed(1));
+    const nowChip = await chipLum();
+    if (nowChip > baseChip * 0.9) veiled.push(win + "/top " + baseChip.toFixed(1) + " to " + nowChip.toFixed(1));
     await p.evaluate((w) => window["__" + w](false), win);
-    await p.waitForTimeout(250);
-    const back = await sweep();
-    for (const id of SKINS) if (Math.abs(back[id] - before[id]) > before[id] * 0.05) restored.push(win + "/" + id + " " + before[id].toFixed(1) + " to " + back[id].toFixed(1));
+    await p.waitForTimeout(400);
+    const backChip = await chipLum();
+    if (Math.abs(backChip - baseChip) > baseChip * 0.05) restored.push(win + "/top " + baseChip.toFixed(1) + " to " + backChip.toFixed(1));
+    const backBox = await boxes();
+    for (let i = 0; i < backBox.length; i++) if (Math.abs(backBox[i].left - baseBox[i].left) > 1) restored.push(win + "/" + backBox[i].id + " " + baseBox[i].left.toFixed(0) + " to " + backBox[i].left.toFixed(0));
   }
-  check("chrome:every-window-veils-every-control-and-chip", veiled.length === 0,
-    veiled.slice(0, 6).join(", ") || WINDOWS.length + " windows over " + SKINS.length + " surfaces");
+  check("chrome:every-window-clears-both-columns-off-screen", stayed.length === 0,
+    stayed.slice(0, 6).join(", ") || WINDOWS.length + " windows over " + IDS.length + " controls");
+  check("chrome:every-window-veils-the-status-chip", veiled.length === 0,
+    veiled.slice(0, 6).join(", ") || "chip veiled in all " + WINDOWS.length);
   check("chrome:the-status-chip-stays-on-screen-in-every-window", vanished.length === 0,
     vanished.join(", ") || "chip present in all " + WINDOWS.length);
   // 대조군. 창을 닫으면 밝기가 돌아와야 한다. 안 돌아오면 위의 하락은 창 때문이 아니다.
-  check("control:closing-any-window-restores-every-surface", restored.length === 0,
+  check("control:closing-any-window-puts-every-surface-back", restored.length === 0,
     restored.slice(0, 6).join(", ") || "all restored");
 
   // 창은 한 번에 하나만 선다. 겹쳐 열면 닫았을 때 무엇이 남는지가 닫아 봐야 안다.

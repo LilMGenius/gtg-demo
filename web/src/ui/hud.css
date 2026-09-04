@@ -777,3 +777,13 @@ body.playing #hud{opacity:1}
    keep-all은 띄어쓰기에서만 넘긴다. 한 낱말이 상자보다 길 때만 break-word가 받는다. */
 #hud, #hud *, .panel, .panel * { word-break: keep-all; overflow-wrap: break-word; }
 body { word-break: keep-all; overflow-wrap: break-word; }
+
+/* 창이 열리면 조작 두 기둥은 화면 밖으로 물러난다. 덮개는 밝기만 낮추므로,
+   판이 큰 상점과 판이 작은 훈련장이 같은 덮개를 쓰고도 남는 여백이 갈려
+   창마다 다른 말을 했다. 상태 칩은 남긴다. 잔고를 보며 사는 자리라 사라지면 살 수가 없다.
+   96px은 마진 12px에 가장 넓은 판때기 66px을 더하고 그림자 여유를 둔 값이라
+   어느 기둥도 자기 폭보다 많이 빠져 화면에 한 화소도 안 남는다.
+   .24s는 창이 뜨는 시간과 같아 두 움직임이 한 동작으로 읽힌다. */
+#mute,#auto,#out,#gymBtn,#rosterBtn,#gramBtn,#shopBtn{transition:translate .24s ease}
+#hud:has(:is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is(#mute,#auto,#out){translate:-96px 0}
+#hud:has(:is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is(#gymBtn,#rosterBtn,#gramBtn,#shopBtn){translate:96px 0}
