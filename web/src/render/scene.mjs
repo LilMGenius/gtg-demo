@@ -489,6 +489,55 @@ const TOUCHED = new Set(['contact']);
   // 4.35는 그 사이에서 망원 압축이 크로스바를 아래로 밀어낸 만큼만 더 올린 값이다.
   const CAM_BASE = new THREE.Vector3(0, 4.35, -8.0);
   const CAM_LOOK = new THREE.Vector3(0, 1.35, 4.5);
+  /* 카메라와 공 사이에는 언제나 뒷틀의 쇠가 있다. 사건마다 종점 좌표를 상수로 고르면
+     한 사건에서 쇠를 피한 값이 다른 사건에서는 그 쇠 위에 앉는다. 실측으로 잡은 공을
+     몸 밖으로 내놓았더니 가림의 주어가 키퍼에서 쇠로 바뀌었을 뿐 프레임 수는 그대로였다.
+     그래서 자리를 고르는 쪽이 아니라 시선 경로를 묻는 쪽에 규칙을 둔다. */
+  // pitch.mjs가 뒷틀을 세우는 평면과 치수. 그물 상자 뒷면과 같은 값이라 여기서 다시 정하지 않는다.
+  const REAR_Z = -1.5;
+  const REAR_TOP = R_H;
+  const REAR_HW = R_HALF_W;
+  // 쇠 반지름 0.05에 공 반경과 여유 0.06을 더한다. 중심이 이 띠 밖이면 공 화소가 쇠 옆에 남는다.
+  const REAR_BAND = 0.05 + BALL_R + 0.06;
+  const clearRear = (p) => {
+    // 뒷틀이 카메라와 공 사이에 있을 때만 가린다. 공이 그보다 앞이면 t가 구간을 벗어난다.
+    const t = (REAR_Z - CAM_BASE.z) / (p.z - CAM_BASE.z);
+    if (!(t > 0 && t < 1)) return;
+    const ry = CAM_BASE.y + (p.y - CAM_BASE.y) * t;
+    const rx = p.x * t;
+    // 상단 가로대. 띠 안이면 가까운 쪽 가장자리로 내보내고 그 값을 공 높이로 되푼다.
+    if (Math.abs(rx) < REAR_HW + REAR_BAND && Math.abs(ry - REAR_TOP) < REAR_BAND) {
+      const want = ry > REAR_TOP ? REAR_TOP + REAR_BAND : REAR_TOP - REAR_BAND;
+      // 땅 아래로는 못 내린다. 공 반경이 하한이다.
+      p.y = Math.max(BALL_R, CAM_BASE.y + (want - CAM_BASE.y) / t);
+    }
+    // 좌우 기둥과 빗댐. 둘 다 x가 같은 자리라 한 검사로 걷힌다. 골문 안쪽으로 비킨다.
+    if (ry > -REAR_BAND && ry < REAR_TOP + REAR_BAND && Math.abs(Math.abs(rx) - REAR_HW) < REAR_BAND) {
+      const sgn = rx >= 0 ? 1 : -1;
+      const want = Math.abs(rx) < REAR_HW ? REAR_HW - REAR_BAND : REAR_HW + REAR_BAND;
+      p.x = (sgn * want) / t;
+    }
+  };
+  /* 시선을 막는 것은 쇠만이 아니다. 키퍼도 같은 자리에 설 수 있고, 다른 점은 그 자리가
+     매 프레임 바뀐다는 것뿐이다. 그래서 같은 질문을 몸 상자에 대고 한 번 더 한다.
+     공이 몸보다 카메라 쪽이면 몸은 앞을 못 가리므로 깊이부터 거른다. */
+  const sightBox = new THREE.Box3();
+  const clearKeeper = (p) => {
+    sightBox.setFromObject(keeper);
+    const kz = (sightBox.min.z + sightBox.max.z) / 2;
+    if (p.z <= kz) return;
+    const t = (kz - CAM_BASE.z) / (p.z - CAM_BASE.z);
+    if (!(t > 0 && t < 1)) return;
+    const sy = CAM_BASE.y + (p.y - CAM_BASE.y) * t;
+    const sx = p.x * t;
+    if (sy < sightBox.min.y - BALL_R || sy > sightBox.max.y + BALL_R) return;
+    if (sx < sightBox.min.x - BALL_R || sx > sightBox.max.x + BALL_R) return;
+    // 가까운 쪽 어깨 밖으로 비킨다. 위아래로 밀면 뜬 공이 되고 옆으로 밀면 자리만 옮긴 공이 된다.
+    const left = sightBox.min.x - BALL_R;
+    const right = sightBox.max.x + BALL_R;
+    const want = Math.abs(sx - left) < Math.abs(sx - right) ? left : right;
+    p.x = want / t;
+  };
   let shakeAmp = 0;
   let shakeLeft = 0;
   let shakeSpan = 1;
@@ -1619,6 +1668,9 @@ const TOUCHED = new Set(['contact']);
         default:
           break;
       }
+      // 갈래가 자기 자리를 다 쓴 뒤 한 번만 묻는다. 갈래 안에서 부르면 갈래마다 빠뜨릴 수 있다.
+      clearRear(ball.position);
+      clearKeeper(ball.position);
       // 손으로 잡는 갈래와 달리는 갈래는 최종 자세가 준비 자세와 가까워서, 그 선 위를 움직여도
       // 회차가 채취 잡음만큼도 안 갈린다. 그런 갈래에서는 몸이 다이빙 각도 그대로 굳는다.
       // 회차별 각도를 한 번만 얹는다. 매 프레임 더하면 감쇠와 싸우다 각도가 계속 자라므로
