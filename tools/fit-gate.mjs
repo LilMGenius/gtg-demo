@@ -75,10 +75,22 @@ try {
   check("fit:the-bill-is-the-sum-of-the-shelf-prices", two.coin === want, two.coin + " want " + want);
   check("fit:both-tried-items-are-listed", two.rows === 2, two.rows + " rows");
 
+  // 창이 열려 있어도 판은 계속 굴러가고 완봉 보상이 지갑에 들어온다.
+  // 사기 전후를 그냥 맞대면 그 사이 벌어들인 몫이 결제액으로 읽힌다.
+  // 실측으로 1670을 결제한 회차가 1666으로 잡혔다. 판을 세워 놓고 재야 이 축이 결제만 본다.
+  await p.evaluate(() => window.__fixedStep(0.000001));
+  await p.waitForTimeout(200);
+  const idle = await coin();
+  await p.waitForTimeout(700);
+  const stillIdle = await coin();
   const before = await coin();
   await p.evaluate(() => { const a = document.querySelector("#shop .fitting .all"); if (a && !a.disabled) a.click(); });
   await p.waitForTimeout(600);
   const after = await coin();
+  await p.evaluate(() => window.__fixedStep(0));
+  // 대조군. 판을 세운 동안 아무것도 안 사면 잔고가 한 푼도 안 움직여야 한다.
+  // 안 멈췄으면 위의 차액에 배경 수입이 섞여 있고, 그 축은 결제를 재는 것이 아니다.
+  check("control:the-wallet-holds-still-while-the-world-is-stopped", idle === stillIdle, idle + " then " + stillIdle);
   const done = await bill();
   check("fit:buying-everything-charges-the-bill-once", before - after === want, before + " minus " + after + " is " + (before - after) + ", want " + want);
   check("fit:the-fitting-empties-after-buying", done.rows === 0, done.rows + " rows left");
