@@ -6,13 +6,14 @@ import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
-import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine } from './ui/lines.mjs';
+import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dmLine } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
 import { coinGain, readWallet, COIN_DRILL, COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
-import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds, photoOdds, selfieFans } from './state/gram.mjs';
+import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds, photoOdds, selfieFans,
+  DM_MOVES, dmOdds, dmOutcome, dmClock, dmWaiting, applyDm } from './state/gram.mjs';
 import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost } from './state/rapport.mjs';
 import { passerName } from './state/passer.mjs';
 import { DATE_COST, MOVES, dateOdds, dateOutcome, applyDate, dateGate } from './state/date.mjs';
@@ -725,6 +726,9 @@ function closeRoster() {
 // 아웃문그램. 구가 끝날 때마다 쌓인 글을 최신 순으로 건다.
 function renderGram() {
   const box = el('gram');
+  /* 열려 있는 쪽지. 맞팔인 사람만 이 자리에 선다. 선팔은 내가 건 것이고 맞팔은 상대도 걸어 준 것이라,
+     대화가 시작되는 자리는 뒤엣것이다. 미연시를 따로 열 필요가 없는 이유가 여기 있다. */
+  if (dmOpen) return renderDm();
   /* 남이 올린 글. 그림은 저장에 안 들어 있고 그때의 차림만 남아 있어, 열 때마다 그 차림으로 다시 굽는다.
      한 장이 47KB라 열두 장을 저장에 실으면 한도를 위협하고, 굽는 비용은 상점이 이미 스물넉 장으로 치른다. */
   /* 내가 올린 셀카. 주어가 둘이라 상대 이름이 사진 위에 서고, 팔로워는 그 자리에서 이미 올랐다.
@@ -766,7 +770,23 @@ function renderGram() {
   const mut = mutualCount(state.social);
   const head = 'Outmoongram<small>' + IC_FANS + ' ' + state.fans.toLocaleString()
     + ' 맞팔 ' + mut + '명, 팔로워 ' + Math.round((mutualBoost(state.social) - 1) * 100) + '% 더 붙는다</small>';
-  box.innerHTML = '<h4>' + head + '</h4><div class="feed">' + feed + '</div><button class="close">닫기</button>';
+  /* 답장을 기다리는 사람. 맞팔이 된 뒤 세 판이 지나면 다시 이 줄에 선다.
+     계정을 여는 이유가 글을 보는 것 하나뿐이면 그 창은 읽고 닫는 창으로 굳는다. */
+  const clock = dmClock(state.record);
+  const waiting = dmWaiting(state.social, clock);
+  const inbox = waiting.length
+    ? '<div class="inbox">' + waiting.map((key) => {
+      const part = key.split(':');
+      const city = Number(part[0]);
+      const passer = Number(part[1]);
+      const tier = rapportTier(state.rapport, city, passer);
+      return '<button class="dmOpen" data-key="' + key + '">' + passerName(city, passer, tier) + '<em>새 쪽지</em></button>';
+    }).join('') + '</div>'
+    : '';
+  box.innerHTML = '<h4>' + head + '</h4>' + inbox + '<div class="feed">' + feed + '</div><button class="close">닫기</button>';
+  for (const b of box.querySelectorAll('.dmOpen')) {
+    b.onclick = () => { dmOpen = b.dataset.key; dmSaid = null; renderGram(); };
+  }
   for (const b of box.querySelectorAll('.fol')) {
     b.onclick = () => {
       // 맞팔 여부는 여기서 한 번 굴린다. 열 때마다 다시 굴리면 같은 사람이 매번 다른 답을 준다.
@@ -812,6 +832,9 @@ function closeEarn() {
 
 function closeGram() {
   el('gram').hidden = true;
+  // 닫을 때 대화를 비운다. 남겨 두면 다음에 계정을 열었을 때 남의 대화가 먼저 뜬다.
+  dmOpen = null;
+  dmSaid = null;
 }
 
 // 히든 둘은 숫자가 아니라 문구로 뜬다. 숫자를 걸면 훈련장에서 올릴 수 있는 칸으로 읽힌다.
@@ -940,6 +963,57 @@ function closeMe() {
   el('me').hidden = true;
   // 닫을 때 보던 칸이 남으면 다음에 연 사람이 능력치를 찾아 탭을 눌러야 한다. 상점 선반과 같은 규칙이다.
   meTab = 'stat';
+}
+
+/* 지금 열어 둔 쪽지. 키는 도시와 행인 인덱스이고, 답장을 보내면 결과가 여기 남는다.
+   창을 닫으면 비운다. 남겨 두면 다음에 계정을 열었을 때 남의 대화가 먼저 뜬다. */
+let dmOpen = null;
+let dmSaid = null;
+
+// 쪽지 한 통. 맞팔이라야 오고, 답장하면 다음 말은 세 판 뒤에 온다.
+function renderDm() {
+  const box = el('gram');
+  const part = dmOpen.split(':');
+  const city = Number(part[0]);
+  const passer = Number(part[1]);
+  const tier = rapportTier(state.rapport, city, passer);
+  const who = passerName(city, passer, tier);
+  const said = dmSaid && dmSaid.key === dmOpen ? dmSaid : null;
+  const body = said
+    ? '<div class="line them">' + said.said + '</div><div class="line me">' + said.pick + '</div>'
+      + '<div class="out ' + (said.won ? 'win' : 'lose') + '">' + said.line
+      + (said.fans ? ' ' + IC_FANS + ' +' + said.fans : '') + '</div>'
+    : '<div class="line them">' + dmSay(city, passer, tier) + '</div>'
+      + '<div class="pick">' + DM_MOVES.map((m) => '<button data-dm="' + m.id + '">' + m.label
+        + '<em>' + CAUSE_LABEL[m.stat] + ' ' + state.keeper[m.stat] + '로 성공 ' + dmOdds(state.keeper, m.id) + '%</em></button>').join('') + '</div>';
+  box.innerHTML = '<h4>' + who + '<small>쪽지</small></h4><div class="dm">' + body + '</div>'
+    + '<button class="close">계정으로</button>';
+  box.querySelector('.close').onclick = () => { dmOpen = null; dmSaid = null; renderGram(); };
+  for (const b of box.querySelectorAll('[data-dm]')) b.onclick = () => sendDm(city, passer, tier, b.dataset.dm);
+}
+
+/* 먼저 온 말은 한 번 뽑아 그 대화가 열려 있는 동안 고정한다. 매 렌더마다 다시 뽑으면
+   답장 버튼을 보다가 상대의 말이 바뀐다. */
+let dmHeld = null;
+function dmSay(city, passer, tier) {
+  if (!dmHeld || dmHeld.key !== dmOpen) dmHeld = { key: dmOpen, text: dmLine(tier, Math.random) };
+  return dmHeld.text;
+}
+
+// 답장. 성공하면 라포가 한 칸 오르고 팔로워가 붙는다. 실패해도 잃는 것은 없고 다음 말이 밀린다.
+function sendDm(city, passer, tier, moveId) {
+  const out = dmOutcome(state.keeper, moveId, Math.random() * 100);
+  if (!out) return;
+  const move = DM_MOVES.find((m) => m.id === moveId);
+  state.social = applyDm(state.social, dmOpen, dmClock(state.record));
+  if (out.won) {
+    state.fans += out.fans;
+    state.rapport = addRapport(state.rapport, city, passer);
+  }
+  dmSaid = { key: dmOpen, said: dmSay(city, passer, tier), pick: move ? move.label : '', won: out.won, line: out.line, fans: out.fans };
+  persist();
+  pips();
+  renderGram();
 }
 
 /* 셀카 한 장. 내 계정에 올라가고 팔로워가 그 자리에서 오른다.
@@ -1645,6 +1719,8 @@ window.__fans = () => state.fans;
 window.__rapport = () => state.rapport;
 // 계정 장부. 피드가 옮겨 그리는 원본이라, 화면이 말한 수와 이 수가 갈리면 화면이 거짓말한 것이다.
 window.__posts = () => state.posts;
+// 대화가 화면에 적은 확률과 판정 쪽 확률을 맞대려면 계기가 같은 키퍼를 들고 있어야 한다.
+window.__keeperStats = () => Object.assign({}, state.keeper);
 window.__social = () => state.social;
 // 봇이 실제로 뛴 구였는지. 크레딧과 자동 상태만 보고 짐작하면 배선이 끊겨도 게이트가 초록으로 남는다.
 window.__botRan = () => state.botRan;

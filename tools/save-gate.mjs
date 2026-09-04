@@ -42,8 +42,17 @@ try {
   await p.waitForTimeout(1200);
   const after = await p.evaluate(() => JSON.parse(localStorage.getItem("gtg.save.v1")));
   check("save:keeper-survives-reload", after?.keeper?.level === before?.keeper?.level, after?.keeper?.level + "/" + before?.keeper?.level);
-  const fansShown = await p.evaluate(() => document.getElementById("fans").textContent);
-  check("save:followers-restored-on-screen", fansShown.includes(String(before.fans)), fansShown);
+  /* 저장과 화면을 맞대는 축이라 둘을 같은 순간에 읽어야 한다. 되살아난 판은 계속 굴러서
+     읽는 사이에 한 구가 끝나면 저장은 옛 수를, 화면은 새 수를 말한다. 실측으로 그렇게 한 번 빨갰다.
+     판을 세우고 그 자리에서 둘 다 읽는다. */
+  await p.evaluate(() => window.__lockRound());
+  await p.waitForTimeout(150);
+  const live = await p.evaluate(() => ({
+    saved: JSON.parse(localStorage.getItem("gtg.save.v1")).fans,
+    shown: document.getElementById("fans").textContent
+  }));
+  check("save:followers-restored-on-screen", live.shown.includes(String(live.saved)),
+    live.shown + " against " + live.saved);
 
   // 대조군 2. 시계를 되돌린 사람은 적립이 없다.
   await p.evaluate(() => {

@@ -313,3 +313,15 @@ const SELFIES = [
 export function selfieLine(rng) {
   return SELFIES[Math.floor(rng() * SELFIES.length) % SELFIES.length];
 }
+
+// 먼저 온 쪽지. 단계가 오를수록 말이 가까워진다. 맞팔이라야 오므로 0단계는 없다.
+const DMS = {
+  1: ['아까 그 경기 봤어요', '여기 자주 계세요?', '사진 잘 나왔던데요'],
+  2: ['오늘도 운동장 가요?', '어제 그 선방 또 봤어요', '나 이번 주도 지나갈 것 같은데'],
+  3: ['끝나고 시간 있어요?', '오늘은 안 다쳤죠', '다음 경기 언제예요']
+};
+
+export function dmLine(tier, rng) {
+  const row = DMS[Math.min(3, Math.max(1, Math.floor(Number(tier) || 1)))];
+  return row[Math.floor(rng() * row.length) % row.length];
+}

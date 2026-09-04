@@ -37,7 +37,7 @@ export const MUTUAL_STEP = 0.03;
 export const MUTUAL_CAP = 1.3;
 
 export function newSocial() {
-  return { follows: {} };
+  return { follows: {}, dm: {} };
 }
 
 // 한 사람의 키. 동네가 다르면 다른 사람이다. 이름은 라포와 같은 규칙으로 만든다.
@@ -49,10 +49,21 @@ export function whoKey(city, passer) {
 export function readSocial(raw) {
   const out = newSocial();
   const src = raw && raw.follows;
-  if (!src || typeof src !== 'object') return out;
-  for (const key of Object.keys(src)) {
-    if (!/^\d+:\d+$/.test(key)) continue;
-    out.follows[key] = src[key] === 1 ? 1 : 0;
+  if (src && typeof src === 'object') {
+    for (const key of Object.keys(src)) {
+      if (!/^\d+:\d+$/.test(key)) continue;
+      out.follows[key] = src[key] === 1 ? 1 : 0;
+    }
+  }
+  // 쪽지 시각도 같이 읽는다. 답장한 시각이 사라지면 새 말이 늘 와 있는 상태가 된다.
+  const dm = raw && raw.dm;
+  if (dm && typeof dm === 'object') {
+    out.dm = {};
+    for (const key of Object.keys(dm)) {
+      if (!(key in out.follows)) continue;
+      const at = Number(dm[key] && dm[key].at);
+      if (Number.isFinite(at) && at >= 0) out.dm[key] = { at: Math.floor(at) };
+    }
   }
   return out;
 }
@@ -105,4 +116,79 @@ export function selfieFans(tier, city) {
   const t = Math.min(3, Math.max(0, Math.floor(Number(tier) || 0)));
   const c = Math.min(3, Math.max(0, Math.floor(Number(city) || 0)));
   return SELFIE_BASE + SELFIE_PER_TIER * t + SELFIE_PER_CITY * c;
+}
+
+/* 쪽지. 맞팔이 된 사람과만 열린다. 선팔은 내가 건 것이고 맞팔은 상대도 걸어 준 것이라,
+   대화가 시작되는 자리는 뒤엣것이다. 미연시를 따로 열 필요가 없는 이유가 여기 있다.
+   만남이 한 번으로 끝나는 큰 도박이라면 쪽지는 여러 번 오가는 작은 굴림이다. */
+
+// 답장한 뒤 이만큼 판이 지나야 새 말이 온다. 세 판은 한 세트를 조금 넘는 길이라
+// 쪽지를 확인하러 계정을 여는 이유가 생기되 매 구마다 열 만큼 잦지는 않다.
+export const DM_COOLDOWN = 3;
+// 성공 팔로워. 만남 600의 15퍼센트다. 작게 두어야 만남이 여전히 그 관계의 종점이 된다.
+export const DM_WIN_FANS = 90;
+
+// 세 갈래. 만남과 같은 세 스탯이 민다. 다른 스탯을 쓰면 대화가 다른 게임이 된다.
+export const DM_MOVES = [
+  { id: "reply", label: "바로 답장한다", stat: "communication", base: 30, step: 5.2,
+    win: "말이 계속 이어졌다", lose: "읽고 답이 없다" },
+  { id: "clip", label: "오늘 영상 보낸다", stat: "mischief", base: 24, step: 5.6,
+    win: "이거 진짜냐고 세 번 물었다", lose: "이미 봤다고 했다" },
+  { id: "wait", label: "한 박자 두고 답한다", stat: "composure", base: 34, step: 4.4,
+    win: "먼저 다음 약속을 물어 왔다", lose: "그새 다른 얘기로 넘어갔다" }
+];
+
+export function dmMoveAt(id) {
+  return DM_MOVES.find((m) => m.id === id) || null;
+}
+
+// 성공 확률. 만남과 같은 모양이고 상한도 같다. 확실한 성공은 대화를 버튼 하나로 만든다.
+export function dmOdds(keeper, moveId) {
+  const m = dmMoveAt(moveId);
+  if (!m || !keeper) return 0;
+  const v = Math.max(1, Math.min(10, Number(keeper[m.stat]) || 1));
+  return Math.max(5, Math.min(92, Math.round(m.base + m.step * v)));
+}
+
+// 굴림은 화면 쪽 난수로 받는다. 판정용 rng를 쓰면 그 뒤 모든 구가 밀린다.
+export function dmOutcome(keeper, moveId, roll) {
+  const m = dmMoveAt(moveId);
+  if (!m) return null;
+  const odds = dmOdds(keeper, moveId);
+  const won = Number(roll) < odds;
+  return { won, odds, line: won ? m.win : m.lose, fans: won ? DM_WIN_FANS : 0 };
+}
+
+// 시계는 지금까지 굴린 판 수다. 실시간을 쓰면 탭을 열어 둔 채 기다리는 것이 공략이 된다.
+export function dmClock(record) {
+  const src = record && typeof record === "object" ? record : {};
+  let n = 0;
+  for (const name of Object.keys(src)) {
+    const row = src[name];
+    if (!row) continue;
+    n += (Number(row.saved) || 0) + (Number(row.conceded) || 0);
+  }
+  return n;
+}
+
+// 지금 새 말이 와 있는가. 맞팔이 아니면 대화 자체가 없다.
+export function dmReady(social, key, clock) {
+  if (!isMutual(social, key)) return false;
+  const row = social && social.dm ? social.dm[key] : null;
+  if (!row) return true;
+  return (Number(clock) || 0) - (Number(row.at) || 0) >= DM_COOLDOWN;
+}
+
+// 답장을 보냈다. 다음 말이 오는 시각은 이 판 수에서 센다.
+export function applyDm(social, key, clock) {
+  const now = social && social.follows ? social : newSocial();
+  const dm = Object.assign({}, now.dm || {});
+  dm[key] = { at: Number(clock) || 0 };
+  return { follows: Object.assign({}, now.follows), dm };
+}
+
+// 지금 답장을 기다리는 사람들. 화면은 이 목록만 그린다.
+export function dmWaiting(social, clock) {
+  const src = social && social.follows ? social.follows : {};
+  return Object.keys(src).filter((k) => dmReady(social, k, clock));
 }
