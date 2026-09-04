@@ -263,8 +263,9 @@ export function setPose(g, pose, time = 0) {
 
 // 얼굴. 흰자 위에 검은 동공을 얹는다. 눈이 없으면 사람이 아니라 캡슐이다.
 // dir은 얼굴이 보는 쪽이다. 키퍼는 키커를 보고, 키커는 렌즈 쪽을 본다.
-// hairTone은 상점 헤어 등급의 색이다. 안 넘기면 기본 갈색으로 선다.
-export function addFace(head, r, dir, skin, hairTone) {
+// hairTone은 상점 헤어 등급의 색이고 hairCut은 그 등급의 형태다.
+// 안 넘기면 기본 갈색에 기본 반구로 선다.
+export function addFace(head, r, dir, skin, hairTone, hairCut) {
   const whiteMat = new THREE.MeshBasicMaterial({ color: 0xfbfbf5 });
   const darkMat = pupilMat;
   // 흰자 둘은 표정이 바뀌어도 자리가 그대로다. 한 장으로 붙여야 얼굴 하나가 드로우콜을 아홉 부르지 않는다.
@@ -293,7 +294,13 @@ export function addFace(head, r, dir, skin, hairTone) {
   // 구 하나에 정수리 반구만 얹으면 그 아래가 굴곡 없는 살색 판이 되어 머리로 안 읽힌다.
   // 뒷머리가 뒤통수를 어두운 덩어리로 덮고, 귀 둘이 그 위에 밝은 점으로 떨어져 실루엣을 깨다.
   // 이 넷은 움직이지 않으므로 정점색 한 장으로 붙인다.
-  const hair = new THREE.SphereGeometry(r * 1.05, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.42);
+  // 껍데기 각과 배율을 등급이 정한다. 색만 바꾸면 네 값이 같은 실루엣을 판다.
+  const cut = hairCut || { wide: 1, tall: 1, phi: 0.42, tilt: 0 };
+  const hair = new THREE.SphereGeometry(r * 1.05, 10, 8, 0, Math.PI * 2, 0, Math.PI * cut.phi);
+  // 좌우로 죄면 볏이 되고 위로 늘리면 기른 머리가 된다. z는 그대로 둬야 뒤통수를 계속 덮는다.
+  hair.scale(cut.wide, cut.tall, 1);
+  // 집에서 깎은 머리는 한쪽이 눌린다. 라디안이라 0.07이면 4도쯤이다.
+  if (cut.tilt) hair.rotateZ(cut.tilt);
   hair.translate(0, r * 0.08, -dir * r * 0.1);
   const nape = new THREE.SphereGeometry(r * 0.98, 10, 8);
   nape.scale(1, 1, 0.62);
@@ -378,7 +385,7 @@ function buildBody(o) {
   // 머리는 작다. 몸통과 같은 진폭을 주면 두개골이 찌그러진 것으로 읽힌다.
   jitterMesh(head, 0.008, 11);
   addOutline(head, 0.045);
-  addFace(head, o.headR, o.faceDir, o.skin, o.hair);
+  addFace(head, o.headR, o.faceDir, o.skin, o.hair, o.hairCut);
   neck.add(head);
 
   const joints = { spine, neck };
@@ -491,7 +498,7 @@ export function buildKeeper(height, weight, look) {
     // 색상을 청록으로 꺾으면 밝기가 아니라 색이 팔을 세우고, 양말과 한 벌로 묶인다.
     shirt: (look && look.shirt) || 0x2f8f5b, sleeve: 0x073239, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: (look && look.sock) || 0x63d3e8,
     cuffSleeve: (look && look.ink) || 0x5f8f93, cuffSpan: (look && look.inkSpan) || 0.16, cuffShorts: 0x6d8898, gloveTone: (look && look.glove) || 0xf2d64b, bootTone: (look && look.boot) || 0x2a241c,
-    hair: look && look.hair,
+    hair: look && look.hair, hairCut: look && look.hairCut,
     phase: 0.7, rest: POSES.ready
   });
   g.userData.girth = w;

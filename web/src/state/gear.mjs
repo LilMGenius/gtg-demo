@@ -80,12 +80,25 @@ export const MAX_CITY = CITIES.length - 1;
 // 헤어 선반. 판정에는 손대지 않는다. 세이브율을 건드리면 장비 한 칸이 스탯 한 칸을 넘는 자와 부딪히고,
 // 순수 외형이면 화면에 없는 시스템이 된다. 그래서 축을 팔로워로 잡았다. 팔로워는 판정식 밖이다.
 // tone은 머리 껍데기 정점색이다. 색 상수를 렌더 파일에 따로 두면 두 곳이 갈린다.
+// cut은 그 머리의 형태다. 네 이름이 전부 색이 아니라 모양을 말하는데 색만 바꾸면
+// 같은 물건이 네 값에 팔린다. wide는 좌우 배율, tall은 높이 배율,
+// phi는 정수리 반구가 아래로 덮는 각의 배율이라 클수록 옆까지 덮는다.
 // 값 기준은 앞의 여섯과 같다. 첫 칸은 카드깡 380 육수보다 싸고 마지막 칸은 그보다 비싸다.
 export const HAIRS = [
-  { hair: 0, name: '엄마가 깎아준 머리', cost: 0, tone: 0x2b1d14, note: '아무것도 안 샀을 때 머리' },
-  { hair: 1, name: '동네 미용실 투블럭', cost: 135, tone: 0x1b1410, note: '적어도 단정하다' },
-  { hair: 2, name: '탈색한 노란 머리', cost: 375, tone: 0xd8b45c, note: '멀리서도 누군지 보인다' },
-  { hair: 3, name: '불붙은 빨간 모히칸', cost: 840, tone: 0xc4402c, note: '관중석이 먼저 알아본다' }
+  // 껍데기 반지름이 두개골의 1.05배라, wide와 tall이 1 아래로 내려가면 껍데기가 두개골 안으로
+  // 들어가 그 등급만 대머리가 된다. 짧은 머리는 높이가 아니라 phi로 줄인다.
+  // 집에서 깎은 머리라 한쪽이 더 눌렸다. tilt는 그 기울기다.
+  { hair: 0, name: '엄마가 깎아준 머리', cost: 0, tone: 0x2b1d14, note: '아무것도 안 샀을 때 머리',
+    cut: { wide: 1, tall: 1.02, phi: 0.46, tilt: 0.09 } },
+  // 투블럭은 옆을 밀고 정수리만 남긴다. 덮는 각만 좁히고 배율은 안 건드린다.
+  { hair: 1, name: '동네 미용실 투블럭', cost: 135, tone: 0x1b1410, note: '적어도 단정하다',
+    cut: { wide: 1, tall: 1.03, phi: 0.28, tilt: 0 } },
+  // 탈색은 기른 머리라 위아래로 부푼다.
+  { hair: 2, name: '탈색한 노란 머리', cost: 375, tone: 0xd8b45c, note: '멀리서도 누군지 보인다',
+    cut: { wide: 1.08, tall: 1.22, phi: 0.52, tilt: 0 } },
+  // 모히칸은 가운데 볏 하나다. 좌우를 3분의 1로 죄고 높이를 1.8배로 세운다.
+  { hair: 3, name: '불붙은 빨간 모히칸', cost: 840, tone: 0xc4402c, note: '관중석이 먼저 알아본다',
+    cut: { wide: 0.34, tall: 1.8, phi: 0.6, tilt: 0 } }
 ];
 
 export const MAX_HAIR = HAIRS.length - 1;
@@ -172,7 +185,8 @@ export function inkAt(ink) {
 export function lookOf(gear) {
   const t = inkAt(gear && gear.ink);
   return {
-    hair: hairAt(gear && gear.hair).tone, ink: t.ink_tone, inkSpan: t.span,
+    hair: hairAt(gear && gear.hair).tone, hairCut: hairAt(gear && gear.hair).cut,
+    ink: t.ink_tone, inkSpan: t.span,
     glove: gloveAt(gear && gear.grip).tone, boot: bootAt(gear && gear.studs).tone,
     shirt: kitAt(gear && gear.pads).tone, sock: sockAt(gear && gear.socks).tone
   };
