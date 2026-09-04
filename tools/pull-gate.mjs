@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 import { KEEPERS, keeperCost, PULL_COST, pullWeight, pullFrom } from "../src/roster.mjs";
 
-// 카드깡은 상점에서 유일하게 값을 알고 이름을 모르는 축인데 아무도 재지 않았다.
+// 이적시장은 상점에서 유일하게 값을 알고 이름을 모르는 축인데 아무도 재지 않았다.
 // 뽑기가 값당 무엇을 사는지, 화면이 인쇄한 확률이 실제 뽑기 빈도와 같은지,
 // 그리고 값만 치르고 아무것도 안 주는 경로가 없는지를 한 자리에서 잰다.
 // 표본 범위: 이 게이트는 판정식을 부르지 않는다. 표본은 키퍼의 스탯 범위가 아니라
@@ -45,7 +45,7 @@ const empty = pullFrom([], rng);
 const single = pullFrom([KEEPERS[0]], rng);
 check("pull:empty-pool-refuses", empty === null && single === KEEPERS[0], "empty " + String(empty) + ", single " + (single && single.name));
 
-// 뽑은 카드의 지목 구매가가 뽑기 값보다 낮으면 카드깡은 값을 태우는 창구다.
+// 뽑은 카드의 지목 구매가가 뽑기 값보다 낮으면 이적시장은 값을 태우는 창구다.
 const N = 40000;
 let sum = 0;
 for (let i = 0; i < N; i++) sum += keeperCost(pullFrom(KEEPERS, rng));

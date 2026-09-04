@@ -153,7 +153,7 @@ export function keeperCost(k) {
   return Math.max(0, Math.round((sum - COST_BASE) * COST_PER_STAT + (Number(k.fame) || 0) * COST_PER_FAME));
 }
 
-// 카드깡 한 장 값. 명단에서 가장 싼 지목 구매가 402 땀이라 그보다 낮게 둔다.
+// 이적시장 한 장 값. 명단에서 가장 싼 지목 구매가 402 땀이라 그보다 낮게 둔다.
 // 무작위 한 장이 이름을 찍는 것보다 비싸면 뽑을 이유가 사라진다.
 export const PULL_COST = 380;
 
@@ -193,8 +193,8 @@ export function ticketGain(results, held) {
    9는 열여섯이라 갈래가 된다. 이용권은 동네에만 쓴다. 완봉 한 장으로 상위 풀이 열리면
    그 보상이 너무 세지고, 이용권의 값어치가 고르는 갈래에 따라 달라진다. */
 export const PULL_KINDS = [
-  { id: 'town', name: '동네 카드깡', floor: 0, ticketable: true, note: '아직 없는 키퍼 중 한 장이 나온다' },
-  { id: 'legend', name: '전설 카드깡', floor: 9, ticketable: false, note: '명성 9 이상만 나온다. 이용권은 안 받는다' }
+  { id: 'town', name: '동네 이적시장', floor: 0, ticketable: true, note: '아직 없는 키퍼 중 한 장이 나온다' },
+  { id: 'legend', name: '전설 이적시장', floor: 9, ticketable: false, note: '명성 9 이상만 나온다. 이용권은 안 받는다' }
 ];
 
 export function pullKindOf(id) {

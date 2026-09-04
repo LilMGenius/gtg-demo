@@ -2,7 +2,7 @@ import { chromium } from "playwright";
 import { PULL_COST, PULL_BULK, TICKET_CAP, TICKET_PER_CLEAN, pullBill, ticketGain } from "../src/roster.mjs";
 import { TICKETS_HELD } from "../web/src/state/inject.mjs";
 
-// 카드깡 이용권과 두 자리의 자. 한 장만 뽑을 수 있으면 모아서 지르는 자리가 없고,
+// 이적시장 이용권과 두 자리의 자. 한 장만 뽑을 수 있으면 모아서 지르는 자리가 없고,
 // 뽑기가 값을 고르는 일이 아니라 값이 될 때까지 기다리는 일이 된다.
 //
 // 재는 것은 넷이다. 두 자리가 서 있는가, 이용권이 값보다 먼저 나가는가,

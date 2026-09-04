@@ -614,7 +614,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #me .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 
-/* 상점. 선반은 카드깡과 장비 칸들이고, 여는 탭은 전부 동작한다. 빈 탭은 선반이 아니라 광고다. */
+/* 상점. 선반은 이적시장과 장비 칸들이고, 여는 탭은 전부 동작한다. 빈 탭은 선반이 아니라 광고다. */
 /* safe center. 내용이 화면보다 길어지면 가운데 정렬이 위쪽을 잘라 탭 줄부터 화면 밖으로 밀어낸다.
    safe를 붙이면 넘치는 순간에만 위로 붙으므로, 720p에서 보던 가운데 정렬은 그대로 남고
    세로 390px짜리 가로 모바일에서 선반이 길어져도 탭은 항상 화면 안에 선다. */
@@ -702,7 +702,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #shop .rack{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
   gap:12px;width:min(94vw,1040px);max-height:52vh;overflow-y:auto;padding:4px;align-content:start}
 /* 장비 한 칸은 네 장이 한 화면에 같이 서야 등급 차이가 읽힌다. 720p에서 탭과 닫기까지 들어가려면
-   카드 한 장이 120px 아래여야 해서 카드깡 한 장보다 여백을 좁게 준다. */
+   카드 한 장이 120px 아래여야 해서 이적시장 한 장보다 여백을 좁게 준다. */
 #shop .card.gear{padding:10px 14px 12px;width:auto}
 /* 썸네일 자리. 높이를 고정해 두어야 그림이 늦게 붙어도 칸이 안 뛴다.
    96px는 210px 칸에서 이름과 설명과 값 버튼을 남기고 물건이 알아볼 만하게 커지는 높이다. */

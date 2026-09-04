@@ -67,7 +67,7 @@ state.keeper = state.squad[state.pick];
 state.points = (Number(saved?.points) || 0) + (saved ? offlineGain(saved.at, Date.now()) : 0);
 // 아웃문그램 팔로워. 의사소통과 악동이 여기서 값을 낸다.
 state.fans = Number(saved?.fans) || 0;
-// 카드깡 이용권. 완봉으로만 들어오므로 시간이 아니라 실력에 붙는 자원이다.
+// 이적시장 이용권. 완봉으로만 들어오므로 시간이 아니라 실력에 붙는 자원이다.
 state.tickets = Math.min(TICKET_CAP, Number(saved?.tickets) || 0);
 /* 게시물 보관 수. 12장이던 시절에는 구마다 올라가는 내 글이 열두 자리를 다 먹어,
    가끔 오는 행인의 사진이 밀려 나가 타임라인이 다시 내 일기가 됐다. 18장이면 그 사진이 남는다. */
@@ -210,7 +210,7 @@ const buffIcon = (kind) => BUFF_ICON[kind] || IC_BUFF;
    위 칩과 우측 기둥이 쓰는 3px 격자 픽셀 SVG 관례를 그대로 쓴다. 손그림 톤이 갈리면 안 붙어 보인다. */
 const TAB_ICON = {
   // 폭이 다른 카드 두 장. 사이를 3px 비워야 두 장으로 갈리고, 맞닿으면 한 덩어리로 뭉친다.
-  pull: G('카드깡', R(3, 3, 9, 18) + R(15, 3, 6, 18)),
+  pull: G('이적시장', R(3, 3, 9, 18) + R(15, 3, 6, 18)),
   // 벙어리장갑. 엄지가 옆으로 나와야 손 모양으로 읽힌다.
   glove: G('장갑', R(6, 6, 12, 15) + R(3, 9, 3, 6)),
   // 옆에서 본 축구화. 아래 두 칸이 스터드라 맨발이나 양말과 안 갈린다.
@@ -604,7 +604,7 @@ function endSet() {
   // 자동 팝업이 없으므로 전 스탯 만렙이어도 다음 판이 그대로 온다.
   state.keeper.level += 1;
   state.points += 1;
-  // 완봉이면 카드깡 이용권 한 장. 규칙은 판정이 소유하고 화면은 그 답을 받는다.
+  // 완봉이면 이적시장 이용권 한 장. 규칙은 판정이 소유하고 화면은 그 답을 받는다.
   state.tickets = ticketGain(state.results, state.tickets);
   persist();
   pips();
@@ -898,7 +898,7 @@ function dateLabel(g) {
 
 
 // 명단에서 온 키퍼. 걸친 것은 사람마다 따로이므로 새로 온 사람은 맨몸에서 시작한다.
-// 여기 한 곳에서만 만들면 카드깡과 영입이 서로 다른 상태의 키퍼를 밀어 넣을 수 없다.
+// 여기 한 곳에서만 만들면 이적시장과 영입이 서로 다른 상태의 키퍼를 밀어 넣을 수 없다.
 function recruit(entry) {
   const k = keeperFromRoster(entry);
   k.worn = {};
@@ -1116,8 +1116,8 @@ function closeDate() {
   renderMe();
 }
 
-// 상점. 선반은 카드깡과 장비 둘이다. 지목 구매는 값을 알고 이름을 사는 축이고
-// 카드깡은 값을 알고 이름을 모르는 축이라 두 축이 겹치지 않는다.
+// 상점. 선반은 이적시장과 장비 둘이다. 지목 구매는 값을 알고 이름을 사는 축이고
+// 이적시장은 값을 알고 이름을 모르는 축이라 두 축이 겹치지 않는다.
 // 장비는 이름도 값도 아는 대신 스탯 위에 얇게만 얹는 축이다.
 // 결과 한 줄은 state에 넣지 않는다. 저장에 남을 값이 아니라 이 패널이 열려 있는 동안만 쓰는 글자다.
 // 방금 뽑은 카드. 한 장씩 뒤집히는 동안 이름이 여기 쌓이고, 상점을 닫으면 비워진다.
@@ -1517,7 +1517,7 @@ function pullShelf(all) {
   const bank = kind.ticketable
     ? '<em class="held">완봉하면 이용권 한 장. 지금 ' + state.tickets + '장 있다</em>'
     : '<em class="held">이 갈래는 이용권을 안 받는다</em>';
-  return '<h4>카드깡</h4>' + tabs + '<div class="card">' + kind.note + '. 한 장에 '
+  return '<h4>이적시장</h4>' + tabs + '<div class="card">' + kind.note + '. 한 장에 '
     + SW(cost) + odds + bank + '<div class="buys">' + rows + '</div>' + got
     + '</div>';
 }// 봇은 소모형이라 SHELVES에 못 넣는다. 등급을 갖는 게 아니라 분을 갖는다.
@@ -1608,9 +1608,9 @@ function renderShop() {
   const box = el('shop');
   const pool = KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name));
   // 장비를 한 탭에 몰면 카드가 여덟 장이라 720p에서 닫기 버튼이 화면 밖으로 밀린다.
-  // 이름은 선반 데이터가 소유하고 카드깡과 봇과 버프만 따로 적는다. 열한 줄을 손으로 늘어놓으면
+  // 이름은 선반 데이터가 소유하고 이적시장과 봇과 버프만 따로 적는다. 열한 줄을 손으로 늘어놓으면
   // 선반 이름을 고친 날 탭만 옛 이름을 부른다.
-  const tabName = (k) => (SHELVES[k] ? SHELVES[k].head : { pull: '카드깡', bot: '봇', buff: '버프' }[k]);
+  const tabName = (k) => (SHELVES[k] ? SHELVES[k].head : { pull: '이적시장', bot: '봇', buff: '버프' }[k]);
   const tabs = '<div class="tabs">' + SHOP_TABS.map((k) =>
     '<button class="tab" data-tab="' + k + '"' + (shopTab === k ? ' aria-current="true"' : '') + '>'
     + TAB_ICON[k] + '<span>' + tabName(k) + '</span></button>').join('') + '</div>';
@@ -1708,7 +1708,7 @@ function closeShop() {
   el('shop').hidden = true;
   // 지난번 결과를 들고 다시 열면 방금 뽑은 것처럼 읽힌다. 예약도 같이 끊는다.
   stopReveal();
-  // 선반도 처음 자리로 돌린다. 닫을 때 보던 탭이 남으면 다음에 연 사람이 카드깡을 못 찾는다.
+  // 선반도 처음 자리로 돌린다. 닫을 때 보던 탭이 남으면 다음에 연 사람이 이적시장을 못 찾는다.
   shopTab = 'pull';
   pullTab = 'town';
 }

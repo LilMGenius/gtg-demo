@@ -9,7 +9,7 @@ import { RAPPORT_CAP, RAPPORT_STEPS, rapportKey, rapportTier } from "./rapport.m
 export const DATE_TIER = RAPPORT_STEPS.length;
 
 // 만남 비용. 완봉 한 판이 60이라 세 판 조금 넘게 모으면 한 번 나간다.
-// 카드깡 380보다 싸야 라포를 쌓은 쪽이 뽑기보다 손해로 느껴지지 않는다.
+// 이적시장 380보다 싸야 라포를 쌓은 쪽이 뽑기보다 손해로 느껴지지 않는다.
 export const DATE_COST = 200;
 
 // 실패하면 마지막 문턱 바로 아래로 떨어진다. 0으로 밀면 열다섯 번이 통째로 사라져
