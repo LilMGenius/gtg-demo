@@ -5,21 +5,31 @@
 // 값은 카드깡 380 육수를 기준으로 잡았다. 첫 칸은 그보다 싸야 처음 지르는 자리가 되고,
 // 마지막 칸은 그보다 비싸야 카드깡이 선반에서 밀려나지 않는다.
 //
-// cut은 장갑의 형태다. bulk는 손 전체 배율, cuff는 손목밴드 길이 배율,
-// pips는 손바닥에 붙은 빨판 수다. 네 번째 칸의 이름이 빨판을 말하므로 그 돌기는
-// 지어낸 장식이 아니라 이름이 이미 선언한 것이다.
+// 등급은 이름과 값만 소유한다. 색과 형태는 아래 변형 목록이 소유한다.
 export const GLOVES = [
-  // 목장갑은 얇다. 손목도 짧아 손이 그대로 드러난다.
-  { grip: 0, name: '장터 목장갑', cost: 0, tone: 0xf2d64b, note: '아무것도 안 샀을 때 끼고 있는 것',
-    cut: { bulk: 0.88, cuff: 0.62, pips: 0 } },
-  // 고무를 입히면 손바닥이 두꺼워진다.
-  { grip: 1, name: '고무코팅 목장갑', cost: 140, tone: 0xd9552f, note: '젖은 공을 한 번은 붙잡는다',
-    cut: { bulk: 1, cuff: 1, pips: 0 } },
-  // 송진을 바르면 손목까지 감아 올린다.
-  { grip: 2, name: '송진 범벅 장갑', cost: 360, tone: 0xbf8a2e, note: '손에서 공이 잘 안 떨어진다',
-    cut: { bulk: 1.14, cuff: 1.55, pips: 0 } },
-  { grip: 3, name: '문어 빨판 장갑', cost: 820, tone: 0x8f4fd1, note: '안 떨어진다. 벗겨지지도 않는다',
-    cut: { bulk: 1.22, cuff: 1.9, pips: 5 } }
+  { grip: 0, name: '장터 목장갑', cost: 0, note: '아무것도 안 샀을 때 끼고 있는 것' },
+  { grip: 1, name: '고무코팅 목장갑', cost: 140, note: '젖은 공을 한 번은 붙잡는다' },
+  { grip: 2, name: '송진 범벅 장갑', cost: 360, note: '손에서 공이 잘 안 떨어진다' },
+  { grip: 3, name: '문어 빨판 장갑', cost: 820, note: '안 떨어진다. 벗겨지지도 않는다' }
+];
+
+/* 장갑 변형. bulk는 손 전체 배율, cuff는 손목밴드 길이 배율, pips는 손바닥 빨판 수다.
+   네 번째 등급의 이름이 빨판을 말하므로 그 돌기는 이름이 이미 선언한 것이다.
+   목장갑은 얇고 손목이 짧아 손이 드러나고, 고무는 손바닥이 두꺼워지고,
+   송진은 손목까지 감아 올린다. 등급 안에서는 그 성질을 지키면서 색과 두께만 갈린다. */
+export const GLOVE_SKINS = [
+  [{ name: '장터 목장갑', tone: 0xf2d64b, cut: { bulk: 0.88, cuff: 0.62, pips: 0 } },
+   { name: '흙때 낀 목장갑', tone: 0x8f8f5b, cut: { bulk: 0.92, cuff: 0.7, pips: 0 } },
+   { name: '빨아 놓은 흰 목장갑', tone: 0xe8e4d4, cut: { bulk: 0.84, cuff: 0.55, pips: 0 } }],
+  [{ name: '주황 고무코팅', tone: 0xd9552f, cut: { bulk: 1, cuff: 1, pips: 0 } },
+   { name: '파랑 고무코팅', tone: 0x2f6fd9, cut: { bulk: 1.04, cuff: 0.92, pips: 0 } },
+   { name: '초록 고무코팅', tone: 0x2f8f5b, cut: { bulk: 0.96, cuff: 1.12, pips: 0 } }],
+  [{ name: '송진 범벅', tone: 0xbf8a2e, cut: { bulk: 1.14, cuff: 1.55, pips: 0 } },
+   { name: '굳은 송진', tone: 0x8f6a1e, cut: { bulk: 1.2, cuff: 1.72, pips: 0 } },
+   { name: '테이프까지 감은 손', tone: 0xe0dccc, cut: { bulk: 1.1, cuff: 1.4, pips: 0 } }],
+  [{ name: '보라 빨판', tone: 0x8f4fd1, cut: { bulk: 1.22, cuff: 1.9, pips: 5 } },
+   { name: '붉은 빨판', tone: 0xd14f6f, cut: { bulk: 1.26, cuff: 1.75, pips: 5 } },
+   { name: '먹색 빨판', tone: 0x2a2f4f, cut: { bulk: 1.18, cuff: 2.05, pips: 5 } }]
 ];
 
 export const MAX_GRIP = GLOVES.length - 1;
@@ -27,24 +37,32 @@ export const MAX_GRIP = GLOVES.length - 1;
 // 축구화 선반. 손이 아니라 발이고, 깎는 것은 반경이 아니라 출발이다.
 // 장갑과 같은 값 기준을 쓴다. 첫 칸은 카드깡 380 육수보다 싸고 마지막 칸은 그보다 비싸다.
 //
-// cut은 신발이다. pips는 바닥에 박힌 돌기 수, sole은 밑창 두께 배율,
-// long과 wide는 갑피의 길이와 폭 배율, pip은 돌기 하나의 길이 배율,
-// girth는 돌기 굵기 배율이다. 세 번째 칸의 이름이
-// 돌기 수를 대놓고 말하므로 그 수는 지어낸 값이 아니라 이름이 이미 선언한 값이다.
-// 수만 바꾸면 세 개짜리와 여섯 개짜리가 화면에서 거의 같은 밑창이 된다. 길이와 굵기까지 갈라야
-// 닳은 축구화와 스터드 축구화와 스파이크가 서로 다른 신발로 읽힌다.
 export const BOOTS = [
-  // 실내화는 바닥이 평평하다. 그래서 안 산 사람이 흙에서 미끄러진다.
-  { studs: 0, name: '학교 앞 실내화', cost: 0, tone: 0x2a241c, note: '아무것도 안 샀을 때 신고 있는 것',
-    cut: { sole: 0.7, long: 0.88, wide: 0.92, pips: 0, pip: 0, girth: 1 } },
-  // 닳은 축구화라 돌기가 셋만 남았다.
-  { studs: 1, name: '바닥 닳은 조기축구화', cost: 160, tone: 0x4a3b2a, note: '그래도 미끄러지지는 않는다',
-    cut: { sole: 1, long: 1, wide: 1, pips: 3, pip: 0.5, girth: 1 } },
-  { studs: 2, name: '스터드 여섯 개 축구화', cost: 400, tone: 0x1f4f8f, note: '흙을 물고 첫 발이 빨리 뜬다',
-    cut: { sole: 1.28, long: 1.08, wide: 1.1, pips: 6, pip: 1.05, girth: 1.2 } },
-  // 스파이크는 수보다 길이다. 여덟 개가 더 길게 박혀 있다.
-  { studs: 3, name: '육상용 스파이크', cost: 880, tone: 0xd94f2a, note: '축구화는 아니다. 제일 빨리 뜬다',
-    cut: { sole: 0.8, long: 1.2, wide: 0.86, pips: 8, pip: 1.9, girth: 0.6 } }
+  { studs: 0, name: '학교 앞 실내화', cost: 0, note: '아무것도 안 샀을 때 신고 있는 것' },
+  { studs: 1, name: '바닥 닳은 조기축구화', cost: 160, note: '그래도 미끄러지지는 않는다' },
+  { studs: 2, name: '스터드 여섯 개 축구화', cost: 400, note: '흙을 물고 첫 발이 빨리 뜬다' },
+  { studs: 3, name: '육상용 스파이크', cost: 880, note: '축구화는 아니다. 제일 빨리 뜬다' }
+];
+
+/* 축구화 변형. pips는 바닥에 박힌 돌기 수, sole은 밑창 두께 배율,
+   long과 wide는 갑피의 길이와 폭 배율, pip은 돌기 길이 배율, girth는 돌기 굵기 배율이다.
+   세 번째 등급의 이름이 돌기 수를 대놓고 말하므로 그 수는 이름이 이미 선언한 값이고,
+   한 등급의 변형은 그 수를 지킨다. 실내화는 바닥이 평평해 안 산 사람이 흙에서 미끄러지고,
+   닳은 축구화는 셋만 남았고, 스파이크는 수보다 길이다.
+   수만 바꾸면 세 개짜리와 여섯 개짜리가 같은 밑창이 되므로 등급 사이는 길이와 굵기까지 갈라 둔다. */
+export const BOOT_SKINS = [
+  [{ name: '흰 실내화', tone: 0x2a241c, cut: { sole: 0.7, long: 0.88, wide: 0.92, pips: 0, pip: 0, girth: 1 } },
+   { name: '뒤축 꺾어 신은 실내화', tone: 0x4a4438, cut: { sole: 0.64, long: 0.8, wide: 0.96, pips: 0, pip: 0, girth: 1 } },
+   { name: '남의 실내화', tone: 0x1c2a2a, cut: { sole: 0.76, long: 0.96, wide: 0.86, pips: 0, pip: 0, girth: 1 } }],
+  [{ name: '갈색 조기축구화', tone: 0x4a3b2a, cut: { sole: 1, long: 1, wide: 1, pips: 3, pip: 0.5, girth: 1 } },
+   { name: '검은 조기축구화', tone: 0x22201c, cut: { sole: 1.06, long: 0.96, wide: 1.04, pips: 3, pip: 0.58, girth: 1.1 } },
+   { name: '흰 줄 두 개', tone: 0xd8d2c2, cut: { sole: 0.96, long: 1.06, wide: 0.96, pips: 3, pip: 0.44, girth: 0.9 } }],
+  [{ name: '파란 스터드', tone: 0x1f4f8f, cut: { sole: 1.28, long: 1.08, wide: 1.1, pips: 6, pip: 1.05, girth: 1.2 } },
+   { name: '형광 스터드', tone: 0xb8d92f, cut: { sole: 1.2, long: 1.14, wide: 1.04, pips: 6, pip: 1.15, girth: 1.1 } },
+   { name: '먹색 스터드', tone: 0x1a1c22, cut: { sole: 1.34, long: 1.02, wide: 1.16, pips: 6, pip: 0.95, girth: 1.3 } }],
+  [{ name: '주황 스파이크', tone: 0xd94f2a, cut: { sole: 0.8, long: 1.2, wide: 0.86, pips: 8, pip: 1.9, girth: 0.6 } },
+   { name: '은색 스파이크', tone: 0xc2c6cc, cut: { sole: 0.74, long: 1.28, wide: 0.8, pips: 8, pip: 2.05, girth: 0.54 } },
+   { name: '검은 스파이크', tone: 0x24262c, cut: { sole: 0.86, long: 1.12, wide: 0.92, pips: 8, pip: 1.75, girth: 0.68 } }]
 ];
 
 export const MAX_STUD = BOOTS.length - 1;
@@ -52,19 +70,29 @@ export const MAX_STUD = BOOTS.length - 1;
 // 유니폼 선반. 손도 발도 아니라 몸이고, 깎는 것은 정면 강슛에 같이 밀려 들어가는 사고다.
 // 값 기준은 앞의 둘과 같다. 첫 칸은 카드깡 380 육수보다 싸고 마지막 칸은 그보다 비싸다.
 //
-// cut은 상의의 형태다. girth는 품 배율, len은 기장 배율, pad는 어깨에 박힌 스펀지 두께다.
-// 마지막 칸의 이름이 어깨 스펀지를 말하므로 그 두께는 이름이 이미 선언한 것이다.
 export const KITS = [
-  // 아빠 옷은 품도 기장도 남는다.
-  { pads: 0, name: '아빠 옷장 면티', cost: 0, tone: 0x2f8f5b, note: '아무것도 안 샀을 때 입고 있는 것',
-    cut: { girth: 1.3, len: 1.26, pad: 0 } },
-  { pads: 1, name: '학교 체육복 상의', cost: 150, tone: 0x2f6f8f, note: '적어도 땀은 먹는다',
-    cut: { girth: 1, len: 1, pad: 0 } },
-  // 단체복은 어깨선이 각져 있다.
-  { pads: 2, name: '조기회 단체복', cost: 370, tone: 0x8f2f5b, note: '등에 동네 철물점 이름이 박혀 있다',
-    cut: { girth: 1.14, len: 0.78, pad: 0.8 } },
-  { pads: 3, name: '패드 박은 골키퍼 저지', cost: 850, tone: 0x1c1f2b, note: '어깨에 스펀지가 들었다. 밀려도 덜 밀린다',
-    cut: { girth: 0.88, len: 1.04, pad: 2.1 } }
+  { pads: 0, name: '아빠 옷장 면티', cost: 0, note: '아무것도 안 샀을 때 입고 있는 것' },
+  { pads: 1, name: '학교 체육복 상의', cost: 150, note: '적어도 땀은 먹는다' },
+  { pads: 2, name: '조기회 단체복', cost: 370, note: '등에 동네 철물점 이름이 박혀 있다' },
+  { pads: 3, name: '패드 박은 골키퍼 저지', cost: 850, note: '어깨에 스펀지가 들었다. 밀려도 덜 밀린다' }
+];
+
+/* 상의 변형. girth는 품 배율, len은 기장 배율, pad는 어깨에 박힌 스펀지 두께다.
+   아빠 옷은 품도 기장도 남고, 단체복은 어깨선이 각지고, 저지는 어깨에 스펀지가 든다.
+   마지막 등급의 이름이 그 스펀지를 말하므로 그 등급의 변형은 전부 두께를 지킨다. */
+export const KIT_SKINS = [
+  [{ name: '초록 면티', tone: 0x2f8f5b, cut: { girth: 1.3, len: 1.26, pad: 0 } },
+   { name: '누런 러닝', tone: 0xd8cfa8, cut: { girth: 1.22, len: 1.34, pad: 0 } },
+   { name: '늘어난 검정 면티', tone: 0x24262a, cut: { girth: 1.38, len: 1.18, pad: 0 } }],
+  [{ name: '파란 체육복', tone: 0x2f6f8f, cut: { girth: 1, len: 1, pad: 0 } },
+   { name: '빨간 체육복', tone: 0x9f2f2f, cut: { girth: 1.06, len: 0.96, pad: 0 } },
+   { name: '흰 체육복', tone: 0xdcdcd2, cut: { girth: 0.94, len: 1.06, pad: 0 } }],
+  [{ name: '자주 단체복', tone: 0x8f2f5b, cut: { girth: 1.14, len: 0.78, pad: 0.8 } },
+   { name: '주황 단체복', tone: 0xcf7a2f, cut: { girth: 1.08, len: 0.84, pad: 1 } },
+   { name: '남색 단체복', tone: 0x25355f, cut: { girth: 1.2, len: 0.74, pad: 0.7 } }],
+  [{ name: '검은 저지', tone: 0x1c1f2b, cut: { girth: 0.88, len: 1.04, pad: 2.1 } },
+   { name: '형광 저지', tone: 0xc8e02f, cut: { girth: 0.92, len: 0.98, pad: 2.3 } },
+   { name: '보라 저지', tone: 0x4a2b6f, cut: { girth: 0.84, len: 1.1, pad: 1.9 } }]
 ];
 
 export const MAX_KIT = KITS.length - 1;
@@ -72,19 +100,29 @@ export const MAX_KIT = KITS.length - 1;
 // 양말 선반. 손도 발도 몸도 아니라 착지고, 깎는 것은 흘린 뒤 못 일어나는 사고다.
 // 값 기준은 앞의 셋과 같다. 첫 칸은 카드깡 380 육수보다 싸고 마지막 칸은 그보다 비싸다.
 //
-// cut은 양말의 형태다. girth는 정강이를 감는 두께 배율, guard는 정강이 앞에 덧댄 보호대 두께,
-// band는 발목에 감기는 그립 밴드 두께다. 세 번째와 네 번째 이름이 보호대와 그립을 말하므로
-// 그 둘은 이름이 이미 선언한 것이다.
 export const SOCKS = [
-  // 목이 늘어난 양말은 종아리에 안 붙고 흘러내려 얇게 남는다.
-  { socks: 0, name: '목 늘어난 흰 양말', cost: 0, tone: 0x63d3e8, note: '아무것도 안 샀을 때 신고 있는 것',
-    cut: { girth: 0.78, guard: 0, band: 0 } },
-  { socks: 1, name: '축구 스타킹', cost: 130, tone: 0xe8d463, note: '적어도 흘러내리지는 않는다',
-    cut: { girth: 1.06, guard: 0, band: 0 } },
-  { socks: 2, name: '정강이 보호대 낀 스타킹', cost: 350, tone: 0xe86363, note: '까져도 덜 아파서 덜 눕는다',
-    cut: { girth: 1.2, guard: 1.5, band: 0 } },
-  { socks: 3, name: '미끄럼방지 그립 양말', cost: 830, tone: 0xf2f2f2, note: '발이 신발 안에서 안 논다. 넘어져도 금방 선다',
-    cut: { girth: 0.92, guard: 0, band: 1.3 } }
+  { socks: 0, name: '목 늘어난 흰 양말', cost: 0, note: '아무것도 안 샀을 때 신고 있는 것' },
+  { socks: 1, name: '축구 스타킹', cost: 130, note: '적어도 흘러내리지는 않는다' },
+  { socks: 2, name: '정강이 보호대 낀 스타킹', cost: 350, note: '까져도 덜 아파서 덜 눕는다' },
+  { socks: 3, name: '미끄럼방지 그립 양말', cost: 830, note: '발이 신발 안에서 안 논다. 넘어져도 금방 선다' }
+];
+
+/* 양말 변형. girth는 정강이를 감는 두께 배율, guard는 정강이 앞 보호대 두께,
+   band는 발목 그립 밴드 두께다. 목이 늘어난 양말은 종아리에 안 붙어 얇게 남는다.
+   세 번째와 네 번째 이름이 보호대와 그립을 말하므로 그 등급의 변형은 전부 그것을 지킨다. */
+export const SOCK_SKINS = [
+  [{ name: '늘어난 흰 양말', tone: 0x63d3e8, cut: { girth: 0.78, guard: 0, band: 0 } },
+   { name: '짝짝이 양말', tone: 0xd863b0, cut: { girth: 0.74, guard: 0, band: 0 } },
+   { name: '구멍 난 양말', tone: 0xcfd8c8, cut: { girth: 0.82, guard: 0, band: 0 } }],
+  [{ name: '노란 스타킹', tone: 0xe8d463, cut: { girth: 1.06, guard: 0, band: 0 } },
+   { name: '검은 스타킹', tone: 0x22242a, cut: { girth: 1.1, guard: 0, band: 0 } },
+   { name: '줄무늬 스타킹', tone: 0x2f8f7a, cut: { girth: 1.02, guard: 0, band: 0 } }],
+  [{ name: '붉은 보호대', tone: 0xe86363, cut: { girth: 1.2, guard: 1.5, band: 0 } },
+   { name: '검은 보호대', tone: 0x2a2c32, cut: { girth: 1.24, guard: 1.7, band: 0 } },
+   { name: '흰 보호대', tone: 0xe4e4dc, cut: { girth: 1.16, guard: 1.35, band: 0 } }],
+  [{ name: '흰 그립 양말', tone: 0xf2f2f2, cut: { girth: 0.92, guard: 0, band: 1.3 } },
+   { name: '검은 그립 양말', tone: 0x1e2024, cut: { girth: 0.88, guard: 0, band: 1.45 } },
+   { name: '주황 그립 양말', tone: 0xe08a2f, cut: { girth: 0.96, guard: 0, band: 1.2 } }]
 ];
 
 export const MAX_SOCK = SOCKS.length - 1;
@@ -176,7 +214,7 @@ export const INK_SKINS = [
 
 /* 변형을 파는 선반 표. 여기 든 칸만 변형이 있고, 칸 이름에 Skin을 붙인 것이 그 선택을 담는 자리다.
    선반마다 다른 함수를 두면 새 선반이 늘 때마다 상점과 게이트가 그 이름을 손으로 들어야 한다. */
-export const SKINS = { hair: HAIR_SKINS, ink: INK_SKINS };
+export const SKINS = { grip: GLOVE_SKINS, studs: BOOT_SKINS, pads: KIT_SKINS, socks: SOCK_SKINS, hair: HAIR_SKINS, ink: INK_SKINS };
 export const SKIN_FIELDS = Object.keys(SKINS);
 
 export function skinsAt(field, rank) {
@@ -283,13 +321,17 @@ export function inkAt(ink) {
 export function lookOf(gear) {
   const t = skinAt('ink', gear && gear.ink, gear && gear.inkSkin);
   const h = skinAt('hair', gear && gear.hair, gear && gear.hairSkin);
+  const gl = skinAt('grip', gear && gear.grip, gear && gear.gripSkin);
+  const bo = skinAt('studs', gear && gear.studs, gear && gear.studsSkin);
+  const ki = skinAt('pads', gear && gear.pads, gear && gear.padsSkin);
+  const so = skinAt('socks', gear && gear.socks, gear && gear.socksSkin);
   return {
     hair: h.tone, hairCut: h.cut,
     ink: t.tone, inkSpan: t.cut.span, inkGirth: t.cut.girth,
-    glove: gloveAt(gear && gear.grip).tone, gloveCut: gloveAt(gear && gear.grip).cut,
-    boot: bootAt(gear && gear.studs).tone, bootCut: bootAt(gear && gear.studs).cut,
-    shirt: kitAt(gear && gear.pads).tone, kitCut: kitAt(gear && gear.pads).cut,
-    sock: sockAt(gear && gear.socks).tone, sockCut: sockAt(gear && gear.socks).cut
+    glove: gl.tone, gloveCut: gl.cut,
+    boot: bo.tone, bootCut: bo.cut,
+    shirt: ki.tone, kitCut: ki.cut,
+    sock: so.tone, sockCut: so.cut
   };
 }
 
