@@ -752,6 +752,13 @@ function rapportRows() {
   return head + rows;
 }
 
+/* 내 정보는 성격이 다른 넷을 한 두루마리에 쌓고 있었다. 능력치를 보러 온 사람과 전적을
+   보러 온 사람은 다른 질문을 들고 오는데 화면은 하나라, 아래로 계속 긁어야 답이 나왔다.
+   세 칸으로 가른다. 초상화와 걸친 것은 어느 칸에서도 남는다. 그것은 칸의 내용이 아니라
+   지금 누구를 보고 있는지이기 때문이다. */
+const ME_TABS = [['stat', '능력치'], ['face', '아는 얼굴'], ['log', '전적']];
+let meTab = 'stat';
+
 function renderMe() {
   const box = el('me');
   const k = state.keeper;
@@ -777,10 +784,16 @@ function renderMe() {
     ? k.traits.map((t) => '<div class="note"><b>' + t + '</b><i>' + (TRAITS[t] ? TRAITS[t].note : '') + '</i></div>').join('')
     : '<div class="note dim"><span>달린 특성이 없다. 명단에서 데려오면 붙어 온다</span></div>';
   const hidden = HIDDEN.map((h) => '<div class="note"><b>' + HIDDEN_LABEL[h] + '</b><i>' + hiddenBand(h, k[h]) + '</i></div>').join('');
+  const pane = meTab === 'log' ? recordRows()
+    : meTab === 'face' ? rapportRows()
+      : '<div class="grid">' + grid + '</div>' + traits + hidden;
+  const tabs = '<div class="tabs">' + ME_TABS.map(([id, label]) =>
+    '<button class="tab" data-tab="' + id + '"' + (meTab === id ? ' aria-current="true"' : '') + '>' + label + '</button>').join('') + '</div>';
   box.innerHTML = '<h4>' + name + '<small><i>Lv ' + k.level + '</i><i>' + k.height + 'cm</i><i>' + k.weight + 'kg</i></small></h4>'
-    + '<div class="card">' + wear + '<div class="grid">' + grid + '</div>' + traits + hidden + rapportRows() + recordRows() + '</div>'
+    + '<div class="card">' + wear + tabs + '<div class="pane">' + pane + '</div></div>'
     + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeMe;
+  for (const b of box.querySelectorAll('.tab')) b.onclick = () => { meTab = b.dataset.tab; renderMe(); };
   for (const b of box.querySelectorAll('.note .go')) b.onclick = () => openDate(Number(b.dataset.city), Number(b.dataset.passer));
 }
 
@@ -792,6 +805,8 @@ function openMe() {
 
 function closeMe() {
   el('me').hidden = true;
+  // 닫을 때 보던 칸이 남으면 다음에 연 사람이 능력치를 찾아 탭을 눌러야 한다. 상점 선반과 같은 규칙이다.
+  meTab = 'stat';
 }
 
 // 만남. 세 갈래를 한 번에 보여주고 하나를 고르면 그 자리에서 끝난다.
