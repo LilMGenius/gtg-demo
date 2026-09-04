@@ -93,7 +93,9 @@ try {
       { tab: "pads", field: "pads", look: "shirt", rows: g.KITS },
       { tab: "socks", field: "socks", look: "sock", rows: g.SOCKS },
       { tab: "ink", field: "ink", look: "ink", rows: g.TATTOOS }
-    ].filter((s) => s.rows.every((r) => r.cut));
+    // 형태 값이 등급 줄에 있을 수도 있고, 그 등급의 변형 목록에 있을 수도 있다.
+    // 한쪽만 보면 변형을 들인 선반이 조용히 이 자에서 빠진다. 실제로 그렇게 두 선반이 빠졌다.
+    ].filter((s) => s.rows.every((r, i) => (g.SKINS[s.field] ? g.skinAt(s.field, i, 0).cut : r.cut)));
     const out = [];
     for (const s of TABLE) {
       const bake = (n) => { const look = g.lookOf({ [s.field]: n }); look[s.look] = MARK; return m.thumbURL(s.tab, k, look); };
