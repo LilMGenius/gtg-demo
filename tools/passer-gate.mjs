@@ -65,6 +65,10 @@ try {
   await p.evaluate(() => { const r = window.__rapport(); r["0:1"] = 1; r["0:2"] = 3; });
   await p.evaluate(() => window.__me(true));
   await p.waitForTimeout(500);
+  /* 라포 줄은 아는 얼굴 칸에만 있다. 내 정보가 셋으로 갈린 뒤로 창을 열면 능력치 칸이 서고,
+     그 칸의 글자에는 행인 이름표가 아예 없다. 사람이 그 칸을 눌러야 보이므로 자도 눌러야 한다. */
+  await p.click('#me .tab[data-tab="face"]', { force: true });
+  await p.waitForTimeout(400);
   const txt = await p.textContent("#me");
   const one = passerAt(0, 1), three = passerAt(0, 2);
   check("screen:tier0-shows-face", txt.includes(one.face) && !txt.includes(one.name), one.face);
