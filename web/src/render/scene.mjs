@@ -721,12 +721,19 @@ const TOUCHED = new Set(['contact']);
     head.lookAt(camera.position);
     faceLensQ.copy(head.quaternion);
     head.quaternion.copy(faceRest).slerp(faceLensQ, a);
-    setMood(head, a > 0.25 ? mood : 'rest');
+    /* 표정을 올릴지는 섞음량이 아니라 노출로 정한다. a는 안식 자세에서 렌즈 자세로 가는 비율이고
+       안식 자세는 포즈마다 다르므로, 같은 a가 사건마다 다른 노출을 낸다. 실측으로 제꼈다는
+       a 0.5에서 노출 0.043이었다. 옆얼굴에 하트 눈을 넣어도 관객이 보는 것은 검은 반구다.
+       0.25는 이 코드가 원래 선언해 둔 문턱이고, 그 판단의 대상만 옮겨 붙였다. */
+    setMood(head, faceToCamera(head, camera, 1) > 0.25 ? mood : 'rest');
   }
   // 평상시 0을 지키지 않으면 경기가 안 읽힌다. 고개는 사건이 터진 동안에만 돈다.
   const FACE_TURN = {
     catch: 0.72, save: 0.78, carriedIn: 0.88, gloveGone: 0.74, spill: 0.6,
-    downed: 0.88, rebound: 0.6, reboundMiss: 0.62, charge: 0.52, beat: 0.5,
+    /* 제꼈다와 돌진은 몸이 카메라를 등지고 달려 나간다. 다른 사건과 같은 섞음량으로는
+       고개가 옆얼굴에서 멈춰 표정이 렌즈에 안 닿는다. 어깨 너머로 더 돌려야 그 사건이
+       정지 화면 한 장에서도 읽힌다. 나머지 열셋은 이미 몸이 반쯤 돌아 있어 이 값이면 충분하다. */
+    downed: 0.88, rebound: 0.6, reboundMiss: 0.62, charge: 0.9, beat: 0.92,
     lost: 0.66, skied: 0.58, talked: 0.9, distracted: 0.8, openGoalScored: 0.8
   };
   const FACE_MOOD = {
@@ -1930,6 +1937,12 @@ const TOUCHED = new Set(['contact']);
   // 표정을 바꾸는 코드가 돌았다는 것과 표정이 화면에 있다는 것은 다른 주장이다.
   // 뒤통수를 향한 머리에 하트 눈을 넣어도 관객이 보는 것은 검은 반구다.
   window.__faceVis = () => faceToCamera(keeper.userData.head, camera, 1);
+  // 머리의 월드 좌표. 표정을 눈으로 보려면 그 자리를 화면에서 찾아 확대해야 한다.
+  window.__headAt = () => {
+    const v = new THREE.Vector3();
+    keeper.userData.head.getWorldPosition(v);
+    return { x: v.x, y: v.y, z: v.z };
+  };
   // 얼굴 자를 심어서 증명하기 위한 손잡이. 몸을 잠깐 돌려 같은 자를 대 본다.
   // 자연히 뒤를 보는 사건에 기대면, 그 사건의 연출을 고친 날 이 자가 눈을 감았는지
   // 화면이 좋아졌는지 구분할 수 없다. 재고 나서 원래 각으로 되돌린다.
