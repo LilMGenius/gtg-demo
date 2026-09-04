@@ -138,6 +138,13 @@ body.playing #hud{opacity:1}
   -webkit-text-stroke:clamp(4px,.6vw,8px) var(--edge);paint-order:stroke fill;
   text-shadow:5px 6px 0 var(--edge);letter-spacing:.04em;white-space:nowrap}
 #stamp.hit{animation:stampHit 1.15s ease-out}
+/* 창이 열려 있으면 사건 단어와 섬광을 감춘다. 둘 다 #hud 밖에 있어 창 덮개가 안 닿는데,
+   글자가 화면 너비의 절반을 쓰므로 어두워져도 창 제목과 한 줄에서 겹쳐 읽힌다.
+   실측으로 훈련장 제목 위에 '같이'와 '어감'이 겹쳐 세 낱말이 한 덩어리가 됐다.
+   판은 계속 돌고 사건도 그대로 일어난다. 창을 닫으면 그 다음 구부터 다시 보인다. */
+/* 애니메이션은 일반 선언을 이긴다. opacity만 0으로 두면 돌고 있는 키프레임이 그대로 덮어써서
+   실측으로 훈련장에서 둘 다 계속 보였다. 애니메이션을 끊어야 이 줄이 힘을 쓴다. */
+body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is(#stamp,#flash){animation:none;opacity:0}
 @keyframes stampHit{
   0%{opacity:0;rotate:-13deg;scale:2.4}
   9%{opacity:1;rotate:-7deg;scale:.92}

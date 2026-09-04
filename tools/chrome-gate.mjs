@@ -129,7 +129,7 @@ try {
   const chipLum = async () => mean(await shot("top"));
   const baseChip = await chipLum();
   const baseBox = await boxes();
-  const stayed = [], veiled = [], restored = [], vanished = [];
+  const stayed = [], veiled = [], restored = [], vanished = [], shouted = [];
   for (const win of WINDOWS) {
     await p.evaluate((w) => window["__" + w](true), win);
     // 400ms는 물러나는 데 쓰는 240ms보다 길다. 움직이는 중간을 재면 좌표가 회차마다 갈린다.
@@ -143,6 +143,13 @@ try {
       return { w: e.offsetWidth, o: Number(getComputedStyle(e).opacity), on: r.width > 0 && r.height > 0 };
     });
     if (!(chip.w > 0 && chip.o > 0 && chip.on)) vanished.push(win + " " + chip.w + "px opacity " + chip.o);
+    // 사건 단어와 섬광은 #hud 밖에 있어 창 덮개가 안 닿는다. 글자가 화면 너비의 절반을 쓰므로
+    // 어두워지는 것만으로는 부족하고 창이 열린 동안에는 아예 안 보여야 한다.
+    const loud = await p.evaluate(() => ["stamp", "flash"].filter((id) => {
+      const e = document.getElementById(id);
+      return e && Number(getComputedStyle(e).opacity) > 0.01;
+    }));
+    for (const id of loud) shouted.push(win + "/" + id);
     // 덮개가 얹히면 밝기가 내려간다. 10%는 배경 #080b07c4가 판때기 위에 앉을 때의 실측 하한이다.
     const nowChip = await chipLum();
     if (nowChip > baseChip * 0.9) veiled.push(win + "/top " + baseChip.toFixed(1) + " to " + nowChip.toFixed(1));
@@ -159,6 +166,8 @@ try {
     veiled.slice(0, 6).join(", ") || "chip veiled in all " + WINDOWS.length);
   check("chrome:the-status-chip-stays-on-screen-in-every-window", vanished.length === 0,
     vanished.join(", ") || "chip present in all " + WINDOWS.length);
+  check("chrome:the-event-word-goes-quiet-while-a-window-is-open", shouted.length === 0,
+    shouted.join(", ") || "stamp and flash silent in all " + WINDOWS.length);
   // 대조군. 창을 닫으면 밝기가 돌아와야 한다. 안 돌아오면 위의 하락은 창 때문이 아니다.
   check("control:closing-any-window-puts-every-surface-back", restored.length === 0,
     restored.slice(0, 6).join(", ") || "all restored");
