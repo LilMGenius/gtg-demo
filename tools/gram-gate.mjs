@@ -43,6 +43,9 @@ try {
   });
   check("control:a-fresh-save-shows-the-empty-feed", empty.empty === 1 && empty.says > 0, "posts " + empty.count + " empty " + empty.empty + " chars " + empty.says);
   await p.evaluate(() => window.__gram(false));
+  /* 창이 열려 있는 동안 조작 기둥은 화면 밖으로 물러난다. 닫자마자 누르면 그 버튼은 아직 밖이고,
+     클릭이 뷰포트 밖이라 조용히 시간만 끌다 죽는다. 기둥이 돌아온 것을 보고 누른다. */
+  await p.waitForFunction(() => document.getElementById('auto').getBoundingClientRect().left >= 0, null, { timeout: 5000 });
 
   // 판을 돈다. 손으로 치면 결과가 한쪽으로 쏠리므로 자동으로 두고, 크레딧을 먼저 채운다.
   await p.evaluate(() => { const bot = window.__bot(); bot.tier = 3; bot.ms = 3600000; });

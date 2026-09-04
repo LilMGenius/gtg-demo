@@ -71,7 +71,17 @@ const PANELS = [
   ["roster", (p) => p.evaluate(() => window.__roster(true))],
   ["gram", (p) => p.evaluate(() => window.__gram(true))],
   ["me", (p) => p.evaluate(() => window.__me(true))],
-  ["gym", (p) => p.click("#gymBtn", { force: true })]
+  /* 창을 여는 버튼은 다른 창이 열려 있는 동안 화면 밖으로 물러난다. 사람도 그때는 못 누르므로
+     자도 누르면 안 된다. 앞의 창을 먼저 닫고 기둥이 제자리로 돌아온 것을 보고 누른다. */
+  ["gym", async (p) => {
+    await p.evaluate(() => { ["shop", "roster", "gram", "me", "earn"].forEach((w) => window["__" + w](false)); window.__date(); });
+    await p.waitForFunction(() => {
+      const open = ["gym", "roster", "gram", "me", "shop", "earn", "date"].some((id) => !document.getElementById(id).hidden);
+      const r = document.getElementById("gymBtn").getBoundingClientRect();
+      return !open && r.right <= innerWidth && r.left >= 0;
+    }, null, { timeout: 8000 });
+    await p.click("#gymBtn", { force: true });
+  }]
 ];
 
 
