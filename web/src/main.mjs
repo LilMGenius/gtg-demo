@@ -6,13 +6,13 @@ import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
-import { eventLine, setEndLine, postLine, commentLine, photoLine } from './ui/lines.mjs';
+import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
 import { coinGain, readWallet, COIN_DRILL, COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
-import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds, photoOdds } from './state/gram.mjs';
+import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds, photoOdds, selfieFans } from './state/gram.mjs';
 import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost } from './state/rapport.mjs';
 import { passerName } from './state/passer.mjs';
 import { DATE_COST, MOVES, dateOdds, dateOutcome, applyDate, dateGate } from './state/date.mjs';
@@ -727,6 +727,13 @@ function renderGram() {
   const box = el('gram');
   /* 남이 올린 글. 그림은 저장에 안 들어 있고 그때의 차림만 남아 있어, 열 때마다 그 차림으로 다시 굽는다.
      한 장이 47KB라 열두 장을 저장에 실으면 한도를 위협하고, 굽는 비용은 상점이 이미 스물넉 장으로 치른다. */
+  /* 내가 올린 셀카. 주어가 둘이라 상대 이름이 사진 위에 서고, 팔로워는 그 자리에서 이미 올랐다.
+     사진은 남이 찍은 것과 같은 방식으로 그때의 차림에서 다시 굽는다. */
+  const selfieCard = (p) => '<div class="post shot mine">'
+    + '<div class="by"><b>' + p.n + '</b><span>님과 함께</span></div>'
+    + '<img alt="' + p.n + '과 찍은 사진" src="' + thumbURL('body', { height: p.sf.h, weight: p.sf.w }, p.sf.look) + '">'
+    + '<span>' + p.t + '</span>'
+    + '<i>' + IC_FANS + ' +' + p.g + IC_LIKE + p.l + '</i></div>';
   const photoCard = (p) => {
     const key = whoKey(p.ph.city, p.ph.passer);
     const label = isMutual(state.social, key) ? '맞팔' : (isFollowing(state.social, key) ? '팔로우 중' : '선팔');
@@ -750,10 +757,10 @@ function renderGram() {
       + '<button class="fol" data-key="' + key + '" data-tier="' + p.cm.tier + '"' + off + '>' + state3 + '</button></div>';
   };
   const feed = state.posts.length
-    ? state.posts.slice().reverse().map((p) => (p.ph ? photoCard(p) : '<div class="post' + (p.c ? ' bad' : '') + '">'
+    ? state.posts.slice().reverse().map((p) => (p.ph ? photoCard(p) : (p.sf ? selfieCard(p) : '<div class="post' + (p.c ? ' bad' : '') + '">'
       + '<span>' + p.t.replace(p.n, '<b>' + p.n + '</b>') + '</span>'
       + '<i>' + IC_FANS + ' +' + p.g + (p.l ? IC_LIKE + p.l : '') + '</i>'
-      + cmtRow(p) + '</div>')).join('')
+      + cmtRow(p) + '</div>'))).join('')
     : '<div class="post empty"><span>아직 올린 글이 없다. 한 슛 막고 오면 생긴다</span></div>';
   // 계정 요약. 맞팔이 몇인지가 팔로워 증가에 곱해지므로 그 수가 화면에 있어야 한다.
   const mut = mutualCount(state.social);
@@ -935,18 +942,43 @@ function closeMe() {
   meTab = 'stat';
 }
 
+/* 셀카 한 장. 내 계정에 올라가고 팔로워가 그 자리에서 오른다.
+   사진은 저장에 안 실린다. 행인이 찍은 사진과 같은 이유로 그때의 차림만 남기고 열 때 다시 굽는다.
+   상대 이름을 글에 박는 것은 이 사진의 주어가 둘이기 때문이다. */
+function takeSelfie(city, passer, tier) {
+  const fans = selfieFans(tier, state.gear.city);
+  state.fans += fans;
+  state.posts.push({ n: passerName(city, passer, tier), c: false, g: fans,
+    t: selfieLine(Math.random), lb: fans, ct: state.gear.city,
+    l: likesFor(fans, state.gear.city, Math.random()),
+    sf: { city, passer, tier, h: state.keeper.height, w: state.keeper.weight, look: lookOf(state.gear) } });
+  while (state.posts.length > FEED_CAP) state.posts.shift();
+  persist();
+  pips();
+  return fans;
+}
+
 // 만남. 세 갈래를 한 번에 보여주고 하나를 고르면 그 자리에서 끝난다.
 // 무르기는 없다. 다시 열려면 라포를 다시 쌓아야 한다.
 function renderDate(city, passer, done) {
   const box = el('date');
   const who = passerName(city, passer, rapportTier(state.rapport, city, passer));
   if (done) {
+    /* 눈이 맞았으면 한 장 찍는다. 라포를 쌓아 값을 치르고 만나러 간 것이 여기서 회수된다.
+       진 만남에는 이 자리가 없다. 있으면 져도 얻는 것이 있어 만남의 결과가 화면에서 사라진다.
+       한 번 찍으면 버튼이 닫힌다. 이 화면이 열려 있는 동안 두 번 누르면 같은 사진이 두 장 올라간다. */
+    const tier = rapportTier(state.rapport, city, passer);
+    const shoot = done.won && !done.shot
+      ? '<button class="selfie">같이 한 장 찍는다<em>' + IC_FANS + ' +' + selfieFans(tier, state.gear.city) + '</em></button>'
+      : (done.shot ? '<div class="took">' + IC_FANS + ' +' + done.shot + ' 올렸다</div>' : '');
     box.innerHTML = '<h4>' + who + '</h4>'
       + '<div class="out">' + done.line + '<i class="' + (done.won ? 'win' : 'lose') + '">'
       + '팔로워 ' + (done.fans > 0 ? '+' : '') + done.fans + '. '
       + (done.won ? '이 동네에서는 이제 눈이 안 흔들린다' : '처음부터 다시 말을 섞어야 한다')
-      + '</i></div><button class="close">닫기</button>';
+      + '</i></div>' + shoot + '<button class="close">닫기</button>';
     box.querySelector('.close').onclick = closeDate;
+    const cam = box.querySelector('.selfie');
+    if (cam) cam.onclick = () => { done.shot = takeSelfie(city, passer, tier); renderDate(city, passer, done); };
     return;
   }
   const moves = MOVES.map((m) => '<button data-move="' + m.id + '">' + m.label

@@ -43,9 +43,11 @@ async function run(fixture) {
     await p.waitForTimeout(700); // 판정이 한 구도 돌기 전. 라포가 더 쌓이지 않는 창
     await p.evaluate(() => window.__freeze(true));
     await p.evaluate(() => window.__me(true));
+    // 아는 얼굴은 내 정보의 제 칸에 있다. 칸을 안 열면 이 자가 능력치 격자를 세게 된다.
+    await p.click('#me .tab[data-tab="face"]', { force: true });
     await p.waitForTimeout(400);
     const shot = await p.evaluate((a) => {
-      const card = document.querySelector('#me .card');
+      const card = document.querySelector('#me .pane');
       const kids = [...card.children];
       const bText = (n) => (n.querySelector('b') ? n.querySelector('b').textContent : '');
       const head = kids.findIndex((n) => bText(n) === a.HEAD);
@@ -130,10 +132,14 @@ check('view:numbers-match-judgment', mismatch.length === 0, mismatch.join(' | ')
 const top = main.shot.rows[0] ? main.shot.rows[0].i : '';
 check('view:anchor-tier3-30pct-24pct', top.includes('30%') && top.includes('+24%'), top ? 'ok' : 'no row');
 
-// 실측: scrollTop 0에서 세 줄 모두 카드 밑변 아래. 그 줄을 불러오면 모두 카드 안
-const belowFold = main.shot.atTop.rows.every((r) => r.top >= main.shot.atTop.cardBottom);
+/* 줄에 닿을 수 있는가. 옛 화면은 세 줄이 전부 접힌 자리 아래에 있었고 그때는 접힘 자체가 조건이었다.
+   칸이 갈리면서 아는 얼굴은 제 칸을 통째로 쓰므로 첫 줄부터 보이는 것이 정상이다.
+   그래서 접힘은 조건이 아니라 상태로 적고, 묻는 것은 하나로 좁힌다. 모든 줄이 결국 칸 안에 들어오는가. */
+const belowFold = main.shot.atTop.rows.filter((r) => r.top >= main.shot.atTop.cardBottom).length;
 const inViewAfter = main.shot.reach.every(Boolean);
-check('scroll:rows-reachable-by-scrolling', belowFold && inViewAfter, 'fold=' + belowFold + ' after=' + inViewAfter + ' h=' + main.shot.clientHeight + '/' + main.shot.scrollHeight);
+check('scroll:every-row-can-be-reached', inViewAfter,
+  belowFold + ' of ' + main.shot.atTop.rows.length + ' start below the fold, all reachable ' + inViewAfter
+  + ' h=' + main.shot.clientHeight + '/' + main.shot.scrollHeight);
 
 const allErrs = main.errs.concat(ctrl.errs);
 check('console:no-errors', allErrs.length === 0, allErrs.join(' | ') || 'clean');
@@ -142,4 +148,3 @@ for (const n of notes) console.log('  ok  ' + n);
 for (const f of fails) console.log('  FAIL ' + f);
 console.log('rapport-view ' + (fails.length ? 'FAIL ' : 'PASS ') + (notes.length + fails.length));
 process.exitCode = fails.length ? 1 : 0;
-

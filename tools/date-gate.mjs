@@ -72,6 +72,9 @@ try {
     window.__wallet().coin = cost;
     window.__me(true);
   }, DATE_COST);
+  // 아는 얼굴은 이제 내 정보의 제 칸에 있다. 칸을 안 열면 버튼이 없고, 그 없음은
+  // 만남이 안 열린다는 뜻이 아니라 이 자가 다른 칸을 보고 있다는 뜻이다.
+  await p.click('#me .tab[data-tab="face"]', { force: true });
   await p.waitForTimeout(500);
   const shut = await p.getAttribute('#me .go[data-passer="1"]', "disabled");
   const open = await p.getAttribute('#me .go[data-passer="2"]', "disabled");

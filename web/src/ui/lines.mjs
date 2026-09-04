@@ -300,3 +300,16 @@ export function photoLine(conceded, tier, rng) {
   const row = bank[Math.min(bank.length - 1, Math.max(0, Math.floor(Number(tier) || 1) - 1))];
   return row[Math.floor(rng() * row.length) % row.length];
 }
+
+// 셀카에 내가 붙이는 말. 찍은 사람이 나라서 주어가 나다.
+const SELFIES = [
+  '오늘 한 장 남겼다',
+  '동네에서 제일 잘 나온 사진',
+  '골키퍼도 사람이다',
+  '이 각도는 내가 잡았다',
+  '경기 끝나고 한 컷'
+];
+
+export function selfieLine(rng) {
+  return SELFIES[Math.floor(rng() * SELFIES.length) % SELFIES.length];
+}

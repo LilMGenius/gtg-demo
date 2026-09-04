@@ -465,6 +465,20 @@ body.playing #hud{opacity:1}
 /* 152px. 피드 폭 560px에서 사진이 글자를 밀어내지 않으면서 사람이 사람으로 보이는 하한이다. */
 #gram .post.shot img{display:block;width:152px;height:152px;object-fit:contain;
   background:#12180f;border:2px solid #ffffff14;margin-bottom:7px}
+/* 내가 올린 셀카. 남이 올린 글과 테두리 색으로 갈린다. 같은 카드 모양이면 계정 주인이 안 읽힌다. */
+#gram .post.shot.mine{border-color:#4a5f38}
+#gram .post.shot.mine .by span{color:var(--dim)}
+/* 만남 창의 셀카 버튼. 이긴 만남에서만 서는 자리라 눈에 먼저 들어와야 한다. */
+#date .selfie{padding:10px 22px 12px;border:var(--line) solid var(--edge);background:#2b3a22;
+  color:#ffd83d;font-family:var(--disp);font-size:17px;font-weight:400;
+  box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(-1deg)}
+#date .selfie em{font-style:normal;display:block;margin-top:3px;font-family:var(--body);font-size:12px;
+  font-weight:700;color:var(--good)}
+#date .selfie em svg{width:12px;height:12px;vertical-align:-2px}
+#date .selfie:active{transform:rotate(-1deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
+/* 이미 찍은 뒤. 버튼 자리를 비우면 화면이 흔들리므로 같은 자리에 결과를 남긴다. */
+#date .took{font-family:var(--body);font-size:13px;font-weight:700;color:var(--good)}
+#date .took svg{width:12px;height:12px;vertical-align:-2px}
 /* 계정 요약. 제목 아래 한 줄이라 제목 글꼴의 굵은 획을 그대로 쓰면 두 줄이 한 덩어리가 된다. */
 #gram h4 small{display:block;margin-top:4px;font-family:var(--body);font-size:13px;font-weight:400;
   color:var(--ink);-webkit-text-stroke:2px var(--edge);text-shadow:2px 3px 0 var(--edge)}

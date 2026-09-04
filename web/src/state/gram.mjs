@@ -94,3 +94,15 @@ export function photoOdds(tier) {
   const i = Math.min(PHOTO_PCT.length - 1, Math.max(0, Math.floor(Number(tier) || 0)));
   return PHOTO_PCT[i];
 }
+
+// 셀카. 눈이 맞은 사람과 한 장 찍어 내 계정에 올린다. 만남이 끝나는 자리에서만 열린다.
+// 팔로워는 여기서만 한 번에 크게 오른다. 라포를 쌓아 만나러 간 값이 이 자리에서 회수된다.
+export const SELFIE_BASE = 120;
+export const SELFIE_PER_TIER = 90;
+export const SELFIE_PER_CITY = 60;
+
+export function selfieFans(tier, city) {
+  const t = Math.min(3, Math.max(0, Math.floor(Number(tier) || 0)));
+  const c = Math.min(3, Math.max(0, Math.floor(Number(city) || 0)));
+  return SELFIE_BASE + SELFIE_PER_TIER * t + SELFIE_PER_CITY * c;
+}
