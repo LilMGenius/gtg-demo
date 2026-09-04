@@ -392,6 +392,9 @@ function buildBody(o) {
   const arms = [];
   const gloves = [];
   const gloveParent = [];
+  // 축구화 칸은 축구화를 겨냥해야 한다. 무릎에서 상수만큼 내려가 잡으면 그 상수가 키를 안 따라가고,
+  // 칸에 정강이만 담긴다. 실제 메시를 들고 있으면 겨냥이 몸 크기와 같이 움직인다.
+  const boots = [];
   const bareHands = [];
   for (const side of [-1, 1]) {
     const k = side < 0 ? 'L' : 'R';
@@ -449,7 +452,26 @@ function buildBody(o) {
     if (o.bootLen) {
       // 포스트 렌더타깃이 8비트 선형이라 이보다 어두우면 세 채널이 각기 다른 정수로 반올림돼 색비가 깨진다.
       // 0x14100c는 화면에 (41,2,2) 순적색으로 나왔고, 0x2a241c부터 (26,17,17) 가죽 갈색이 보존된다.
-      const boot = new THREE.Mesh(new THREE.BoxGeometry(o.legR * 1.5, o.legR * 0.9, o.bootLen), flat(o.bootTone || 0x2a241c));
+      // 밑창과 돌기를 등급이 정한다. 색만 바꾸면 스터드 여섯 개라고 이름 붙은 신발과
+      // 실내화가 같은 상자로 서고, 화면에서 880을 치른 이유가 안 보인다.
+      const bc = o.bootCut || { sole: 1, pips: 0, pip: 0, girth: 1 };
+      const sole = o.legR * 0.9 * bc.sole;
+      const parts = [new THREE.BoxGeometry(o.legR * 1.5, sole, o.bootLen)];
+      // 돌기는 두 줄로 깐다. 한 줄이면 발바닥이 아니라 톱니로 읽힌다.
+      const rows = Math.ceil(bc.pips / 2);
+      for (let n = 0; n < bc.pips; n++) {
+        const col = n % 2 === 0 ? -1 : 1;
+        const row = Math.floor(n / 2);
+        const len = o.legR * 0.26 * bc.pip;
+        const th = o.legR * 0.2 * (bc.girth || 1);
+        const pip = new THREE.BoxGeometry(th, len, th);
+        // 앞뒤로 고르게 편다. rows가 1이면 가운데 하나다.
+        const z = rows > 1 ? (row / (rows - 1) - 0.5) * o.bootLen * 0.72 : 0;
+        pip.translate(col * o.legR * 0.4, -(sole + len) * 0.5, z);
+        parts.push(pip);
+      }
+      const boot = new THREE.Mesh(mergeGeos(parts), flat(o.bootTone || 0x2a241c));
+      boots.push(boot);
       boot.name = tag;
       jitterMesh(boot, 0.016, side < 0 ? 51 : 52);
       // 발끝은 얼굴이 보는 쪽으로 나간다. 뒤꿈치는 발목 밑에 남긴다.
@@ -469,6 +491,7 @@ function buildBody(o) {
   standOnGround(g);
   if (gloves.length) {
     g.userData.gloves = gloves;
+    g.userData.boots = boots;
     g.userData.gloveHome = gloves.map((m) => m.position.clone());
     g.userData.gloveParent = gloveParent;
     g.userData.bareHands = bareHands;
@@ -497,7 +520,8 @@ export function buildKeeper(height, weight, look) {
     // 같은 초록을 어둡게만 내린 소매는 팔이 아니라 몸통에 진 그림자로 읽혔다.
     // 색상을 청록으로 꺾으면 밝기가 아니라 색이 팔을 세우고, 양말과 한 벌로 묶인다.
     shirt: (look && look.shirt) || 0x2f8f5b, sleeve: 0x073239, skin: 0xe8c39a, shorts: 0x2b3b4e, socks: (look && look.sock) || 0x63d3e8,
-    cuffSleeve: (look && look.ink) || 0x5f8f93, cuffSpan: (look && look.inkSpan) || 0.16, cuffShorts: 0x6d8898, gloveTone: (look && look.glove) || 0xf2d64b, bootTone: (look && look.boot) || 0x2a241c,
+    cuffSleeve: (look && look.ink) || 0x5f8f93, cuffSpan: (look && look.inkSpan) || 0.16, cuffShorts: 0x6d8898, gloveTone: (look && look.glove) || 0xf2d64b,
+    bootTone: (look && look.boot) || 0x2a241c, bootCut: look && look.bootCut,
     hair: look && look.hair, hairCut: look && look.hairCut,
     phase: 0.7, rest: POSES.ready
   });

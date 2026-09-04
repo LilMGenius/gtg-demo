@@ -15,11 +15,24 @@ export const MAX_GRIP = GLOVES.length - 1;
 
 // 축구화 선반. 손이 아니라 발이고, 깎는 것은 반경이 아니라 출발이다.
 // 장갑과 같은 값 기준을 쓴다. 첫 칸은 카드깡 380 육수보다 싸고 마지막 칸은 그보다 비싸다.
+//
+// cut은 밑창이다. pips는 바닥에 박힌 돌기 수, sole은 밑창 두께 배율,
+// pip은 돌기 하나의 길이 배율, girth는 돌기 굵기 배율이다. 세 번째 칸의 이름이
+// 돌기 수를 대놓고 말하므로 그 수는 지어낸 값이 아니라 이름이 이미 선언한 값이다.
+// 수만 바꾸면 세 개짜리와 여섯 개짜리가 화면에서 거의 같은 밑창이 된다. 길이와 굵기까지 갈라야
+// 닳은 축구화와 스터드 축구화와 스파이크가 서로 다른 신발로 읽힌다.
 export const BOOTS = [
-  { studs: 0, name: '학교 앞 실내화', cost: 0, tone: 0x2a241c, note: '아무것도 안 샀을 때 신고 있는 것' },
-  { studs: 1, name: '바닥 닳은 조기축구화', cost: 160, tone: 0x4a3b2a, note: '그래도 미끄러지지는 않는다' },
-  { studs: 2, name: '스터드 여섯 개 축구화', cost: 400, tone: 0x1f4f8f, note: '흙을 물고 첫 발이 빨리 뜬다' },
-  { studs: 3, name: '육상용 스파이크', cost: 880, tone: 0xd94f2a, note: '축구화는 아니다. 제일 빨리 뜬다' }
+  // 실내화는 바닥이 평평하다. 그래서 안 산 사람이 흙에서 미끄러진다.
+  { studs: 0, name: '학교 앞 실내화', cost: 0, tone: 0x2a241c, note: '아무것도 안 샀을 때 신고 있는 것',
+    cut: { sole: 0.8, pips: 0, pip: 0, girth: 1 } },
+  // 닳은 축구화라 돌기가 셋만 남았다.
+  { studs: 1, name: '바닥 닳은 조기축구화', cost: 160, tone: 0x4a3b2a, note: '그래도 미끄러지지는 않는다',
+    cut: { sole: 1, pips: 3, pip: 0.5, girth: 1 } },
+  { studs: 2, name: '스터드 여섯 개 축구화', cost: 400, tone: 0x1f4f8f, note: '흙을 물고 첫 발이 빨리 뜬다',
+    cut: { sole: 1.2, pips: 6, pip: 1.05, girth: 1.2 } },
+  // 스파이크는 수보다 길이다. 여덟 개가 더 길게 박혀 있다.
+  { studs: 3, name: '육상용 스파이크', cost: 880, tone: 0xd94f2a, note: '축구화는 아니다. 제일 빨리 뜬다',
+    cut: { sole: 0.88, pips: 8, pip: 1.8, girth: 0.6 } }
 ];
 
 export const MAX_STUD = BOOTS.length - 1;
@@ -187,7 +200,8 @@ export function lookOf(gear) {
   return {
     hair: hairAt(gear && gear.hair).tone, hairCut: hairAt(gear && gear.hair).cut,
     ink: t.ink_tone, inkSpan: t.span,
-    glove: gloveAt(gear && gear.grip).tone, boot: bootAt(gear && gear.studs).tone,
+    glove: gloveAt(gear && gear.grip).tone,
+    boot: bootAt(gear && gear.studs).tone, bootCut: bootAt(gear && gear.studs).cut,
     shirt: kitAt(gear && gear.pads).tone, sock: sockAt(gear && gear.socks).tone
   };
 }
