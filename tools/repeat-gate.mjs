@@ -94,12 +94,18 @@ try {
     }
     return got;
   };
+  /* 가장 닮은 쌍에서 하나를 잘라내고 그 다음으로 닮은 쌍을 쓴다.
+     쌍 열 개의 최솟값은 순서통계량 중 분산이 가장 큰 자리라, 산출물이 그대로여도 실행마다 흔들린다.
+     실측으로 한 실행은 save가 바의 73퍼센트, 다음 실행은 charge가 93퍼센트로 갈렸고 코드는 안 바뀌었다.
+     한 쌍만 잘라내므로 여전히 닮은 쪽을 보는 통계이고, 두 팔에 같이 적용하므로 비율의 뜻도 그대로다.
+     쌍이 여섯 미만이면 잘라낼 여유가 없어 최솟값을 그대로 쓴다. */
   const low = (set, rounds) => {
     const out = {};
     for (const k of KINDS) {
-      let lo = Infinity;
-      for (let i = 0; i < rounds; i++) for (let j = i + 1; j < rounds; j++) lo = Math.min(lo, dist(sceneVec(set[k][i]), sceneVec(set[k][j])));
-      out[k] = lo;
+      const ds = [];
+      for (let i = 0; i < rounds; i++) for (let j = i + 1; j < rounds; j++) ds.push(dist(sceneVec(set[k][i]), sceneVec(set[k][j])));
+      ds.sort((a, c) => a - c);
+      out[k] = ds[ds.length >= 6 ? 1 : 0];
     }
     return out;
   };
