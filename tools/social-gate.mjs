@@ -50,13 +50,15 @@ try {
   const posts = await p.evaluate(() => window.__posts());
   check("instrument:the-account-has-posts-to-read", posts.length >= 3, posts.length + " posts");
   // 좋아요는 그 글의 화제와 동네에서 나온다. 굴림 폭 0.7~1.3 안에 있어야 그 식에서 나온 수다.
+  // 좋아요를 만든 수는 글이 들고 있다. 남이 올린 사진은 내 팔로워가 안 오르므로 g가 0이고,
+  // 그 0으로 되짚으면 화제가 없던 글로 읽혀 이 축이 엉뚱한 자리를 빨갛게 만든다.
   const off = posts.filter((x) => {
-    const lo = likesFor(x.g, 0, 0);
-    const hi = likesFor(x.g, 0, 1);
+    const lo = likesFor(x.lb, x.ct, 0);
+    const hi = likesFor(x.lb, x.ct, 1);
     return !(x.l >= lo && x.l <= hi);
   });
   check("social:every-post-carries-likes-from-its-own-topic", posts.every((x) => x.l >= 1) && off.length === 0,
-    off.length ? off.map((x) => x.l + " outside [" + likesFor(x.g, 0, 0) + "," + likesFor(x.g, 0, 1) + "]").join(", ")
+    off.length ? off.map((x) => x.l + " outside [" + likesFor(x.lb, x.ct, 0) + "," + likesFor(x.lb, x.ct, 1) + "]").join(", ")
       : posts.map((x) => x.l).join(",") + " likes over " + posts.length + " posts");
   const cmts = posts.filter((x) => x.cm);
   check("instrument:some-post-drew-a-comment", cmts.length > 0, cmts.length + " of " + posts.length);

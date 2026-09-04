@@ -6,13 +6,13 @@ import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
-import { eventLine, setEndLine, postLine, commentLine } from './ui/lines.mjs';
+import { eventLine, setEndLine, postLine, commentLine, photoLine } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
 import { coinGain, readWallet, COIN_DRILL, COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
-import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds } from './state/gram.mjs';
+import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds, photoOdds } from './state/gram.mjs';
 import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost } from './state/rapport.mjs';
 import { passerName } from './state/passer.mjs';
 import { DATE_COST, MOVES, dateOdds, dateOutcome, applyDate, dateGate } from './state/date.mjs';
@@ -66,8 +66,10 @@ state.points = (Number(saved?.points) || 0) + (saved ? offlineGain(saved.at, Dat
 state.fans = Number(saved?.fans) || 0;
 // 카드깡 이용권. 완봉으로만 들어오므로 시간이 아니라 실력에 붙는 자원이다.
 state.tickets = Math.min(TICKET_CAP, Number(saved?.tickets) || 0);
-// 게시물은 한 화면 분량만 남긴다. 12장은 패널 스크롤 한 번에 끝나는 길이다.
-state.posts = Array.isArray(saved?.posts) ? saved.posts.slice(-12) : [];
+/* 게시물 보관 수. 12장이던 시절에는 구마다 올라가는 내 글이 열두 자리를 다 먹어,
+   가끔 오는 행인의 사진이 밀려 나가 타임라인이 다시 내 일기가 됐다. 18장이면 그 사진이 남는다. */
+const FEED_CAP = 18;
+state.posts = Array.isArray(saved?.posts) ? saved.posts.slice(-FEED_CAP) : [];
 // 지갑은 두 갈래로 읽는다. 이전 배포본 저장에는 지갑이 없고, 그때 둘 다 0에서 시작한다.
 state.wallet = readWallet(saved?.wallet);
 // 상대 전적. 키커 이름을 열쇠로 막은 수와 먹힌 수를 따로 센다.
@@ -497,13 +499,25 @@ function rollCaptions(result) {
       const seen = state.shots[state.i].passer;
       const tier = rapportTier(state.rapport, state.gear.city, seen);
       const post = { n: who, c: result.conceded, g: gain, t: postLine(who, result.conceded, rng),
-        l: likesFor(gain, state.gear.city, Math.random()) };
+        /* 좋아요의 밑값과 동네를 글에 박아 둔다. 남이 올린 사진은 내 팔로워가 안 오르므로 g가 0인데,
+           그 0으로 좋아요를 되짚으면 화제가 없던 글로 읽힌다. 좋아요를 만든 수는 따로 남는다. */
+        lb: gain, ct: state.gear.city, l: likesFor(gain, state.gear.city, Math.random()) };
       if (Math.random() * 100 < commentOdds(tier)) {
         post.cm = { city: state.gear.city, passer: seen, tier,
           who: passerName(state.gear.city, seen, tier), text: commentLine(result.conceded, tier, Math.random) };
       }
       state.posts.push(post);
-      if (state.posts.length > 12) state.posts.shift();
+      /* 그 구를 지켜본 사람이 나를 찍어 자기 계정에 올린다. 얼굴을 튼 사이라야 태그를 걸고,
+         지나간 사람이 없던 구에는 찍은 사람도 없다. 사진은 저장에 이미지를 넣지 않는다.
+         한 장이 47KB라 열두 장이면 저장 한도를 위협하고, 그림은 지금 차림에서 다시 구우면 된다. */
+      if (state.shots[state.i].gaze && tier > 0 && Math.random() * 100 < photoOdds(tier)) {
+        state.posts.push({ n: passerName(state.gear.city, seen, tier), c: result.conceded, g: 0,
+          t: photoLine(result.conceded, tier, Math.random),
+          lb: gain, ct: state.gear.city, l: likesFor(gain, state.gear.city, Math.random()),
+          ph: { city: state.gear.city, passer: seen, tier,
+            h: state.keeper.height, w: state.keeper.weight, look: lookOf(state.gear) } });
+      }
+      while (state.posts.length > FEED_CAP) state.posts.shift();
       pips();
       coinPop(coin);
       state.i += 1;
@@ -711,6 +725,19 @@ function closeRoster() {
 // 아웃문그램. 구가 끝날 때마다 쌓인 글을 최신 순으로 건다.
 function renderGram() {
   const box = el('gram');
+  /* 남이 올린 글. 그림은 저장에 안 들어 있고 그때의 차림만 남아 있어, 열 때마다 그 차림으로 다시 굽는다.
+     한 장이 47KB라 열두 장을 저장에 실으면 한도를 위협하고, 굽는 비용은 상점이 이미 스물넉 장으로 치른다. */
+  const photoCard = (p) => {
+    const key = whoKey(p.ph.city, p.ph.passer);
+    const label = isMutual(state.social, key) ? '맞팔' : (isFollowing(state.social, key) ? '팔로우 중' : '선팔');
+    const off = isFollowing(state.social, key) ? ' disabled' : '';
+    return '<div class="post shot' + (p.c ? ' bad' : '') + '">'
+      + '<div class="by"><b>' + p.n + '</b><span>님이 회원님을 태그했습니다</span>'
+      + '<button class="fol" data-key="' + key + '" data-tier="' + p.ph.tier + '"' + off + '>' + label + '</button></div>'
+      + '<img alt="' + p.n + '이 찍은 사진" src="' + thumbURL('body', { height: p.ph.h, weight: p.ph.w }, p.ph.look) + '">'
+      + '<span>' + p.t + '</span>'
+      + '<i>' + IC_LIKE + p.l + '</i></div>';
+  };
   /* 글 한 장이 들고 있는 것 셋. 문장과 좋아요와 댓글이다. 문장 안에 이미 상대 이름이 박혀 있어
      앞에 한 번 더 걸면 같은 이름이 두 번 읽힌다. 옛 저장의 글에는 좋아요와 댓글 칸이 없고,
      그때는 그 자리를 비운다. 없는 것을 0으로 그리면 아무도 안 본 글로 읽힌다. */
@@ -723,10 +750,10 @@ function renderGram() {
       + '<button class="fol" data-key="' + key + '" data-tier="' + p.cm.tier + '"' + off + '>' + state3 + '</button></div>';
   };
   const feed = state.posts.length
-    ? state.posts.slice().reverse().map((p) => '<div class="post' + (p.c ? ' bad' : '') + '">'
+    ? state.posts.slice().reverse().map((p) => (p.ph ? photoCard(p) : '<div class="post' + (p.c ? ' bad' : '') + '">'
       + '<span>' + p.t.replace(p.n, '<b>' + p.n + '</b>') + '</span>'
       + '<i>' + IC_FANS + ' +' + p.g + (p.l ? IC_LIKE + p.l : '') + '</i>'
-      + cmtRow(p) + '</div>').join('')
+      + cmtRow(p) + '</div>')).join('')
     : '<div class="post empty"><span>아직 올린 글이 없다. 한 슛 막고 오면 생긴다</span></div>';
   // 계정 요약. 맞팔이 몇인지가 팔로워 증가에 곱해지므로 그 수가 화면에 있어야 한다.
   const mut = mutualCount(state.social);

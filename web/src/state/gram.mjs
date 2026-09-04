@@ -83,3 +83,14 @@ export function mutualCount(social) {
 export function mutualBoost(social) {
   return Math.min(MUTUAL_CAP, 1 + MUTUAL_STEP * mutualCount(social));
 }
+
+// 행인이 찍은 사진. 그 구를 지켜본 사람만 찍는다. 얼굴을 튼 사이라야 남의 계정에 태그를 건다.
+// 0단계가 0인 것은 댓글과 같은 이유다. 스쳐 지나간 사람은 남을 찍어 올리지 않는다.
+// 얼굴을 튼 사람이 그 자리에 서서 보고 있었으면 대개 한 장 찍는다. 25/45/70으로 두었을 때는
+// 열다섯 구를 돌아도 타임라인에 한 장이 남을까 말까였고, 그러면 계정은 다시 내 일기가 된다.
+export const PHOTO_PCT = [0, 35, 60, 85];
+
+export function photoOdds(tier) {
+  const i = Math.min(PHOTO_PCT.length - 1, Math.max(0, Math.floor(Number(tier) || 0)));
+  return PHOTO_PCT[i];
+}

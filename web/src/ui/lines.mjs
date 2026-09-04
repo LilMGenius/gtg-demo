@@ -280,3 +280,23 @@ export function commentLine(conceded, tier, rng) {
   const row = bank[Math.min(bank.length - 1, Math.max(0, Math.floor(Number(tier) || 1) - 1))];
   return row[Math.floor(rng() * row.length) % row.length];
 }
+
+// 행인이 사진에 붙이는 말. 찍은 사람이 쓰는 글이라 주어가 나가 아니다.
+const PHOTOS = {
+  saved: [
+    ['지나가다 한 장', '이 사람 오늘 안 먹힘', '동네 골키퍼 클래스'],
+    ['오늘도 여기 계심', '내 눈앞에서 막은 거 실화', '이 각을 손으로 쳐냄'],
+    ['우리 동네 자랑', '나 이 사람 안다', '주말마다 여기서 봄']
+  ],
+  conceded: [
+    ['그래도 멋있었음', '아쉽다 방금 그거', '다음엔 막을 듯'],
+    ['한 번 먹혔다고 안 무너짐', '손은 나갔음 분명히', '오늘 바람 셌음'],
+    ['그래도 우리 동네 골키퍼', '끝까지 안 주저앉음', '내일 또 보러 옴']
+  ]
+};
+
+export function photoLine(conceded, tier, rng) {
+  const bank = PHOTOS[conceded ? 'conceded' : 'saved'];
+  const row = bank[Math.min(bank.length - 1, Math.max(0, Math.floor(Number(tier) || 1) - 1))];
+  return row[Math.floor(rng() * row.length) % row.length];
+}
