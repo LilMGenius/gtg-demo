@@ -99,7 +99,15 @@ try {
   await p.goto(URL, { waitUntil: "load" });
   await p.waitForTimeout(1200);
   await p.click("#go", { force: true });
-  await p.waitForTimeout(1800);
+  await p.waitForTimeout(600);
+  /* 흙을 재는 자인데 흐르는 판을 찍고 있었다. 몇 초에 찍느냐에 따라 공과 키퍼와 그 그림자가
+     바닥 행 위에 들어와, 같은 흙이 어떤 회차에는 네 띠 어떤 회차에는 다섯 띠로 읽힌다.
+     구를 세우고 세계시계를 멈춘 뒤 찍는다. 0.000001은 이 레포가 정지에 쓰는 그 값이다. */
+  /* 임자는 3D 피킹으로 고르는데 화소는 화면에서 읽는다. 그래서 흙 위에 얹힌 HUD가
+     그 칸의 값을 대신 말한다. 타이밍 자의 노란 띠가 바닥 행을 지나가자 근경의 띠가
+     넷에서 셋으로 줄었고, 그 수는 흙이 아니라 게이지를 잰 것이었다. HUD를 접고 찍는다. */
+  await p.evaluate(() => { window.__lockRound(); window.__fixedStep(0.000001); document.getElementById("hud").style.display = "none"; });
+  await p.waitForTimeout(400);
 
   const owners = await p.evaluate(ownGrid, [cols, rows, W, H]);
   const shot = (await p.screenshot()).toString("base64");
