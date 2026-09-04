@@ -6,12 +6,13 @@ import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
-import { eventLine, setEndLine, postLine } from './ui/lines.mjs';
+import { eventLine, setEndLine, postLine, commentLine } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord } from './state/save.mjs';
 import { coinGain, readWallet, COIN_DRILL, COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
+import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds } from './state/gram.mjs';
 import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost } from './state/rapport.mjs';
 import { passerName } from './state/passer.mjs';
 import { DATE_COST, MOVES, dateOdds, dateOutcome, applyDate, dateGate } from './state/date.mjs';
@@ -102,6 +103,8 @@ state.bot = readBot(saved?.bot);
 state.buff = readBuff(saved?.buff);
 // 라포. 도시별 행인 인덱스마다 마주친 횟수가 저장에 남는다.
 state.rapport = readRapport(saved?.rapport);
+// 선팔과 맞팔. 라포가 얼굴을 아는 것이라면 이쪽은 계정으로 이어진 것이다.
+state.social = readSocial(saved?.social);
 // 게이트 표본 주입. 모든 read가 끝난 뒤라야 저장에서 올라온 값을 덮어쓴다.
 // 자동 판정보다는 앞이어야 주입된 지갑이 그 판정에 반영된다.
 window.__preset = applyPreset(new URLSearchParams(location.search).get('preset'), state);
@@ -155,6 +158,10 @@ const G = (t, body) => '<svg viewBox="0 0 24 24" fill="currentColor" shape-rende
 const R = (x, y, w, h) => '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '"/>';
 // 팔로워. 이름 대신 사람 하나를 세운다. Outmoongram이라는 이름은 관리창 안에서만 쓴다.
 const IC_FANS = G('팔로워', R(9, 3, 6, 6) + R(6, 12, 12, 3) + R(3, 15, 18, 6));
+// 좋아요. 3px 격자에서 하트는 봉우리 둘과 아래로 좁아지는 세 단이면 선다.
+// 24 격자의 가운데가 12라 마지막 단은 6폭이 하한이다. 3폭으로 좁히면 중심이 격자 밖으로 나간다.
+const IC_LIKE = G('좋아요', R(6, 3, 3, 3) + R(15, 3, 3, 3) + R(3, 6, 18, 3) + R(3, 9, 18, 3)
+  + R(6, 12, 12, 3) + R(9, 15, 6, 3));
 // 육수. 시간으로 버는 재화다. 땀을 뺀 결과를 부르는 입말이라 물방울 하나가 그대로 단위로 읽히고,
 // 뾰족한 위와 둥근 아래라 별 실루엣과 안 겹친다. 판을 세던 옛 단위 '구'와 글자가 안 겹친다.
 const IC_SWEAT = G('육수', R(10.5, 3, 3, 3) + R(7.5, 6, 9, 3) + R(6, 9, 12, 3) + R(4.5, 12, 15, 3)
@@ -310,7 +317,7 @@ function setPad(on) {
 
 // 저장은 항상 보유 목록 전체로 나간다. 뛰는 키퍼만 저장하면 나머지가 다음 저장에서 지워진다.
 function persist() {
-  save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets);
+save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets, state.social);
 }
 
 // 봇 크레딧은 실시간으로 줄어든다. 구 수로 세면 탭을 열어두고 안 누르는 쪽이 이득이 된다.
@@ -473,7 +480,7 @@ function rollCaptions(result) {
       state.skip = null;
       // 팔로워는 구마다 오른다. 먹혀도 오르고, 막으면 더 오른다.
       // 봇이 뛴 구는 사고가 안 나서 아무도 안 본다. 성장은 남고 화제만 안 남는다.
-      const gain = state.botRan ? 0 : followerGain(state.keeper, result, state.gear.city, lookBoost(state.gear), state.buff.kind === 'hype' ? HYPE_BOOST : 1, rapportBoost(state.rapport, state.gear.city, state.shots[state.i].passer));
+      const gain = state.botRan ? 0 : followerGain(state.keeper, result, state.gear.city, lookBoost(state.gear), state.buff.kind === 'hype' ? HYPE_BOOST : 1, rapportBoost(state.rapport, state.gear.city, state.shots[state.i].passer), mutualBoost(state.social));
       state.fans += gain;
       // 라포는 말을 섞은 구에서만 쌓인다. 스쳐 지나간 얼굴은 다음에도 남이다.
       // 봇이 뛴 구는 팔로워와 같은 규칙으로 0이다. 봇이 서 있었으니 얼굴이 익을 리 없다.
@@ -485,7 +492,17 @@ function rollCaptions(result) {
       // 구가 끝나면 계정에 한 장 올라간다. 먹힌 구에도 올라가야 성적표가 아니라 사람으로 읽힌다.
       // 이름은 state.i를 올리기 전에 읽는다. result에는 키커 이름이 없다.
       const who = state.shots[state.i].kicker.name;
-      state.posts.push({ n: who, c: result.conceded, g: gain, t: postLine(who, result.conceded, rng) });
+      /* 글에 반응이 붙는다. 좋아요는 그 구의 화제와 동네가 정하고, 댓글은 얼굴을 튼 사람만 단다.
+         굴림은 화면 쪽 난수다. 판정용 rng를 쓰면 그 뒤 모든 구가 밀려 게이트가 통째로 흔들린다. */
+      const seen = state.shots[state.i].passer;
+      const tier = rapportTier(state.rapport, state.gear.city, seen);
+      const post = { n: who, c: result.conceded, g: gain, t: postLine(who, result.conceded, rng),
+        l: likesFor(gain, state.gear.city, Math.random()) };
+      if (Math.random() * 100 < commentOdds(tier)) {
+        post.cm = { city: state.gear.city, passer: seen, tier,
+          who: passerName(state.gear.city, seen, tier), text: commentLine(result.conceded, tier, Math.random) };
+      }
+      state.posts.push(post);
       if (state.posts.length > 12) state.posts.shift();
       pips();
       coinPop(coin);
@@ -694,11 +711,36 @@ function closeRoster() {
 // 아웃문그램. 구가 끝날 때마다 쌓인 글을 최신 순으로 건다.
 function renderGram() {
   const box = el('gram');
-  // 문장 안에 이미 상대 이름이 박혀 있다. 앞에 한 번 더 걸면 같은 이름이 두 번 읽힌다.
+  /* 글 한 장이 들고 있는 것 셋. 문장과 좋아요와 댓글이다. 문장 안에 이미 상대 이름이 박혀 있어
+     앞에 한 번 더 걸면 같은 이름이 두 번 읽힌다. 옛 저장의 글에는 좋아요와 댓글 칸이 없고,
+     그때는 그 자리를 비운다. 없는 것을 0으로 그리면 아무도 안 본 글로 읽힌다. */
+  const cmtRow = (p) => {
+    if (!p.cm) return '';
+    const key = whoKey(p.cm.city, p.cm.passer);
+    const state3 = isMutual(state.social, key) ? '맞팔' : (isFollowing(state.social, key) ? '팔로우 중' : '선팔');
+    const off = isFollowing(state.social, key) ? ' disabled' : '';
+    return '<div class="cmt"><b>' + p.cm.who + '</b><span>' + p.cm.text + '</span>'
+      + '<button class="fol" data-key="' + key + '" data-tier="' + p.cm.tier + '"' + off + '>' + state3 + '</button></div>';
+  };
   const feed = state.posts.length
-    ? state.posts.slice().reverse().map((p) => `<div class="post${p.c ? ' bad' : ''}"><span>${p.t.replace(p.n, `<b>${p.n}</b>`)}</span><i>${IC_FANS} +${p.g}</i></div>`).join('')
+    ? state.posts.slice().reverse().map((p) => '<div class="post' + (p.c ? ' bad' : '') + '">'
+      + '<span>' + p.t.replace(p.n, '<b>' + p.n + '</b>') + '</span>'
+      + '<i>' + IC_FANS + ' +' + p.g + (p.l ? IC_LIKE + p.l : '') + '</i>'
+      + cmtRow(p) + '</div>').join('')
     : '<div class="post empty"><span>아직 올린 글이 없다. 한 슛 막고 오면 생긴다</span></div>';
-  box.innerHTML = `<h4>Outmoongram</h4><div class="feed">${feed}</div><button class="close">닫기</button>`;
+  // 계정 요약. 맞팔이 몇인지가 팔로워 증가에 곱해지므로 그 수가 화면에 있어야 한다.
+  const mut = mutualCount(state.social);
+  const head = 'Outmoongram<small>' + IC_FANS + ' ' + state.fans.toLocaleString()
+    + ' 맞팔 ' + mut + '명, 팔로워 ' + Math.round((mutualBoost(state.social) - 1) * 100) + '% 더 붙는다</small>';
+  box.innerHTML = '<h4>' + head + '</h4><div class="feed">' + feed + '</div><button class="close">닫기</button>';
+  for (const b of box.querySelectorAll('.fol')) {
+    b.onclick = () => {
+      // 맞팔 여부는 여기서 한 번 굴린다. 열 때마다 다시 굴리면 같은 사람이 매번 다른 답을 준다.
+      state.social = follow(state.social, b.dataset.key, Math.random() * 100, Number(b.dataset.tier) || 0);
+      persist();
+      renderGram();
+    };
+  }
   box.querySelector('.close').onclick = closeGram;
 }
 
@@ -1542,6 +1584,9 @@ window.__record = () => state.record;
 // 팔로워와 라포는 화면에 숫자 하나와 막대로만 나온다. 봇이 뛴 구가 정말 아무것도 안 남기는지는 장부를 직접 읽어야 안다.
 window.__fans = () => state.fans;
 window.__rapport = () => state.rapport;
+// 계정 장부. 피드가 옮겨 그리는 원본이라, 화면이 말한 수와 이 수가 갈리면 화면이 거짓말한 것이다.
+window.__posts = () => state.posts;
+window.__social = () => state.social;
 // 봇이 실제로 뛴 구였는지. 크레딧과 자동 상태만 보고 짐작하면 배선이 끊겨도 게이트가 초록으로 남는다.
 window.__botRan = () => state.botRan;
 

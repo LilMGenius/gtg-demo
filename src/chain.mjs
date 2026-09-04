@@ -541,15 +541,18 @@ export function restartDelay(keeper, result) {
 // 판 사이 대기는 회복이다. 스태미너와 호흡력은 잠겨 있어 지금은 상수로 선다.
 // 동네 등급은 소문의 배율이다. 사람이 많은 곳에서 막을수록 더 퍼진다.
 // look은 외형 선반 승수다. 판정에는 안 들어가고 소문에만 붙는다.
-export function followerGain(keeper, result, city = 0, look = 1, boost = 1, rapport = 1) {
+export function followerGain(keeper, result, city = 0, look = 1, boost = 1, rapport = 1, social = 1) {
   const saved = !result.conceded;
   const flair = result.events.some((e) => e.t === "beat" || e.t === "charge" || e.t === "talked");
   const base = saved ? 40 : 8;
   const talk = 6 * clamp(keeper.communication, 1, 10) + 3 * clamp(keeper.mischief, 1, 10);
   const fame = clamp(result.fame || 1, 1, 10) * (saved ? 9 : 2);
   const crowd = 1 + CITY_CROWD * clamp(city, 0, 3);
-  // boost는 바이럴 떡밥이다. 판정 밖 축이라 스킨 1.30, 관중 1.36과 곱셈 인자가 따로 선다.
-  return Math.round((base + talk + fame) * (flair ? 2.2 : 1) * crowd * clamp(look, 1, 1.3) * clamp(boost, 1, 1.6) * clamp(rapport, 1, 1.25));
+  // boost는 바이럴 떡밥이고 social은 맞팔이다. 넷 다 판정 밖 축이라 곱셈 인자가 따로 선다.
+  // 맞팔 상한 1.30은 동네 최고 등급 1.36을 안 넘는다. 넘기면 실점을 감수하는 동네 선택이
+  // 계정 관리로 무력화된다.
+  return Math.round((base + talk + fame) * (flair ? 2.2 : 1) * crowd * clamp(look, 1, 1.3)
+    * clamp(boost, 1, 1.6) * clamp(rapport, 1, 1.25) * clamp(social, 1, 1.3));
 }
 
 export function setBreak() {

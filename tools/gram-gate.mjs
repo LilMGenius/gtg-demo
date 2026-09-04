@@ -93,6 +93,9 @@ try {
 
   // 상대 전적은 내 정보 창이 그린다. 장부와 화면이 같은 수를 말하는지가 이 창의 전부다.
   await p.evaluate(() => window.__me(true));
+  // 그 창은 이제 칸 셋으로 갈렸고 전적은 제 칸에 있다. 열지 않고 세면 0줄이 나오는데,
+  // 그 0은 화면이 장부를 안 옮겼다는 뜻이 아니라 이 자가 다른 칸을 보고 있다는 뜻이다.
+  await p.click('#me .tab[data-tab="log"]', { force: true });
   await p.waitForTimeout(320);
   const rows = await p.evaluate(() => {
     const box = document.getElementById("me");

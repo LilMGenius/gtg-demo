@@ -445,6 +445,21 @@ body.playing #hud{opacity:1}
 #gram .post i{display:block;font-style:normal;font-size:12px;font-weight:700;
   color:var(--good);margin-top:4px}
 #gram .post i svg{width:13px;height:13px;vertical-align:-2px}
+/* 좋아요 수는 팔로워 증가분 옆에 붙는다. 12px은 두 수가 한 덩어리로 안 읽히는 최소 간격이다. */
+#gram .post i svg + svg,#gram .post i svg:nth-of-type(2){margin-left:12px}
+/* 댓글. 글과 같은 칸 안에 있되 한 칸 들여써야 남이 쓴 줄로 읽힌다. */
+#gram .cmt{display:flex;align-items:baseline;gap:7px;margin:7px 0 0 10px;padding-top:7px;
+  border-top:2px solid #ffffff14;font-size:13px;line-height:1.35}
+#gram .cmt span{flex:1;color:var(--ink)}
+/* 선팔 버튼. 눌러서 관계가 바뀌는 자리라 글자보다 판때기가 먼저 보여야 한다. */
+#gram .cmt .fol{flex:none;padding:4px 10px 6px;border:2px solid var(--edge);background:#2b3a22;
+  color:#ffd83d;font-family:var(--disp);font-size:13px;font-weight:400;box-shadow:3px 3px 0 var(--edge)}
+#gram .cmt .fol:disabled{background:#141a12;color:var(--dim);box-shadow:none}
+#gram .cmt .fol:not(:disabled):active{transform:translate(2px,3px);box-shadow:1px 1px 0 var(--edge)}
+/* 계정 요약. 제목 아래 한 줄이라 제목 글꼴의 굵은 획을 그대로 쓰면 두 줄이 한 덩어리가 된다. */
+#gram h4 small{display:block;margin-top:4px;font-family:var(--body);font-size:13px;font-weight:400;
+  color:var(--ink);-webkit-text-stroke:2px var(--edge);text-shadow:2px 3px 0 var(--edge)}
+#gram h4 small svg{width:13px;height:13px;vertical-align:-2px}
 /* 먹힌 경기 게시물. 이름이 죽어야 넘긴 판과 구분된다. */
 #gram .post.bad b{color:#f6efdc99}
 #gram .post.empty{color:var(--dim);text-align:center}

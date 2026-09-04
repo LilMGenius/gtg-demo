@@ -27,10 +27,11 @@ export function load() {
 // 버프도 같이 나간다. 남은 구가 탭을 닫을 때 사라지면 상점에서 산 소모품이 통째로 증발한다.
 // 라포도 같이 나간다. 얼굴을 익힌 행인이 탭을 닫을 때 지워지면 반복해서 마주친 보람이 사라진다.
 // 카드깡 이용권도 같이 나간다. 완봉으로 받은 장이 탭을 닫을 때 사라지면 그 판을 다시 이겨야 한다.
-export function save(squad, pick, auto, fans, points, wallet, posts, record, gear, bot, buff, rapport, tickets) {
+// 팔로우도 같이 나간다. 선팔과 맞팔이 탭을 닫을 때 지워지면 사람을 다시 처음부터 따라가야 한다.
+export function save(squad, pick, auto, fans, points, wallet, posts, record, gear, bot, buff, rapport, tickets, social) {
   try {
     const i = Number(pick) || 0;
-    localStorage.setItem(KEY, JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], record: record || {}, gear: gear || {}, bot: bot || {}, buff: buff || {}, rapport: rapport || {}, tickets: Number(tickets) || 0, at: Date.now() }));
+    localStorage.setItem(KEY, JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], record: record || {}, gear: gear || {}, bot: bot || {}, buff: buff || {}, rapport: rapport || {}, tickets: Number(tickets) || 0, social: social || {}, at: Date.now() }));
   } catch {
     // 사파리 프라이빗 모드는 쓰기를 막는다. 저장이 안 되는 것과 게임이 죽는 것은 다른 일이다.
   }
