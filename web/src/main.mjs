@@ -6,7 +6,7 @@ import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
-import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dmLine } from './ui/lines.mjs';
+import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dmLine, gazeAct } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord, readSquadKickers, useAccount } from './state/save.mjs';
 import { currentId } from './state/account.mjs';
 import { coinGain, readWallet, COIN_DRILL, COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from './state/wallet.mjs';
@@ -146,7 +146,8 @@ window.__gear = () => state.gear;
 // 봇이 실제로 섰는지는 자막이 아니라 상태로만 확인된다.
 window.__bot = () => state.bot;
 // 사고 연출은 확률로만 나오므로 계측기가 불러낼 수 있어야 한다. 판정은 안 바뀐다.
-window.__act = (kind) => stage.act(kind);
+// 갈래를 못 받으면 계기가 눈맞음 아홉 갈래 중 하나만 볼 수 있고, 그 하나로 아홉을 대변하게 된다.
+window.__act = (kind, flavour) => stage.act(kind, flavour);
 // 선언값은 증거가 아니다. 게이트가 실제 파형을 재려면 발화를 불러낼 수 있어야 한다.
 window.__sfx = stage.sfx;
 // 정지가 정말 정지인지 재려면 세계시계를 밖에서 읽을 수 있어야 한다.
@@ -529,6 +530,11 @@ function commit(dive) {
 function rollCaptions(result) {
   const lines = result.events.slice();
   state.phase = 'caption';
+  /* 눈맞음 갈래를 여기서 뽑는다. 판정 rng를 쓰면 그 뒤 모든 구가 밀려 게이트가 통째로 흔들리므로
+     화면 쪽 난수를 쓴다. 한 구 안에서 한 번만 뽑아 자막과 자세가 같은 갈래를 본다. */
+  for (const e of lines) {
+    if (e.t === 'distracted' || e.t === 'talked') e.act = gazeAct(Math.random);
+  }
   // 같은 사건이 두 구 연속 같은 문장으로 나오면 굴림이 아니라 상수로 읽힌다.
   let lastCap = null;
   // reboundMiss는 누워서와 서서 두 자리에서 cause 없이 나온다. 문맥으로만 갈린다.
@@ -586,7 +592,8 @@ function rollCaptions(result) {
     if (e.t === 'downed') ctx.downed = true;
     say(line, e.cause);
     // 자막이 말한 사건을 화면도 같이 연기한다. 결과는 이미 확정됐고 여기서 바뀌지 않는다.
-    if (e.t !== 'result') stage.act(e.t);
+    // 눈맞음은 갈래가 있고 자막과 자세가 그 갈래를 같이 따라간다. 한쪽만 갈리면 둘이 서로를 배신한다.
+    if (e.t !== 'result') stage.act(e.t, e.act);
     stage.cancel(timer);
     timer = stage.after(e.t === 'result' ? 0.9 : 0.85, step);
     // 자막을 밀어놓는 것은 손가락이다. 스택으로 살 수 있는 것은 공이 다시 놀이는 시간뿐이다.

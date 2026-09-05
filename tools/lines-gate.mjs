@@ -1,5 +1,5 @@
 import { makeRng, buildSet, resolve, keeperAtLevel, autoInput, rollForm } from "../src/chain.mjs";
-import { POOLS, KEYLESS, lineKey, eventLine, LINE_POOL, SET_END, SET_END_POOL, setEndLine } from "../web/src/ui/lines.mjs";
+import { POOLS, KEYLESS, lineKey, eventLine, LINE_POOL, SET_END, SET_END_POOL, setEndLine, gazeAct } from "../web/src/ui/lines.mjs";
 
 // 결과 자막 게이트. 사건마다 문장이 하나뿐이라 방치형에서 로그처럼 읽히던 것을 고친 뒤,
 // 그 수리가 실제 판정이 뱉는 사건 전부에 닿는지를 시뮬레이션으로 다시 잰다.
@@ -41,6 +41,9 @@ for (const mode of [0, 1, 2]) {
       let last = null;
       const ctx = { downed: false };
       for (const e of result.events) {
+        // 눈맞음 갈래는 판정이 아니라 화면 쪽에서 붙는다. 계기가 이 단계를 건너뛰면
+        // 갈래별 자막 열여덟이 통째로 도달 불가로 읽힌다. 붙이는 함수는 게임과 같은 것을 쓴다.
+        if (e.t === "distracted" || e.t === "talked") e.act = gazeAct(lineRng);
         const key = lineKey(e, ctx);
         seen.set(key, (seen.get(key) || 0) + 1);
         const line = eventLine(e, lineRng, last, ctx);

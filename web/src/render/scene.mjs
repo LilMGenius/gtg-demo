@@ -12,6 +12,7 @@ import {
 import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, pushPose, setPose } from './objects/actors.mjs';
 import { buildPitch, buildPassers } from './objects/pitch.mjs';
 import { skinAt, placeAt } from '../state/gear.mjs';
+import { gazeMood } from '../ui/lines.mjs';
 import { createImpact } from './objects/impact.mjs';
 import { jitterMesh, addOutline, blobGeo, ballGeo } from './handmade.mjs';
 
@@ -808,6 +809,16 @@ const TOUCHED = new Set(['contact']);
     // 안 와도 될 공이었다. 웃을 일도 놀랄 일도 아니고 어이가 없는 자리다.
     wide: 'shock'
   };
+  // 눈맞음 두 사건은 표정이 갈래에서 온다. 기어가는 갈래에 하트 눈을 띄우면
+  // 자막은 굴욕을 말하는데 얼굴만 반해 있다.
+  const GAZE_POSE = {
+    stare: POSES.swoon, selfie: POSES.selfie, piggy: POSES.piggy,
+    hug: POSES.hug, kneel: POSES.kneel, crawl: POSES.crawl,
+    follow: POSES.trail, joke: POSES.joke, wave: POSES.wave
+  };
+  // 자세와 표정과 하트는 한 갈래를 봐야 한다. 셋이 갈라지면 한 컷 안에서 서로를 배신한다.
+  const tailMood = (t) => (t.kind === 'talked' || t.kind === 'distracted'
+    ? gazeMood(t.act) : (FACE_MOOD[t.kind] ?? 'shock'));
   // 머리 위로 떠오르는 하트 셋. 눈동자만 하트로 바꾸면 고개가 돌아간 순간 얼굴이 뒤를 보고 있어 안 읽힌다.
   // 정지 화면 한 장에서 한눈팔림을 알리는 픽셀은 이것뿐이다.
   const heartShape = new THREE.Shape();
@@ -880,7 +891,7 @@ const TOUCHED = new Set(['contact']);
   // 손을 안 대고 그냥 들어간 공. 가장 흔한 결과인데 여기가 통째로 무음이었다.
   // 손끝을 스치는 사건이라 박히는 소리는 안 난다. 그물이 받는 소리 하나다.
   const NET = new Set(['miss']);
-  function act(kind) {
+  function act(kind, flavour) {
     // 장갑에 박히는 것은 가죽이 눌리는 소리다. 슛이 발에 맞는 것과 같은 재질이고 세기만 다르다.
     if (GRAB.has(kind)) sfx.kick(0.12);
     // 다시 차는 사건은 새 슛이다. 리바운드도 빈 골대로 미는 것도 발에 맞는 순간이 있다.
@@ -898,6 +909,8 @@ const TOUCHED = new Set(['contact']);
       keeper.userData.bareHands[gi].visible = true;
     }
     tail = { kind, t0: vnow, from: ball.position.clone(), kx: keeper.position.x };
+    // 눈맞음이 어느 갈래인지. 자막을 고른 쪽이 넘겨 주므로 화면과 글자가 같은 갈래를 본다.
+    tail.act = flavour || null;
     // 화면 전용 편차. 판정 rng가 아니라 여기서 뽑으므로 시드 재현 게이트를 흔들지 않는다.
     // ?vary=0이면 가운데 값으로 굳는다. 편차가 없을 때 회차 간 거리가 얼마인지를 재는 대조군이고,
     // 그 수를 모르면 편차를 넣은 뒤의 수가 설계인지 채취 흔들림인지 말할 수 없다.
@@ -1022,7 +1035,7 @@ const TOUCHED = new Set(['contact']);
     if (frozen) dt = 0;
     frames += 1;
     // 맡겨 둔 사건을 그 프레임에서 건다. 밖에서 부르면 폴링 간격만큼 늦는다.
-    if (planAct && planAct.kind && frames >= planAct.n) { act(planAct.kind); planAct = null; }
+      if (planAct && planAct.kind && frames >= planAct.n) { act(planAct.kind, planAct.act); planAct = null; }
     // 멈출 프레임에 닿으면 세계시간이 더 안 간다. 읽는 쪽이 언제 읽어도 같은 상태다.
     if (stopFrame >= 0 && frames >= stopFrame) dt = 0;
     if (stopLeft > 0) {
@@ -1270,6 +1283,8 @@ const TOUCHED = new Set(['contact']);
         talked: POSES.swoon, distracted: POSES.swoon, openGoalScored: POSES.despair
       };
       kp = TAIL_POSE[tail.kind] ?? kp;
+      // 눈맞음은 갈래가 자세를 정한다. 표에 상수로 두면 아홉 갈래가 한 그림으로 뭉친다.
+      if (tail.kind === 'talked' || tail.kind === 'distracted') kp = GAZE_POSE[tail.act] ?? POSES.swoon;
       kpId = kp;
       // 종점이 상수라 회차가 모두 같았다. 잔여 진동만 흔들면 그 폭이 시작 자세와 종점 사이
       // 거리에 비례해서, 그 거리가 짧은 사건은 회차 간에 채취 잡음만큼도 안 움직인다.
@@ -1645,7 +1660,8 @@ const TOUCHED = new Set(['contact']);
             // 더 올리면 크로스바가 하트를 가로지른다.
             // 두 머리의 눈높이로 내리면 가로대에 걸리지 않는다.
             if (hp) hk.set((hk.x + hp.x) / 2, Math.min(hk.y, hp.y + 1.5) - 0.1, (hk.z + hp.z) / 2 - 0.2);
-            showHearts(true, hk, e);
+            // 하트는 반한 갈래만 띄운다. 개그나 굴욕 갈래에 띄우면 자막과 얼굴이 서로 다른 말을 한다.
+            showHearts(tailMood(tail) === 'heart', hk, e);
           }
           if (passers[0]) {
             // 1.2만큼 떨어뜨렸더니 두 캡슐이 화면에서 한 덩어리로 붙었다. 사람이 둘이라는 것부터 안 읽혔다.
@@ -1684,7 +1700,7 @@ const TOUCHED = new Set(['contact']);
           tail.faceMul = 0.86 + vy.a * 0.2;
           // 하트가 매번 같은 순간에 같은 위상으로 뜬다. 반한 타이밍을 조금 늦추거나 당긴다.
           const he = Math.max(0, (e - vy.b * 0.14) / (1 - vy.b * 0.14));
-          showHearts(true, head.getWorldPosition(new THREE.Vector3()), he);
+          showHearts(tailMood(tail) === 'heart', head.getWorldPosition(new THREE.Vector3()), he);
           // 키퍼는 고개만 돌리고 제자리에 선다. 종점이 x*1.3이면 실루엣 반폭(실측 0.72) 안이라
           // 공이 가슴을 뚫고 지나갔다. 실점 꼬리 여섯 중 이 하나만 520ms에 키퍼에 가려졌다.
           // 반폭 0.72에 공 반지름 0.14와 여유를 더한 1.05로 어깨 밖을 지나가게 한다.
@@ -1818,7 +1834,7 @@ const TOUCHED = new Set(['contact']);
     keeper.position.y += hover - footY(keeper);
     // drive()가 목을 덮어쓰고, 위치 보정 전 월드행렬은 낡았다. 둘이 끝난 뒤에 고개를 돌린다.
     // 사건별 고개 각도는 상수다. 회차 편차가 필요한 사건만 자기 배율을 남긴다.
-    if (tail) applyFace((FACE_TURN[tail.kind] ?? 0.6) * (tail.faceMul ?? 1), FACE_MOOD[tail.kind] ?? 'shock', tailRamp);
+    if (tail) applyFace((FACE_TURN[tail.kind] ?? 0.6) * (tail.faceMul ?? 1), tailMood(tail), tailRamp);
     else if (titleMode) applyFace(0.92, 'grin', 1);
     else applyFace(0, 'rest', 1);
     kicker.position.y += -footY(kicker);
@@ -2087,6 +2103,11 @@ const TOUCHED = new Set(['contact']);
   // 표정을 바꾸는 코드가 돌았다는 것과 표정이 화면에 있다는 것은 다른 주장이다.
   // 뒤통수를 향한 머리에 하트 눈을 넣어도 관객이 보는 것은 검은 반구다.
   window.__faceVis = () => faceToCamera(keeper.userData.head, camera, 1);
+  // 갈래가 화면 셋을 같이 움직였는지 재는 손잡이. 자세는 __poseVis가 이미 들고 있으므로
+  // 여기서는 갈래 이름과 표정과 켜진 하트 수만 낸다. 셋이 어긋나면 게이트가 잡는다.
+  window.__gazeVis = () => (tail
+    ? { act: tail.act ?? null, mood: tailMood(tail), hearts: hearts.filter((h) => h.visible).length }
+    : { act: null, mood: null, hearts: 0 });
   // 머리의 월드 좌표. 표정을 눈으로 보려면 그 자리를 화면에서 찾아 확대해야 한다.
   window.__headAt = () => {
     const v = new THREE.Vector3();
@@ -2117,7 +2138,9 @@ const TOUCHED = new Set(['contact']);
   // 게이트가 사건을 걸 프레임과 세계를 멈출 프레임을 미리 맡긴다.
   // kind가 비면 사건은 안 걸고 멈춤만 맞는다. 장부를 읽는 동안 판이 더 돌면
   // 앞에 읽은 수와 뒤에 읽은 수가 한 판씩 어깼다.
-  window.__plan = (at, kind, stopAt) => { planAct = { n: at, kind }; stopFrame = stopAt; };
+  // flavour까지 실어야 눈맞음 아홉 갈래를 고정 프레임에서 채취할 수 있다.
+  // 실시간으로 걸면 같은 갈래를 두 번 세운 대조군이 갈래 간 최소 거리의 80%까지 벌어졌다.
+  window.__plan = (at, kind, stopAt, flavour) => { planAct = { n: at, kind, act: flavour ?? null }; stopFrame = stopAt; };
 
   // 꼬리가 겨냥한 x. 키커가 노린 자리이고 먹힌 공이 끝나야 할 자리다.
   // 이 값과 공의 최종 x가 따로 놀면 어느 코너로 찼든 공이 골문 한가운데에 선다.
