@@ -744,6 +744,9 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   border:2px solid #ffffff14;display:grid;place-items:center;overflow:hidden}
 #shop .shot img,#shop .shot canvas{width:100%;height:100%;object-fit:contain;display:block}
 #shop .card.gear em{margin-top:5px}
+#shop .card.gear .duration{display:block;margin-top:var(--gap-1);color:var(--dim);font-size:var(--fs-body);font-style:normal;font-weight:700}
+/* 봇과 버프의 기간·횟수는 가격 배지와 분리된 카드 보조행이다. 본문 토큰만 쓴다. */
+#shop .card.gear .duration{display:block;margin-top:3px;color:var(--dim);font-size:var(--fs-body);font-style:normal;font-weight:700}
 /* 변형 조각. 한 등급이 여러 모양을 들고 있다는 것을 값 버튼 위에서 알린다.
    18px는 손가락으로 누르기엔 작지만 카드 높이를 안 밀고, 눌리는 것은 조각이 아니라 그 줄 전체다. */
 #shop .skins{display:flex;gap:6px;margin-top:7px}
@@ -762,6 +765,8 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #shop .buy:not(:disabled):active{transform:translateY(3px);box-shadow:2px 2px 0 var(--edge)}
 /* 못 누르는 이유는 버튼 글자 자체가 말한다. 회색만으로는 왜 죽었는지가 안 남는다. */
 #shop .buy:disabled{background:#141a12;color:#f6efdc5c;cursor:default}
+#shop .bad-price .px,#me .bad-price .px{color:var(--bad)}
+#shop .buy.bad-price .px{color:var(--bad)}
 /* 갈래 한 줄 소개와 보유 이용권. 문장은 왼쪽, 수는 오른쪽에 선다. 한 줄 안에 두면
    설명을 읽는 눈과 잔고를 세는 눈이 같은 높이에서 끝난다. */
 #shop .card .lede{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left}
