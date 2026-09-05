@@ -764,7 +764,7 @@ function renderRoster() {
      명단 밖에서 시작한 첫 키퍼는 어느 줄에도 없고, 다른 사람을 세우는 순간 못 돌아온다. */
   const mine = state.squad.map((k, i) => {
     const now = i === state.pick;
-    const tail = now ? '지금 뛰는 중' : '세우기';
+    const tail = now ? '출전' : '교체';
     return '<button data-at="' + i + '"' + (now ? ' class="here" disabled' : '') + '>'
       /* 이름만 늘어놓으면 명단이 글자 목록이라 누가 누군지가 이름을 읽어야 안다.
          얼굴을 앞에 세우면 세우려는 사람을 찾는 눈이 글자를 안 지난다. */
@@ -789,7 +789,7 @@ function renderRoster() {
     ? '<div class="row mine">' + mine + '</div>'
       + '<h5>명단에서 데려오기</h5>'
       + (hire ? '<div class="row hire">' + hire + '</div>'
-        : '<div class="note dim"><span>명단을 다 모았다</span></div>')
+        : '<div class="note dim"><span></span></div>')
     : kickerPane(squadTab);
   const count = squadTab === 'gk' ? '보유 ' + state.squad.length + '명'
     : '주전 ' + state.eleven.length + ' / ' + ELEVEN + '명';
@@ -835,7 +835,7 @@ function kickerPane(role) {
     if (!k) return "";
     return '<button data-kick="' + n + '"' + (on ? ' class="here"' : '') + '>'
       + '<img alt="' + n + '" src="' + thumbURL("face", k, lookOf({}, n)) + '">'
-      + n + '<em>결정력 ' + k.finishing + ', ' + (on ? "내리기" : "세우기") + '</em></button>';
+      + n + '<em>결정력 ' + k.finishing + ', ' + (on ? "해제" : "선발") + '</em></button>';
   };
   const hire = KICKERS.filter((k) => k.role === role && state.kickers.indexOf(k.name) < 0).map((k) => {
     const cost = kickerCost(k);
@@ -846,13 +846,13 @@ function kickerPane(role) {
   }).join("");
   return '<h5>주전 ' + starting.length + ' / ' + slots + '</h5>'
     + '<div class="row mine">' + (starting.map((n) => card(n, true)).join("")
-      || '<span class="note dim">이 자리가 비었다</span>') + '</div>'
+      || '<span class="note dim"></span>') + '</div>'
     + '<h5>가진 사람</h5>'
     + '<div class="row mine">' + (owned.map((n) => card(n, false)).join("")
-      || '<span class="note dim">벤치가 비었다</span>') + '</div>'
+      || '<span class="note dim"></span>') + '</div>'
     + '<h5>명단에서 데려오기</h5>'
     + (hire ? '<div class="row hire">' + hire + '</div>'
-      : '<div class="note dim"><span>이 자리는 다 모았다</span></div>');
+      : '<div class="note dim"><span></span></div>');
 }
 
 /* 세우기와 내리기와 영입. 셋 다 한 곳에서 끝나야 정원 검사가 한 번만 적힌다.
@@ -1030,8 +1030,8 @@ function closeGram() {
 const HIDDEN_LABEL = { consistency: '기복', professionalism: '프로의식' };
 // 기본값이 5다. 5를 가운데로 두고 위아래 두 칸씩 벌려야 평범한 선수가 평범하게 읽힌다.
 function hiddenBand(key, v) {
-  if (key === 'consistency') return v >= 8 ? '한결같다' : v >= 6 ? '기복이 적다' : v >= 4 ? '들쭉날쭉하다' : '오늘 뭐가 나올지 모른다';
-  return v >= 8 ? '훈련을 거르지 않는다' : v >= 6 ? '성실하다' : v >= 4 ? '적당히 한다' : '훈련장을 싫어한다';
+  if (key === 'consistency') return v >= 8 ? '한결' : v >= 6 ? '안정' : v >= 4 ? '변동' : '불안';
+  return v >= 8 ? '성실' : v >= 6 ? '근면' : v >= 4 ? '적당' : '회피';
 }
 
 // 내 정보. 오른쪽 기둥이 찼으므로 좌상단 레벨 칩이 진입이다.
@@ -1054,9 +1054,9 @@ function recordRows() {
 
 // 만남 버튼 글자. 문은 판정이 열고, 값을 어떻게 보여 줄지는 화면이 정한다.
 function dateLabel(g) {
-  if (g.open) return SW(g.cost) + ' 내고 만나러 간다';
-  if (g.short > 0) return SW(g.short) + ' 모자라다';
-  return g.why;
+  if (g.open) return SW(g.cost);
+  if (g.short > 0) return SW(g.short);
+  return '만남';
 }
 
 
@@ -1072,8 +1072,8 @@ function recruit(entry) {
 // 아는 얼굴. 라포는 이미 판정과 팔로워에 붙는데 화면 어디에도 없어서 플레이어가 늘어난 줄을 몰랐다.
 function rapportRows() {
   const keys = Object.keys(state.rapport || {});
-  const head = '<div class="note"><b>아는 얼굴</b><i>말 섞은 만큼 한눈을 덜 판다</i></div>';
-  if (!keys.length) return head + '<div class="note dim"><span>아직 얼굴을 튼 사람이 없다</span></div>';
+  const head = '<div class="note"><b>아는 얼굴</b><i>라포</i></div>';
+  if (!keys.length) return head + '<div class="note dim"><span></span></div>';
   // 많이 마주친 순. 같으면 키 순이라 같은 동네가 흩어지지 않는다.
   keys.sort((a, b) => (state.rapport[b] - state.rapport[a]) || a.localeCompare(b));
   const rows = keys.map((key) => {
@@ -1087,12 +1087,12 @@ function rapportRows() {
     const fans = Math.round((rapportBoost(state.rapport, city, passer) - 1) * 100);
     // 이름은 라포 1단계부터 열린다. 그 전에는 차림새로만 부른다.
     const who = passerName(city, passer, tier);
-    const face = tier > 0 ? tier + '단계' : '얼굴만 익었다';
+    const face = tier > 0 ? tier + '단계' : '초면';
     // 만남은 이 사람에게 붙은 행동이라 그 줄 안에 둔다. 못 누르는 사유도 버튼이 직접 말한다.
     const g = dateGate(state.rapport, city, passer, state.wallet.coin);
     return '<div class="note"><b>' + cityAt(city).name + '에서 마주친 ' + who + '</b><i>말 섞은 횟수 ' + n
       + '. ' + face + '. 한눈팔기 ' + aid + '% 감소, 팔로워 +' + fans + '%</i>'
-      + '<button class="go" data-city="' + city + '" data-passer="' + passer + '"' + (g.open ? '' : ' disabled') + '>' + dateLabel(g) + '</button></div>';
+      + '<button class="go' + (g.short > 0 ? ' bad-price' : '') + '" data-city="' + city + '" data-passer="' + passer + '"' + (g.open ? '' : ' disabled') + '>' + dateLabel(g) + '</button></div>';
   }).join('');
   return head + rows;
 }
@@ -1127,7 +1127,7 @@ function renderMe() {
   }).join('');
   const traits = (k.traits && k.traits.length)
     ? k.traits.map((t) => '<div class="note"><b>' + t + '</b><i>' + (TRAITS[t] ? TRAITS[t].note : '') + '</i></div>').join('')
-    : '<div class="note dim"><span>달린 특성이 없다. 명단에서 데려오면 붙어 온다</span></div>';
+    : '<div class="note dim"><span></span></div>';
   const hidden = HIDDEN.map((h) => '<div class="note"><b>' + HIDDEN_LABEL[h] + '</b><i>' + hiddenBand(h, k[h]) + '</i></div>').join('');
   const pane = meTab === 'log' ? recordRows()
     : meTab === 'face' ? rapportRows()
@@ -1324,14 +1324,14 @@ function shopOdds(pool) {
 // 버튼 글자 규칙이 한쪽에서만 바뀌어 같은 상점 안에서 말이 갈린다.
 // 장갑은 손이라 판정식의 gloveP와 spillP로, 축구화는 발이라 출발 지연으로 들어간다.
 const SHELVES = {
-  glove: { head: '장갑', list: GLOVES, field: 'grip', worn: '끼는 중', past: '지난 장갑', top: MAX_GRIP, at: gloveAt },
-  boot: { head: '축구화', list: BOOTS, field: 'studs', worn: '신는 중', past: '지난 축구화', top: MAX_STUD, at: bootAt },
-  kit: { head: '유니폼', list: KITS, field: 'pads', worn: '입는 중', past: '지난 유니폼', top: MAX_KIT, at: kitAt },
-  sock: { head: '양말', list: SOCKS, field: 'socks', worn: '신는 중', past: '지난 양말', top: MAX_SOCK, at: sockAt },
-  frame: { head: '골대', list: GOALS, field: 'frame', worn: '쓰는 중', past: '지난 골대', top: MAX_FRAME, at: frameAt },
-  city: { head: '동네', list: CITIES, field: 'city', worn: '뛰는 중', past: '지난 동네', top: MAX_CITY, at: cityAt },
-  hair: { head: '머리', list: HAIRS, field: 'hair', worn: '자른 머리', past: '지난 머리', top: MAX_HAIR, at: hairAt },
-  ink: { head: '타투', list: TATTOOS, field: 'ink', worn: '새긴 것', past: '지운 타투', top: MAX_INK, at: inkAt }
+  glove: { head: '장갑', list: GLOVES, field: 'grip', worn: '착용', past: '보유', top: MAX_GRIP, at: gloveAt },
+  boot: { head: '축구화', list: BOOTS, field: 'studs', worn: '착용', past: '보유', top: MAX_STUD, at: bootAt },
+  kit: { head: '유니폼', list: KITS, field: 'pads', worn: '착용', past: '보유', top: MAX_KIT, at: kitAt },
+  sock: { head: '양말', list: SOCKS, field: 'socks', worn: '착용', past: '보유', top: MAX_SOCK, at: sockAt },
+  frame: { head: '골대', list: GOALS, field: 'frame', worn: '착용', past: '보유', top: MAX_FRAME, at: frameAt },
+  city: { head: '동네', list: CITIES, field: 'city', worn: '착용', past: '보유', top: MAX_CITY, at: cityAt },
+  hair: { head: '머리', list: HAIRS, field: 'hair', worn: '착용', past: '보유', top: MAX_HAIR, at: hairAt },
+  ink: { head: '타투', list: TATTOOS, field: 'ink', worn: '착용', past: '보유', top: MAX_INK, at: inkAt }
 };
 
 
@@ -1366,10 +1366,9 @@ function specLines(kind, rank) {
     // 외형 선반은 판정에 안 들어간다. 대신 소문에 붙는 승수가 있고, 그것도 값이다.
     if (!steps) {
       const gain = Math.round(0.05 * n * 100);
-      return n > 0 ? ['소문이 ' + gain + '% 더 퍼진다', '판정은 안 바뀐다. 보이는 것만 바뀐다']
-        : ['아무것도 안 바꾼다'];
+      return n > 0 ? ['소문 확산 +' + gain + '%', '외형 효과'] : ['효과 없음'];
     }
-    if (n === 0) return ['아무것도 안 샀을 때 자리다'];
+    if (n === 0) return ['효과 없음'];
     return steps.map((st) => {
       const v = Math.round(st.per * n * 10) / 10;
       const u = AXIS_UNIT[st.axis] || '';
@@ -1380,18 +1379,18 @@ function specLines(kind, rank) {
     const b = botAt(rank);
     if (!b) return [];
     // 팔로워가 안 붙는다는 사실은 선반 머리글이 이미 말한다. 여기는 성능과 기간만 말한다.
-    return ['판단력을 ' + b.judge + '로 대신 굴린다', b.minutes + '분 켜지고, 내 키퍼가 더 높으면 손해다'];
+    return ['판단력 ' + b.judge];
   }
   if (kind === 'buff') {
     const b = buffAt(rank);
     if (!b) return [];
     // 카드 본문이 이미 든 문장을 여기서 되풀이하면 이 칸이 새 정보를 안 준다. 수로 말한다.
-    const dose = b.shots + '슛 동안만 간다';
+    const dose = b.shots + '슛';
     if (b.kind === 'tonic') {
       const cut = Math.round((1 - TONIC_FOCUS) * 100);
-      return ['한눈팔기 확률 -' + cut + '%', '수다 확률 -' + cut + '%', dose];
+      return ['한눈팔기 -' + cut + '%', '수다 -' + cut + '%', dose];
     }
-    if (b.kind === 'hype') return ['소문이 퍼지는 배율 +' + Math.round((HYPE_BOOST - 1) * 100) + '%', dose];
+    if (b.kind === 'hype') return ['소문 확산 +' + Math.round((HYPE_BOOST - 1) * 100) + '%', dose];
     // 송진은 장갑 한 등급을 더 얹는 물건이라, 장갑 선반이 파는 그 두 축을 그대로 쓴다.
     return GEAR_STEP.grip.map((st) => AXIS_WORD[st.axis] + ' -' + st.per + (AXIS_UNIT[st.axis] || '')).concat([dose]);
   }
@@ -1410,9 +1409,12 @@ function showSpec(name, kind, rank) {
 function clearSpec() {
   const box = el('shop') && el('shop').querySelector('.spec');
   if (!box) return;
-  box.innerHTML = '<i class="dim">카드에 손을 올리면 무엇을 사는지가 여기 뜬다</i>';
+  box.innerHTML = '';
   box.dataset.at = '';
 }
+
+// 상점 안내문은 다음 위키 화면이 가져갈 원문이다. 상점에는 안내문을 그리지 않는다.
+export const SHOP_NOTICES_FOR_WIKI = ['봇이 대신 막은 슛에는 팔로워가 안 붙는다', '시간이 아니라 슛으로 닳는다. 한 번에 한 종류만 든다'];
 
 // 탈의실. 지금 내 모습과 걸쳐 본 것을 한 자리에서 보여 준다.
 // 값을 치르기 전에 자기 몸에서 확인할 수 있어야 꾸미는 재미가 산다.
@@ -1426,20 +1428,21 @@ function fittingRoom() {
   // 무엇을 걸쳤는지 아는 자리와 그것을 무르는 자리가 갈려 있다.
   const lines = tried.length
     ? tried.map((f) => '<i data-off="' + f + '">' + nameOfField(f, fitting[f]) + '<b>X</b></i>').join('')
-    : '<i class="dim">눌러서 걸쳐 본다</i>';
+    : '';
   const canAll = tried.length > 0 && bill <= state.wallet.coin;
-  const allLabel = tried.length === 0 ? '고른 것이 없다'
-    : (canAll ? '전부 사기 ' + SW(bill) : SW(bill - state.wallet.coin) + ' 모자라다');
+  const allLabel = tried.length === 0 ? '구매'
+    : SW(canAll ? bill : bill - state.wallet.coin);
+  const allClass = tried.length > 0 && !canAll ? ' bad-price' : '';
   return '<div class="fitting">'
     + '<div class="me">' + (url ? '<img alt="" src="' + url + '">' : '') + '</div>'
     + '<b>' + state.keeper.name + '</b>'
     + '<div class="tried">' + lines + '</div>'
     + '<div class="acts">'
-    + '<button class="all"' + (canAll ? '' : ' disabled') + '>' + allLabel + '</button>'
-    + (tried.length ? '<button class="strip">전부 벗기</button>' : '')
+    + '<button class="all' + allClass + '"' + (canAll ? '' : ' disabled') + '>' + allLabel + '</button>'
+    + (tried.length ? '<button class="strip">벗기</button>' : '')
     + '</div>'
     // 효과 칸. 카드 본문은 이름과 한 줄만 들고, 수치는 손을 올린 카드의 것만 여기 뜬다.
-    + '<div class="spec"><i class="dim">카드에 손을 올리면 무엇을 사는지가 여기 뜬다</i></div>'
+    + '<div class="spec"></div>'
     + '</div>';
 }
 
@@ -1466,6 +1469,7 @@ function gearShelf(kind) {
     const rank = g[s.field];
     let label = SW(g.cost);
     let off = false;
+    let bad = false;
     if (rank === have) {
       label = s.worn;
       off = true;
@@ -1474,8 +1478,9 @@ function gearShelf(kind) {
       off = true;
     } else if (state.wallet.coin < g.cost) {
       // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
-      label = SW(g.cost - state.wallet.coin) + ' 모자라다';
+      label = SW(g.cost - state.wallet.coin);
       off = true;
+      bad = true;
     }
     // 썸네일 자리는 마크업에서 비워 두고 그림은 bindGear가 굽는다. 굽는 데 렌더러가 필요해서
     // 문자열을 만드는 자리에서는 그릴 수 없다. 자리가 없으면 카드 높이가 그림을 받고 나서 뛴다.
@@ -1494,10 +1499,9 @@ function gearShelf(kind) {
     }
     return '<div class="card gear" data-spec="' + kind + '" data-at="' + rank + '"><div class="shot" data-kind="' + kind + '" data-rank="' + rank + '"></div>'
       + '<b>' + g.name + '</b><em>' + g.note + '</em>' + skins
-      + '<button class="buy" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
+      + '<button class="buy' + (bad ? ' bad-price' : '') + '" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
   });
-  const top = have >= s.top ? '<span class="got">' + s.at(s.top).name + '까지 갔다. 더 살 게 없다</span>' : '';
-  return '<h4>' + s.head + '</h4><div class="rack">' + rows.join('') + '</div>' + top;
+  return '<h4>' + s.head + '</h4><div class="rack">' + rows.join('') + '</div>';
 }
 
 
@@ -1757,12 +1761,13 @@ function pullShelf(all) {
     const off = !pool.length || !bill.afford || left < want;
     // 이용권으로 다 내는 회차는 값 대신 이용권 수를 적는다. 나가는 것이 다른 자원이다.
     const price = bill.cost > 0 ? SW(bill.cost) : IC_TICKET + bill.free;
-    const why = !pool.length ? '품절' : (!bill.afford ? '잔고 부족' : (left < want ? '남은 카드 ' + left : ''));
-    return '<button class="buy pull" data-want="' + want + '"' + (off ? ' disabled' : '') + '>'
+    const why = !pool.length ? '품절' : (left < want ? '한도' : '');
+    const bad = !pool.length || !bill.afford || left < want;
+    return '<button class="buy pull' + (bad && bill.cost > 0 ? ' bad-price' : '') + '" data-want="' + want + '"' + (off ? ' disabled' : '') + '>'
       + (why ? '<u>' + why + '</u>' : '')
       // 보너스가 붙는 회차는 그 사실이 버튼에 있어야 한다. 눌러 봐야 아는 이득은 이득이 아니다.
       + (want === PULL_BULK ? '<s>+' + PULL_BONUS + '</s>' : '')
-      + '<b>' + want + '회</b><i>' + price + '</i></button>';
+      + '<b>' + want + '</b><i>' + price + '</i></button>';
   }).join('');
   /* 확률은 사는 자리가 아니라 확인하는 자리다. 본문에 두 줄로 깔면 살 것을 고르는 눈이
      매번 그 줄을 지나간다. 눌러야 열리는 칸으로 뺀다. */
@@ -1780,25 +1785,27 @@ function pullShelf(all) {
 }// 봇은 소모형이라 SHELVES에 못 넣는다. 등급을 갖는 게 아니라 분을 갖는다.
 function botShelf() {
   const cur = state.bot;
-  const left = Math.ceil(cur.ms / 60000);
   const rows = BOTS.map((b) => {
-    let label = SW(b.cost) + ' 내고 ' + b.minutes + '분';
+    let label = SW(b.cost);
+    let duration = b.minutes + '분';
     let off = false;
+    let bad = false;
     if (state.wallet.coin < b.cost) {
       // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
-      label = SW(b.cost - state.wallet.coin) + ' 모자라다';
+      label = SW(b.cost - state.wallet.coin);
       off = true;
+      bad = true;
     } else if (cur.ms > 0 && b.tier === cur.tier) {
-      label = '남은 ' + left + '분에 ' + b.minutes + '분 더';
+      duration = '+' + b.minutes + '분';
     } else if (cur.ms > 0 && b.tier < cur.tier) {
       // 더 좋은 클론이 서 있는데 싼 걸 사면 등급이 내려간다. 산 사람은 그걸 산 줄 모른다.
-      label = '더 좋은 클론이 남아 있다';
+      label = '상위 보유';
       off = true;
     }
-    return '<div class="card gear" data-spec="bot" data-at="' + b.tier + '"><b>' + b.name + '</b><em>' + b.note + '</em>'
-      + '<button class="buy" data-bot="' + b.tier + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
+    return '<div class="card gear" data-spec="bot" data-at="' + b.tier + '"><b>' + b.name + '</b><em>판단력 ' + b.judge + '</em><small class="duration">' + duration + '</small>'
+      + '<button class="buy' + (bad ? ' bad-price' : '') + '" data-bot="' + b.tier + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
   });
-  return '<h4>봇</h4><span class="got">봇이 대신 막은 슛에는 팔로워가 안 붙는다</span><div class="rack">' + rows.join('') + '</div>';
+  return '<h4>봇</h4><div class="rack">' + rows.join('') + '</div>';
 }
 
 function bindBot(box) {
@@ -1822,25 +1829,29 @@ function bindBot(box) {
 function buffShelf() {
   const cur = state.buff;
   const rows = BUFFS.map((b) => {
-    let label = SW(b.cost) + ' 내고 ' + b.shots + '슛';
+    let label = SW(b.cost);
+    let duration = b.shots + '슛';
     let off = false;
+    let bad = false;
     if (state.wallet.coin < b.cost) {
       // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
-      label = SW(b.cost - state.wallet.coin) + ' 모자라다';
+      label = SW(b.cost - state.wallet.coin);
       off = true;
+      bad = true;
     } else if (cur.shots > 0 && cur.kind === b.kind) {
-      label = '남은 ' + cur.shots + '슛에 ' + b.shots + '슛 더';
+      duration = '+' + b.shots + '슛';
       // 상한에 닿으면 산 구가 그대로 버려진다. 사기 전에 알아야 한다.
-      if (cur.shots >= BUFF_CAP) { label = '더 못 담는다'; off = true; }
+      if (cur.shots >= BUFF_CAP) { label = '한도'; off = true; }
     } else if (cur.shots > 0) {
       // 슬롯이 하나라 다른 종류를 사면 지금 것이 덮인다. 산 사람은 그걸 산 줄 모른다.
-      label = buffAt(cur.kind).name + '가 아직 ' + cur.shots + '슛 남았다';
+      label = '보유';
       off = true;
     }
-    return '<div class="card gear" data-spec="buff" data-at="' + b.kind + '"><b>' + b.name + '</b><em>' + b.note + '</em>'
-      + '<button class="buy" data-buff="' + b.kind + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
+    const effect = specLines('buff', b.kind).filter((line) => !/[분슛]$/.test(line)).join(', ');
+    return '<div class="card gear" data-spec="buff" data-at="' + b.kind + '"><b>' + b.name + '</b><em>' + effect + '</em><small class="duration">' + duration + '</small>'
+      + '<button class="buy' + (bad ? ' bad-price' : '') + '" data-buff="' + b.kind + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
   });
-  return '<h4>버프</h4><span class="got">시간이 아니라 슛으로 닳는다. 한 번에 한 종류만 든다</span><div class="rack">' + rows.join('') + '</div>';
+  return '<h4>버프</h4><div class="rack">' + rows.join('') + '</div>';
 }
 
 function bindBuff(box) {

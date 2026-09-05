@@ -10,6 +10,8 @@ const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win6
 // maxed는 훈련장의 잉여 훈련 환전 줄을 열고, rich는 상점 값이 전부 모자람 문구로 덮이는 것을 막는다.
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=maxed,rich,veteran";
 const LINE = String.fromCharCode(10);
+// 가격 문법을 확인할 화면은 상점의 열한 선반과 시착실·선수단·프로필이다.
+const LABEL_SURFACES = ["shop", "roster", "me"];
 // U+C721 U+C218. 재화 이름을 소스에 글자로 두면 이 파일 자신이 잔여 검색에 걸린다.
 // 값은 아래 대조군이 검증한다. 코드포인트를 잘못 적으면 이 자는 엉뚱한 글자를 재고 조용히 초록을 낸다.
 const WORD = String.fromCharCode(0xC721, 0xC218);
@@ -42,6 +44,23 @@ function shown(sel) {
     if (s.display === "none" || s.visibility === "hidden") continue;
     if (!e.getClientRects().length) continue;
     out.push(n.nodeValue);
+  }
+  return out;
+}
+
+// 버튼과 배지는 값 하나 또는 짧은 명사구만 가져야 한다. 아이콘의 title은 제외한다.
+function labelHits(sel) {
+  const root = document.querySelector(sel);
+  if (!root) return [];
+  const nodes = root.querySelectorAll("button, .px, .got, .held, .tried i, .price-badge");
+  const out = [];
+  for (const node of nodes) {
+    if (!node.getClientRects().length) continue;
+    const text = node.textContent.trim().replace(/\s+/g, " ");
+    if (!text) continue;
+    const numeric = /^[0-9,]+$/.test(text);
+    if (!numeric && /(?:다|요|\.)$/.test(text)) out.push(text);
+    if (!numeric && /모자라다|내고 |눌러서|고른 것이|좋은 클론|못 담|남은 .*에/.test(text)) out.push(text);
   }
   return out;
 }
@@ -151,6 +170,77 @@ try {
   const gotDot = planted.find((s) => BULLETS.some((d) => s.indexOf(d) >= 0));
   check("instrument:a-planted-bullet-is-caught", Boolean(gotDot), gotDot ? gotDot.trim() : "missed");
   await p.evaluate(() => { const q = document.getElementById("priceProbe"); if (q) q.remove(); });
+
+  // 상점·시착실·선수단·프로필의 행동 표기는 문장이 아니라 값 또는 짧은 명사구여야 한다.
+  // 표본 범위: 표면 15 (상점 11탭 + 시착실 + 선수단 + 프로필 + planted control)
+  let labelFirst = "", labelCount = 0;
+  for (const id of LABEL_SURFACES) {
+    if (id === "shop") {
+      await p.evaluate((h) => { window[h](true); }, "__shop");
+      await p.waitForTimeout(320);
+      const tabs = await p.evaluate(() => [...document.querySelectorAll("#shop .tab")].map((e) => e.dataset.tab));
+      for (const tab of tabs) {
+        await p.click('#shop .tab[data-tab="' + tab + '"]', { force: true });
+        await p.waitForTimeout(180);
+        const hits = await p.evaluate(labelHits, "#shop");
+        labelCount += hits.length;
+        if (!labelFirst && hits.length) labelFirst = tab + ": " + hits[0];
+      }
+      await p.evaluate((h) => { window[h](false); }, "__shop");
+      await p.waitForTimeout(120);
+    } else {
+      await p.evaluate((h) => { window[h](true); }, "__" + id);
+      await p.waitForTimeout(320);
+      const hits = await p.evaluate(labelHits, "#" + id);
+      labelCount += hits.length;
+      if (!labelFirst && hits.length) labelFirst = id + ": " + hits[0];
+      await p.evaluate((h) => { window[h](false); }, "__" + id);
+      await p.waitForTimeout(120);
+    }
+  }
+  check("label:no-sentence-in-buttons-or-badges", labelCount === 0,
+    labelCount ? labelCount + " hits; first " + labelFirst : "clean over 15 surfaces");
+
+  // 기간과 횟수는 가격 배지 밖의 카드 보조행에 있어야 한다. planted 문장은 반드시 같은 축에 걸린다.
+  await p.evaluate((h) => { window[h](true); }, "__shop");
+  await p.waitForTimeout(320);
+  await p.click('#shop .tab[data-tab="bot"]', { force: true });
+  await p.waitForTimeout(180);
+  const botDuration = await p.evaluate(() => [...document.querySelectorAll("#shop .card[data-spec=bot]")].every((card) => {
+    const badge = card.querySelector(".buy");
+    const body = card.querySelector(".duration");
+    return Boolean(badge && body && !/[분슛]/.test(badge.textContent) && /분/.test(body.textContent));
+  }));
+  await p.click('#shop .tab[data-tab="buff"]', { force: true });
+  await p.waitForTimeout(180);
+  const buffDuration = await p.evaluate(() => [...document.querySelectorAll("#shop .card[data-spec=buff]")].every((card) => {
+    const badge = card.querySelector(".buy");
+    const body = card.querySelector(".duration");
+    return Boolean(badge && body && !/[분슛]/.test(badge.textContent) && /슛/.test(body.textContent));
+  }));
+  check("price:duration-sits-outside-the-badge", botDuration && buffDuration,
+    botDuration && buffDuration ? "bot and buff cards" : "bot=" + botDuration + ", buff=" + buffDuration);
+  await p.evaluate((h) => { window[h](false); }, "__shop");
+  await p.waitForTimeout(120);
+
+  // 자가 심은 문장도 실제 축이 읽어야 한다. 이 대조군을 빼면 계기가 빈 화면의 초록을 낸다.
+  await p.evaluate((h) => { window[h](true); }, "__shop");
+  await p.waitForTimeout(320);
+  await p.evaluate(() => {
+    const q = document.createElement("button");
+    q.id = "sentenceProbe";
+    q.textContent = "문장 대조군이다";
+    document.querySelector("#shop").appendChild(q);
+  });
+  await p.waitForTimeout(120);
+  const plantedLabels = await p.evaluate(labelHits, "#shop");
+  const plantedSentence = plantedLabels.find((s) => s.indexOf("문장") >= 0);
+  check("instrument:a-planted-label-sentence-is-caught", Boolean(plantedSentence),
+    plantedSentence || "missed");
+  await p.evaluate(() => { const q = document.getElementById("sentenceProbe"); if (q) q.remove(); });
+  await p.evaluate((h) => { window[h](false); }, "__shop");
+  await p.evaluate((h) => { window[h](true); }, "__shop");
+  await p.waitForTimeout(320);
 
   // 아이콘이 화소로 찍혔는가. DOM에 있는 것으로는 부족하다. 첫 값 표기 하나를 켜고 끄고 잰다.
   // 세는 창은 아이콘 자기 상자다. 표기 전체를 창으로 쓰면 옆의 숫자가 분모를 키워
