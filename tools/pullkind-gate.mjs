@@ -38,7 +38,7 @@ check("pullkind:the-base-kind-is-the-anchor-and-does-not-drift", pullCostOf("tow
 const moved = pullCostOf("legend", half);
 check("pullkind:the-price-follows-the-roster-it-is-given", moved !== costs[1] && moved > 0,
   "legend on the full roster " + costs[1] + ", on a fame-8 roster " + moved);
-// 값이 그 풀 최저 지목가보다 낮아야 뽑을 이유가 남는다. 동네 갈래의 위반은 OPEN.md가 소유한다.
+// 값이 그 풀 최저 지목가보다 낮아야 뽑을 이유가 남는다. 동네 갈래의 위반은 AGENTS.md 대기 목록이 소유한다.
 const floorCost = Math.min.apply(null, poolFor(KEEPERS, "legend").map(keeperCost));
 check("pullkind:the-legend-draw-undercuts-naming-in-its-own-pool", costs[1] < floorCost,
   costs[1] + " against the cheapest legend name " + floorCost);
