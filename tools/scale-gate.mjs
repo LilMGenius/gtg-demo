@@ -59,6 +59,7 @@ async function readSurface(page, surface) {
       if (document.getElementById("me").hidden) window.__me(true);
     } else if (name === "shop") window.__shop(true);
   }, surface.name);
+  // 바쁜 sweep 중 차가운 페이지도 표면을 마운트할 수 있게 선택자 대기에 15초를 둔다.
   await page.waitForSelector(surface.title, { state: "visible", timeout: 15000 });
   return page.evaluate((s) => {
     const root = getComputedStyle(document.documentElement);
@@ -112,6 +113,7 @@ try {
         "computed=" + value + "px token=" + token.raw + " (" + token.px + "px)");
     }
   }
+  // 오류가 많아도 실패 진단 출력은 앞의 두 건으로 제한해 원인을 읽을 수 있게 한다.
   check("render:console-clean", errors.length === 0, errors.slice(0, 2).join(" | ") || "clean");
   console.log("표본 범위: " + sampleCount + " 표면 × 제목/본문/수치 셋");
   console.log("토큰 실측: " + JSON.stringify(tokenSet));
