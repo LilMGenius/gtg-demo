@@ -14,6 +14,18 @@
      그 글자 수와 지문은 web/assets/fonts/pretendard-subset.json이 소유한다. */
   --disp:'Black Han Sans',sans-serif;
   --body:'Pretendard GTG',sans-serif;
+  /* 제목은 작은 모바일 화면에서도 위계가 서도록 최소 16px을 보장한다. */
+  --fs-title:clamp(16px,2.4vw,26px);
+  /* 본문은 모바일에서 읽히는 최소 15px을 지키고 넓은 화면에서만 조금 키운다. */
+  --fs-body:clamp(15px,1.4vw,18px);
+  /* 수치는 칩과 카드에서 본문보다 또렷해야 하므로 최소 16px로 둔다. */
+  --fs-num:clamp(16px,1.8vw,22px);
+  /* 가장 작은 간격은 아이콘과 글자가 붙지 않게 4px로 둔다. */
+  --gap-1:4px;
+  /* 중간 간격은 인접한 컨트롤 사이를 한 글자 폭만큼 벌린다. */
+  --gap-2:8px;
+  /* 큰 간격은 서로 다른 정보 덩어리를 분리하는 두 칸 폭이다. */
+  --gap-3:12px;
   --pad-l:calc(16px + env(safe-area-inset-left));
   --pad-r:calc(16px + env(safe-area-inset-right));
 }
@@ -68,11 +80,11 @@ body.playing #hud{opacity:1}
   image-rendering:pixelated;display:block}
 #meBtn:active{transform:translate(2px,3px);box-shadow:1px 1px 0 var(--edge)}
 /* 레벨은 이제 표시만 한다. 누름은 초상화가 받는다. */
-#lv{grid-area:lv;font-family:var(--disp);font-weight:400;font-size:18px;letter-spacing:.02em;
+#lv{grid-area:lv;font-family:var(--body);font-weight:400;font-size:var(--fs-num);letter-spacing:.02em;
   color:#ffd83d;line-height:1.05}
 /* 아래칸 두 값은 같은 등급이다. 굵기나 투명도가 갈리면 하나가 더 중요해 보인다.
    대신 세로 선 하나로 서로 다른 것을 재는 값임을 표시한다. */
-#form,#fans,#purse{font-size:12px;font-weight:700;opacity:.72;letter-spacing:.02em;line-height:1.15;
+#form,#fans,#purse{font-size:var(--fs-num);font-weight:700;opacity:.72;letter-spacing:.02em;line-height:1.15;
   display:flex;align-items:center;gap:4px}
 /* 13px. 12px 글자와 같은 줄에서 숫자보다 커지지 않는 최대치다. 더 키우면 아이콘이 값을 눌러 읽는다. */
 #form svg,#fans svg,#purse svg{width:13px;height:13px;display:block;flex:none}
@@ -105,7 +117,7 @@ body.playing #hud{opacity:1}
 /* 패널 위로 띄우면 구 결과 칸과 겹쳐 둘 다 안 읽힌다. 패널 바깥 오른쪽이 비어 있고,
    잔고 바로 옆이라 어느 값이 오른 것인지 선을 그을 필요가 없다. */
 #purse .pop{position:absolute;left:100%;margin-left:9px;bottom:-3px;
-  font-family:var(--disp);font-weight:400;font-size:17px;color:#ffd83d;
+  font-family:var(--body);font-weight:400;font-size:var(--fs-num);color:#ffd83d;
   /* 패널 밖은 하늘과 아파트가 지나간다. 글자만 두면 밝은 배경에서 노란 글자가 사라진다. */
   padding:1px 6px 2px;background:var(--panel);border:var(--line) solid var(--edge);
   pointer-events:none;white-space:nowrap;
@@ -142,7 +154,7 @@ body.playing #hud{opacity:1}
 /* 실점 도장. 흰 장은 0.42초에 끝나 스크린샷에도 눈에도 안 남았다.
    골이 들어간 것은 한 박자 뒤까지 화면에 찍혀 있어야 읽힌다. */
 #stamp{position:fixed;left:50%;top:30%;translate:-50% -50%;pointer-events:none;opacity:0;
-  font-family:var(--disp);font-weight:400;font-size:clamp(28px,4.6vw,54px);color:#ff4d3d;
+  font-family:var(--disp);font-weight:400;font-size:var(--fs-title);color:#ff4d3d;
   -webkit-text-stroke:clamp(4px,.6vw,8px) var(--edge);paint-order:stroke fill;
   text-shadow:5px 6px 0 var(--edge);letter-spacing:.04em;white-space:nowrap}
 #stamp.hit{animation:stampHit 1.15s ease-out}
@@ -165,12 +177,12 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   top:calc(72px + env(safe-area-inset-top));
   width:min(660px,calc(100vw - 2*(var(--pad-r) + 84px)));text-align:center;pointer-events:none;
   font-family:var(--disp);
-  font-size:clamp(17px,2.4vw,25px);line-height:1.34;font-weight:400;
+  font-size:var(--fs-title);line-height:1.34;font-weight:400;
   -webkit-text-stroke:clamp(3px,.5vw,6px) var(--edge);paint-order:stroke fill;
   text-shadow:3px 4px 0 var(--edge);
   display:flex;flex-direction:column-reverse;align-items:center;gap:7px;min-height:3.6em;
   justify-content:flex-end}
-#caption b{color:#fff;font-size:13px;font-weight:400;letter-spacing:.05em;
+#caption b{color:#fff;font-size:var(--fs-title);font-weight:400;letter-spacing:.05em;
   padding:2px 10px 3px;background:var(--bad);
   border:var(--line) solid var(--edge);box-shadow:3px 3px 0 var(--edge);
   -webkit-text-stroke:0;transform:rotate(1.6deg)}
@@ -203,7 +215,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #aura[hidden]{display:none}
 #aura .tag{display:inline-flex;align-items:center;gap:5px;padding:4px 9px 6px;
   border:var(--line) solid var(--edge);background:var(--panel);color:var(--ink);
-  font-family:var(--body);font-size:12px;font-weight:700;line-height:1;
+  font-family:var(--body);font-size:var(--fs-body);font-weight:700;line-height:1;
   box-shadow:4px 4px 0 var(--edge), var(--bevel);transform:rotate(-1.2deg)}
 #aura .tag:nth-child(2n){transform:rotate(1deg)}
 #aura .tag svg{width:14px;height:14px;flex:none}
@@ -273,7 +285,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(2deg);
-  color:var(--dim);font-family:var(--disp);font-size:15px;font-weight:400;letter-spacing:-.03em}
+  color:var(--dim);font-family:var(--body);font-size:var(--fs-body);font-weight:400;letter-spacing:-.03em}
 /* 26px. 46px 판때기에서 사방 10px씩 남아 손그림 지터로 기울어도 테두리에 안 닿는다. */
 #out svg{width:26px;height:26px}
 #out.on{background:#e0563f;color:#fff;box-shadow:var(--lift) var(--lift) 0 var(--edge)}
@@ -305,7 +317,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
   background:#080b07c4}
 #earn[hidden]{display:none}
-#earn h4{font-family:var(--disp);font-size:clamp(18px,2.4vw,26px);font-weight:400;
+#earn h4{font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
   text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
 #earn .ways{display:grid;gap:9px;width:min(92vw,620px);max-height:56vh;overflow-y:auto;padding:4px}
@@ -313,10 +325,10 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
   box-shadow:5px 5px 0 var(--edge), var(--bevel)}
 #earn .way svg{width:15px;height:15px;flex:none}
-#earn .way b{font-family:var(--disp);font-weight:400;font-size:15px;color:#ffd83d}
-#earn .way i{font-style:normal;font-size:12px;opacity:.78;line-height:1.35}
+#earn .way b{font-family:var(--body);font-weight:400;font-size:var(--fs-body);color:#ffd83d}
+#earn .way i{font-style:normal;font-size:var(--fs-body);opacity:.78;line-height:1.35}
 #earn .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
-  background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
+  background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #earn .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 /* 자동. 손가락만 대신하는 토글이라 소리 아래 왼쪽 기둥에 선다.
@@ -325,7 +337,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(-2.4deg);
-  color:var(--dim);font-family:var(--disp);font-size:19px;font-weight:400;letter-spacing:.02em}
+  color:var(--dim);font-family:var(--body);font-size:var(--fs-body);font-weight:400;letter-spacing:.02em}
 /* 26px. 토글 셋이 같은 46px 판때기에 같은 크기 그림을 쓴다. */
 #auto svg{width:26px;height:26px}
 #auto.on{background:#4fd08a;color:#0d110c;box-shadow:var(--lift) var(--lift) 0 var(--edge)}
@@ -344,7 +356,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 /* 자동 배지도 같은 자리를 쓴다. #auto도 absolute라 기준점이 같다. */
 #gymDot,#autoDot{position:absolute;left:-9px;top:-9px;min-width:22px;height:22px;padding:0 4px;
   display:grid;place-items:center;background:#e0563f;color:#fff;
-  border:3px solid var(--edge);font-family:var(--disp);font-size:13px;line-height:1}
+  border:3px solid var(--edge);font-family:var(--body);font-size:var(--fs-num);line-height:1}
 #gymDot[hidden],#autoDot[hidden]{display:none}
 
 /* 훈련장. 15칸이라 한 줄로는 안 눕는다. 5열 3행 격자로 놓는다. */
@@ -354,20 +366,20 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
    c4(77%)는 카드 테두리 대비를 지키면서 골대와 키퍼가 뒤에 남는 선이다. */
   background:#080b07c4}
 #gym[hidden]{display:none}
-#gym h4{font-family:var(--disp);font-size:clamp(18px,2.4vw,26px);font-weight:400;
+#gym h4{font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
   text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
 #gym .row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;
   width:min(94vw,940px)}
 #gym .row button{padding:9px 11px 11px;
   border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
-  font-family:var(--body);font-size:15px;font-weight:400;text-align:left;line-height:1.3;
+  font-family:var(--body);font-size:var(--fs-body);font-weight:400;text-align:left;line-height:1.3;
   box-shadow:6px 6px 0 var(--edge), var(--bevel);transition:transform .12s,box-shadow .12s}
 /* 카드는 안 기울인다. 기울이면 격자 윗변이 어긋나고 한 행이 세 행으로 읽힌다.
    손으로 그린 티는 그림자 길이를 장마다 다르게 줘서 낸다. */
 #gym .row button:nth-child(3n+1){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
 #gym .row button:nth-child(3n){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
-#gym .row button em{display:block;font-style:normal;font-size:12px;font-weight:700;
+#gym .row button em{display:block;font-style:normal;font-size:var(--fs-num);font-weight:700;
   color:var(--good);margin-top:3px}
 /* 이름 앞에 그 칸의 그림을 세운다. 18px은 15px 글자 옆에서 이름을 안 누르는 최대치이고,
    두 창이 같은 규칙을 써야 같은 칸이 두 화면에서 다르게 안 보인다. */
@@ -381,13 +393,13 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #gym .row button:not(:disabled):active{transform:translateY(3px) rotate(0);box-shadow:2px 2px 0 var(--edge)}
 /* 환전 줄. 성장 칸이 전부 상한일 때만 붙는다. 닫기와 같은 모양이면 어느 쪽이 본 행동인지 안 읽혀서 금색으로 뗀다. */
 #gym .swap{padding:10px 30px 12px;border:var(--line) solid var(--edge);
-  background:#2b2412;color:#ffd83d;font-family:var(--disp);font-size:17px;
+  background:#2b2412;color:#ffd83d;font-family:var(--body);font-size:var(--fs-body);
   box-shadow:6px 6px 0 var(--edge), var(--bevel);transform:rotate(-1deg)}
 #gym .swap:disabled{background:#141a12;color:#f6efdc5c;cursor:default}
 #gym .swap:not(:disabled):active{transform:rotate(-1deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 /* 닫기는 늘 보인다. 포인트가 0일 때 열면 나갈 길이 이것뿐이다. */
 #gym .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
-  background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
+  background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #gym .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 
@@ -411,14 +423,14 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
    45px로 잘리고 이름이 사라졌다. 넘치는 것은 스크롤이 받아야지 줄이 받으면 안 된다. */
 #roster > *{flex:none}
 #roster[hidden]{display:none}
-#roster h4{font-family:var(--disp);font-size:clamp(18px,2.4vw,26px);font-weight:400;
+#roster h4{font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
   text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
 #roster .row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;
   width:min(94vw,940px);max-height:52vh;overflow-y:auto;padding:4px}
 #roster .row button{padding:9px 11px 11px;
   border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
-  font-family:var(--body);font-size:15px;font-weight:400;text-align:left;line-height:1.3;
+  font-family:var(--body);font-size:var(--fs-body);font-weight:400;text-align:left;line-height:1.3;
   box-shadow:6px 6px 0 var(--edge), var(--bevel);transition:transform .12s,box-shadow .12s}
 #roster .row button:nth-child(3n+1){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
 /* 아웃문그램 계정 사진. 제목과 한 줄에 서므로 글자 크기에 맞춰 둥근 모서리 없이 판때기로 둔다. */
@@ -428,7 +440,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #roster .row button img{width:38px;height:38px;object-fit:cover;object-position:center top;
   image-rendering:pixelated;display:block;margin:0 auto 5px;border:2px solid var(--edge);background:#141a12}
 #roster .row button:nth-child(3n){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
-#roster .row button em{display:block;font-style:normal;font-size:12px;font-weight:700;
+#roster .row button em{display:block;font-style:normal;font-size:var(--fs-num);font-weight:700;
   color:var(--good);margin-top:3px}
 /* 지금 뛰는 자리와 육수가 모자란 카드. 눌러도 아무 일이 없다는 것이 먼저 보여야 한다. */
 #roster .row button:disabled{color:#f6efdc5c;background:#141a12;cursor:default}
@@ -438,7 +450,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #roster .row button.here em{color:#ffd83d}
 /* 두 목록을 가르는 줄. 가진 사람은 값이 없고 명단은 값이 있어, 같은 격자에 붙여 두면
    위쪽이 공짜로 살 수 있는 칸으로 읽힌다. 제목 하나가 그 오해를 끊는다. */
-#roster h5{margin:0;font-family:var(--disp);font-size:15px;font-weight:400;color:var(--dim);
+#roster h5{margin:0;font-family:var(--disp);font-size:var(--fs-title);font-weight:400;color:var(--dim);
   letter-spacing:.02em}
 /* 가진 사람 줄은 대체로 짧다. 다섯 칸 격자에 두 명만 서면 카드가 화면 폭을 다 먹는다. */
 #roster .row.mine{grid-template-columns:repeat(auto-fill,minmax(150px,180px));justify-content:center}
@@ -446,7 +458,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   box-shadow:8px 10px 0 var(--edge), var(--bevel)}
 #roster .row button:not(:disabled):active{transform:translateY(3px);box-shadow:2px 2px 0 var(--edge)}
 #roster .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
-  background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
+  background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #roster .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 
@@ -464,36 +476,36 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
   background:#080b07c4}
 #gram[hidden]{display:none}
-#gram h4{font-family:var(--disp);font-size:clamp(18px,2.4vw,26px);font-weight:400;
+#gram h4{font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
   text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
 #gram .feed{display:flex;flex-direction:column;gap:9px;
   width:min(92vw,560px);max-height:52vh;overflow-y:auto;padding:4px}
 #gram .post{padding:9px 12px 11px;border:var(--line) solid var(--edge);background:#1b2318;
-  color:var(--ink);font-family:var(--body);font-size:15px;font-weight:400;line-height:1.35;
+  color:var(--ink);font-family:var(--body);font-size:var(--fs-body);font-weight:400;line-height:1.35;
   box-shadow:6px 6px 0 var(--edge), var(--bevel)}
 #gram .post:nth-child(3n+1){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
 #gram .post:nth-child(3n){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
 #gram .post b{color:#ffd83d;font-weight:400}
-#gram .post i{display:block;font-style:normal;font-size:12px;font-weight:700;
+#gram .post i{display:block;font-style:normal;font-size:var(--fs-num);font-weight:700;
   color:var(--good);margin-top:4px}
 #gram .post i svg{width:13px;height:13px;vertical-align:-2px}
 /* 좋아요 수는 팔로워 증가분 옆에 붙는다. 12px은 두 수가 한 덩어리로 안 읽히는 최소 간격이다. */
 #gram .post i svg + svg,#gram .post i svg:nth-of-type(2){margin-left:12px}
 /* 댓글. 글과 같은 칸 안에 있되 한 칸 들여써야 남이 쓴 줄로 읽힌다. */
 #gram .cmt{display:flex;align-items:baseline;gap:7px;margin:7px 0 0 10px;padding-top:7px;
-  border-top:2px solid #ffffff14;font-size:13px;line-height:1.35}
+  border-top:2px solid #ffffff14;font-size:var(--fs-body);line-height:1.35}
 #gram .cmt span{flex:1;color:var(--ink)}
 /* 선팔 버튼. 눌러서 관계가 바뀌는 자리라 글자보다 판때기가 먼저 보여야 한다. */
 #gram .cmt .fol{flex:none;padding:4px 10px 6px;border:2px solid var(--edge);background:#2b3a22;
-  color:#ffd83d;font-family:var(--disp);font-size:13px;font-weight:400;box-shadow:3px 3px 0 var(--edge)}
+  color:#ffd83d;font-family:var(--body);font-size:var(--fs-body);font-weight:400;box-shadow:3px 3px 0 var(--edge)}
 #gram .cmt .fol:disabled{background:#141a12;color:var(--dim);box-shadow:none}
 #gram .cmt .fol:not(:disabled):active{transform:translate(2px,3px);box-shadow:1px 1px 0 var(--edge)}
 /* 남이 올린 사진 글. 작성자 줄이 맨 위에 서야 내 글과 남의 글이 한 눈에 갈린다. */
-#gram .post.shot .by{display:flex;align-items:baseline;gap:6px;margin-bottom:7px;font-size:13px}
+#gram .post.shot .by{display:flex;align-items:baseline;gap:6px;margin-bottom:7px;font-size:var(--fs-body)}
 #gram .post.shot .by span{flex:1;color:var(--dim)}
 #gram .post.shot .by .fol{flex:none;padding:4px 10px 6px;border:2px solid var(--edge);background:#2b3a22;
-  color:#ffd83d;font-family:var(--disp);font-size:13px;font-weight:400;box-shadow:3px 3px 0 var(--edge)}
+  color:#ffd83d;font-family:var(--body);font-size:var(--fs-body);font-weight:400;box-shadow:3px 3px 0 var(--edge)}
 #gram .post.shot .by .fol:disabled{background:#141a12;color:var(--dim);box-shadow:none}
 /* 152px. 피드 폭 560px에서 사진이 글자를 밀어내지 않으면서 사람이 사람으로 보이는 하한이다. */
 #gram .post.shot img{display:block;width:152px;height:152px;object-fit:contain;
@@ -503,51 +515,51 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 /* 쪽지함. 피드 위에 서야 새 말이 왔다는 것이 먼저 읽힌다. */
 #gram .inbox{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:min(92vw,560px);margin-bottom:2px}
 #gram .inbox .dmOpen{padding:7px 13px 9px;border:var(--line) solid var(--edge);background:#2b3a22;
-  color:#ffd83d;font-family:var(--disp);font-size:15px;font-weight:400;
+  color:#ffd83d;font-family:var(--body);font-size:var(--fs-body);font-weight:400;
   box-shadow:4px 4px 0 var(--edge), var(--bevel);transform:rotate(-.8deg)}
-#gram .inbox .dmOpen em{font-style:normal;display:block;font-family:var(--body);font-size:11px;
+#gram .inbox .dmOpen em{font-style:normal;display:block;font-family:var(--body);font-size:var(--fs-body);
   font-weight:700;color:var(--good)}
 #gram .inbox .dmOpen:active{transform:rotate(-.8deg) translate(2px,3px);box-shadow:1px 1px 0 var(--edge)}
 /* 대화. 상대 말은 왼쪽, 내 말은 오른쪽. 말풍선 방향만으로 누가 말했는지가 갈린다. */
 #gram .dm{display:flex;flex-direction:column;gap:9px;width:min(92vw,560px);max-height:52vh;overflow-y:auto;padding:4px}
 #gram .dm .line{max-width:78%;padding:9px 12px 11px;border:var(--line) solid var(--edge);
-  font-family:var(--body);font-size:15px;font-weight:400;line-height:1.35;
+  font-family:var(--body);font-size:var(--fs-body);font-weight:400;line-height:1.35;
   box-shadow:5px 5px 0 var(--edge), var(--bevel)}
 #gram .dm .them{align-self:flex-start;background:#1b2318;color:var(--ink);transform:rotate(-.6deg)}
 #gram .dm .me{align-self:flex-end;background:#2b3a22;color:#ffd83d;transform:rotate(.6deg)}
-#gram .dm .out{align-self:center;font-family:var(--body);font-size:13px;font-weight:700}
+#gram .dm .out{align-self:center;font-family:var(--body);font-size:var(--fs-body);font-weight:700}
 #gram .dm .out.win{color:var(--good)}
 #gram .dm .out.lose{color:var(--dim)}
 #gram .dm .out svg{width:12px;height:12px;vertical-align:-2px}
 /* 세 갈래. 만남 창과 같은 모양이라 한 화면에서 배운 조작이 다른 창에서 달라 보이지 않는다. */
 #gram .dm .pick{display:flex;flex-direction:column;gap:7px}
 #gram .dm .pick button{padding:9px 12px 11px;border:var(--line) solid var(--edge);background:var(--panel);
-  color:var(--ink);font-family:var(--disp);font-size:16px;font-weight:400;text-align:left;
+  color:var(--ink);font-family:var(--body);font-size:var(--fs-body);font-weight:400;text-align:left;
   box-shadow:5px 5px 0 var(--edge), var(--bevel)}
 #gram .dm .pick button em{font-style:normal;display:block;margin-top:3px;font-family:var(--body);
-  font-size:12px;font-weight:400;color:var(--dim)}
+  font-size:var(--fs-body);font-weight:400;color:var(--dim)}
 #gram .dm .pick button:active{transform:translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 #gram .post.shot.mine .by span{color:var(--dim)}
 /* 만남 창의 셀카 버튼. 이긴 만남에서만 서는 자리라 눈에 먼저 들어와야 한다. */
 #date .selfie{padding:10px 22px 12px;border:var(--line) solid var(--edge);background:#2b3a22;
-  color:#ffd83d;font-family:var(--disp);font-size:17px;font-weight:400;
+  color:#ffd83d;font-family:var(--body);font-size:var(--fs-body);font-weight:400;
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(-1deg)}
-#date .selfie em{font-style:normal;display:block;margin-top:3px;font-family:var(--body);font-size:12px;
+#date .selfie em{font-style:normal;display:block;margin-top:3px;font-family:var(--body);font-size:var(--fs-body);
   font-weight:700;color:var(--good)}
 #date .selfie em svg{width:12px;height:12px;vertical-align:-2px}
 #date .selfie:active{transform:rotate(-1deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 /* 이미 찍은 뒤. 버튼 자리를 비우면 화면이 흔들리므로 같은 자리에 결과를 남긴다. */
-#date .took{font-family:var(--body);font-size:13px;font-weight:700;color:var(--good)}
+#date .took{font-family:var(--body);font-size:var(--fs-num);font-weight:700;color:var(--good)}
 #date .took svg{width:12px;height:12px;vertical-align:-2px}
 /* 계정 요약. 제목 아래 한 줄이라 제목 글꼴의 굵은 획을 그대로 쓰면 두 줄이 한 덩어리가 된다. */
-#gram h4 small{display:block;margin-top:4px;font-family:var(--body);font-size:13px;font-weight:400;
+#gram h4 small{display:block;margin-top:4px;font-family:var(--body);font-size:var(--fs-num);font-weight:400;
   color:var(--ink);-webkit-text-stroke:2px var(--edge);text-shadow:2px 3px 0 var(--edge)}
 #gram h4 small svg{width:13px;height:13px;vertical-align:-2px}
 /* 먹힌 경기 게시물. 이름이 죽어야 넘긴 판과 구분된다. */
 #gram .post.bad b{color:#f6efdc99}
 #gram .post.empty{color:var(--dim);text-align:center}
 #gram .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
-  background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
+  background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #gram .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 
@@ -556,11 +568,11 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
   background:#080b07c4}
 #me[hidden]{display:none}
-#me h4{font-family:var(--disp);font-size:clamp(18px,2.4vw,26px);font-weight:400;
+#me h4{font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
   text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
 /* 창 이름 아래 붙는 수. 제목과 점으로 잇지 않고 줄을 나눈다. 세 창이 같은 규칙을 쓴다. */
-#me h4 small,#gym h4 small,#roster h4 small{display:block;font-size:13px;color:var(--ink);
+#me h4 small,#gym h4 small,#roster h4 small{display:block;font-size:var(--fs-title);color:var(--ink);
   -webkit-text-stroke:2px var(--edge);text-shadow:2px 3px 0 var(--edge);margin-top:4px}
 /* 값 셋을 가운뎃점으로 이으면 화면에서는 목록 기호로 읽혀 세 값이 한 항목처럼 붙는다.
    14px. 글자 13px보다 넓어야 사이가 기호 없이도 갈린다. */
@@ -579,8 +591,9 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #me .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
 #me .grid span{display:flex;justify-content:space-between;gap:8px;padding:7px 10px 9px;
   border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
-  font-family:var(--body);font-size:14px;font-weight:400;
+  font-family:var(--body);font-size:var(--fs-body);font-weight:400;
   box-shadow:6px 6px 0 var(--edge), var(--bevel)}
+#me .grid span > b{font-size:var(--fs-num)}
 #me .grid span:nth-child(4n+1){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
 #me .grid span:nth-child(4n){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
 #me .grid span b{color:#ffd83d;font-weight:400}
@@ -596,33 +609,33 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #me .wear .shot img{width:100%;height:100%;object-fit:contain;display:block}
 /* 여덟 줄을 두 칸으로 접으면 네 줄이 되어 초상화보다 길어진다. 네 칸이면 두 줄이다. */
 #me .wear .on{flex:1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 12px;align-content:start}
-#me .wear .on h5{grid-column:1 / -1;margin:0;font-family:var(--disp);font-size:14px;font-weight:400;
+#me .wear .on h5{grid-column:1 / -1;margin:0;font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:var(--dim);letter-spacing:.02em;line-height:1.25}
 #me .wear .on h5:not(:first-child){margin-top:6px}
-#me .wear .on i{font-style:normal;font-family:var(--body);font-size:13px;font-weight:400;color:var(--ink);
+#me .wear .on i{font-style:normal;font-family:var(--body);font-size:var(--fs-body);font-weight:400;color:var(--ink);
   line-height:1.35}
-#me .wear .on i b{display:block;font-weight:400;font-size:11px;color:var(--dim)}
+#me .wear .on i b{display:block;font-weight:400;font-size:var(--fs-body);color:var(--dim)}
 /* 칸 셋. 상점 선반 탭과 같은 그림 언어를 쓴다. 한 창에서 배운 조작이 다른 창에서 달라 보이면
    같은 화면 안에서 문법이 둘이 된다. 아이콘이 없어 좌우 여백만 상점보다 넓게 잡았다. */
 #me .tabs{display:flex;justify-content:center;gap:9px;margin:2px 0 1px}
 #me .tab{padding:7px 15px 9px;border:var(--line) solid var(--edge);
-  background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;font-weight:400;
+  background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);font-weight:400;
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(-.8deg)}
 #me .tab:nth-child(2n){transform:rotate(1deg)}
 #me .tab[aria-current]{background:#2b3a22;color:#ffd83d}
 #me .tab:active{box-shadow:1px 1px 0 var(--edge)}
 #me .note{padding:9px 12px 11px;border:var(--line) solid var(--edge);background:#1b2318;
-  color:var(--ink);font-family:var(--body);font-size:14px;font-weight:400;line-height:1.35;
+  color:var(--ink);font-family:var(--body);font-size:var(--fs-body);font-weight:400;line-height:1.35;
   box-shadow:6px 6px 0 var(--edge), var(--bevel)}
 #me .note b{color:#ffd83d;font-weight:400}
-#me .note i{display:block;font-style:normal;font-size:12px;font-weight:700;
+#me .note i{display:block;font-style:normal;font-size:var(--fs-body);font-weight:700;
   color:var(--good);margin-top:3px}
 #me .note.dim{color:var(--dim);text-align:center}
 /* 상대 전적. 두 칸씩 끊는다. 이름이 긴 키커가 많아 세 칸으로 깔면 수치가 줄바꿈된다. */
 #me .log{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
 #me .log span{display:flex;justify-content:space-between;gap:10px;padding:7px 10px 9px;
   border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
-  font-family:var(--body);font-size:14px;font-weight:400;
+  font-family:var(--body);font-size:var(--fs-body);font-weight:400;
   box-shadow:6px 6px 0 var(--edge), var(--bevel)}
 #me .log span:nth-child(2n){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
 /* 막은 수는 좋은 색, 먹힌 수는 노랑. 두 숫자가 같은 색이면 어느 쪽이 늘었는지 안 읽힌다. */
@@ -630,7 +643,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #me .log span em{font-style:normal;color:var(--good)}
 #me .log span i{font-style:normal;color:var(--dim);margin:0 3px}
 #me .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
-  background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
+  background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #me .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 
@@ -655,22 +668,22 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #shop .fitting .me{width:100%;height:clamp(88px,20vh,150px);background:#12180f;border:2px solid #ffffff14;
   display:grid;place-items:center;overflow:hidden}
 #shop .fitting .me img{width:100%;height:100%;object-fit:contain;display:block}
-#shop .fitting b{font-family:var(--disp);font-weight:400;font-size:17px;color:#ffd83d}
+#shop .fitting b{font-family:var(--body);font-weight:400;font-size:var(--fs-body);color:#ffd83d}
 #shop .fitting .tried{display:flex;flex-direction:column;gap:3px;width:100%;min-height:34px}
-#shop .fitting .tried i{font-style:normal;font-size:12px;color:var(--good);line-height:1.35}
+#shop .fitting .tried i{font-style:normal;font-size:var(--fs-body);color:var(--good);line-height:1.35}
 /* 걸친 줄과 그 줄을 무르는 자리. X는 이름 오른쪽 끝에 붙어, 줄 어디를 눌러도 벗겨지는 것이
    아니라 무르는 자리가 따로 있다는 것이 보인다. */
 #shop .fitting .tried i[data-off]{display:flex;justify-content:space-between;align-items:center;gap:6px;cursor:pointer}
-#shop .fitting .tried i[data-off] b{font-weight:400;color:var(--dim);font-family:var(--disp)}
+#shop .fitting .tried i[data-off] b{font-weight:400;color:var(--dim);font-family:var(--body)}
 #shop .fitting .tried i[data-off]:hover b{color:var(--bad)}
 /* 사기와 벗기를 나란히 둔다. 세로로 쌓으면 왼쪽 기둥이 한 줄 길어지고 그만큼 효과 칸이 잘린다. */
 #shop .fitting .acts{display:flex;gap:7px;width:100%}
 #shop .fitting .acts .all{flex:1 1 auto}
 #shop .fitting .strip{flex:0 0 auto;padding:9px 11px 11px;border:var(--line) solid var(--edge);
-  background:#241a16;color:var(--dim);font-family:var(--disp);font-size:14px;font-weight:400}
+  background:#241a16;color:var(--dim);font-family:var(--body);font-size:var(--fs-body);font-weight:400}
 #shop .fitting .tried i.dim{color:var(--dim)}
 #shop .fitting .all{width:100%;padding:9px 0 11px;border:var(--line) solid var(--edge);
-  background:#2b3a22;color:var(--ink);font-family:var(--disp);font-size:15px;font-weight:400;
+  background:#2b3a22;color:var(--ink);font-family:var(--body);font-size:var(--fs-body);font-weight:400;
   box-shadow:5px 5px 0 var(--edge), var(--bevel)}
 #shop .fitting .all:disabled{background:#141a12;color:#f6efdc5c;cursor:default}
 /* 효과 칸. 카드 본문은 이름과 한 줄만 들고 수치는 여기가 받는다.
@@ -684,13 +697,13 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #shop .fitting .spec{width:100%;flex:1 1 120px;min-height:0;overflow:hidden;
   display:flex;flex-direction:column;gap:3px;
   padding:8px 9px 12px;background:#12180f;border:2px solid #ffffff14;text-align:left}
-#shop .fitting .spec b{font-family:var(--disp);font-weight:400;font-size:14px;color:#ffd83d}
-#shop .fitting .spec i{font-family:var(--body);font-style:normal;font-size:12px;font-weight:400;
+#shop .fitting .spec b{font-family:var(--body);font-weight:400;font-size:var(--fs-num);color:#ffd83d}
+#shop .fitting .spec i{font-family:var(--body);font-style:normal;font-size:var(--fs-body);font-weight:400;
   color:var(--good);line-height:1.4}
 #shop .fitting .spec i.dim{color:var(--dim)}
 /* 걸쳐 본 칸은 테두리로 표시한다. 어느 것을 고른 상태인지가 탈의실 그림만으로는 안 갈린다. */
 #shop .card.gear.fit{border-color:#ffd83d}
-#shop h4{font-family:var(--disp);font-size:clamp(18px,2.4vw,26px);font-weight:400;
+#shop h4{font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
   text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
 /* 탭은 선반 위에 붙는다. 지금 보는 선반은 노란 글자로 남기고 나머지는 죽인 색으로 둔다. */
@@ -702,7 +715,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
    아이콘이 이름을 안 누르면서도 형태가 안 뭉개지는 크기다. */
 #shop .tab{padding:7px 11px 9px;display:inline-flex;align-items:center;gap:5px;
   border:var(--line) solid var(--edge);
-  background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;font-weight:400;
+  background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);font-weight:400;
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(-.8deg)}
 #shop .tab:nth-child(2n){transform:rotate(1deg)}
 #shop .tab[aria-current]{background:#2b3a22;color:#ffd83d}
@@ -710,11 +723,11 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #shop .tab:active{box-shadow:1px 1px 0 var(--edge)}
 #shop .card{width:min(88vw,430px);padding:15px 18px 17px;text-align:center;
   border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
-  font-family:var(--body);font-size:16px;font-weight:400;line-height:1.45;
+  font-family:var(--body);font-size:var(--fs-body);font-weight:400;line-height:1.45;
   box-shadow:6px 6px 0 var(--edge), var(--bevel);transform:rotate(-.6deg)}
 #shop .card b{color:#ffd83d;font-weight:400}
 /* 확률과 남은 장수는 값을 치르기 전에 읽혀야 한다. 뽑고 나서 아는 확률은 안내가 아니다. */
-#shop .card em{display:block;font-style:normal;font-size:12px;font-weight:700;
+#shop .card em{display:block;font-style:normal;font-size:var(--fs-body);font-weight:700;
   color:var(--dim);margin-top:7px;line-height:1.5}
 /* 선반은 한 열로 세우지 않는다. 한 열이면 화면 폭의 대부분이 비고 상품은 스크롤 뒤로 숨는다.
    auto-fill이 뷰포트가 허락하는 만큼 칸을 늘리므로, 폭이 늘면 상품이 더 보이고 좁으면 한 열로 접힌다.
@@ -738,11 +751,11 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 /* 고른 조각만 테를 밝힌다. 색만으로 표시하면 어두운 변형끼리 무엇이 켜졌는지가 안 보인다. */
 #shop .skin.on{border-color:#e8d463;box-shadow:0 0 0 2px #e8d46355, 2px 2px 0 var(--edge)}
 #shop .skin:active{transform:translate(2px,2px);box-shadow:none}
-#shop .card.gear .buy{margin-top:8px;padding:8px 0 10px;font-size:16px}
+#shop .card.gear .buy{margin-top:8px;padding:8px 0 10px;font-size:var(--fs-num)}
 #shop .card.gear:nth-child(2n){transform:rotate(.5deg)}
 #shop .buy{width:100%;margin-top:13px;padding:10px 0 12px;
   border:var(--line) solid var(--edge);background:#2b3a22;color:var(--ink);
-  font-family:var(--disp);font-size:18px;font-weight:400;
+  font-family:var(--body);font-size:var(--fs-num);font-weight:400;
   box-shadow:6px 6px 0 var(--edge), var(--bevel);transition:transform .12s,box-shadow .12s}
 #shop .buy:not(:disabled):hover{transform:translateY(-4px);box-shadow:8px 10px 0 var(--edge), var(--bevel)}
 #shop .buy:not(:disabled):active{transform:translateY(3px);box-shadow:2px 2px 0 var(--edge)}
@@ -755,12 +768,12 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 /* 보유 이용권. 지금 몇 장 있다는 문장 대신 아이콘 옆 숫자다. 재화 칩과 같은 문법이다. */
 #shop .card .held{display:flex;align-items:center;gap:5px;flex:none;color:#ffd83d}
 #shop .card .held svg{width:15px;height:15px;display:block}
-#shop .card .held b{font-family:var(--disp);font-size:15px;font-weight:400}
+#shop .card .held b{font-family:var(--body);font-size:var(--fs-num);font-weight:400}
 /* 확률은 접힌 채로 선다. 펼치기 전에는 한 줄만 먹고, 살 것을 고르는 눈을 안 붙잡는다. */
 #shop .odds{margin-top:10px;text-align:left}
 #shop .odds summary{cursor:pointer;list-style:none;display:inline-block;
   padding:4px 10px 6px;border:2px solid var(--edge);background:var(--panel);
-  color:var(--dim);font-size:12px;font-weight:700;box-shadow:3px 3px 0 var(--edge)}
+  color:var(--dim);font-size:var(--fs-body);font-weight:700;box-shadow:3px 3px 0 var(--edge)}
 #shop .odds summary::-webkit-details-marker{display:none}
 #shop .odds[open] summary{background:#2b3a22;color:#ffd83d}
 #shop .odds em{margin-top:8px}
@@ -768,17 +781,17 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
    버튼 글자는 언제나 같은 두 줄이라, 살 수 있을 때와 없을 때 버튼이 다른 물건으로 안 읽힌다. */
 #shop .buy.pull{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;
   padding:12px 0 13px;line-height:1.1}
-#shop .buy.pull b{font-family:var(--disp);font-size:22px;font-weight:400;color:inherit}
-#shop .buy.pull i{display:flex;align-items:center;gap:4px;font-style:normal;font-size:14px;font-weight:700}
+#shop .buy.pull b{font-family:var(--body);font-size:var(--fs-num);font-weight:400;color:inherit}
+#shop .buy.pull i{display:flex;align-items:center;gap:4px;font-style:normal;font-size:var(--fs-num);font-weight:700}
 #shop .buy.pull i svg{width:14px;height:14px;display:block}
 /* 사유 배지. 버튼 위 모서리에 걸쳐 서서 버튼 안 글자를 밀어내지 않는다. */
 #shop .buy.pull u{position:absolute;top:-9px;left:50%;translate:-50% 0;text-decoration:none;
-  padding:2px 8px 3px;background:var(--bad);color:#0d110c;font-size:11px;font-weight:700;
+  padding:2px 8px 3px;background:var(--bad);color:#0d110c;font-size:var(--fs-num);font-weight:700;
   border:2px solid var(--edge);white-space:nowrap}
 /* 묶음 보너스. 사유 배지와 같은 자리를 쓰되 반대쪽 모서리에 서서 둘이 겹치지 않는다.
    이득은 노랑이고 사유는 빨강이라 색만으로도 어느 쪽인지가 갈린다. */
 #shop .buy.pull s{position:absolute;top:-9px;right:-8px;text-decoration:none;
-  padding:2px 8px 3px;background:#ffd83d;color:#0d110c;font-family:var(--disp);font-size:13px;
+  padding:2px 8px 3px;background:#ffd83d;color:#0d110c;font-family:var(--body);font-size:var(--fs-num);
   font-weight:400;border:2px solid var(--edge)}
 /* 한 장과 열 장을 나란히 둔다. 세로로 쌓으면 카드가 한 줄만큼 길어지고,
    세로 390px짜리 가로 모바일에서 그만큼 상점이 밀려 위쪽 탭이 화면 밖으로 나간다. */
@@ -787,7 +800,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
    선반을 고르는 줄이 아니라는 것이 보이게 한다. */
 #shop .kinds{display:flex;flex-wrap:wrap;justify-content:center;gap:7px}
 #shop .kind{padding:5px 12px 7px;border:2px solid var(--edge);background:var(--panel);
-  color:var(--dim);font-family:var(--disp);font-size:14px;font-weight:400;
+  color:var(--dim);font-family:var(--body);font-size:var(--fs-body);font-weight:400;
   box-shadow:3px 3px 0 var(--edge)}
 #shop .kind[aria-current]{background:#2b3a22;color:#ffd83d}
 #shop .card .buys .buy{margin-top:0}
@@ -795,7 +808,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
    58px는 이름 두 글자가 접히지 않는 최소 폭이고, 그 아래로 줄이면 뒷면과 앞면의 폭이 갈린다. */
 #shop .card .tray{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:13px;cursor:pointer}
 #shop .card .tray i{display:grid;place-items:center;width:58px;height:34px;font-style:normal;
-  font-family:var(--body);font-size:12px;font-weight:400;line-height:1.15;
+  font-family:var(--body);font-size:var(--fs-body);font-weight:400;line-height:1.15;
   border:2px solid var(--edge);background:#12180f;color:var(--dim)}
 /* 뒷면은 비어 있고 앞면은 이름을 든다. 뒤집히는 순간 위로 한 번 튀어 오른다. */
 #shop .card .tray i.up{background:#2b3a22;color:var(--ink);animation:flip .18s ease-out}
@@ -808,7 +821,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   align-items:center;justify-content:center;gap:16px;background:#060803ef}
 #pull[hidden]{display:none}
 /* 몇 장째인지. 열 장을 여는 동안 남은 수가 없으면 언제 끝나는지를 모른 채 기다린다. */
-#pull .count{font-family:var(--disp);font-size:clamp(13px,1.6vw,17px);font-weight:400;color:var(--dim)}
+#pull .count{font-family:var(--body);font-size:var(--fs-num);font-weight:400;color:var(--dim)}
 /* 지금 서는 한 장. 화면 높이의 절반을 쓴다. 이보다 작으면 상점 안 칩과 크기가 겹친다. */
 #pull .now{position:relative;width:min(46vh,300px);height:min(64vh,420px);
   display:grid;place-items:center;gap:0;
@@ -830,12 +843,12 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #pull .now img,#pull .now b{grid-area:card}
 #pull .now img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated}
 /* 이름은 그림 위라 배경이 필요하다. 아래에서 올라오는 그늘 한 겹이면 어떤 그림 위에서도 읽힌다. */
-#pull .now b{align-self:end;font-family:var(--disp);font-size:clamp(20px,3.2vw,34px);font-weight:400;
+#pull .now b{align-self:end;font-family:var(--body);font-size:var(--fs-num);font-weight:400;
   color:var(--ink);text-align:center;width:100%;padding:26px 12px 14px;line-height:1.25;
   background:linear-gradient(#0000,#060803e0 46%)}
 /* 명성. 별 대신 숫자를 크게 세우면 다섯과 아홉이 한눈에 갈린다. */
 #pull .now u{position:absolute;top:12px;left:14px;text-decoration:none;
-  font-family:var(--disp);font-size:clamp(15px,2vw,22px);font-weight:400;color:var(--dim)}
+  font-family:var(--body);font-size:var(--fs-body);font-weight:400;color:var(--dim)}
 /* 명성 9 이상. 마흔여섯 중 여덟이라 자주 안 오므로, 올 때는 판 전체가 달라야 한다. */
 #pull .now.rare{border-color:#ffd83d;background:#3a3312;box-shadow:10px 12px 0 var(--edge), 0 0 0 6px #ffd83d3d}
 #pull .now.rare b,#pull .now.rare u{color:#ffd83d}
@@ -846,7 +859,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #pull .done{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;
   width:min(92vw,720px);min-height:34px}
 #pull .done i{display:grid;place-items:center;min-width:64px;height:32px;padding:0 8px;
-  font-style:normal;font-size:12px;font-weight:700;color:var(--ink);
+  font-style:normal;font-size:var(--fs-body);font-weight:700;color:var(--ink);
   border:2px solid var(--edge);background:#2b3a22}
 #pull .done i.rare{background:#3a3312;color:#ffd83d;border-color:#ffd83d}
 /* 넘기는 법. 연출 중에는 건너뛰기, 다 열리면 닫기라고 같은 자리에서 말이 바뀐다. */
@@ -855,19 +868,19 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
    카드 위에 놓이므로 배경은 없고, 버튼은 글꼴을 물려받지 않으니 여기서 다시 준다. */
 #pull .tap{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;
   padding-bottom:22px;background:none;border:0;cursor:pointer;font:inherit;
-  font-size:12px;font-weight:700;color:var(--dim)}
+  font-size:var(--fs-body);font-weight:700;color:var(--dim)}
 #pull .tap:focus-visible{outline:2px solid var(--dim);outline-offset:-6px}
 @keyframes flip{from{transform:translateY(6px) scaleY(.4)}to{transform:none}}
-#shop .got{display:block;margin-top:11px;font-size:15px;color:var(--good)}
+#shop .got{display:block;margin-top:11px;font-size:var(--fs-num);color:var(--good)}
 #shop .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
-  background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
+  background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #shop .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 
 /* 만남 버튼. 아는 얼굴 줄 안에 붙어서 그 사람에게 붙은 행동임을 자리로 말한다. */
 #me .note .go{margin-top:7px;padding:7px 10px 9px;width:100%;
   border:var(--line) solid var(--edge);background:#2b3a24;color:var(--ink);
-  font-family:var(--disp);font-size:13px;font-weight:400;cursor:pointer;
+  font-family:var(--body);font-size:var(--fs-body);font-weight:400;cursor:pointer;
   box-shadow:4px 4px 0 var(--edge), var(--bevel)}
 #me .note .go:disabled{color:#f6efdc5c;background:#141a12;cursor:default}
 #me .note .go:not(:disabled):hover{background:#37492e;transform:translateY(-3px)}
@@ -879,25 +892,25 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;
   background:#080b07f5;padding:5vh 4vw}
 #date[hidden]{display:none}
-#date h4{font-family:var(--disp);font-size:clamp(17px,2.2vw,24px);font-weight:400;
+#date h4{font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:3px var(--edge);paint-order:stroke;text-align:center;margin:0}
 #date .card{display:flex;flex-direction:column;gap:9px;width:min(560px,92vw)}
 #date .card button{padding:10px 12px 12px;border:var(--line) solid var(--edge);
-  background:#1b2318;color:var(--ink);font-family:var(--body);font-size:14px;
+  background:#1b2318;color:var(--ink);font-family:var(--body);font-size:var(--fs-body);
   font-weight:400;text-align:left;cursor:pointer;box-shadow:6px 6px 0 var(--edge), var(--bevel)}
-#date .card button em{display:block;font-style:normal;font-size:12px;font-weight:700;
+#date .card button em{display:block;font-style:normal;font-size:var(--fs-body);font-weight:700;
   color:var(--good);margin-top:3px}
 #date .card button:hover{background:#25301f;transform:translateY(-3px)}
 #date .card button:active{transform:translateY(2px);box-shadow:2px 2px 0 var(--edge)}
 #date .out{padding:11px 13px 13px;border:var(--line) solid var(--edge);background:#1b2318;
-  color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.4;
+  color:var(--ink);font-family:var(--body);font-size:var(--fs-body);line-height:1.4;
   width:min(560px,92vw);text-align:center;box-shadow:6px 6px 0 var(--edge), var(--bevel)}
-#date .out i{display:block;font-style:normal;font-size:12px;font-weight:700;margin-top:5px}
+#date .out i{display:block;font-style:normal;font-size:var(--fs-body);font-weight:700;margin-top:5px}
 #date .out i.win{color:var(--good)}
 #date .out i.lose{color:#e0705f}
 /* 닫기 스타일은 id 스코프라 다른 패널 것이 상속되지 않는다. 안 적으면 브라우저 기본 버튼이 뜬다. */
 #date .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
-  background:var(--panel);color:var(--dim);font-family:var(--disp);font-size:16px;
+  background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg);cursor:pointer}
 #date .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 

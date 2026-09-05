@@ -11,11 +11,11 @@
 
 #mark{transform:rotate(-2.2deg);max-width:min(660px,64vw)}
 #kicker{display:inline-block;background:var(--bad);color:#fff;
-  font-size:clamp(11px,1.5vw,18px);letter-spacing:.09em;
+  font-size:var(--fs-body);letter-spacing:.09em;
   padding:5px 13px 6px;transform:rotate(1.4deg);
   box-shadow:4px 4px 0 #0009}
 #word{margin-top:clamp(8px,1.2vw,16px);line-height:.85;
-  font-size:clamp(52px,10.4vw,150px);color:#ffd83d;font-weight:400;
+  font-size:var(--fs-title);color:#ffd83d;font-weight:400;
   -webkit-text-stroke:clamp(3px,.62vw,8px) #12160e;paint-order:stroke fill;
   text-shadow:clamp(5px,.9vw,12px) clamp(6px,1.05vw,14px) 0 #12160e}
 #word span{display:block}
@@ -24,7 +24,7 @@
    로고와 같은 검정 스트로크를 지면 배경이 무엇이든 떨어진다. */
 #tag{margin-top:clamp(14px,1.7vw,24px);color:#eef3ea;
   font-family:var(--body);font-weight:700;
-  font-size:clamp(12px,1.45vw,19px);
+  font-size:var(--fs-body);
   -webkit-text-stroke:clamp(3px,.42vw,5px) #12160e;paint-order:stroke fill;
   text-shadow:2px 3px 0 #12160e}
 
@@ -34,7 +34,7 @@
   padding:clamp(11px,1.4vw,18px) clamp(34px,4.8vw,68px) clamp(14px,1.7vw,22px);
   border:clamp(4px,.55vw,7px) solid #12160e;
   color:#12160e;
-  font-family:inherit;font-weight:400;font-size:clamp(26px,3.3vw,44px);letter-spacing:.04em;
+  font-family:inherit;font-weight:400;font-size:var(--fs-title);letter-spacing:.04em;
   transform:rotate(-2.6deg);
   /* 단색 면은 평평한 앱 버튼이다. 위가 밝고 아래가 어두워야 눌리는 물건으로 읽힌다.
      같은 화면의 조작법 버튼이 이미 이 언어를 쓰는데 시작 버튼만 혼자 평면이었다. */
@@ -58,23 +58,23 @@
   width:min(86vw,320px)}
 #gate[hidden]{display:none}
 #gate input{width:100%;padding:10px 12px 12px;border:4px solid #12160e;background:#f6efdc;
-  color:#12160e;font-family:inherit;font-weight:400;font-size:clamp(15px,1.8vw,20px);
+  color:#12160e;font-family:inherit;font-weight:400;font-size:var(--fs-body);
   box-shadow:5px 6px 0 #12160e}
 #gate input[hidden]{display:none}
 #gate input::placeholder{color:#12160e8c}
 /* 지금 로그인한 사람. 이름이 서 있으면 이 기기에서 누구의 판이 열리는지가 누르기 전에 보인다. */
 #gate .who{width:100%;text-align:center;font-family:inherit;font-weight:400;
-  font-size:clamp(15px,1.9vw,21px);color:#12160e}
+  font-size:var(--fs-body);color:#12160e}
 #gate .who[hidden]{display:none}
 /* 이름은 판때기 위에 선다. 배경이 경기장이라 글자만 두면 흙바닥 위 검은 글씨가 되어 안 읽힌다. */
 #gate .who{padding:9px 12px 11px;border:4px solid #12160e;background:#f6efdc;
   box-shadow:5px 6px 0 #12160e}
 #gate .acts{display:flex;gap:9px;width:100%}
 #gate button{flex:1;padding:10px 0 12px;border:4px solid #12160e;background:#ffd83d;color:#12160e;
-  font-family:inherit;font-weight:400;font-size:clamp(16px,2vw,22px);box-shadow:5px 6px 0 #12160e}
+  font-family:inherit;font-weight:400;font-size:var(--fs-body);box-shadow:5px 6px 0 #12160e}
 #gate button:active{transform:translate(3px,4px);box-shadow:2px 2px 0 #12160e}
 /* 거절 사유. 아이디가 겹쳤는지 비밀번호가 틀렸는지를 말해야 다시 눌러 볼 수 있다. */
-#asay{margin:0;width:100%;text-align:center;font-size:clamp(12px,1.4vw,15px);font-weight:700;
+#asay{margin:0;width:100%;text-align:center;font-size:var(--fs-body);font-weight:700;
   color:#8f2020}
 #asay[hidden]{display:none}
 
@@ -86,7 +86,7 @@
   padding:7px 15px 9px;border:3px solid #12160e;
   background:var(--panel);color:var(--ink);transform:rotate(1.8deg);
   box-shadow:4px 5px 0 #12160e, inset 2px 2px 0 #ffffff1f, inset -2px -2px 0 #00000038;
-  font-family:inherit;font-weight:400;font-size:17px;letter-spacing:.02em}
+  font-family:inherit;font-weight:400;font-size:var(--fs-body);letter-spacing:.02em}
 #helpBtn svg{width:18px;height:18px;stroke-width:3}
 #helpBtn:active{transform:rotate(1.8deg) translate(3px,4px);box-shadow:1px 1px 0 #12160e}
 #helpBtn[aria-expanded="true"]{background:#ffd83d;color:#12160e}
@@ -100,11 +100,11 @@
 #helpPanel ul{list-style:none;display:flex;flex-direction:column;gap:14px}
 #helpPanel li{display:flex;align-items:center;gap:13px}
 #helpPanel li>svg{flex:0 0 auto;width:40px;height:40px}
-#helpPanel b{display:block;font-family:inherit;font-size:15px;font-weight:700}
-#helpPanel small{font-size:12px;color:var(--dim);line-height:1.45}
+#helpPanel b{display:block;font-family:inherit;font-size:var(--fs-body);font-weight:700}
+#helpPanel small{font-size:var(--fs-body);color:var(--dim);line-height:1.45}
 #helpPanel .keys{margin-top:14px;padding-top:12px;border-top:1px solid #ffffff1a;
-  font-size:11.5px;color:#7e8878;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-#helpPanel kbd{font:inherit;font-size:11px;padding:1px 6px 2px;
+  font-size:var(--fs-body);color:#7e8878;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+#helpPanel kbd{font:inherit;font-size:var(--fs-body);padding:1px 6px 2px;
   background:#20281d;border:2px solid #12160e;box-shadow:2px 2px 0 #12160e;color:#c3ccbc}
 
 /* 세로로 들면 골대 좌우가 잘린다. 그때는 게임을 보여주지 않는다. */
@@ -113,9 +113,9 @@
   background:#0b0f0a;text-align:center;
   font-family:var(--body)}
 #rotate svg{width:74px;height:74px;animation:tilt 1.8s ease-in-out infinite}
-#rotate p{font-family:var(--disp);font-size:21px;
+#rotate p{font-family:var(--disp);font-size:var(--fs-title);
   font-weight:400;color:#ffd83d;-webkit-text-stroke:4px #12160e;paint-order:stroke fill}
-#rotate small{font-size:12.5px;color:var(--dim)}
+#rotate small{font-size:var(--fs-body);color:var(--dim)}
 @keyframes tilt{0%,45%{transform:rotate(0)}70%,100%{transform:rotate(-90deg)}}
 @media (max-aspect-ratio:1/1){
   #rotate{display:flex}
