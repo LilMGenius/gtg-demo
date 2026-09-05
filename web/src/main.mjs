@@ -51,6 +51,12 @@ window.__bgm = bgm;
 // 재현되지 않는 캐프처는 증거가 아니다. ?seed= 가 있으면 그 씨드로 고정한다.
 const seedParam = new URLSearchParams(location.search).get('seed');
 const rng = makeRng(seedParam === null ? ((Date.now() ^ 0x9e3779b9) >>> 0) : (Number(seedParam) >>> 0));
+/* 화면 쪽 굴림은 판정 스트림을 안 쓴다. 판정에 굴림을 하나 더 얹으면 그 뒤 모든 구가 밀려
+   shot과 band와 save와 pose가 통째로 흔들린다. 그래서 여기는 Math.random이었는데, 그러면
+   시드를 줘도 화면 사건이 매번 다르다. 실측으로 행인 사진 수가 같은 시드에서 1과 3 사이를 오갔고
+   그 축은 확률 사건의 한 번 실현을 재고 있었다. 시드에서 파생한 둘째 스트림을 따로 세운다.
+   0x85ebca6b는 murmur3의 섞기 상수라 첫 스트림과 겹치지 않고, 시드가 없으면 시간을 쓴다. */
+const roll = makeRng(seedParam === null ? ((Date.now() ^ 0x85ebca6b) >>> 0) : ((Number(seedParam) ^ 0x85ebca6b) >>> 0));
 /* 저장은 계정마다 갈리므로 읽기 전에 누구인지부터 정해야 한다. 이 모듈은 맨 위에서 한 번
    읽고 그 값으로 상태를 세우므로, 계정을 여기서 안 걸면 로그인 전 자리를 읽고 시작한다. */
 useAccount(currentId());
@@ -533,7 +539,7 @@ function rollCaptions(result) {
   /* 눈맞음 갈래를 여기서 뽑는다. 판정 rng를 쓰면 그 뒤 모든 구가 밀려 게이트가 통째로 흔들리므로
      화면 쪽 난수를 쓴다. 한 구 안에서 한 번만 뽑아 자막과 자세가 같은 갈래를 본다. */
   for (const e of lines) {
-    if (e.t === 'distracted' || e.t === 'talked') e.act = gazeAct(Math.random);
+    if (e.t === 'distracted' || e.t === 'talked') e.act = gazeAct(roll);
   }
   // 같은 사건이 두 구 연속 같은 문장으로 나오면 굴림이 아니라 상수로 읽힌다.
   let lastCap = null;
@@ -564,19 +570,19 @@ function rollCaptions(result) {
       const post = { n: who, c: result.conceded, g: gain, t: postLine(who, result.conceded, rng),
         /* 좋아요의 밑값과 동네를 글에 박아 둔다. 남이 올린 사진은 내 팔로워가 안 오르므로 g가 0인데,
            그 0으로 좋아요를 되짚으면 화제가 없던 글로 읽힌다. 좋아요를 만든 수는 따로 남는다. */
-        lb: gain, ct: state.gear.city, l: likesFor(gain, state.gear.city, Math.random()) };
-      if (Math.random() * 100 < commentOdds(tier)) {
+        lb: gain, ct: state.gear.city, l: likesFor(gain, state.gear.city, roll()) };
+      if (roll() * 100 < commentOdds(tier)) {
         post.cm = { city: state.gear.city, passer: seen, tier,
-          who: passerName(state.gear.city, seen, tier), text: commentLine(result.conceded, tier, Math.random) };
+          who: passerName(state.gear.city, seen, tier), text: commentLine(result.conceded, tier, roll) };
       }
       state.posts.push(post);
       /* 그 구를 지켜본 사람이 나를 찍어 자기 계정에 올린다. 얼굴을 튼 사이라야 태그를 걸고,
          지나간 사람이 없던 구에는 찍은 사람도 없다. 사진은 저장에 이미지를 넣지 않는다.
          한 장이 47KB라 열두 장이면 저장 한도를 위협하고, 그림은 지금 차림에서 다시 구우면 된다. */
-      if (state.shots[state.i].gaze && tier > 0 && Math.random() * 100 < photoOdds(tier)) {
+      if (state.shots[state.i].gaze && tier > 0 && roll() * 100 < photoOdds(tier)) {
         state.posts.push({ n: passerName(state.gear.city, seen, tier), c: result.conceded, g: 0,
-          t: photoLine(result.conceded, tier, Math.random),
-          lb: gain, ct: state.gear.city, l: likesFor(gain, state.gear.city, Math.random()),
+          t: photoLine(result.conceded, tier, roll),
+          lb: gain, ct: state.gear.city, l: likesFor(gain, state.gear.city, roll()),
           ph: { city: state.gear.city, passer: seen, tier,
             h: state.keeper.height, w: state.keeper.weight, look: lookOf(state.gear, state.keeper.name) } });
       }
@@ -619,7 +625,7 @@ function countdown(sec, label, then) {
     const now = stage.now();
     const left = until - now;
     if (left <= 0) { el('caption').textContent = ''; then(); return; }
-    if (now >= bounce && left > 0.45) { stage.sfx.dribble(); bounce = now + 0.62 + Math.random() * 0.36; }
+    if (now >= bounce && left > 0.45) { stage.sfx.dribble(); bounce = now + 0.62 + roll() * 0.36; }
     tickEl.textContent = left.toFixed(1) + 's';
     timer = stage.after(0.1, tick);
   };
@@ -946,7 +952,7 @@ function renderGram() {
   for (const b of box.querySelectorAll('.fol')) {
     b.onclick = () => {
       // 맞팔 여부는 여기서 한 번 굴린다. 열 때마다 다시 굴리면 같은 사람이 매번 다른 답을 준다.
-      state.social = follow(state.social, b.dataset.key, Math.random() * 100, Number(b.dataset.tier) || 0);
+      state.social = follow(state.social, b.dataset.key, roll() * 100, Number(b.dataset.tier) || 0);
       persist();
       renderGram();
     };
@@ -1152,13 +1158,13 @@ function renderDm() {
    답장 버튼을 보다가 상대의 말이 바뀐다. */
 let dmHeld = null;
 function dmSay(city, passer, tier) {
-  if (!dmHeld || dmHeld.key !== dmOpen) dmHeld = { key: dmOpen, text: dmLine(tier, Math.random) };
+  if (!dmHeld || dmHeld.key !== dmOpen) dmHeld = { key: dmOpen, text: dmLine(tier, roll) };
   return dmHeld.text;
 }
 
 // 답장. 성공하면 라포가 한 칸 오르고 팔로워가 붙는다. 실패해도 잃는 것은 없고 다음 말이 밀린다.
 function sendDm(city, passer, tier, moveId) {
-  const out = dmOutcome(state.keeper, moveId, Math.random() * 100);
+  const out = dmOutcome(state.keeper, moveId, roll() * 100);
   if (!out) return;
   const move = DM_MOVES.find((m) => m.id === moveId);
   state.social = applyDm(state.social, dmOpen, dmClock(state.record));
@@ -1179,8 +1185,8 @@ function takeSelfie(city, passer, tier) {
   const fans = selfieFans(tier, state.gear.city);
   state.fans += fans;
   state.posts.push({ n: passerName(city, passer, tier), c: false, g: fans,
-    t: selfieLine(Math.random), lb: fans, ct: state.gear.city,
-    l: likesFor(fans, state.gear.city, Math.random()),
+    t: selfieLine(roll), lb: fans, ct: state.gear.city,
+    l: likesFor(fans, state.gear.city, roll()),
     sf: { city, passer, tier, h: state.keeper.height, w: state.keeper.weight, look: lookOf(state.gear, state.keeper.name) } });
   while (state.posts.length > FEED_CAP) state.posts.shift();
   persist();
@@ -1220,7 +1226,7 @@ function renderDate(city, passer, done) {
 
 // 굴림은 화면 쪽 난수다. 판정용 rng를 쓰면 그 뒤 모든 구가 밀려 네 게이트가 통째로 흔들린다.
 function commitDate(city, passer, moveId) {
-  const out = dateOutcome(state.keeper, moveId, Math.random() * 100);
+  const out = dateOutcome(state.keeper, moveId, roll() * 100);
   if (!out) return;
   state.wallet.coin = Math.max(0, state.wallet.coin - DATE_COST);
   state.fans = Math.max(0, state.fans + out.fans);
@@ -1677,7 +1683,7 @@ function onboardStep() {
   const left = pool.slice();
   const drawn = [];
   for (let i = 0; i < pullYield(PULL_BULK); i += 1) {
-    const pick = pullFrom(left, Math.random);
+    const pick = pullFrom(left, roll);
     if (!pick) break;
     left.splice(left.indexOf(pick), 1);
     drawn.push(pick);
@@ -1898,7 +1904,7 @@ function renderShop() {
        그래서 한 장 자리가 안 죽는다. 뽑는 수는 판정이 소유하는 함수가 정한다. */
     const take = pullYield(want);
     for (let i = 0; i < take; i += 1) {
-      const pick = pullFrom(left, Math.random);
+      const pick = pullFrom(left, roll);
       if (!pick) break;
       left.splice(left.indexOf(pick), 1);
       drawn.push(pick);
