@@ -379,15 +379,16 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
   const nape = new THREE.SphereGeometry(r * 0.98, 10, 8);
   nape.scale(1, 1, 0.62);
   nape.translate(0, -r * 0.04, -dir * r * 0.42);
-  const neck = new THREE.CylinderGeometry(r * 1.12, r * 0.66, r * 1.3, 8);
-  neck.translate(0, -r * 1.05, -dir * r * 0.12);
-  // 머리가 젖혀지면 카메라가 턱 밑면을 본다. 입 웨지만 빼고 어둡게 덮는다.
-  const chin = new THREE.SphereGeometry(r * 1.04, 12, 6, Math.PI * (dir > 0 ? 0.64 : 1.64), Math.PI * 1.72, Math.PI * 0.5, Math.PI * 0.5);
-  // 칼라가 머리와 어깨 사이 값을 끊는다.
-  const collar = new THREE.CylinderGeometry(r * 1.22, r * 1.32, r * 0.26, 10);
-  collar.translate(0, -r * 1.02, -dir * r * 0.1);
-  const shellGeos = [hair, nape, neck, chin, collar];
-  const shellColors = [hairTone || 0x2b1d14, 0x5a4030, 0x1a1712, 0x141110, 0xd7dfd2];
+  /* 목은 머리보다 가늘다. 1.12r로 시작하면 머리보다 굵어 어깨 위에 기둥이 서고,
+     그 위에 밝은 칼라까지 얹혀 있어서 파운더가 목깁스를 찼다고 짚었다.
+     0.62r은 두개골 반지름의 3분의 2로, 사람 목이 머리에 대해 갖는 비율에 가깝다. */
+  const neck = new THREE.CylinderGeometry(r * 0.62, r * 0.58, r * 0.9, 8);
+  neck.translate(0, -r * 0.92, -dir * r * 0.12);
+  /* 칼라를 뺐다. 머리와 어깨 사이 값이 안 끊긴다는 문제에 실물에 없는 원반을 얹어
+     풀었고, 사람은 없는 물건이 몸에 붙어 있으면 그것을 결함이 아니라 병으로 읽는다.
+     값은 목을 가늘게 해서 끊는다. 가는 목은 양옆에 배경을 남기므로 그 자체가 경계다. */
+  const shellGeos = [hair, nape, neck];
+  const shellColors = [hairTone || 0x2b1d14, 0x5a4030, 0x2a2018];
   /* 수염과 묶은 머리. 머리색과 피부색만으로는 백 명이 다섯 얼굴로 뭉친다.
      이 둘은 실루엣을 바꾸므로 카드 크기에서도, 경기장의 작은 머리에서도 갈린다.
      수염은 턱을 감싸는 얇은 껍데기다. 1은 짧고 2는 덥수룩해서 볼까지 올라온다. */
