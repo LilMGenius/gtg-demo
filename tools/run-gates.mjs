@@ -136,17 +136,18 @@ if (head1 !== head0 || dirty1 !== dirty0) {
 
 // 빨간 게이트에는 두 종류가 있다. 고칠 것과 파운더 답을 기다리는 것이다.
 // 그 구분이 레포에 없으면 다음 세션이 대기 중인 결정을 그냥 고쳐 버린다.
-// OPEN.md에 이름이 적힌 게이트는 이미 알려진 대기 건이고, 안 적힌 빨간불만 새 소식이다.
-if (existsSync("OPEN.md")) {
-  const open = readFileSync("OPEN.md", "utf8");
+  // AGENTS.md에 이름이 적힌 게이트는 이미 알려진 대기 건이고, 안 적힌 빨간불만 새 소식이다.
+  // 목록을 위해 파일을 따로 두지 않는다. 그 규칙을 소유한 문서가 이름도 같이 갖는다.
+  if (existsSync("AGENTS.md")) {
+    const open = readFileSync("AGENTS.md", "utf8");
   const redNames = red.map((x) => x.split(" ")[0]);
   const fresh = redNames.filter((n) => !open.includes("`" + n + "`"));
-  if (red.length) say(fresh.length ? "  not in OPEN.md: " + fresh.join(", ") : "  all red gates are logged in OPEN.md");
+    if (red.length) say(fresh.length ? "  not waiting on a ruling: " + fresh.join(", ") : "  every red gate is a logged wait");
   // 반대 방향도 본다. 문서가 이름을 적어 둔 게이트가 초록으로 돌아왔다면 그 항목은 닫혔거나,
    // 애초에 게이트가 그 사실을 안 재고 있는 것이다. 어느 쪽이든 사람이 한 번 읽어야 한다.
   const named = open.split("`").filter((_, i) => i % 2 === 1)
     .filter((s) => picked.includes(s + "-gate.mjs"));
   const settled = [...new Set(named)].filter((n) => !redNames.includes(n));
-  if (settled.length) say("  in OPEN.md and green here: " + settled.join(", ") + " (closed, or the gate does not measure the open question)");
+    if (settled.length) say("  logged as waiting but green here: " + settled.join(", ") + " (closed, or the gate does not measure the open question)");
 }
 if (red.length) process.exitCode = 1;
