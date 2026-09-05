@@ -501,7 +501,7 @@ function nextShot() {
   pips();
   setPad(true);
   // 지난 구의 표시를 지운다. 남겨 두면 이번 구를 안 눌렀을 때 지난 선택이 이번 것으로 읽힌다.
-  markDive(null, false);
+  markDive(state.pref, false);
   beatStart(shot);
   stage.reset();
   pressAt = performance.now() + shot.flight * 1000 * 0.72;
@@ -2110,7 +2110,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'ArrowUp' || e.key === ' ') chooseDive(0);
 });
 
-markDive(null, false);
+markDive(state.pref, false);
 pips();
 mountTitle(() => {
   stage.leaveTitle();

@@ -181,11 +181,32 @@ try {
         JSON.stringify(pressed));
       await ctx.close();
     }
+
+    // 저장된 선호가 첫 구를 연 뒤에도 눌림 상태로 남아야 하므로 최소 저장을 넣고 확인한다.
+    {
+      const saved = { keeper: { level: 1, name: "동네형" }, onboard: 2, pref: -1 };
+      // 고정 뷰포트는 요청된 실제 손 모드 패드 크기에서 상태를 측정하기 위한 값이다.
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+      const page = await ctx.newPage();
+      await page.addInitScript((record) => localStorage.setItem("gtg.save.v1", JSON.stringify(record)), saved);
+      await page.goto("http://127.0.0.1:10310/web/index.html?seed=20", { waitUntil: "load" });
+      await page.waitForSelector("#go", { timeout: ROUND_MS });
+      await page.click("#go", { force: true });
+      // 300ms는 go 직후 다음 구의 패드 상태가 반영됐는지 확인하기 위한 관찰 창이다.
+      await page.waitForTimeout(300);
+      const pressed = await page.evaluate(() => [...document.querySelectorAll('.zone')].map((b) => ({
+        dive: Number(b.dataset.dive), pressed: b.getAttribute('aria-pressed')
+      })));
+      check("pad:a-saved-preference-is-pressed-after-go",
+        pressed.length === 3 && pressed.every((v) => v.pressed === (v.dive === -1 ? 'true' : 'false')),
+        JSON.stringify(pressed));
+      await ctx.close();
+    }
     check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
     console.log("표본 범위: veteran 손 모드 5구, 왼쪽 선호 뒤 무입력 3구, 크레딧 봇 2구, 저장 재적재와 두 옛 저장, 740x360·1280x720 패드");
     if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
     if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
-    console.log(fails.length ? "hand FAIL " + fails.length : "hand PASS 8");
+    console.log(fails.length ? "hand FAIL " + fails.length : "hand PASS 9");
     if (fails.length) process.exitCode = 1;
   }
 } finally {
