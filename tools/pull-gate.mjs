@@ -52,12 +52,11 @@ for (let i = 0; i < N; i++) sum += keeperCost(pullFrom(KEEPERS, rng));
 const mean = sum / N;
 check("pull:buys-more-than-it-costs", mean >= PULL_COST, mean.toFixed(0) + " value per " + PULL_COST + " sweat, x" + (mean / PULL_COST).toFixed(2));
 
-// 축의 출처는 roster.mjs의 PULL_COST 주석이다. 무작위 한 장이 이름을 찍는 것보다 비싸면
-// 뽑을 이유가 사라진다고 그 주석이 선언하고, 그 값을 명단 최저가 아래에 두었다고 적혀 있다.
-const costs = KEEPERS.map(keeperCost);
-const floor = Math.min(...costs);
-const cheapest = KEEPERS[costs.indexOf(floor)].name;
-check("pull:cheaper-than-naming", PULL_COST < floor, PULL_COST + " sweat vs cheapest name " + floor + " (" + cheapest + ")");
+/* 축의 출처는 roster.mjs의 PULL_COST 주석이다. 무작위 한 장이 이름을 찍는 것보다 비싸면
+   뽑을 이유가 사라진다고 그 주석이 선언한다. 견줄 대상은 명단 최저가가 아니라 지금 살 수 있는
+   최저가다. 명단 맨 아래는 첫 진입이 모두에게 주는 시작 키퍼라 아무도 그 이름을 못 산다.
+   그 한 명을 세면 이 자는 존재하지 않는 선택지와 뽑기를 견준다. 아래에서 풀을 읽은 뒤에 잰다. */
+const roster = KEEPERS.map((k) => ({ name: k.name, cost: keeperCost(k) })).sort((a, b) => a.cost - b.cost);
 
 let b;
 try {
@@ -80,6 +79,16 @@ try {
   const st = await p.evaluate(() => window.__squad());
   const owned = new Set(st.squad);
   const pool = KEEPERS.filter((k) => !owned.has(k.name));
+  /* 견줄 최저가. 풀은 지금 안 가진 카드이고, 그 안의 최저가가 뽑기 대신 고를 수 있는 유일한
+     대안이다. 대조군은 명단 맨 아래가 이미 손에 있다는 것이다. 그 사람이 안 팔린 채 남아 있으면
+     첫 진입이 준 것을 이 표본이 못 받은 것이라, 아래 축은 사람이 겪는 판을 재지 않는다. */
+  const buyable = pool.map((k) => ({ name: k.name, cost: keeperCost(k) })).sort((a, b) => a.cost - b.cost);
+  const cheapest = buyable[0].name;
+  const floor = buyable[0].cost;
+  check("instrument:the-starter-is-already-in-hand", owned.has(roster[0].name),
+    roster[0].name + " at " + roster[0].cost + ", owned " + [...owned].join(","));
+  check("pull:cheaper-than-naming", PULL_COST < floor,
+    PULL_COST + " sweat vs cheapest name a player can still buy " + floor + " (" + cheapest + ")");
   /* 확률과 남은 장수는 카드 본문이 아니라 눌러야 열리는 칸에 산다. 닫힌 details 안의
      innerText는 빈 문자열이라, 안 열고 읽으면 화면에 수가 없는 것과 구분이 안 된다.
      사람이 여는 자리를 그대로 눌러 열고 읽는다. 계기가 다른 문으로 들어가면 그 뒤로는

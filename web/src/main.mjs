@@ -2057,5 +2057,12 @@ stage.setGoal(state.gear.frame, state.gear.frameSkin);
   nextSet();
   /* 처음 온 사람은 공보다 카드가 먼저다. 판은 뒤에서 이미 돌고 있고 개봉 화면이 그 위를 덮으므로,
      닫는 순간 바로 첫 구가 온다. 이미 하던 사람에게는 아무 일도 안 일어난다. */
-  onboardStep();
+  /* veteran 표본은 그 절차를 카드 없이 끝까지 돌린 사람이다. 단계를 건너뛰는 것이 아니라
+     다 돌리고 화면만 안 세우므로, 받는 것도 주전 열하나도 사람이 클릭했을 때와 같다. */
+  if (state.onboardSkip) {
+    while (onboardStep());
+    stopReveal();
+  } else {
+    onboardStep();
+  }
 });
