@@ -12,7 +12,9 @@ from fontTools import subset
 from fontTools.ttLib import TTFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SKIP = {".git", "node_modules", "vendor", "video.local", "critic.local", "renders"}
+# tools는 코퍼스가 아니다. 굽는 쪽과 재는 쪽이 같은 목록을 봐야 하고, 계기의 주석은
+# 화면에 안 뜨므로 실려 나갈 이유가 없다. 근거는 tools/font-gate.mjs의 같은 줄이다.
+SKIP = {".git", "node_modules", "vendor", "video.local", "critic.local", "renders", "tools"}
 BASE = "https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/woff2/Pretendard-%s.woff2"
 # 굵기 둘을 싣는다. 하나만 실으면 브라우저가 나머지를 기울이고 늘려 가짜 굵기를 만들고,
 # 그 가짜는 진짜 굵은 획보다 지저분하다. HUD의 숫자가 700을 쓰므로 없으면 바로 드러난다.

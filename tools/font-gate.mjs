@@ -7,7 +7,10 @@ import { join, relative } from "node:path";
 // 이 검사가 없을 때 로스터에 담기지 않은 이름 하나가 들어가 그대로 나갔다.
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "");
 const TTF = join(ROOT, "web/assets/fonts/black-han-sans.ttf");
-const SKIP = [".git", "node_modules", "vendor", "video.local", "critic.local", "renders"];
+// tools는 코퍼스가 아니다. 계기의 주석은 플레이어 화면에 절대 안 뜨는데 실려 나가는 서체를
+// 키웠고, 게이트 하나를 새로 쓸 때마다 이 축이 빨개져 서체를 다시 굽게 만들었다.
+// 실측으로 tools에만 있는 한글이 쉰아홉 자, 전체 1058자의 5.6퍼센트였다.
+const SKIP = [".git", "node_modules", "vendor", "video.local", "critic.local", "renders", "tools"];
 
 function coverage(path) {
   const d = readFileSync(path);
