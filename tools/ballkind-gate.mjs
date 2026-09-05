@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { pinClock } from "./clock.mjs";
 
 // 사건마다 공이 보이는지 재는 자.
 // shot-gate가 같은 축을 이미 갖고 있다. 다만 여덟 구를 실제로 쳐서 나온 모든 프레임을
@@ -32,6 +33,7 @@ let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
   const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  await pinClock(ctx, STEP);
   const p = await ctx.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -59,7 +61,6 @@ try {
       await p.goto(BASE, { waitUntil: "load" });
       await p.waitForSelector("#go", { timeout: 15000 });
       // 채취를 프레임으로 못 박는다. 잠으로 기다리면 사건을 거는 순간 공이 비행 어디쯤인지가 달라진다.
-      await p.evaluate((s) => window.__fixedStep(s), STEP);
       await p.click("#go", { force: true });
       const base = await p.evaluate(() => window.__frames());
       await p.waitForFunction((m) => window.__frames() >= m, base + LEAD, { timeout: 20000 });

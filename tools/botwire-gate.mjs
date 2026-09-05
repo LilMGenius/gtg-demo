@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { pinClock } from "./clock.mjs";
 
 // 봇이 뛴 구는 성장은 남기고 화제는 안 남긴다. 그 교환이 실제로 배선돼 있는지는
 // 시드 시뮬로 못 잰다. state.botRan 하나가 팔로워와 라포 둘을 지배하고,
@@ -37,6 +38,7 @@ let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
   const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  await pinClock(ctx, STEP);
   const p = await ctx.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -56,7 +58,6 @@ try {
   await p.evaluate(() => { window.__gear().city = 3; });
 
   // 여기서부터 세계시계가 실시간을 안 본다. 창은 프레임 수로 센다.
-  await p.evaluate((s) => window.__fixedStep(s), STEP);
 
   // 한 랩을 도는 동안 장부를 계속 읽는다. 구 경계를 따로 잡지 않아도 델타는 정확하다.
   // armOn은 표본이 열리는 상태다. 자동을 켜거나 끈 직후에는 직전 구의 값이 남아 있고,

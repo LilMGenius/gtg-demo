@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { likesFor, backOdds, mutualBoost, whoKey } from "../web/src/state/gram.mjs";
+import { pinClock } from "./clock.mjs";
 
 // 아웃문그램의 자. 담벼락이면 글만 붙으면 끝이지만, 계정이면 누가 보고 반응하고 이어진다.
 //
@@ -21,6 +22,7 @@ let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
   const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  await pinClock(ctx, STEP);
   const p = await ctx.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -29,7 +31,6 @@ try {
   await p.evaluate(() => localStorage.clear());
   await p.reload({ waitUntil: "load" });
   await p.waitForSelector("#go", { timeout: 15000 });
-  await p.evaluate((s) => window.__fixedStep(s), STEP);
   await p.click("#go", { force: true });
 
   // 대조군. 아무도 안 따라간 계정은 배율이 1이고 화면도 0퍼센트라고 말해야 한다.

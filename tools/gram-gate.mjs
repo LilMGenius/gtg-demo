@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { pinClock } from "./clock.mjs";
 
 // 아웃문그램과 키커별 상대 전적은 화면에 선 지 오래인데 재는 자가 없었다.
 // 두 창 다 장부를 옮겨 그리는 창이라, 옮기는 도중에 어긋나면 화면만 조용히 거짓말을 한다.
@@ -22,6 +23,7 @@ let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
   const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  await pinClock(ctx, STEP);
   const p = await ctx.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -30,7 +32,6 @@ try {
   await p.evaluate(() => localStorage.clear());
   await p.reload({ waitUntil: "load" });
   await p.waitForSelector("#go", { timeout: 15000 });
-  await p.evaluate((s) => window.__fixedStep(s), STEP);
   await p.click("#go", { force: true });
 
   // 대조군. 한 구도 안 돈 자리에서 피드는 비어 있어야 하고, 빈 이유를 자기 글자로 말해야 한다.

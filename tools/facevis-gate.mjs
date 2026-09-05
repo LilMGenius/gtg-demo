@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { pinClock } from "./clock.mjs";
 
 // 사건마다 정해 둔 표정이 렌즈에 닿는지 재는 자.
 // FACE_MOOD가 열다섯 사건에 표정을 하나씩 배정하고, applyFace가 섞음량 a > 0.25일 때
@@ -27,6 +28,7 @@ let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
   const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  await pinClock(ctx, STEP);
   const p = await ctx.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -38,7 +40,6 @@ try {
     for (let r = 0; r < ROUNDS; r += 1) {
       await p.goto(BASE, { waitUntil: "load" });
       await p.waitForSelector("#go", { timeout: 15000 });
-      await p.evaluate((s) => window.__fixedStep(s), STEP);
       await p.click("#go", { force: true });
       const base = await p.evaluate(() => window.__frames());
       await p.waitForFunction((m) => window.__frames() >= m, base + LEAD, { timeout: 20000 });

@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { pinClock } from "./clock.mjs";
 
 // 같은 사건이 회차마다 같은 그림으로 끝나면 두 번째부터는 결과만 남고 사건은 안 보인다.
 // pose 게이트는 사건 종류끼리 갈리는지만 잰다. 같은 종류를 여러 번 찍어 회차 사이를 재는 자는 없었다.
@@ -66,6 +67,7 @@ try {
         // 회차마다 새 페이지다. 한 페이지에서 이어 찍으면 앞 사건이 남긴 하트와 벗겨진 장갑이
         // 다음 회차의 몸을 바꾸고, 그 차이가 편차로 잡혀 거짓 초록이 된다.
         const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+        await pinClock(ctx, STEP);
         const p = await ctx.newPage();
         await p.goto(BASE + q, { waitUntil: "load" });
         // 시작 버튼이 생겼는지를 기다린다. 잠으로 기다리면 안 뜬 날 클릭이 조용히 흘러간다.
@@ -74,7 +76,6 @@ try {
         // 지났는지가 실시간으로 정해져, 사건을 거는 순간 공이 비행 어디쯤인지가 회차마다 달라진다.
         // 그 차이는 tail.from으로 들어가 종점을 흔든다. 실측으로 흘린 공의 대조군 잡음이
         // 0.056이었고 나머지 사건의 중앙값은 0.0059였다.
-        await p.evaluate((s) => window.__fixedStep(s), STEP);
         const at = async (n) => p.waitForFunction((m) => window.__frames() >= m, n, { timeout: 20000 });
         await p.click("#go", { force: true });
         const base = await p.evaluate(() => window.__frames());

@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { MOUTH_X } from "../web/src/render/units.mjs";
+import { pinClock } from "./clock.mjs";
 
 // 먹힌 공은 키커가 노린 자리에서 끝나야 한다. 종점을 0으로 모으면 어느 코너로 찼든
 // 공이 매번 골문 한가운데에 서고, 그러면 그 구가 어디로 들어갔는지 화면이 말하지 않는다.
@@ -39,12 +40,12 @@ try {
     rows[k] = [];
     for (const seed of SEEDS) {
       const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+      await pinClock(ctx, STEP);
       const p = await ctx.newPage();
       await p.goto(BASE + seed, { waitUntil: "load" });
       await p.waitForTimeout(1200);
       await p.click("#go", { force: true });
       await p.waitForTimeout(1400);
-      await p.evaluate((s) => window.__fixedStep(s), STEP);
       const at = async (n) => p.waitForFunction((m) => window.__frames() >= m, n, { timeout: 20000 });
       // 다이빙은 대기 상태에서만 먹는다. 잠으로 그 순간을 맞추려 하면 그날의 부하가 맞추고,
       // 안 맞은 날은 키가 조용히 무시되어 키퍼가 가운데 선 채로 측정된다.

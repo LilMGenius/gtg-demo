@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { HAIRS, TATTOOS, GLOVES, BOOTS, KITS, SOCKS } from "../web/src/state/gear.mjs";
+import { pinClock } from "./clock.mjs";
 
 // 머리와 타투는 판정에 한 칸도 안 닿는다. 오직 화면으로만 존재하는 상품이라,
 // 사고 나서 그림이 안 바뀌면 그 선반은 아무것도 팔지 않은 것이 된다.
@@ -25,6 +26,7 @@ let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
   const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  await pinClock(ctx, STEP);
   const p = await ctx.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -33,7 +35,6 @@ try {
   await p.evaluate(() => localStorage.clear());
   await p.reload({ waitUntil: "load" });
   await p.waitForSelector("#go", { timeout: 15000 });
-  await p.evaluate((s) => window.__fixedStep(s), STEP);
   await p.click("#go", { force: true });
   const from = await p.evaluate(() => window.__frames());
   await p.waitForFunction((n) => window.__frames() >= n, from + LEAD, { timeout: 20000 });

@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { photoOdds, likesFor, whoKey } from "../web/src/state/gram.mjs";
+import { pinClock } from "./clock.mjs";
 
 // 타임라인의 자. 계정에 내가 쓴 글만 올라오면 그것은 일기지 타임라인이 아니다.
 // 그 구를 지켜본 사람이 나를 찍어 올리고, 그 글에는 사진과 작성자와 선팔 자리가 있어야 한다.
@@ -22,6 +23,7 @@ let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
   const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  await pinClock(ctx, STEP);
   const p = await ctx.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -30,7 +32,6 @@ try {
   await p.evaluate(() => localStorage.clear());
   await p.reload({ waitUntil: "load" });
   await p.waitForSelector("#go", { timeout: 15000 });
-  await p.evaluate((s) => window.__fixedStep(s), STEP);
   await p.click("#go", { force: true });
   // 얼굴을 튼 사람이 없으면 아무도 안 찍는다. 그 문이 설계라 열 자리를 모두 3단계로 심는다.
   // 동네도 최고 등급으로 올린다. 지나가는 사람이 잦아야 표본에 사진이 든다.
