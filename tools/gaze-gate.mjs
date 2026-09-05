@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { pinClock } from "./clock.mjs";
 import { GAZE_ACTS, gazeMood, lineKey, POOLS } from "../web/src/ui/lines.mjs";
 
 // 눈맞음 두 사건이 아홉 갈래로 갈리는지 재는 자.
@@ -45,21 +46,19 @@ for (const kind of ["distracted", "talked"]) {
 let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
-  const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
-  /* 고정 폭 시계를 페이지가 뜬 뒤에 켜면, 켜기 전까지 흐른 실시간이 세계시각에 그대로 쌓인다.
-     대기 자세 위의 흔들림이 그 시각의 함수라 회차마다 다른 위상에서 잡히고, 그 몫은 기계가
-     바쁠수록 커진다. 실측으로 대조군이 0.006에서 0.031까지 부하를 따라 움직였고, 회차 간
-     자세 거리가 세계시각 차이에 0.17 비례했다. 손잡이가 생기는 즉시 켜면 그 항이 사라지고
-     남는 것은 클릭이 떨어진 프레임 몇 칸뿐이다. 실측 잔여 0.011이다. */
-  await ctx.addInitScript((s) => {
-    const t = setInterval(() => { if (window.__fixedStep) { window.__fixedStep(s); clearInterval(t); } }, 0);
-  }, STEP);
-  const p = await ctx.newPage();
   const errs = [];
-  p.on("pageerror", (e) => errs.push(String(e)));
-  p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
 
   async function stand(act) {
+    /* 회차마다 새 컨텍스트를 연다. 한 컨텍스트를 나눠 쓰면 저장 자리도 나눠 쓴다. 첫 회차가
+       손님 계정을 세우고 첫 판을 저장하면 다음 회차는 그 저장을 읽어 개봉 화면 없이 서고,
+       그 갈래에서는 판정 rng의 소비가 달라 같은 시드가 다른 구를 낸다. 실측으로 대조군의
+       두 회차가 advance 0.92와 0으로 갈렸고, 그 차이가 자세 거리 0.026으로 들어와 문턱 0.02를
+       넘었다. 시계가 아니라 저장이 원인이었다. headroom이 같은 함정을 먼저 적어 두었다. */
+    const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+    await pinClock(ctx, STEP);
+    const p = await ctx.newPage();
+    p.on("pageerror", (e) => errs.push(String(e)));
+    p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
     await p.goto(BASE, { waitUntil: "load" });
     await p.waitForSelector("#go", { timeout: 15000 });
     await p.click("#go", { force: true });
@@ -70,7 +69,9 @@ try {
     const actAt = base + LEAD + DIVE;
     await p.evaluate(([a, k, s, f]) => window.__plan(a, k, s, f), [actAt, "distracted", actAt + TAIL, act]);
     await p.waitForFunction((m) => window.__frames() >= m, actAt + TAIL, { timeout: 20000 });
-    return { pose: await p.evaluate(() => window.__poseVis()), gaze: await p.evaluate(() => window.__gazeVis()) };
+    const got = { pose: await p.evaluate(() => window.__poseVis()), gaze: await p.evaluate(() => window.__gazeVis()) };
+    await ctx.close();
+    return got;
   }
 
   const out = {};
@@ -100,7 +101,6 @@ try {
   for (const r of rows.slice(0, 6)) console.log("  " + r[0].toFixed(3) + "  " + r[1] + " vs " + r[2]);
   check("pose:the-closest-pair-still-splits", rows[0][0] >= BAR, rows[0][0].toFixed(3) + " bar " + BAR);
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
-  await ctx.close();
 
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));

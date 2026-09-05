@@ -146,6 +146,12 @@ export function createScene(canvas) {
   let stopFrame = -1;
   // drive()는 frame() 밖에 있어 이번 프레임의 dt를 직접 못 본다. 여기에 실어 보낸다.
   let stepDt = 0;
+  /* 대기 자세 흔들림의 시계. 세계시각을 그대로 읽으면 흔들림 위상이 페이지가 뜬 뒤 흐른 시간의
+     함수라, 같은 구를 같은 프레임 수 뒤에 찍어도 클릭이 떨어진 프레임만큼 어긋난다. 실측으로
+     클릭 프레임이 10에서 12 사이를 오갔고 gaze 대조군 잔여가 0.011에서 0.026까지 움직여 문턱
+     0.02를 부하 아래서 넘었다. 구가 열릴 때 0으로 되돌리면 흔들림은 구 안의 시간만 읽는다.
+     리셋이 setPose(…, 0)으로 위상을 0에 놓고 다음 프레임에 세계시각으로 뛰던 튐도 같이 사라진다. */
+  let swayT0 = 0;
   let realLast = performance.now() / 1000;
   let stopLeft = 0;
   // 사건 선언 시점의 장갑 좌표는 다이빙 전 몸 옆이다. 공이 손에 붙는 것은 그 뒤 꼬리 연출 중이다.
@@ -730,7 +736,7 @@ const TOUCHED = new Set(['contact']);
     // 정지 프레임 두 장을 비교하는 계측이 그 수렴을 잡음 바닥으로 읽었다.
     // 감쇠를 dt로 환산하면 dt가 0일 때 0이 되고, 프레임률이 흔들려도 같은 속도로 도착한다.
     poseNow[key] = lerpPose(poseNow[key], target, 1 - Math.pow(1 - rate, stepDt * 60));
-    setPose(actor[key], poseNow[key], vnow);
+    setPose(actor[key], poseNow[key], vnow - swayT0);
   }
 
   let cue = null;
@@ -2486,6 +2492,7 @@ const TOUCHED = new Set(['contact']);
     kicker.rotation.z = 0;
     poseNow.keeper = POSES.ready;
     poseNow.kicker = POSES.windup;
+    swayT0 = vnow;
     setPose(keeper, POSES.ready, 0);
     setPose(kicker, POSES.windup, 0);
   }
