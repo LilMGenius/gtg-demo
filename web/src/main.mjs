@@ -2042,6 +2042,15 @@ window.__rapport = () => state.rapport;
 window.__posts = () => state.posts;
 // 대화가 화면에 적은 확률과 판정 쪽 확률을 맞대려면 계기가 같은 키퍼를 들고 있어야 한다.
 window.__keeperStats = () => Object.assign({}, state.keeper);
+/* 체격을 갈아 세우는 손잡이. 키와 몸무게가 캡슐에 물려 있는데 극단 둘을 나란히 세워 본 사람이
+   없었다. 로스터의 168에서 200까지가 한 화면에서 갈리는지는 판정이 아니라 눈이 답하는 질문이라
+   계기가 이 손잡이로 세우고 사람이 본다. 세운 몸은 저장에 안 남는다. 이 판 한정이다. */
+window.__setBody = (height, weight) => {
+  state.keeper.height = height;
+  state.keeper.weight = weight;
+  stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
+  return { height, weight };
+};
 window.__social = () => state.social;
 // 봇이 실제로 뛴 구였는지. 크레딧과 자동 상태만 보고 짐작하면 배선이 끊겨도 게이트가 초록으로 남는다.
 window.__botRan = () => state.botRan;
