@@ -14,7 +14,7 @@ import { writeFileSync } from "node:fs";
 // 렌즈 밀림과 공 찌그러짐은 프레임 사이로 피크가 빠져나가므로 그리는 쪽이 최고값을 적고 여기서 읽는다.
 
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const URL = "http://127.0.0.1:10310/web/index.html?seed=" + (process.argv[2] || 7);
+const URL = "http://127.0.0.1:10310/web/index.html?seed=" + (process.argv[2] || 7) + "&preset=veteran";
 const W = 1280;
 const H = 720;
 // 손이 닿은 사건 넷. 이 넷이 전부 히트스톱과 버스트를 선언하는 사건이다.

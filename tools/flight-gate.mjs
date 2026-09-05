@@ -19,7 +19,7 @@ import { writeFileSync } from "node:fs";
 // 비행이 아닐 때 잔상 화소가 0이면서 공 화소는 남아야 자가 잔상만 골라 보는 것이다.
 
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const URL = "http://127.0.0.1:10310/web/index.html?seed=" + (process.argv[2] || 7);
+const URL = "http://127.0.0.1:10310/web/index.html?seed=" + (process.argv[2] || 7) + "&preset=veteran";
 const W = 1280;
 const H = 720;
 const ROUNDS = 4;

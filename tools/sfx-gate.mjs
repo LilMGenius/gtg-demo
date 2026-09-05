@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 // 한 겹짜리 발소리도 거부되고, 사각파 삐 소리도 거부돼야 한다.
 // 셋 다 예상대로 나와야 이 계측기가 무엇을 보고 있다고 말할 수 있다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const URL = "http://127.0.0.1:10310/web/index.html";
+const URL = "http://127.0.0.1:10310/web/index.html?preset=veteran";
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();
 
