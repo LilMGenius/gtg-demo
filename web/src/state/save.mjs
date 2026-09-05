@@ -63,10 +63,12 @@ export function load() {
 // 이적시장 이용권도 같이 나간다. 완봉으로 받은 장이 탭을 닫을 때 사라지면 그 판을 다시 이겨야 한다.
 // 팔로우도 같이 나간다. 선팔과 맞팔이 탭을 닫을 때 지워지면 사람을 다시 처음부터 따라가야 한다.
 // 키커 보유와 주전 열하나도 같이 나간다. 영입한 사람이 탭을 닫을 때 사라지면 그 육수가 증발한다.
-export function save(squad, pick, auto, fans, points, wallet, posts, record, gear, bot, buff, rapport, tickets, social, kickers, eleven, onboard) {
+export function save(squad, pick, auto, fans, points, wallet, posts, record, gear, bot, buff, rapport, tickets, social, kickers, eleven, onboard, pref) {
   try {
     const i = Number(pick) || 0;
-    localStorage.setItem(KEY(), JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], record: record || {}, gear: gear || {}, bot: bot || {}, buff: buff || {}, rapport: rapport || {}, tickets: Number(tickets) || 0, social: social || {}, kickers: Array.isArray(kickers) ? kickers : [], eleven: Array.isArray(eleven) ? eleven : [], onboard: Number(onboard) || 0, at: Date.now() }));
+    // 저장 호출자가 옛 형태여도 가운데를 써야 선호가 손상된 값으로 남지 않는다.
+    const savedPref = [-1, 0, 1].includes(Number(pref)) ? Number(pref) : 0;
+    localStorage.setItem(KEY(), JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], record: record || {}, gear: gear || {}, bot: bot || {}, buff: buff || {}, rapport: rapport || {}, tickets: Number(tickets) || 0, social: social || {}, kickers: Array.isArray(kickers) ? kickers : [], eleven: Array.isArray(eleven) ? eleven : [], onboard: Number(onboard) || 0, pref: savedPref, at: Date.now() }));
   } catch {
     // 사파리 프라이빗 모드는 쓰기를 막는다. 저장이 안 되는 것과 게임이 죽는 것은 다른 일이다.
   }

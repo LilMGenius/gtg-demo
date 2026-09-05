@@ -72,6 +72,11 @@ const squad = (restored.squad.length ? restored.squad : [null]).map((k) => {
 // state.keeper와 state.squad[state.pick]은 같은 객체다. 값을 복사하면 성장이 보유 목록에 안 남는다.
 const state = { squad, pick: Math.min(restored.pick, squad.length - 1), shots: [], i: 0, results: [], phase: 'idle', auto: Boolean(saved?.auto), points: 0 };
 state.keeper = state.squad[state.pick];
+// 옛 저장과 세 패드 밖의 값은 가운데를 선호해야 다음 구도 안전하게 이어진다.
+state.pref = [-1, 0, 1].includes(Number(saved?.pref)) ? Number(saved.pref) : 0;
+// 호출 수는 로그가 아니라 실제 입력 자리를 세야 손 모드의 우회 호출을 놓치지 않는다.
+window.__autoCalls = 0;
+window.__lastInput = null;
 // 비운 시간은 훈련 선택권으로만 바뀌고, 그 선택은 손으로 한다.
 // 이전 배포본 세이브에는 points가 없다. 없으면 0으로 읽고 게임은 그대로 이어진다.
 state.points = (Number(saved?.points) || 0) + (saved ? offlineGain(saved.at, Date.now()) : 0);
@@ -386,7 +391,7 @@ function markDive(dive, mine) {
 
 // 저장은 항상 보유 목록 전체로 나간다. 뛰는 키퍼만 저장하면 나머지가 다음 저장에서 지워진다.
 function persist() {
-save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets, state.social, state.kickers, state.eleven, state.onboard);
+save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets, state.social, state.kickers, state.eleven, state.onboard, state.pref);
 }
 
 // 봇 크레딧은 실시간으로 줄어든다. 구 수로 세면 탭을 열어두고 안 누르는 쪽이 이득이 된다.
@@ -524,11 +529,15 @@ function commit(dive) {
   botTick();
   // 버프는 실제로 굴린 구에서만 닳는다. 시간으로 닳으면 상점에 둔 채로 증발한다.
   state.buff = spendBuff(state.buff);
-  const input = dive === null
-    ? autoInput(ran ? botKeeper(state.keeper, state.bot) : state.keeper, shot, rng)
-    : { dive, errMs: performance.now() - pressAt, advance, auto: false };
+  const input = dive === null && !ran
+    ? { dive: state.pref, errMs: 0, advance, auto: false }
+    : dive === null
+      ? (window.__autoCalls += 1, autoInput(ran ? botKeeper(state.keeper, state.bot) : state.keeper, shot, rng))
+      : { dive, errMs: performance.now() - pressAt, advance, auto: false };
+  // 실제 판정에 넘긴 한 덩어리를 남겨 계기가 표시나 로그가 아닌 입력을 읽는다.
+  window.__lastInput = input;
   // 판정이 고른 쪽까지 정해진 뒤에 표시한다. 누른 값으로 표시하면 안 누른 구가 빈 채로 남는다.
-  markDive(input.dive, dive !== null);
+  markDive(input.dive, !input.auto);
   stage.diving = state.keeper.diving;
   const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads, socks: state.gear.socks, frame: state.gear.frame, focusAid: state.buff.kind === 'tonic' ? TONIC_FOCUS : 1, rosin: state.buff.kind === 'rosin', gazeAid: rapportGazeAid(state.rapport, state.gear.city, shot.passer) });
   state.results[state.i] = result.conceded;
@@ -537,6 +546,14 @@ function commit(dive) {
   // 비행 중에는 자막을 비운다. 자리표시자를 남기면 화면 위쪽에 말줄임표가 박힌 채 촬영된다.
   el('caption').innerHTML = '';
   stage.play(shot, input, result, () => rollCaptions(result));
+}
+
+// 패드를 누른 순간 다음 무입력 구에도 남을 선호를 저장한다.
+function chooseDive(dive) {
+  if (state.phase !== 'wait') return;
+  state.pref = dive;
+  persist();
+  commit(dive);
 }
 
 // 자막은 체인 순서대로 한 줄씩 나온다. 반전이 반전을 덮으려면 한꺼번에 오면 안 된다.
@@ -1955,7 +1972,7 @@ function closeShop() {
 for (const b of document.querySelectorAll('.zone')) {
   b.onpointerdown = () => {
     if (state.phase === 'caption') return state.skip && state.skip();
-    commit(Number(b.dataset.dive));
+    chooseDive(Number(b.dataset.dive));
   };
 }
 const autoBtn = el('auto');
@@ -2078,9 +2095,9 @@ el('out').onpointerdown = () => {
 };
 addEventListener('keydown', (e) => {
   if (state.phase === 'caption' && state.skip) return state.skip();
-  if (e.key === 'ArrowLeft') commit(-1);
-  if (e.key === 'ArrowRight') commit(1);
-  if (e.key === 'ArrowUp' || e.key === ' ') commit(0);
+  if (e.key === 'ArrowLeft') chooseDive(-1);
+  if (e.key === 'ArrowRight') chooseDive(1);
+  if (e.key === 'ArrowUp' || e.key === ' ') chooseDive(0);
 });
 
 pips();
