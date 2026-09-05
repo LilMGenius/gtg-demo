@@ -72,14 +72,24 @@ try {
     judgeWindow(beat.keeper, shot, { studs: 0 }).slackMs.toFixed(0) + "ms against "
     + judgeWindow(beat.keeper, shot, { studs: 3 }).slackMs.toFixed(0) + "ms");
 
-  // 화면에서도 달라지는가. 판정 쪽 계산만 갈리면 그린 것은 그대로일 수 있다.
+  /* 화면에서도 달라지는가. 판정 쪽 계산만 갈리면 그린 것은 그대로일 수 있다.
+     등급을 바꾸고 다음 라운드를 뽑으면 두 팔이 서로 다른 구를 잰다. 창은 그 구의 비행시간에
+     달려 있고 띠 폭은 레인 길이에 대한 비율이라, 넓어진 창이 더 긴 레인 위에서 더 작은
+     비율로 나온다. 실측으로 맨발 51.78%가 축구화 47.89%보다 컸고 판정 쪽 대조군은 반대였다.
+     같은 씨앗에서 다시 열면 첫 구가 같다. 등급은 난수를 안 먹으므로 두 팔이 한 구를 본다. */
   const drawn = [];
   for (const rank of [0, 3]) {
+    await p.goto(BASE, { waitUntil: "load" });
+    await p.waitForSelector("#go", { timeout: 15000 });
     await p.evaluate((r) => { window.__gear().studs = r; }, rank);
-    await p.evaluate(() => { window.__lockRound(); window.__resumeRound(); });
-    await p.waitForTimeout(700);
+    await p.click("#go", { force: true });
+    await p.waitForTimeout(1400);
     drawn.push(await p.evaluate(() => window.__beat()));
   }
+  // 같은 구인지부터 묻는다. 갈리면 아래 비교는 등급이 아니라 구를 잰 것이다.
+  check("instrument:both-ranks-were-shown-one-shot",
+    Math.abs(drawn[0].flight - drawn[1].flight) < 1e-6 && drawn[0].course === drawn[1].course,
+    drawn[0].flight.toFixed(4) + "/" + drawn[0].course + " against " + drawn[1].flight.toFixed(4) + "/" + drawn[1].course);
   check("beat:the-drawn-band-follows-the-gear", pct(drawn[1].hotW) > pct(drawn[0].hotW),
     "bare " + drawn[0].hotW + " against studded " + drawn[1].hotW);
 
