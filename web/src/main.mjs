@@ -1660,6 +1660,12 @@ function onboardStep() {
     state.squad[0] = recruit(first);
     state.pick = 0;
     state.keeper = state.squad[0];
+    /* 갈아 세운 사람은 맨몸 신인이라 앞서 주입한 표본이 통째로 지워진다. 실측으로 maxed가
+       개봉을 지나며 사라져 계기가 만렙 대신 신인을 쟀고, 스물여섯 초에 닿는 구가 여덟 중
+       하나뿐이었다. 주입은 절대값이라 다시 얹어도 같은 자리이고, 순서상 개봉이 먼저 일어난
+       일이므로 그 위에 얹는 것이 사람이 겪는 순서와도 같다. 갈아 세우는 자리가 여기 하나라
+       여기서 얹어야 개봉을 눌러 넘긴 경로와 건너뛴 경로가 같은 상태로 끝난다. */
+    applyPreset(new URLSearchParams(location.search).get('preset'), state);
     stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
     persist();
     pips();
@@ -2066,11 +2072,6 @@ stage.setGoal(state.gear.frame, state.gear.frameSkin);
   if (state.onboardSkip) {
     while (onboardStep());
     stopReveal();
-    /* 개봉은 키퍼를 명단에서 온 사람으로 갈아 세운다. 그 사람은 맨몸 신인이라, 앞서 주입한
-       표본이 통째로 지워진다. 실측으로 maxed,veteran이 만렙이 아닌 신인을 냈고 훈련장의
-       환전 줄이 안 떴다. 주입은 절대값이라 다시 얹어도 같은 자리이고, 순서상 개봉이 먼저
-       일어난 일이므로 그 위에 얹는 것이 사람이 겪는 순서와도 같다. */
-    applyPreset(new URLSearchParams(location.search).get('preset'), state);
     stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
     pips();
   } else {
