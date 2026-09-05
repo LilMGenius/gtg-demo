@@ -80,10 +80,26 @@ try {
   const st = await p.evaluate(() => window.__squad());
   const owned = new Set(st.squad);
   const pool = KEEPERS.filter((k) => !owned.has(k.name));
-  const shown = await p.evaluate(() => {
-    const e = document.querySelector("#shop .card em");
+  /* 확률과 남은 장수는 카드 본문이 아니라 눌러야 열리는 칸에 산다. 닫힌 details 안의
+     innerText는 빈 문자열이라, 안 열고 읽으면 화면에 수가 없는 것과 구분이 안 된다.
+     사람이 여는 자리를 그대로 눌러 열고 읽는다. 계기가 다른 문으로 들어가면 그 뒤로는
+     화면이 바뀌어도 계기만 옛 자리를 계속 읽는다. */
+  const openOdds = async () => p.evaluate(() => {
+    const d = document.querySelector("#shop details.odds");
+    if (!d) return "";
+    d.querySelector("summary").click();
+    const e = d.querySelector("em");
     return e ? e.innerText : "";
   });
+  const closedText = await p.evaluate(() => {
+    const e = document.querySelector("#shop details.odds em");
+    return e ? e.innerText : "";
+  });
+  const shown = await openOdds();
+  // 대조군. 닫힌 칸은 아무것도 안 읽혀야 한다. 닫아도 같은 수가 읽히면 이 자는 여는 문이
+  // 있다는 것을 증명하지 못하고, 다음에 그 문이 사라져도 초록을 낸다.
+  check("instrument:the-shut-panel-reads-empty", closedText.trim() === "", JSON.stringify(closedText.slice(0, 24)));
+  check("pull:the-odds-panel-opens-where-a-player-clicks", shown.trim() !== "", JSON.stringify(shown.slice(0, 40)));
 
   // 정규식 대신 문자로 훑는다. 이 레포에서 게이트 소스의 역슬래시는 전송 단계에서 사라진 적이 있다.
   const parse = (s) => {
@@ -119,10 +135,7 @@ try {
   await p.evaluate(() => window.__roster(false));
   await p.evaluate(() => window.__shop(true));
   await p.waitForTimeout(320);
-  const after = parse(await p.evaluate(() => {
-    const e = document.querySelector("#shop .card em");
-    return e ? e.innerText : "";
-  }));
+  const after = parse(await openOdds());
   check("pull:owned-leaves-the-pool", bought !== null && after.cnt === cnt - 1, "bought " + String(bought) + ", screen " + cnt + " -> " + after.cnt);
 
   // 인쇄된 수와 실제 뽑기 빈도는 다른 명제다. 같은 풀에서 실제로 뽑아 빈도를 센다.
