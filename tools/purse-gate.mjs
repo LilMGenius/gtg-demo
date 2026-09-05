@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from "../web/src/state/wallet.mjs";
+import { coinGain } from "../web/src/state/wallet.mjs";
 
 // 한 구가 벌어들인 육수가 화면에 뜨는지 잰다. 총액만 갱신하면 유명한 키커를 막아 더 벌었다는
 // 사실이 어디에도 안 남고, 보상이 난이도를 탄다는 설계가 플레이어에게 도달하지 않는다.
@@ -10,11 +10,17 @@ const BASE = "http://127.0.0.1:10310/web/index.html";
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();
 
-// 한 구가 낼 수 있는 값은 범위가 아니라 집합이다. 실점은 명성이 안 붙어 4 하나뿐이고,
-// 세이브는 12에서 명성 한 계단마다 2씩 올라 30까지 짝수만 나온다.
-// 범위로 재면 13이나 5 같은 값이 통과한다. 그런 수가 뜨는 건 식이 바뀌었다는 뜻이다.
-const LEGAL = new Set([COIN_CONCEDED]);
-for (let f = 1; f <= 10; f += 1) LEGAL.add(COIN_SAVE + COIN_FAME_STEP * (f - 1));
+// 한 구가 낼 수 있는 값은 범위가 아니라 집합이다. 범위로 재면 13이나 5 같은 값이 통과하고,
+// 그런 수가 뜨는 건 식이 바뀌었다는 뜻이라 잡혀야 한다.
+// 그 집합을 여기서 다시 세우지 않고 판정이 소유한 함수에 물어서 만든다. 상수로 옮겨 적으면
+// 갈래가 하나 늘 때 게임은 맞고 자만 틀린다. 헛구 6이 그렇게 들어와 이 축을 빨갛게 만들었다.
+// 도는 것은 coinGain이 선언한 입력 전부다. 먹힌 구, 헛구, 막은 구에 명성 1에서 10을 곱한다.
+const LEGAL = new Set();
+for (let f = 1; f <= 10; f += 1) {
+  LEGAL.add(coinGain(true, f));
+  LEGAL.add(coinGain(false, f, true));
+  LEGAL.add(coinGain(false, f));
+}
 
 // 애니메이션이 1.1초다. 200ms면 한 팝업을 다섯 번 본다.
 const POLL = 200;
