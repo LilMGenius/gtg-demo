@@ -48,9 +48,9 @@ try {
 
   // 두 갈래가 각각 살아남는가. 스폰은 결제 경로가 없으니 손으로 넣어 확인한다.
   await p.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem("gtg.save.v1"));
+    const s = JSON.parse(localStorage.getItem(window.__saveKey()));
     s.wallet.cash = 7;
-    localStorage.setItem("gtg.save.v1", JSON.stringify(s));
+    localStorage.setItem(window.__saveKey(), JSON.stringify(s));
   });
   await p.reload({ waitUntil: "load" });
   await p.waitForTimeout(1200);

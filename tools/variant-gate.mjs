@@ -95,7 +95,7 @@ try {
   // 저장에 남는가. 다시 읽어들여 같은 변형이 서 있어야 한다.
   // 저장 키는 save.mjs가 소유한다. 여기 이름을 손으로 적으면 그 파일이 바뀐 날 이 축이 조용히 통과한다.
   const saved = await p.evaluate(async () => {
-    const raw = localStorage.getItem("gtg.save.v1");
+    const raw = localStorage.getItem(window.__saveKey());
     if (!raw) return { has: false, at: -1 };
     const j = JSON.parse(raw);
     const k = j.keeper && j.keeper.worn ? j.keeper.worn : null;

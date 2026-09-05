@@ -11,6 +11,13 @@ export function useAccount(id) {
   who = id || null;
 }
 
+/* 저장이 실제로 사는 자리. 계정이 생기면서 그 자리가 브라우저에서 계정으로 내려갔고,
+   그 이동을 못 읽은 계기 넷이 브라우저 키를 그대로 읽어 null을 받았다. 자리를 아는 곳은
+   여기 하나이므로 여기서 말한다. 계기가 키를 다시 적으면 다음 이동에서 또 갈린다. */
+export function saveKey() {
+  return KEY();
+}
+
 // 이름 없던 자리에 판이 남아 있는가. 첫 가입이 그것을 가져갈지 정하는 데 쓴다.
 export function hasLegacy() {
   try { return Boolean(localStorage.getItem(BASE)); } catch { return false; }

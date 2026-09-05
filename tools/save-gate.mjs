@@ -33,14 +33,14 @@ try {
   for (let i = 0; i < 4; i++) { await p.keyboard.press(i % 2 ? "ArrowRight" : "ArrowLeft"); await p.waitForTimeout(3200); }
   await p.waitForTimeout(2000);
 
-  const before = await p.evaluate(() => JSON.parse(localStorage.getItem("gtg.save.v1")));
+  const before = await p.evaluate(() => JSON.parse(localStorage.getItem(window.__saveKey())));
   check("save:record-written-while-playing", before !== null && Number.isFinite(before?.keeper?.level), JSON.stringify(before && { lv: before.keeper.level, fans: before.fans }));
   check("save:followers-accumulated", (before?.fans || 0) > 0, String(before?.fans));
 
   // 되살아나는가. 새 탭에서 같은 키퍼가 나와야 한다.
   await p.reload({ waitUntil: "load" });
   await p.waitForTimeout(1200);
-  const after = await p.evaluate(() => JSON.parse(localStorage.getItem("gtg.save.v1")));
+  const after = await p.evaluate(() => JSON.parse(localStorage.getItem(window.__saveKey())));
   check("save:keeper-survives-reload", after?.keeper?.level === before?.keeper?.level, after?.keeper?.level + "/" + before?.keeper?.level);
   /* 저장과 화면을 맞대는 축이라 둘을 같은 순간에 읽어야 한다. 되살아난 판은 계속 굴러서
      읽는 사이에 한 구가 끝나면 저장은 옛 수를, 화면은 새 수를 말한다. 실측으로 그렇게 한 번 빨갰다.
@@ -48,7 +48,7 @@ try {
   await p.evaluate(() => window.__lockRound());
   await p.waitForTimeout(150);
   const live = await p.evaluate(() => ({
-    saved: JSON.parse(localStorage.getItem("gtg.save.v1")).fans,
+    saved: JSON.parse(localStorage.getItem(window.__saveKey())).fans,
     shown: document.getElementById("fans").textContent
   }));
   check("save:followers-restored-on-screen", live.shown.includes(String(live.saved)),
@@ -56,9 +56,9 @@ try {
 
   // 대조군 2. 시계를 되돌린 사람은 적립이 없다.
   await p.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem("gtg.save.v1"));
+    const s = JSON.parse(localStorage.getItem(window.__saveKey()));
     s.at = Date.now() + 9e8;
-    localStorage.setItem("gtg.save.v1", JSON.stringify(s));
+    localStorage.setItem(window.__saveKey(), JSON.stringify(s));
   });
   await p.reload({ waitUntil: "load" });
   await p.waitForTimeout(900);
@@ -67,9 +67,9 @@ try {
 
   // 대조군 3. 몇 달을 비워도 상한을 못 넘는다.
   await p.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem("gtg.save.v1"));
+    const s = JSON.parse(localStorage.getItem(window.__saveKey()));
     s.at = Date.now() - 90 * 24 * 3600 * 1000;
-    localStorage.setItem("gtg.save.v1", JSON.stringify(s));
+    localStorage.setItem(window.__saveKey(), JSON.stringify(s));
   });
   await p.reload({ waitUntil: "load" });
   await p.waitForTimeout(900);
@@ -78,9 +78,9 @@ try {
 
   // 한 구간만 비운 사람은 그만큼만 받는다. 상한과 구분되어야 계측기를 믿는다.
   await p.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem("gtg.save.v1"));
+    const s = JSON.parse(localStorage.getItem(window.__saveKey()));
     s.at = Date.now() - 3 * 20 * 60 * 1000 - 1000;
-    localStorage.setItem("gtg.save.v1", JSON.stringify(s));
+    localStorage.setItem(window.__saveKey(), JSON.stringify(s));
   });
   await p.reload({ waitUntil: "load" });
   await p.waitForTimeout(900);
@@ -90,14 +90,14 @@ try {
   // 만렙 데드락. 전 스탯 10인 저장에 밀린 훈련이 쌓여도 진행이 멈추면 안 된다.
   // 강제 팝업을 훈련장 패널로 옮긴 뒤에도 같은 상황을 다시 잰다. 문턱은 그대로다.
   await p.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem('gtg.save.v1'));
+    const s = JSON.parse(localStorage.getItem(window.__saveKey()));
     // 저장의 정본은 보유 목록이고 keeper 칸은 구버전을 위한 사본이다. 정본을 올려야 만렙이 된다.
     const head = Array.isArray(s.squad) ? s.squad[Number(s.pick) || 0] : s.keeper;
     for (const k of Object.keys(head)) if (k !== 'level' && Number.isFinite(head[k])) head[k] = 10;
     head.level = 40;
     s.keeper = head;
     s.at = Date.now() - 90 * 24 * 3600 * 1000;
-    localStorage.setItem('gtg.save.v1', JSON.stringify(s));
+    localStorage.setItem(window.__saveKey(), JSON.stringify(s));
   });
   await p.reload({ waitUntil: 'load' });
   await p.waitForTimeout(900);

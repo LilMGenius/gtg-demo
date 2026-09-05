@@ -7,7 +7,7 @@ import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dmLine, gazeAct } from './ui/lines.mjs';
-import { load, save, readSquad, offlineGain, readRecord, readSquadKickers, useAccount } from './state/save.mjs';
+import { load, save, readSquad, offlineGain, readRecord, readSquadKickers, useAccount, saveKey } from './state/save.mjs';
 import { currentId } from './state/account.mjs';
 import { coinGain, readWallet, COIN_DRILL, COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
@@ -1996,6 +1996,8 @@ window.__tickets = () => state.tickets;
 window.__eleven = () => state.eleven.slice();
 // 계기가 심은 값을 저장까지 밀어 넣는 자리. 계정이 갈리는지는 저장에 닿아야 재진다.
 window.__persist = () => { persist(); return true; };
+// 저장이 사는 자리. 계기가 이 자리를 손으로 적으면 계정이 갈린 날 조용히 빈 자리를 읽는다.
+window.__saveKey = () => saveKey();
 window.__kickers = () => state.kickers.slice();
 // 뒤집힌 카드 수와 뽑은 카드 수. 연출이 도는 동안 계기가 이 둘을 읽어 한 번에 안 열리는 것을 본다.
 window.__reveal = () => ({ shown, drawn: lastPull.length });

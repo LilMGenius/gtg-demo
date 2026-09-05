@@ -28,7 +28,7 @@ async function run(fixture) {
     // 저장은 첫 구 판정이 끝나야 써진다. 20초는 5구 한 세트가 도는 시간의 두 배
     let raw = null;
     for (let i = 0; i < 40; i++) {
-      raw = await p.evaluate(() => localStorage.getItem('gtg.save.v1'));
+      raw = await p.evaluate(() => localStorage.getItem(window.__saveKey()));
       if (raw) break;
       await p.waitForTimeout(500);
     }
@@ -37,7 +37,7 @@ async function run(fixture) {
     o.rapport = fixture;
     o.gear = o.gear || {};
     o.gear.city = 0; // 도시 0이어야 화면의 동네 이름이 고정된다
-    await p.evaluate((s) => localStorage.setItem('gtg.save.v1', s), JSON.stringify(o));
+    await p.evaluate((s) => localStorage.setItem(window.__saveKey(), s), JSON.stringify(o));
     await p.reload({ waitUntil: 'load' });
     await p.click('#go', { force: true });
     await p.waitForTimeout(700); // 판정이 한 구도 돌기 전. 라포가 더 쌓이지 않는 창
@@ -84,7 +84,7 @@ async function run(fixture) {
         atBottom
       };
     }, { HEAD, RECORD });
-    const kept = await p.evaluate(() => JSON.parse(localStorage.getItem('gtg.save.v1')).rapport);
+    const kept = await p.evaluate(() => JSON.parse(localStorage.getItem(window.__saveKey())).rapport);
     return { shot, kept, errs };
   } finally { await b.close(); }
 }
