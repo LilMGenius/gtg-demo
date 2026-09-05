@@ -46,6 +46,14 @@ let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
   const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  /* 고정 폭 시계를 페이지가 뜬 뒤에 켜면, 켜기 전까지 흐른 실시간이 세계시각에 그대로 쌓인다.
+     대기 자세 위의 흔들림이 그 시각의 함수라 회차마다 다른 위상에서 잡히고, 그 몫은 기계가
+     바쁠수록 커진다. 실측으로 대조군이 0.006에서 0.031까지 부하를 따라 움직였고, 회차 간
+     자세 거리가 세계시각 차이에 0.17 비례했다. 손잡이가 생기는 즉시 켜면 그 항이 사라지고
+     남는 것은 클릭이 떨어진 프레임 몇 칸뿐이다. 실측 잔여 0.011이다. */
+  await ctx.addInitScript((s) => {
+    const t = setInterval(() => { if (window.__fixedStep) { window.__fixedStep(s); clearInterval(t); } }, 0);
+  }, STEP);
   const p = await ctx.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -54,7 +62,6 @@ try {
   async function stand(act) {
     await p.goto(BASE, { waitUntil: "load" });
     await p.waitForSelector("#go", { timeout: 15000 });
-    await p.evaluate((s) => window.__fixedStep(s), STEP);
     await p.click("#go", { force: true });
     const base = await p.evaluate(() => window.__frames());
     await p.waitForFunction((m) => window.__frames() >= m, base + LEAD, { timeout: 20000 });
