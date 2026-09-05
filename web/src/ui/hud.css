@@ -239,7 +239,8 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #beat.hit .run{animation-play-state:paused;background:#4fd08a}
 
 #pad{position:absolute;inset:0;display:flex;pointer-events:auto}
-.zone{flex:1;border:0;background:transparent;position:relative;
+/* 48px은 좁은 모바일에서도 손가락 한 개가 안정적으로 닿는 최소 조작 크기다. */
+.zone{flex:1;min-width:48px;min-height:48px;border:0;background:transparent;position:relative;
   display:flex;align-items:flex-end;justify-content:center;
   /* 화살표는 골라인 앞 흙바닥에 앉는다. 더 올리면 키퍼가 좌우로 뻗는 통로를 덮는다.
      10px은 16:9에서 아이콘 아래끝이 화면 밖으로 나가 세 개가 반토막으로 찍혔다. */
@@ -268,12 +269,12 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
    읽혀야 하고, 꺼졌다는 신호는 밝기 차이로 충분하다. */
 .zone:disabled svg{color:#f6efdc5c}
 .zone:disabled{cursor:default}
-/* 어느 쪽으로 떴는지. 눌림 색(#ffd83d)을 그대로 쓰면 누르는 순간과 뜬 뒤가 같은 그림이 되어
-   무엇이 남은 표시인지 모른다. 내가 고른 쪽은 노란 판 위에 테두리를 얹어 눌린 것보다 진하고,
-   안 눌러서 대신 굴려진 쪽은 색을 빼고 테두리만 세워 남의 선택으로 읽히게 한다.
-   비활성 규칙보다 아래에 두어야 한다. 구가 날아가는 동안 세 버튼이 전부 disabled이기 때문이다. */
-.zone.chose svg{color:#0d110c;background:#ffd83d;box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel)}
-.zone.drawn svg{color:#f6efdc;background:#2a3520;outline:3px dashed #ffd83d;outline-offset:-4px}
+.zone.pref>svg{color:#0d110c;background:#ffd83d;box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel)}
+.zone .bot{position:absolute;right:var(--gap-2);bottom:calc(var(--gap-2) + env(safe-area-inset-bottom));
+  width:var(--fs-title);height:var(--fs-title);display:none;place-items:center;
+  color:#ffd83d;background:var(--panel);border:var(--line) solid var(--edge);box-shadow:var(--bevel)}
+.zone.bot .bot{display:grid}
+.zone .bot svg{width:100%;height:100%;padding:var(--gap-1)}
 
 /* 오른쪽 기둥은 판을 굴리는 손에만 준다. 기둥 아래끝 234px, 크로스바 325px.
    화면 아래 오른쪽은 골포스트와 골문 구석이고, 그 구석에서 선방과 실점이 갈린다.

@@ -112,11 +112,80 @@ try {
       check("stale_state:an-old-save-without-pref-plays-centre", input?.dive === 0 && input?.errMs === 0, JSON.stringify(input));
       await ctx.close();
     }
+
+    // 축 5. 오른쪽을 누른 뒤 다음 입력창에서도 실제 DOM의 그 버튼 하나만 눌린 상태여야 한다.
+    {
+      const { ctx, page } = await open();
+      await page.click('.zone[data-dive="1"]');
+      await waitRound(page);
+      const pressed = await page.evaluate(() => [...document.querySelectorAll('.zone')].map((b) => ({
+        dive: Number(b.dataset.dive), pressed: b.getAttribute('aria-pressed')
+      })));
+      check("pad:preferred-zone-is-aria-pressed",
+        pressed.length === 3 && pressed.every((v) => v.pressed === (v.dive === 1 ? 'true' : 'false')),
+        JSON.stringify(pressed));
+      await ctx.close();
+    }
+
+    // 축 6. 실제 크레딧 봇이 뛴 한 구는 고른 구 안에 글자 없는 봇 배지를 남겨야 한다.
+    {
+      const { ctx, page } = await open(null, BASE + ",rich");
+      await page.click("#auto", { force: true });
+      await page.waitForSelector('.buy[data-bot="1"]', { timeout: ROUND_MS });
+      await page.click('.buy[data-bot="1"]', { force: true });
+      await page.click("#shop .close", { force: true });
+      await page.click("#auto", { force: true });
+      await page.waitForFunction(() => window.__botRan() === true, null, { timeout: ROUND_MS });
+      const badge = await page.evaluate(() => ({
+        input: window.__lastInput?.dive,
+        zones: [...document.querySelectorAll('.zone')].map((b) => ({
+          dive: Number(b.dataset.dive), badge: Boolean(b.querySelector('.bot:not([hidden])'))
+        }))
+      }));
+      check("pad:a-bot-round-carries-the-bot-badge",
+        badge.zones.filter((v) => v.badge).length === 1 && badge.zones.some((v) => v.badge && v.dive === badge.input),
+        JSON.stringify(badge));
+      await ctx.close();
+    }
+
+    // 축 7. 손가락 한 개를 받는 세 구는 좁은 가로와 넓은 가로 모두 48px보다 작아지면 안 된다.
+    {
+      const { ctx, page } = await open();
+      const sizes = [];
+      for (const viewport of [{ width: 740, height: 360 }, { width: 1280, height: 720 }]) {
+        await page.setViewportSize(viewport);
+        sizes.push(await page.evaluate(() => [...document.querySelectorAll('.zone')].map((b) => {
+          const r = b.getBoundingClientRect();
+          return { width: r.width, height: r.height };
+        })));
+      }
+      check("pad:zones-meet-48px",
+        sizes.every((sample) => sample.length === 3 && sample.every((r) => r.width >= 48 && r.height >= 48)),
+        JSON.stringify(sizes));
+      await ctx.close();
+    }
+
+    // 저장된 선호는 첫 구를 열기 전부터 실제 눌림 속성으로 복원돼야 한다.
+    {
+      const saved = { keeper: { level: 1, name: "동네형" }, onboard: 2, at: Date.now(), pref: -1 };
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+      const page = await ctx.newPage();
+      await page.addInitScript((record) => localStorage.setItem("gtg.save.v1", JSON.stringify(record)), saved);
+      await page.goto(BASE, { waitUntil: "load" });
+      await page.waitForSelector("#go", { timeout: ROUND_MS });
+      const pressed = await page.evaluate(() => [...document.querySelectorAll('.zone')].map((b) => ({
+        dive: Number(b.dataset.dive), pressed: b.getAttribute('aria-pressed')
+      })));
+      check("stale_state:stored-preference-renders-before-first-round",
+        pressed.length === 3 && pressed.every((v) => v.pressed === (v.dive === -1 ? 'true' : 'false')),
+        JSON.stringify(pressed));
+      await ctx.close();
+    }
     check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
-    console.log("표본 범위: veteran 손 모드 5구, 왼쪽 선호 뒤 무입력 3구, 크레딧 봇 1구, 저장 재적재와 pref 없는 옛 저장 1구");
+    console.log("표본 범위: veteran 손 모드 5구, 왼쪽 선호 뒤 무입력 3구, 크레딧 봇 2구, 저장 재적재와 두 옛 저장, 740x360·1280x720 패드");
     if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
     if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
-    console.log(fails.length ? "hand FAIL " + fails.length : "hand PASS 4");
+    console.log(fails.length ? "hand FAIL " + fails.length : "hand PASS 8");
     if (fails.length) process.exitCode = 1;
   }
 } finally {
