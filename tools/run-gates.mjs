@@ -49,11 +49,35 @@ const picked = all.filter((f) => {
 // 느린 쓸기는 십 분이 넘어 커밋마다 겹칠 수 있다. 락은 이 파일이 소유한다.
 // 훅이 락을 만들고 지우면 두 곳이 같은 상태를 들고 있다가 갈라진다.
 const LOCK = "sweep.local.lock";
+
+/* 락이 있다는 것과 그 쓸기가 살아 있다는 것은 다른 명제다. drop은 exit과 SIGINT에만 걸려
+   있어서 강제 종료된 러너는 락을 남기고, 그때부터 모든 쓸기가 조용히 0으로 죽는다.
+   실측으로 죽은 pid 8836이 붙든 락 때문에 커밋 세 번이 판정 없이 지나갔고, 훅은 그동안
+   도는 중이라고 말했다. 락은 pid를 들고 있으니 물어보면 되고, 그 판정은 여기만 안다.
+   pid 재사용은 남는 위험이다. 그때는 살아 있다고 읽지만, 락이 영원히 남는 것보다 낫다. */
+const lockState = () => {
+  if (!existsSync(LOCK)) return { state: "none", pid: 0 };
+  const pid = Number(String(readFileSync(LOCK, "utf8")).trim());
+  if (!Number.isFinite(pid) || pid <= 0) return { state: "stale", pid: 0 };
+  // 신호 0은 보내지 않고 존재만 묻는다. EPERM은 남의 프로세스라는 뜻이라 살아 있는 것이다.
+  try { process.kill(pid, 0); return { state: "running", pid }; }
+  catch (e) { return { state: e.code === "EPERM" ? "running" : "stale", pid }; }
+};
+
+// 훅도 같은 답을 써야 해서 물어보는 입구를 낸다. 훅이 파일 존재로 따로 판단하면 두 곳이 갈린다.
+if (mode === "lockstate") {
+  const s = lockState();
+  console.log(s.state + (s.pid ? " " + s.pid : ""));
+  process.exit(0);
+}
+
 if (mode === "slow") {
-  if (existsSync(LOCK)) {
-    console.log("slow sweep already running");
+  const s = lockState();
+  if (s.state === "running") {
+    console.log("slow sweep already running, pid " + s.pid);
     process.exit(0);
   }
+  if (s.state === "stale") console.log("took over a stale lock left by pid " + s.pid);
   writeFileSync(LOCK, String(process.pid));
   const drop = () => { try { unlinkSync(LOCK); } catch {} };
   process.on("exit", drop);

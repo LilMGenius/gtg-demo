@@ -13,7 +13,7 @@ if [ -f sweep.local.txt ]; then
   verdict=$(grep "^gates " sweep.local.txt | tail -1)
   if [ -n "$verdict" ]; then
     echo "  last slow sweep: $verdict"
-  elif [ -f sweep.local.lock ]; then
+  elif [ "$(node tools/run-gates.mjs lockstate | cut -d' ' -f1)" = "running" ]; then
     echo "  last slow sweep: still running, no verdict yet"
   else
     echo "  last slow sweep: died without a verdict"
