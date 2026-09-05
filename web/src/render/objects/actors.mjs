@@ -341,23 +341,28 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
   const whiteGeos = [];
   const eyes = [];
   for (const s of [-1, 1]) {
-    const w = new THREE.SphereGeometry(r * 0.34, 10, 8);
+    /* 얼굴은 두 거리에서 쓰인다. 경기 화면은 골대 뒤에서 잡는 작은 뒤통수라 이목구비를
+       크게 깎아야 읽히고, 상점 카드는 근접 초상이라 같은 크기가 흉물이 된다.
+       먼 거리 기준으로만 깎아 흰자 지름이 머리 반지름의 0.68이었고, 두 개가 얼굴을 덮어
+       파운더가 볼에 검은 김이 붙었다고 짚었다. 그 김은 입이고, 흰자에 밀려 자리가 없었다.
+       가까운 쪽에 맞추고 먼 쪽은 facevis가 지킨다. 그 자가 열다섯 사건에서 얼굴 노출을 잰다. */
+    const w = new THREE.SphereGeometry(r * 0.23, 10, 8);
     w.scale(1, 1.15, 0.42);
-    w.translate(s * r * 0.42, r * 0.16, dir * r * 0.7);
+    w.translate(s * r * 0.36, r * 0.16, dir * r * 0.78);
     whiteGeos.push(w);
     // 동공은 감정마다 따로 늘어난다. 붙이면 한쪽 배율이 반대쪽 눈을 밖으로 민다.
-    const pupil = new THREE.Mesh(new THREE.SphereGeometry(r * 0.17, 8, 6), darkMat);
-    pupil.position.set(s * r * 0.42, r * 0.14, dir * r * 0.95);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(r * 0.115, 8, 6), darkMat);
+    pupil.position.set(s * r * 0.36, r * 0.14, dir * r * 0.99);
     pupil.scale.set(1, 1.1, 0.5);
     head.add(pupil);
     eyes.push(pupil);
   }
   head.add(new THREE.Mesh(mergeGeos(whiteGeos), whiteMat));
   // 입은 벌어진 채로 둔다. 다물면 표정이 죽고, 벌리면 뭘 봐도 얼빠져 보인다.
-  const mouth = new THREE.Mesh(new THREE.SphereGeometry(r * 0.26, 8, 6), darkMat);
-  mouth.position.set(0, -r * 0.42, dir * r * 0.84);
+  const mouth = new THREE.Mesh(new THREE.SphereGeometry(r * 0.155, 8, 6), darkMat);
+  mouth.position.set(0, -r * 0.4, dir * r * 0.9);
   // 폭이 좁으면 검은 원이 되어 공의 검은 오각 무늬와 구별이 안 된다. 가로로 눕혀야 입이다.
-  mouth.scale.set(1.5, 0.62, 0.4);
+  mouth.scale.set(1.35, 0.6, 0.34);
   head.add(mouth);
   // 카메라는 골대 뒤에 있다. 키퍼는 키커를 보므로 화면에 잡히는 건 언제나 뒤통수다.
   // 구 하나에 정수리 반구만 얹으면 그 아래가 굴곡 없는 살색 판이 되어 머리로 안 읽힌다.
