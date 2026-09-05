@@ -377,15 +377,14 @@ function setPad(on) {
   for (const b of document.querySelectorAll('.zone')) b.disabled = !on;
 }
 
-/* 어느 쪽으로 떴는지를 화면에 남긴다. 세 버튼은 눌리는 순간에만 색이 변하고 그 뒤에는
-   아무 표시가 없어서, 플레이어가 고른 방향과 안 눌러서 대신 굴려진 방향이 구별되지 않았다.
-   안 누르면 판정이 알아서 한 쪽을 고르므로, 그 경우도 누구의 선택인지가 화면에 있어야 한다.
-   dive가 null이면 셋 다 비운다. 다음 구가 시작될 때 부르는 자리다. */
-function markDive(dive, mine) {
+function markDive(dive, bot) {
   for (const b of document.querySelectorAll('.zone')) {
     const on = dive !== null && Number(b.dataset.dive) === dive;
-    b.classList.toggle('chose', on && mine);
-    b.classList.toggle('drawn', on && !mine);
+    const pref = Number(b.dataset.dive) === state.pref;
+    b.classList.toggle('pref', pref);
+    b.classList.toggle('bot', on && bot);
+    b.setAttribute('aria-pressed', String(pref));
+    b.querySelector('.bot').hidden = !(on && bot);
   }
 }
 
@@ -537,7 +536,7 @@ function commit(dive) {
   // 실제 판정에 넘긴 한 덩어리를 남겨 계기가 표시나 로그가 아닌 입력을 읽는다.
   window.__lastInput = input;
   // 판정이 고른 쪽까지 정해진 뒤에 표시한다. 누른 값으로 표시하면 안 누른 구가 빈 채로 남는다.
-  markDive(input.dive, !input.auto);
+  markDive(input.dive, input.auto);
   stage.diving = state.keeper.diving;
   const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads, socks: state.gear.socks, frame: state.gear.frame, focusAid: state.buff.kind === 'tonic' ? TONIC_FOCUS : 1, rosin: state.buff.kind === 'rosin', gazeAid: rapportGazeAid(state.rapport, state.gear.city, shot.passer) });
   state.results[state.i] = result.conceded;
@@ -2100,6 +2099,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'ArrowUp' || e.key === ' ') chooseDive(0);
 });
 
+markDive(null, false);
 pips();
 mountTitle(() => {
   stage.leaveTitle();
