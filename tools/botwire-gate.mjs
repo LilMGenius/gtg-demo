@@ -44,7 +44,7 @@ try {
 
   // 의사소통과 악동이 만렙이라야 talked가 관측 가능한 빈도로 열린다. 3짜리 신규 저장으로는
   // 라포 축이 한 시간을 돌려도 한 번 안 뜬다. 주입은 판정식을 안 건드리고 도달 가능한 상태만 앞당긴다.
-  const q = "?preset=maxed";
+  const q = "?preset=maxed,veteran";
   await p.goto(BASE + q, { waitUntil: "load" });
   await p.evaluate(() => localStorage.clear());
   await p.reload({ waitUntil: "load" });
