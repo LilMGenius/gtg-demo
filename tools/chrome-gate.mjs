@@ -9,7 +9,11 @@ import { chromium } from "playwright";
 // 덮임은 선언이 아니라 화소로 잰다. z-index를 읽으면 쌓임 맥락이 갈리는 자리를 못 본다.
 // 대조군으로 창을 닫은 프레임을 같이 재서, 어두워진 것이 창 때문임을 갈라 놓는다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
+// veteran은 첫 진입 개봉을 마친 저장이다. 개봉판은 화면 전체를 덮고 그동안 어떤 창도 안 열리므로,
+// 신규 저장에서 시작하면 이 자는 창 크롬이 아니라 잠긴 문 앞의 어두운 화면을 잰다. 실측 밝기 9.5였다.
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
+// 그 잠금 자체를 재는 표본은 프리셋 없이 따로 세운다. 같은 판에서 둘을 재면 하나가 다른 하나를 지운다.
+const FIRST = "http://127.0.0.1:10310/web/index.html?seed=20";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();
@@ -35,6 +39,37 @@ try {
   await p.waitForSelector("#go", { timeout: 15000 });
   await p.click("#go", { force: true });
   await p.waitForTimeout(1300);
+
+  /* 첫 진입 개봉이 서 있는 동안 창이 열리면 개봉판이 조용히 걷힌다. 개봉판은 화면을 다 덮어
+     사람의 클릭을 막고 있으므로 그 창을 여는 것은 손잡이뿐이고, 그 자리는 사람이 못 가는 자리다.
+     처음 오는 사람이 자기가 무엇을 들고 시작하는지를 못 보고 지나가는 결함이기도 하다. */
+  {
+    const fresh = await b.newContext({ viewport: { width: 1280, height: 720 } });
+    const q = await fresh.newPage();
+    await q.goto(FIRST, { waitUntil: "load" });
+    await q.waitForSelector("#go", { timeout: 15000 });
+    await q.click("#go", { force: true });
+    await q.waitForTimeout(1300);
+    const standing = await q.evaluate(() => !document.getElementById("pull").hidden);
+    check("chrome:the-first-reveal-stands-on-a-new-save", standing, String(standing));
+    await q.evaluate(() => window.__shop(true));
+    await q.waitForTimeout(400);
+    const held = await q.evaluate(() => ({ shop: document.getElementById("shop").hidden, pull: !document.getElementById("pull").hidden }));
+    check("chrome:no-window-opens-while-the-reveal-stands", held.shop && held.pull,
+      "shop hidden " + held.shop + ", reveal standing " + held.pull);
+    // 대조군. 개봉을 사람처럼 눌러 끝내면 같은 손잡이로 창이 열려야 한다.
+    // 안 열리면 위의 초록은 잠금이 아니라 손잡이가 죽은 것이다.
+    for (let i = 0; i < 8; i += 1) {
+      if (await q.evaluate(() => document.getElementById("pull").hidden)) break;
+      await q.click("#pull", { force: true });
+      await q.waitForTimeout(500);
+    }
+    await q.evaluate(() => window.__shop(true));
+    await q.waitForTimeout(400);
+    const after = await q.evaluate(() => document.getElementById("shop").hidden);
+    check("control:the-same-handle-opens-once-the-reveal-is-done", after === false, "shop hidden " + after);
+    await fresh.close();
+  }
 
   const scan = await p.evaluate((ids) => {
     const out = [];

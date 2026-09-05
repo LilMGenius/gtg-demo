@@ -9,7 +9,7 @@ import { photoOdds, likesFor, whoKey } from "../web/src/state/gram.mjs";
 // 표본 범위: 판정을 안 부른다. 계정 화면만 재므로 키퍼 표본이 결론을 안 바꾼다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 // 동네 3은 행인이 가장 자주 지나간다. 사진이 오는 구를 표본 안에 넣으려면 그 자리가 맞다.
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=maxed,famous,rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=maxed,famous,rich,veteran";
 const LINE = String.fromCharCode(10);
 const STEP = 1 / 60;
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 280000);

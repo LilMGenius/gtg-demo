@@ -6,7 +6,7 @@ import { chromium } from "playwright";
 // 가장 중요한 축은 걸쳐 보는 것이 돈을 안 쓰는가다. 시착용이 조용히 결제가 되면
 // 눌러 보는 행위 자체가 함정이 되고, 그 손해는 되돌릴 방법이 없다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();

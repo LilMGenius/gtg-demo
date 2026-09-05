@@ -14,6 +14,13 @@ const STAT_MAX = 10;
 // 잉여 훈련 환전 경로가 화면에 아예 안 뜬다. 그 경로까지 재려면 남은 훈련이 있어야 한다.
 export const MAXED_POINTS = 5;
 
+/* 첫 진입이 어디까지 왔는가. 0은 키퍼 한 장, 1은 키커 열 장, 2는 끝난 상태다.
+   저장 칸이라 여기가 정본이고, main의 개봉 단계와 아래 veteran 프리셋이 같은 수를 본다.
+   둘이 각자 상수를 적으면 단계를 하나 늘린 날 한쪽만 바뀐다. */
+export const ONBOARD_KEEPER = 0;
+export const ONBOARD_KICKERS = 1;
+export const ONBOARD_DONE = 2;
+
 // 상점 8선반의 최상급 합이 6810이고 이적시장 한 번이 380이다. 8000이면 그 둘을 다 하고도
 // 남아, 장비 표본이 살 수 있는 등급 하나에 묶이지 않는다. 완봉 한 판 60 기준 약 133판 몫이다.
 export const RICH_COIN = 8000;
@@ -54,6 +61,12 @@ const PRESETS = {
   // 열 장 묶음 한 번과 낱장 둘이 되는 수라, 두 자리가 서로 다르게 동작하는 것을 한 표본에서 볼 수 있다.
   ticketed(state) {
     state.tickets = TICKETS_HELD;
+  },
+  /* 첫 진입 개봉을 이미 마친 사람. 개봉판은 화면 전체를 덮고 그동안 어떤 창도 안 열리므로,
+     창을 재는 계기가 신규 저장에서 시작하면 첫 화면에서 문이 잠긴 채로 잰다. 두 번째 판을
+     여는 사람이 실제로 있는 상태이고, 판정도 지갑도 명단도 안 건드린다. */
+  veteran(state) {
+    state.onboard = ONBOARD_DONE;
   }
 };
 

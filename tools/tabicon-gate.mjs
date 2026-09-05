@@ -9,7 +9,7 @@ import { chromium } from "playwright";
 // 아이콘이 들어오면 칸이 넓어져 줄 수가 는다. 좁은 화면에서 탭이 화면 밖으로 나가는지는
 // maxview가 소유하므로 여기서는 한 화면 안에 다 서 있는지만 본다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();

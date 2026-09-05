@@ -8,7 +8,7 @@ import { BUFFS } from "../web/src/state/buff.mjs";
 // 행 수를 코드에서 뽑아 화면과 맞대므로 등급을 늘리면 이 게이트가 먼저 빨개진다.
 
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?preset=rich,veteran";
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 90000);
 t.unref();
 

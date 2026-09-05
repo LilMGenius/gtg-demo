@@ -7,7 +7,7 @@ import { HAIRS, TATTOOS, GLOVES, BOOTS, KITS, SOCKS } from "../web/src/state/gea
 // 세계를 얼려 놓고 스킨만 갈아 끼우면 두 장의 차이는 그 상품 하나뿐이다.
 
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const LINE = String.fromCharCode(10);
 const STEP = 1 / 60;
 // 판이 자리를 잡고 키퍼가 화면에 설 때까지. 그 뒤로는 세계를 멈춘다.

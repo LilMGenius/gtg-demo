@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 // 다름을 재는 축에는 같음을 재는 대조군이 붙는다. 같은 카드에 두 번 손을 올리면 같은 문장이 와야
 // 하고, 손을 떼면 안내로 돌아가야 한다. 그 둘이 없으면 달라진 문장이 카드 때문인지 잡음인지 모른다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();

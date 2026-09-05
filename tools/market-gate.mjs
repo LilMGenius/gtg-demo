@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 // 축은 둘이다. 그 선반이 새 이름으로 서는가, 화면 어디에도 옛 이름이 안 남았는가.
 // 못 찾는 자와 없는 것은 같은 답을 주므로, 옛 이름을 한 번 심어 잡히는지를 대조군으로 둔다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const OLD = "카드깡";
 const NEW = "이적시장";
 const LINE = String.fromCharCode(10);

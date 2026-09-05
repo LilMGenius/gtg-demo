@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 // 등급이 다르면 카드가 다른가. 대조군은 뽑기 전이다. 거기서 이 화면이 서 있으면
 // 아래의 어떤 축도 뽑기가 만든 것이 아니다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();

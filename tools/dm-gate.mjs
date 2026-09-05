@@ -8,7 +8,7 @@ import { DM_COOLDOWN, DM_WIN_FANS, dmOdds, DM_MOVES } from "../web/src/state/gra
 // 팔로워를 뽑아낼 수 있다. 대조군은 선팔만 걸린 사람이다. 거기서도 대화가 열리면 맞팔이 값을 잃는다.
 // 표본 범위: 판정을 안 부른다. 계정 화면만 재므로 키퍼 표본이 결론을 안 바꾼다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=maxed,rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=maxed,rich,veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();

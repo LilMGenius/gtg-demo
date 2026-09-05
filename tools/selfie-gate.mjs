@@ -9,7 +9,7 @@ import { selfieFans, likesFor } from "../web/src/state/gram.mjs";
 // 대조군은 진 만남이다. 거기서도 자리가 열리면 만남의 결과가 화면에서 사라진다.
 // 표본 범위: 판정을 안 부른다. 만남과 계정만 재므로 키퍼 표본이 결론을 안 바꾼다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=maxed,rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=maxed,rich,veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();

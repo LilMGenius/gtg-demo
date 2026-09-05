@@ -8,7 +8,7 @@ import { BUFFS } from "../web/src/state/buff.mjs";
 // 종류마다 다른 그림을 쓰는가. 마지막이 없으면 병 하나가 셋을 대신하고 배지는 개수만 세게 된다.
 // 종류는 한 번에 하나만 살 수 있으므로 판을 새로 열어 하나씩 산다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();

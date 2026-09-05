@@ -10,7 +10,7 @@ import { chromium } from "playwright";
 // 값이 안 든다는 축에는 판을 세우는 절차가 붙는다. 창이 열려 있어도 판이 굴러
 // 완봉 보상이 지갑에 들어오면, 그 몫이 변형 값으로 읽힌다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();

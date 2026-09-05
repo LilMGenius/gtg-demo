@@ -43,7 +43,7 @@ try {
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
   p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
-  await p.goto("http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,ticketed", { waitUntil: "load" });
+  await p.goto("http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,ticketed,veteran", { waitUntil: "load" });
   await p.waitForSelector("#go", { timeout: 15000 });
   await p.click("#go", { force: true });
   await p.waitForTimeout(900);

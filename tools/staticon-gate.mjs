@@ -9,7 +9,7 @@ import { chromium } from "playwright";
 // 그림이 그 능력치로 읽히는지는 계기가 답하지 못한다. 겹침으로 재면 눈과 반대로 나오는 것을
 // 탭 아이콘 랩에서 이미 확인했다. 그래서 판정은 눈에 맡기고 이 자는 그 눈이 볼 판을 굽는다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();

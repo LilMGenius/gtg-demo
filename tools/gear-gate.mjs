@@ -68,7 +68,7 @@ try {
 
   // 대조군. 주입이 없으면 지갑이 비어 최상급 칸은 사유를 적은 채 죽어 있다.
   // 이게 없으면 본시험의 녹색은 버튼이 원래 늘 살아 있는 것과 구분되지 않는다.
-  await boot("?seed=20");
+  await boot("?seed=20&preset=veteran");
   let poorTop = 0, poorSaid = 0;
   for (const s of SHELVES) {
     const v = await shelf(s.tab);
@@ -80,7 +80,7 @@ try {
   check("control:dead-button-states-the-shortfall", poorSaid === SHELVES.length, poorSaid + "/" + SHELVES.length);
 
   // 본시험. 지갑만 앞당긴 저장에서 여덟 선반을 끝까지 산다.
-  await boot("?seed=20&preset=rich");
+  await boot("?seed=20&preset=rich,veteran");
   const applied = await p.evaluate(() => window.__preset);
   check("preset:rich-was-applied", Array.isArray(applied) && applied.includes("rich"), JSON.stringify(applied));
 

@@ -6,7 +6,7 @@ import { chromium } from "playwright";
 // 훈련 줄이 전부 MAX가 된다. 글자가 제 상자를 넘으면 화면은 열리는데 읽히지 않는다.
 
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();

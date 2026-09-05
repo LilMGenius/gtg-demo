@@ -11,7 +11,7 @@ import { makeRng, buildSet } from "../src/chain.mjs";
 // 표본 범위: 키퍼는 안 세운다. 누가 차는가만 재므로 키퍼 능력치가 결론을 안 바꾼다.
 // 시드 하나로 이천 구를 돌린다. 열하나 밖의 이름이 한 번이라도 나오면 그 자리에서 빨개진다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();

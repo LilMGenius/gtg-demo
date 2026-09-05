@@ -14,7 +14,7 @@ import { chromium } from "playwright";
 // 스크롤 상자 밖에서 화면을 벗어난 것은 손이 닿지 않으므로 결함이다.
 // 그 둘을 안 가르면 정상적인 목록이 전부 빨간불이 된다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,famous";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,famous,veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();

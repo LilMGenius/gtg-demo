@@ -58,9 +58,9 @@ try {
   p.on("pageerror", (e) => errs.push(String(e)));
   p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
   // 팔로워는 0에서 시작하고 아래로 안 내려간다. 잃는 쪽을 재려면 쌓인 자리에서 시작해야 한다.
-  await p.goto(BASE + "?preset=famous", { waitUntil: "load" });
+  await p.goto(BASE + "?preset=famous,veteran", { waitUntil: "load" });
   await p.evaluate(() => localStorage.clear());
-  await p.goto(BASE + "?preset=famous", { waitUntil: "load" });
+  await p.goto(BASE + "?preset=famous,veteran", { waitUntil: "load" });
   await p.waitForTimeout(1200);
   await p.click("#go", { force: true });
   await p.waitForTimeout(1400);

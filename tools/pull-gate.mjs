@@ -17,7 +17,7 @@ const mul32 = (a) => () => {
 };
 
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?preset=rich,veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 90000);
 t.unref();

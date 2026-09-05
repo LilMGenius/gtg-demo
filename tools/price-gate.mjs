@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 // 앞의 둘은 대조군을 달고 온다. 판에 '육수' 글자를 심어서 자가 그것을 잡는지 먼저 본다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 // maxed는 훈련장의 잉여 훈련 환전 줄을 열고, rich는 상점 값이 전부 모자람 문구로 덮이는 것을 막는다.
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=maxed,rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=maxed,rich,veteran";
 const LINE = String.fromCharCode(10);
 // U+C721 U+C218. 재화 이름을 소스에 글자로 두면 이 파일 자신이 잔여 검색에 걸린다.
 // 값은 아래 대조군이 검증한다. 코드포인트를 잘못 적으면 이 자는 엉뚱한 글자를 재고 조용히 초록을 낸다.

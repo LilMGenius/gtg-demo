@@ -3,7 +3,7 @@ import { rapportTier, rapportGazeAid, rapportBoost } from '../web/src/state/rapp
 
 // 3단계/2단계/0단계를 한 화면에 같이 세운다. 15는 마지막 문턱, 8은 중간 문턱, 2는 문턱 미달
 const FIX = { '0:0': 15, '0:2': 8, '0:3': 2 };
-const URL = 'http://127.0.0.1:10310/web/index.html?seed=20';
+const URL = 'http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran';
 const HEAD = '아는 얼굴';
 const SUB = '말 섞은 만큼 한눈을 덜 판다';
 const RECORD = '상대 전적';

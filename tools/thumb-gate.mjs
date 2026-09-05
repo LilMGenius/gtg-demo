@@ -10,7 +10,7 @@ import { chromium } from "playwright";
 //
 // 맥락은 하나여야 한다. 카드마다 WebGL을 열면 열 몇 장에서 상한에 걸려 조용히 검은 칸이 된다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 // 몸에 걸치는 여섯 선반만 굽는다. 골대와 동네와 봇과 버프는 몸이 아니라 다른 주어라 아직 안 굽는다.
 const WORN = ["glove", "boot", "kit", "sock", "hair", "ink"];
 const LINE = String.fromCharCode(10);

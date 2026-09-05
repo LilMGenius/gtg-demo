@@ -11,7 +11,7 @@ import { chromium } from "playwright";
 // 문턱은 지어내지 않는다. 축은 폭이 넓어지면 칸이 늘어나는가와, 좁아져도 상품이 사라지지 않는가다.
 // 둘 다 같은 화면을 두 폭에서 재서 비교하는 것이라 절대값을 고를 일이 없다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const WIDE = 1280;
 const NARROW = 620;
 const LINE = String.fromCharCode(10);

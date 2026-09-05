@@ -9,7 +9,7 @@ import { KEEPERS, KICKERS, faceOf } from "../src/roster.mjs";
 // 앞은 노드에서, 뒤는 구운 화소에서 잰다. 데이터만 재면 갈린 값이 렌더에 안 닿아도 초록이다.
 
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();

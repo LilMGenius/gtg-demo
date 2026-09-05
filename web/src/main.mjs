@@ -18,7 +18,7 @@ import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualB
 import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost } from './state/rapport.mjs';
 import { passerName } from './state/passer.mjs';
 import { DATE_COST, MOVES, dateOdds, dateOutcome, applyDate, dateGate } from './state/date.mjs';
-import { applyPreset } from './state/inject.mjs';
+import { applyPreset, ONBOARD_KEEPER, ONBOARD_KICKERS, ONBOARD_DONE } from './state/inject.mjs';
 import { thumbURL, startSpin, stopSpin } from './render/thumb.mjs';
 
 const el = (id) => document.getElementById(id);
@@ -697,18 +697,23 @@ function renderGym() {
 // 창은 한 번에 하나만 선다. 닫기 전에 겹쳐 열리면 뒤엣것이 앞엣것을 덮고,
 // 닫았을 때 무엇이 남는지가 닫아 봐야 안다. 만남만 예외다. 내 정보 안의 버튼으로만
 // 열리고 닫으면 그 자리로 돌아가는 한 단계라 부모를 같이 닫으면 길이 끊긴다.
-// 개봉은 창이 아니라 상점이 낳는 화면이라 다른 창을 닫지 않는다. 다만 다른 창이 열리면 같이 걷힌다.
+// 개봉은 창이 아니라 상점이 낳는 화면이라 다른 창을 닫지 않는다. 반대로 개봉이 서 있는 동안에는
+// 어떤 창도 안 열린다. 개봉판은 화면 전체를 덮어 사람의 클릭을 이미 막고 있으므로, 열리는 창은
+// 손잡이로만 열리는 창이고 그때 첫 진입 개봉이 조용히 걷힌다. 처음 오는 사람이 자기가 무엇을
+// 들고 시작하는지를 못 보고 지나가는 자리이고, 계기가 사람이 못 가는 상태를 재게 되는 자리다.
 const PANEL_SHUT = { gym: closeGym, roster: closeRoster, gram: closeGram, me: closeMe, date: closeDate, shop: closeShop, earn: closeEarn, pull: stopReveal };
 function shutOthers(keep) {
+  if (keep !== 'pull' && !el('pull').hidden) return false;
   const spare = keep === 'date' ? ['me', 'date'] : [keep];
   for (const id of Object.keys(PANEL_SHUT)) {
     if (spare.includes(id)) continue;
     if (!el(id).hidden) PANEL_SHUT[id]();
   }
+  return true;
 }
 
 function openGym() {
-  shutOthers('gym');
+  if (!shutOthers('gym')) return;
   el('gym').hidden = false;
   renderGym();
 }
@@ -861,7 +866,7 @@ function swapTo(at) {
   renderRoster();
 }
 function openRoster() {
-  shutOthers('roster');
+  if (!shutOthers('roster')) return;
   el('roster').hidden = false;
   renderRoster();
 }
@@ -950,7 +955,7 @@ function renderGram() {
 }
 
 function openGram() {
-  shutOthers('gram');
+  if (!shutOthers('gram')) return;
   el('gram').hidden = false;
   renderGram();
 }
@@ -972,7 +977,7 @@ function renderEarn() {
 }
 
 function openEarn() {
-  shutOthers('earn');
+  if (!shutOthers('earn')) return;
   el('earn').hidden = false;
   renderEarn();
 }
@@ -1105,7 +1110,7 @@ function renderMe() {
 }
 
 function openMe() {
-  shutOthers('me');
+  if (!shutOthers('me')) return;
   el('me').hidden = false;
   renderMe();
 }
@@ -1229,7 +1234,7 @@ function commitDate(city, passer, moveId) {
 }
 
 function openDate(city, passer) {
-  shutOthers('date');
+  if (!shutOthers('date')) return;
   el('date').hidden = false;
   renderDate(city, passer, null);
 }
@@ -1640,10 +1645,6 @@ function paintPull() {
    그래서 직접 눌러 연다. 0은 키퍼 한 장, 1은 키커 열 장(보너스로 열한 장), 2는 끝난 상태다.
    키퍼 한 장은 결과가 동네형으로 못 박혀 있다. 첫 판이 무작위로 갈리면 처음 오는 사람마다
    다른 게임을 하게 되고, 튜토리얼이 설 자리가 사라진다. 뒤집는 손맛은 그대로 남는다. */
-const ONBOARD_KEEPER = 0;
-const ONBOARD_KICKERS = 1;
-const ONBOARD_DONE = 2;
-
 function onboardStep() {
   if (state.onboard >= ONBOARD_DONE) return false;
   if (state.onboard === ONBOARD_KEEPER) {
@@ -1912,7 +1913,7 @@ function renderShop() {
 }
 
 function openShop() {
-  shutOthers('shop');
+  if (!shutOthers('shop')) return;
   el('shop').hidden = false;
   renderShop();
 }

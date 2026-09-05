@@ -8,7 +8,7 @@ import { gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt } from "
 // 그 차림이 그림으로도 서는가. 이름은 선반 데이터에서 꺼내 맞대므로 화면이 옮겨 적으면 갈린다.
 // 대조군은 장비를 갈아입히는 것이다. 줄과 그림이 같이 바뀌지 않으면 위의 초록은 정지 화면을 잰 것이다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);
 t.unref();

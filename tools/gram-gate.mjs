@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 // 신규 키퍼로 돌리면 다섯 판이 전부 실점이라 먹힌 글의 표시가 갈리는지를 못 묻는다.
 // 만렙으로 돌려 선방과 실점이 둘 다 나오게 하고, 둘 다 나왔는지를 축으로 말한다.
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=maxed";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=maxed,veteran";
 const LINE = String.fromCharCode(10);
 // 판을 도는 창은 프레임으로 센다. 잠으로 세면 기계가 바쁜 날 구가 덜 돌아 표본이 빈다.
 const STEP = 1 / 60;

@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 // 대조군으로 칸을 옮겨 다니며 같은 것을 다시 잰다. 한 칸만 재면 나머지 둘은 아무도 안 본다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 // famous는 라포 줄을, seed 20은 전적 줄을 만든다. 빈 칸만 재면 갈렸는지를 알 수 없다.
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=famous,rich";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=famous,rich,veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);
 t.unref();
