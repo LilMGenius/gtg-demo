@@ -23,6 +23,9 @@ build/
 *.local.*
 *.local/
 
+# agent workflow state. plans, drafts, research journals and evidence live with the session, not the product
+.omo/
+
 # run results. regenerating these costs nothing
 sim/out/
 *.log
