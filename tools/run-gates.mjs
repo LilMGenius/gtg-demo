@@ -118,8 +118,13 @@ for (const f of picked) {
     const flagged = body.filter((x) => x.includes("FAIL") || x.includes("BAD"));
     const quote = flagged.length ? flagged.slice(0, 6) : body.slice(-4);
     for (const l of quote) say("           " + l.trim().slice(0, 96));
-    const err = (r.stderr || "").trim();
-    if (err) say("           stderr " + err.split(NL2)[0].slice(0, 90));
+    /* node의 잡히지 않은 예외는 첫 줄이 항상 node:internal/modules/run_main이고 진짜 이유는
+       몇 줄 아래에 있다. 첫 줄만 찍으면 조용히 죽은 게이트가 전부 같은 말을 하고,
+       실측으로 pullshow가 쓸기에서 그렇게 죽었는데 단독으로는 세 번 초록이라 가를 수가 없었다.
+       내부 프레임과 캐럿과 스택 줄을 걷고 남는 첫 줄이 그 게이트가 죽은 이유다. */
+    const err = (r.stderr || "").split(NL2).map((x) => x.trim())
+      .filter((x) => x && !x.startsWith("node:internal") && !x.startsWith("triggerUncaught") && x !== "^" && !x.startsWith("at "));
+    if (err.length) say("           stderr " + err[0].slice(0, 96));
   }
 }
 
