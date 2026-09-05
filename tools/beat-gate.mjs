@@ -9,7 +9,7 @@ import { judgeWindow } from "../src/chain.mjs";
 // 표본 범위: 라이브 한 구와 그 구에서 파생한 대조군이다. 창의 폭은 세이브율이 아니라 능력치의
 // 직접 함수라 레벨을 순회할 이유가 없고, 대신 반응속도 1과 10을 같은 구에 넣어 폭이 따라 움직이는지 본다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);
 t.unref();

@@ -9,7 +9,7 @@ import { chromium } from "playwright";
 // 다음 구가 열릴 때 지워지는가. 마지막이 없으면 지난 구의 표시가 이번 구의 것으로 읽힌다.
 // 표시는 클래스가 아니라 화소로 잰다. 클래스가 붙었다는 것과 사람이 다르게 본다는 것은 다른 주장이다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();

@@ -7,7 +7,7 @@
 import { chromium } from "playwright";
 
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const URL = "http://127.0.0.1:10310/web/index.html?seed=20";
+const URL = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const KINDS = ["downed", "reboundMiss", "carriedIn", "spill", "rebound", "save"];
 const BAR = 3;
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
