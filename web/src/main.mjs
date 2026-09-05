@@ -162,9 +162,15 @@ window.__now = () => stage.now();
 // 자기 shot으로 덮어쓰고, 지정한 조준점이 무시된 것처럼 보인다.
 // 실측: aimX 2.1을 넣었는데 비행 궤적이 aimX 0.72로 읽혔다.
 // 'demo'는 commit이 요구하는 'wait'가 아니므로 그 경로가 통째로 막힌다.
-window.__lockRound = () => { stage.cancel(timer); state.phase = 'demo'; return state.phase; };
+/* 잠그는 순간의 단계가 wait면 타이머 하나로 끝나지만 flying이나 caption이면 자막 스텝이
+   자기 타이머를 다시 걸고 restart를 거쳐 nextShot이 wait를 새로 세운다. 그 한 구가 잠근
+   뒤에 완주해 잔고에 4를 넣었고, 두 시점의 잔고를 비교하던 축이 그 4를 뽑기 값으로 읽었다.
+   실측으로 세 번 중 한 번이 7620 대신 7624였다. 열 게이트가 이 잠금 위에 서 있으므로
+   잠금은 지금 단계와 무관하게 다음 wait까지 막아야 한다. nextShot이 문이다. */
+let roundLocked = false;
+window.__lockRound = () => { roundLocked = true; stage.cancel(timer); state.phase = 'demo'; return state.phase; };
 // 잠근 판을 다시 굴린다. 하네스가 연출 구간을 끼워 넣고 이어서 촬영하려면 되돌릴 길이 있어야 한다.
-window.__resumeRound = () => { state.phase = 'idle'; nextSet(); return state.phase; };
+window.__resumeRound = () => { roundLocked = false; state.phase = 'idle'; nextSet(); return state.phase; };
 // 불러오기는 판이 시작되기 전에 끝난다. 첨 판을 기다려 그리면 그 사이에 숫자가 없다.
 
 // 손가락 셋. 방향과 타이밍과 나갈지 여부.
@@ -482,6 +488,7 @@ function nextSet() {
 
 function nextShot() {
   if (state.i >= state.shots.length) return endSet();
+  if (roundLocked) { state.phase = 'demo'; return; }
   const shot = state.shots[state.i];
   state.phase = 'wait';
   advance = 0;
@@ -534,6 +541,10 @@ function commit(dive) {
 
 // 자막은 체인 순서대로 한 줄씩 나온다. 반전이 반전을 덮으려면 한꺼번에 오면 안 된다.
 function rollCaptions(result) {
+  /* 잠근 순간 공이 이미 날고 있으면 비행은 timer가 아니라 stage가 굴리므로 취소에 안 걸리고,
+     착지해서 여기로 들어와 잔고를 정산한다. 실측으로 잠근 지 5초 뒤에 22가 들어왔고 그것이
+     세 번 중 한 번 뽑기 값을 더럽혔다. 잠긴 판은 정산도 안 한다. 결과는 commit이 이미 적었다. */
+  if (roundLocked) { state.phase = 'demo'; return; }
   const lines = result.events.slice();
   state.phase = 'caption';
   /* 눈맞음 갈래를 여기서 뽑는다. 판정 rng를 쓰면 그 뒤 모든 구가 밀려 게이트가 통째로 흔들리므로
