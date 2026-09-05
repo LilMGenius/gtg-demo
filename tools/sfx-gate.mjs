@@ -340,38 +340,52 @@ try {
     await new Promise((r) => setTimeout(r, 120));
     return window.__master ? Number(window.__master.gain.value.toFixed(4)) : -1;
   });
+  /* 시계가 도는 기계에서는 게인이 아니라 렌더된 피크를 읽는다. 게인은 열려 있어도 소리가
+     안 나올 수 있고 피크는 실제로 마스터를 지난 파형이다. 120ms는 킥 엔벨로프가 정점을
+     지나는 데 충분하고, 리셋을 먼저 해야 앞 발의 꼬리가 이번 수에 안 섞인다. */
+  const firePeak = () => lp.evaluate(async () => {
+    window.__peakReset();
+    window.__sfx.kick(1);
+    await new Promise((r) => setTimeout(r, 160));
+    return Number(window.__peakMax.toFixed(4));
+  });
   await tap("#go");
   await lp.waitForTimeout(900);
-  const legacyZero = await fireGain();
-  // 이 자리에서 렌더 시계가 도는가. 안 돌면 아래 축들이 게인을 읽는 이유가 서고,
-  // 돌기 시작하면 이 축이 빨개져 피크를 되살리라고 말한다.
+  /* 이 기계의 렌더 시계가 도는가를 먼저 묻고 그 답으로 아래 네 축의 자를 고른다.
+     안 돌면 피크는 언제나 0이라 게인이 유일한 관측값이고, 돌면 게인은 약한 대리물이라
+     피크가 자다. 두 기계에서 같은 축 이름이 다른 양을 재므로 어느 자를 썼는지를 같이 찍는다. */
   const clock = await lp.evaluate(async () => {
     const t0 = window.__ac.currentTime;
     await new Promise((r) => setTimeout(r, 400));
     return { adv: Number((window.__ac.currentTime - t0).toFixed(4)), state: window.__ac.state };
   });
+  const ticking = clock.adv > 0;
+  const fire = ticking ? firePeak : fireGain;
+  const ruler = ticking ? "peak" : "gain";
+  const legacyZero = await fire();
   await tap("#mute");
   await lp.waitForTimeout(250);
-  const whileMuted = await fireGain();
+  const whileMuted = await fire();
   await tap("#mute");
   await lp.waitForTimeout(250);
-  const afterUnmute = await fireGain();
+  const afterUnmute = await fire();
   const stored = await lp.evaluate(() => localStorage.getItem("gtg.sfx.volume"));
   await lp.reload({ waitUntil: "load" });
   await lp.waitForTimeout(600);
   await tap("#go");
   await lp.waitForTimeout(900);
-  const afterReload = await fireGain();
+  const afterReload = await fire();
 
-  check("instrument:this-machine-renders-no-audio-clock", clock.adv === 0,
-    "state " + clock.state + ", advanced " + clock.adv + "s in 0.4s");
-  check("control:mute-shuts-the-live-master", whileMuted === 0, String(whileMuted));
-  check("live:a-stored-zero-volume-does-not-reach-the-master", legacyZero > 0.02, String(legacyZero));
-  check("live:unmute-gives-back-what-mute-took", afterUnmute > 0.02, String(afterUnmute));
+  check("instrument:the-live-ruler-matches-this-machine", true,
+    ruler + ", clock " + clock.state + " advanced " + clock.adv + "s in 0.4s");
+  /* 음소거 아래 값은 게인이면 정확히 0이고 피크면 분석기 잡음 위 0.005 아래다. */
+  check("control:mute-shuts-the-live-master", ticking ? whileMuted < 0.005 : whileMuted === 0, ruler + " " + whileMuted);
+  check("live:a-stored-zero-volume-does-not-reach-the-master", legacyZero > 0.02, ruler + " " + legacyZero);
+  check("live:unmute-gives-back-what-mute-took", afterUnmute > 0.02, ruler + " " + afterUnmute);
   // 믹스는 코드가 소유한다. 화면에 음량 슬라이더가 없으니 저장된 믹스는 잔재뿐이다.
   // 잔재가 남아있으면 그 브라우저만 새 믹스를 영영 받지 못한다.
   check("live:no-stored-mix-survives-a-reload", stored === null, String(stored));
-  check("live:the-master-opens-again-after-a-reload-following-a-mute-toggle", afterReload > 0.02, String(afterReload));
+  check("live:the-master-opens-again-after-a-reload-following-a-mute-toggle", afterReload > 0.02, ruler + " " + afterReload);
 
   // 오디오 장치가 바뀌면 <audio>는 따라가고 AudioContext는 사라진 장치로 계속 내보낸다.
   // 그러면 음악만 남고 효과음이 사라진다. 신고된 증상과 정확히 같다.
