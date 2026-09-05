@@ -266,13 +266,27 @@ try {
     "kick lo " + r.spread.kick.lo + " vs inc hi " + incHi.toFixed(1));
 
 
-  // 살아 있는 소리. 위의 검사는 OfflineAudioContext라 마스터 게인을 지나지 않는다.
-  // 음소거가 음량에 0을 써서 영영 무음이 되던 버그는 그 창 밖에서 일어났다.
+  /* 살아 있는 소리. 위의 검사는 OfflineAudioContext라 마스터 게인을 지나지 않는다.
+     음소거가 음량에 0을 써서 영영 무음이 되던 버그는 그 창 밖에서 일어났다.
+
+     여기서는 렌더된 피크를 못 쓴다. 이 기계의 헤드리스 크로미움에는 출력 장치가 없고,
+     그때 AudioContext는 state를 running이라고 말하면서 currentTime을 512샘플 한 퀀텀에
+     못 박아 둔다. 실측으로 400ms를 기다려도 0.010666에서 한 칸도 안 움직였고, 헤드풀과
+     mute-audio와 autoplay 정책과 오디오 서비스 인프로세스까지 여섯 조합이 전부 같은 수였다.
+     그 시계에 물린 것은 전부 첫 값에서 멈춘다. 즉시 시작한 오실레이터는 분석기에 잡히지만
+     setValueAtTime으로 세운 엔벨로프는 0에서 출발해 영영 안 오른다. 게임의 소리는 전부
+     엔벨로프라 피크가 언제나 0이고, 그 0은 게임이 조용하다는 뜻이 아니라 이 자리에서
+     그 축을 잴 수 없다는 뜻이다.
+
+     그래서 여기서는 음소거와 저장된 믹스가 실제로 움직이는 값을 직접 읽는다. 마스터 게인이다.
+     소리가 들리는가는 위의 오프라인 축들이 이미 답했고, 여기가 답할 것은 그 소리가 마스터를
+     지나 나갈 수 있는 상태인가다. 아래에 시계가 안 간다는 사실 자체를 재는 축을 둔다.
+     장치가 생겨 시계가 돌기 시작하면 그 축이 빨개지고, 그때 피크 축을 되살리면 된다. */
   const live = await b.newContext();
   await live.addInitScript(() => {
     window.__acCount = 0;
     const AC0 = window.AudioContext;
-    window.AudioContext = function (...a) { window.__acCount += 1; return new AC0(...a); };
+    window.AudioContext = function (...a) { window.__acCount += 1; const c = new AC0(...a); window.__ac = c; return c; };
     window.AudioContext.prototype = AC0.prototype;
     const AC = window.AudioContext;
     const gain0 = AC.prototype.createGain;
@@ -298,8 +312,8 @@ try {
       }
       const conn = node.connect.bind(node);
       node.connect = (dst, ...rest) => {
-        const out = conn(dst, ...rest);
-        if (dst === self.destination) conn(self.__tap);
+      const out = conn(dst, ...rest);
+        if (dst === self.destination) { window.__master = node; conn(self.__tap); }
         return out;
       };
       return node;
@@ -319,35 +333,45 @@ try {
     g.dispatchEvent(new PointerEvent("pointerdown", o));
     g.dispatchEvent(new MouseEvent("click", o));
   }, sel);
-  const firePeak = () => lp.evaluate(async () => {
-    window.__peakReset();
+  // 소리 한 발을 세우고 마스터가 그것을 내보낼 수 있는 상태인지 읽는다.
+  // 발화 자체가 예외를 던지면 그것은 그래프가 안 선 것이므로 여기서 걸린다.
+  const fireGain = () => lp.evaluate(async () => {
     window.__sfx.kick(1);
-    await new Promise((r) => setTimeout(r, 450));
-    return Number(window.__peakMax.toFixed(4));
+    await new Promise((r) => setTimeout(r, 120));
+    return window.__master ? Number(window.__master.gain.value.toFixed(4)) : -1;
   });
   await tap("#go");
   await lp.waitForTimeout(900);
-  const legacyZero = await firePeak();
+  const legacyZero = await fireGain();
+  // 이 자리에서 렌더 시계가 도는가. 안 돌면 아래 축들이 게인을 읽는 이유가 서고,
+  // 돌기 시작하면 이 축이 빨개져 피크를 되살리라고 말한다.
+  const clock = await lp.evaluate(async () => {
+    const t0 = window.__ac.currentTime;
+    await new Promise((r) => setTimeout(r, 400));
+    return { adv: Number((window.__ac.currentTime - t0).toFixed(4)), state: window.__ac.state };
+  });
   await tap("#mute");
   await lp.waitForTimeout(250);
-  const whileMuted = await firePeak();
+  const whileMuted = await fireGain();
   await tap("#mute");
   await lp.waitForTimeout(250);
-  const afterUnmute = await firePeak();
+  const afterUnmute = await fireGain();
   const stored = await lp.evaluate(() => localStorage.getItem("gtg.sfx.volume"));
   await lp.reload({ waitUntil: "load" });
   await lp.waitForTimeout(600);
   await tap("#go");
   await lp.waitForTimeout(900);
-  const afterReload = await firePeak();
+  const afterReload = await fireGain();
 
-  check("control:mute-silences-the-live-master", whileMuted < 0.005, String(whileMuted));
-  check("live:a-stored-zero-volume-still-makes-sound", legacyZero > 0.02, String(legacyZero));
+  check("instrument:this-machine-renders-no-audio-clock", clock.adv === 0,
+    "state " + clock.state + ", advanced " + clock.adv + "s in 0.4s");
+  check("control:mute-shuts-the-live-master", whileMuted === 0, String(whileMuted));
+  check("live:a-stored-zero-volume-does-not-reach-the-master", legacyZero > 0.02, String(legacyZero));
   check("live:unmute-gives-back-what-mute-took", afterUnmute > 0.02, String(afterUnmute));
   // 믹스는 코드가 소유한다. 화면에 음량 슬라이더가 없으니 저장된 믹스는 잔재뿐이다.
   // 잔재가 남아있으면 그 브라우저만 새 믹스를 영영 받지 못한다.
   check("live:no-stored-mix-survives-a-reload", stored === null, String(stored));
-  check("live:sound-survives-a-reload-after-a-mute-toggle", afterReload > 0.02, String(afterReload));
+  check("live:the-master-opens-again-after-a-reload-following-a-mute-toggle", afterReload > 0.02, String(afterReload));
 
   // 오디오 장치가 바뀌면 <audio>는 따라가고 AudioContext는 사라진 장치로 계속 내보낸다.
   // 그러면 음악만 남고 효과음이 사라진다. 신고된 증상과 정확히 같다.
@@ -394,38 +418,17 @@ try {
   check("live:every-outcome-makes-at-least-one-sound", silent.length === 0,
     silent.join(",") || String(KINDS.length) + " kinds");
 
-  // 사건마다 소리가 나는 것과 플레이 내내 소리가 들리는 것은 다른 말이다.
-  // 사건을 전부 채워도 공을 다시 세우는 몇 초가 비어 있으면 무음으로 신고된다.
-  // 선언이 아니라 마스터를 직접 탭해서 가장 긴 조용한 구간을 초로 잰다.
-  // AnalyserNode 폴링은 버킷 사이를 흘려 피크를 놓친다. ScriptProcessor만 유효하다.
-  const TAP_MASTER = () => {
-    window.__buckets = [];
-    const AC = window.AudioContext;
-    const gain0 = AC.prototype.createGain;
-    AC.prototype.createGain = function (...a) {
-      const node = gain0.apply(this, a);
-      const self = this;
-      const conn = node.connect.bind(node);
-      node.connect = (dst, ...rest) => {
-        if (dst === self.destination && !self.__tap) {
-          const sp = self.createScriptProcessor(1024, 1, 1);
-          self.__tap = sp;
-          sp.onaudioprocess = (e) => {
-            const d = e.inputBuffer.getChannelData(0);
-            let m = 0;
-            for (let i = 0; i < d.length; i += 1) { const v = Math.abs(d[i]); if (v > m) m = v; }
-            window.__buckets.push([self.currentTime, m]);
-          };
-          sp.connect(self.destination);
-          conn(sp);
-        }
-        return conn(dst, ...rest);
-      };
-      return node;
-    };
-  };
+  /* 사건마다 소리가 나는 것과 플레이 내내 소리가 들리는 것은 다른 말이다.
+     사건을 전부 채워도 공을 다시 세우는 몇 초가 비어 있으면 무음으로 신고된다.
+
+     마스터를 탭해 렌더된 피크로 재려 했지만 이 기계에는 도는 오디오 시계가 없다.
+     위 절의 계기 축이 그것을 재고 있다. 대신 발화 시각을 센다. 판정이 소리를 부를 때마다
+     발화 기록에 이름과 performance.now()가 쌓이고, 그 시계는 오디오와 무관하게 돈다.
+     주장이 한 칸 약해진다. 부른 것과 들린 것은 다른 명제다. 들리는지는 오프라인 축들이
+     답하고, 여기가 답할 것은 플레이가 도는 동안 부르는 일이 끊기지 않는가다. */
   const gapCtx = await b.newContext();
-  await gapCtx.addInitScript(TAP_MASTER);
+  // 발화 기록은 페이지가 스스로 안 켠다. 배열이 있으면 그때만 쌓는다.
+  await gapCtx.addInitScript(() => { window.__sfxLog = []; });
   const gp = await gapCtx.newPage();
   gp.on("pageerror", (e) => errs.push(String(e)));
   await gp.goto(URL, { waitUntil: "load" });
@@ -438,18 +441,21 @@ try {
     g.dispatchEvent(new MouseEvent("click", o));
   });
   await gp.waitForTimeout(1400);
-  await gp.evaluate(() => { window.__buckets = []; });
+  await gp.evaluate(() => { window.__sfxLog.length = 0; });
   await gp.keyboard.press("ArrowLeft");
   await gp.waitForTimeout(16000);
-  const maxGap = await gp.evaluate(() => {
-    const bs = window.__buckets;
+  const gapRead = await gp.evaluate(() => {
+    const bs = window.__sfxLog;
+    if (bs.length < 2) return { fires: bs.length, gap: 0 };
     let gap = 0;
-    let prev = bs.length ? bs[0][0] : 0;
-    for (const [t, v] of bs) { if (v > 0.01) { if (t - prev > gap) gap = t - prev; prev = t; } }
-    return Number(gap.toFixed(2));
+    let prev = bs[0][2];
+    for (const [, , t] of bs) { const d = (t - prev) / 1000; if (d > gap) gap = d; prev = t; }
+    return { fires: bs.length, gap: Number(gap.toFixed(2)) };
   });
-  check("live:play-never-goes-quiet-for-more-than-four-seconds", maxGap > 0 && maxGap <= 4,
-    maxGap + "s");
+  // 발화가 둘 미만이면 간격이라는 값 자체가 없다. 통과도 실패도 아니고 표본이 없는 것이다.
+  check("instrument:play-fired-enough-sounds-to-have-a-gap", gapRead.fires >= 2, gapRead.fires + " fires");
+  check("live:play-never-goes-quiet-for-more-than-four-seconds", gapRead.fires >= 2 && gapRead.gap <= 4,
+    gapRead.gap + "s over " + gapRead.fires + " fires");
 
   // 발화마다 그래프를 새로 세우고 아무도 안 끊으면 마스터에 노드가 쌓인다.
   // 방치형이라 탭을 하루 켜두는 게 정상 사용이다. 6만 개까지 밀었을 때
