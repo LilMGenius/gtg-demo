@@ -14,7 +14,18 @@ import { writeFileSync } from "node:fs";
 //   2. 원반 중심 반지름 절반 안쪽은 20% 미만. 가장자리 스침과 정면 가림은 다른 사건이다.
 // 대조군: 임팩트를 끈 프레임 두 장(B, B2)을 같은 자로 잰다. 여기서 화소가 나오면 자가 고장난 것이다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const URL = "http://127.0.0.1:10310/web/index.html?seed=" + (process.argv[2] || 7);
+const URL = "http://127.0.0.1:10310/web/index.html?preset=veteran&seed=" + (process.argv[2] || 7);
+// 사건을 걸 프레임. 라운드가 열린 프레임에서 센다. 잠으로 세면 세계가 고정 폭으로 도는 동안
+// 그날의 부하가 위상을 정하고, 공이 회차마다 다른 자리에 선다. 실측으로 세 회차의 공 화면
+// 좌표가 403,517과 405,508과 595,441로 갈렸고 덮임이 32.0%에서 1.0%까지 흔들렸다.
+const LEAD = 90;
+const DIVE = 42;
+/* 수명 위에서 잡을 자리. 예전에는 0.02를 처음 넘는 프레임이었고 그 자리는 폭발이 거의 안
+   자란 그림이라 축이 떨어질 수가 없었다. 링과 베일은 u를 따라 커지므로 뒤로 갈수록 공을
+   더 덮는다. 한 번의 폭발에서 여러 자리를 잡으려면 얼렸다 풀어야 하는데 그 왕복이 실시간
+   1초쯤이라 그 사이에 수명이 끝난다. 그래서 한 사건에 한 자리만 잡고, 그 자리를 폭발이
+   충분히 자란 0.45에 둔다. 여러 자리를 재려면 자리마다 사건을 새로 걸어야 한다. */
+const U_POINTS = [0.45];
 const W = 1280;
 const H = 720;
 const KINDS = ["save", "carriedIn", "gloveGone", "downed"];
@@ -27,11 +38,16 @@ const LUM = 24;
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 220000);
 t.unref();
 
-const waitBurst = () => new Promise((res) => {
+/* 폭발이 수명 u의 어느 자리에 왔을 때 잡을지를 부르는 쪽이 정한다. 예전에는 0.02를 처음
+   넘는 프레임에서 멈췄는데, 그 자리는 폭발이 가장 작을 때라 축이 떨어질 수가 없었다.
+   링과 베일은 u를 따라 커지므로(0.46+0.72u, 0.5+0.95u) 공을 가장 많이 덮는 자리는 뒤쪽이다.
+   가장 작은 자리만 재고 통과시키면 그 통과는 아무 말도 안 한다. 수명 위 세 자리를 잡아
+   가장 나쁜 것으로 판정한다. */
+const waitU = (target) => new Promise((res) => {
   const t0 = performance.now();
   const tick = () => {
     const s = window.__impactVis();
-    if (s.life > 0 && s.u > 0.02) { window.__freeze(true); res(s); return; }
+    if (s.life > 0 && s.u >= target) { window.__freeze(true); res(s); return; }
     if (performance.now() - t0 > 2500) { res(null); return; }
     requestAnimationFrame(tick);
   };
@@ -88,7 +104,15 @@ let br;
 let fail = 0;
 try {
   br = await chromium.launch({ executablePath: EXE });
+  /* 채취 시점은 폭발이 u 0.02를 처음 넘는 프레임이다. 세계시계가 실시간을 보면 한 프레임이
+     밀어 올리는 u가 그날의 부하를 따라 달라지고, 문턱을 넘는 순간의 u가 회차마다 다른 자리에
+     선다. 폭발은 그 사이에도 자라므로 늦게 잡힌 회차일수록 공을 더 덮는다. 실측으로 단독
+     실행은 통과하고 쓸기 안에서는 같은 사건이 덮음 49.7%로 죽었다. 고정 폭 시계를 손잡이가
+     생기는 즉시 켜면 한 프레임이 올리는 u가 상수가 되고, 문턱을 넘는 자리가 회차마다 같아진다. */
   const ctx = await br.newContext({ viewport: { width: W, height: H } });
+  await ctx.addInitScript(() => {
+    const t = setInterval(() => { if (window.__fixedStep) { window.__fixedStep(1 / 60); clearInterval(t); } }, 0);
+  });
   const p = await ctx.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -97,29 +121,41 @@ try {
 
   for (const kind of KINDS) {
     await p.goto(URL, { waitUntil: "load" });
-    await p.waitForTimeout(1400);
+    await p.waitForSelector("#go", { timeout: 15000 });
     await p.click("#go", { force: true });
-    await p.waitForTimeout(1500);
+    const base = await p.evaluate(() => window.__frames());
+    const at = (n) => p.waitForFunction((m) => window.__frames() >= m, n, { timeout: 20000 });
+    await at(base + LEAD);
     await p.keyboard.press("ArrowLeft");
-    await p.waitForTimeout(700);
+    await at(base + LEAD + DIVE);
     await p.evaluate((k) => window.__act(k), kind);
-    const live = await p.evaluate(waitBurst);
-    if (!live) { console.log(kind + ": NO BURST"); fail++; continue; }
-    await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-    const disc = await p.evaluate(ballDisc);
-    const a = await grab();
-    await p.evaluate(() => window.__impactHide(true));
-    await p.waitForTimeout(120);
-    const b = await grab();
-    await p.waitForTimeout(120);
-    const b2 = await grab();
-    await p.evaluate(() => window.__impactHide(false));
-
-    const m = await p.evaluate(discDiff, [a, b, disc, LUM]);
-    const c = await p.evaluate(discDiff, [b, b2, disc, LUM]);
-    const cover = m.all ? m.hitAll / m.all : 1;
-    const coreCover = m.core ? m.hitCore / m.core : 1;
-    const ctrl = c.all ? c.hitAll / c.all : 1;
+    let worst = null;
+    let a = null, b = null;
+    for (const target of U_POINTS) {
+      const live = await p.evaluate(waitU, target);
+      if (!live) break;
+      const disc = await p.evaluate(ballDisc);
+      const shotA = await grab();
+      await p.evaluate(() => window.__impactHide(true));
+      await p.waitForTimeout(120);
+      const shotB = await grab();
+      await p.waitForTimeout(120);
+      const shotB2 = await grab();
+      await p.evaluate(() => window.__impactHide(false));
+      const mm = await p.evaluate(discDiff, [shotA, shotB, disc, LUM]);
+      const cc = await p.evaluate(discDiff, [shotB, shotB2, disc, LUM]);
+      const row = { u: live.u, m: mm, ctrl: cc.all ? cc.hitAll / cc.all : 1 };
+      row.cover = mm.all ? mm.hitAll / mm.all : 1;
+      row.core = mm.core ? mm.hitCore / mm.core : 1;
+      if (!worst || row.cover > worst.cover) { worst = row; a = shotA; b = shotB; }
+      // 다음 자리를 보려면 세계를 다시 굴려야 한다. 얼린 채로 기다리면 u가 안 자란다.
+      await p.evaluate(() => window.__freeze(false));
+    }
+    if (!worst) { console.log(kind + ": NO BURST"); fail++; continue; }
+    const m = worst.m;
+    const cover = worst.cover;
+    const coreCover = worst.core;
+    const ctrl = worst.ctrl;
     const bad = !m.onScreen || cover >= BAR_DISC || coreCover >= BAR_CORE || ctrl >= BAR_CONTROL;
     if (bad) fail++;
     console.log(
@@ -127,6 +163,7 @@ try {
       " cover " + (cover * 100).toFixed(1) + "% (bar " + (BAR_DISC * 100) + ")" +
       " core " + (coreCover * 100).toFixed(1) + "% (bar " + (BAR_CORE * 100) + ")" +
       " control " + (ctrl * 100).toFixed(2) + "%" +
+      " at u " + worst.u.toFixed(2) +
       " r " + m.r.toFixed(1) + "px at " + m.cx.toFixed(0) + "," + m.cy.toFixed(0) +
       " px " + m.all
     );
