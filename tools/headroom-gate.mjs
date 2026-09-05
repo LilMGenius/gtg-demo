@@ -23,9 +23,12 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
-  const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
   const errs = [];
+  /* 회차마다 새 컨텍스트를 연다. 한 컨텍스트를 나눠 쓰면 저장 자리도 나눠 쓴다.
+     첫 회차가 손님 계정을 세우면서 이름 없던 저장을 그 계정으로 가져가고, 이후 회차가
+     심는 저장은 계정 자리를 안 덮는다. 실측으로 네 등급이 전부 0등급을 잰 채 초록이었다. */
   const read = async (pads) => {
+    const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
     const p = await ctx.newPage();
     p.on("pageerror", (e) => errs.push(String(e)));
     p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
@@ -47,7 +50,7 @@ try {
     const off = await p.evaluate(() => window.__headVis(40));
     await p.evaluate(() => window.__headHide(false));
     const gear = await p.evaluate(() => window.__gear());
-    await p.close();
+    await ctx.close();
     return { pads, on, off, worn: gear.pads };
   };
 
@@ -70,7 +73,6 @@ try {
     got.every((r) => r.on.eyeRise > 0),
     got.map((r) => r.pads + " eyes " + r.on.eyeRise.toFixed(3)).join(", "));
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
-  await ctx.close();
 
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
