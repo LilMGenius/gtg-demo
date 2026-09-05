@@ -19,9 +19,12 @@ export const BED = 0.048;
 export function mountBgm(base = '') {
   const el = new Audio();
   el.loop = true;
-  el.preload = 'auto';
+  /* 첫 입력 전에는 안 받는다. 브라우저가 어차피 입력 전 재생을 막는데 preload가 auto면
+     소리를 켜 본 적 없는 사람에게도 4MB가 전량 내려간다. 실측으로 방문 한 번의 60에서 62퍼센트가
+     이 파일이었고 입력 861ms 전에 요청이 나갔다. src를 첫 입력에서 꽂으면 받는 시점이 곧 듣는 시점이다. */
+  el.preload = 'none';
   const pick = SRC.find(([type]) => el.canPlayType(type)) ?? SRC[1];
-  el.src = base + pick[1];
+  const src = base + pick[1];
 
   let level = readVolume(KEY, BED);
   let muted = false;
@@ -33,12 +36,15 @@ export function mountBgm(base = '') {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) resume(); });
 
   const kick = () => {
+    if (!el.src) el.src = src;
     resume();
     if (!el.paused) {
       for (const ev of ['pointerdown', 'keydown', 'touchstart']) document.removeEventListener(ev, kick);
     }
   };
-  kick();
+  /* 마운트 직후의 한 번은 자동재생이 허용된 브라우저를 위한 것이었는데, 그 한 번이 src를
+     꽂으면 입력 전에 받는 셈이 된다. 지금은 첫 입력이 유일한 문이다. 자동재생이 허용된
+     브라우저도 첫 입력 뒤에야 음악이 나오고, 그 대가로 안 듣는 사람은 한 바이트도 안 받는다. */
   for (const ev of ['pointerdown', 'keydown', 'touchstart']) document.addEventListener(ev, kick);
 
   return {
