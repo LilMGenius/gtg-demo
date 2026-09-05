@@ -3,7 +3,7 @@ import { chromium } from "playwright";
 // 저장 게이트. 탭을 닫아도 키퍼가 남는가, 자리를 비운 시간이 상한 안에서만 쌓이는가.
 // 대조군 셋: 저장이 비었을 때 0, 시계를 되돌렸을 때 0, 몇 달 비웠을 때도 상한.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const URL = "http://127.0.0.1:10310/web/index.html?seed=20";
+const URL = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();
 

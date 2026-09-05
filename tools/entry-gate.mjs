@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 // 문턱을 지어내지 않는다. 축은 전부 참거짓이다. 무엇이 무엇을 여는가와,
 // 누름을 받는 것이 button 요소인가만 묻는다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);
 t.unref();

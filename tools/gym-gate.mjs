@@ -47,13 +47,13 @@ try {
 
   // 대조군. 주입이 없으면 성장 칸은 상한이 아니고, 환전 줄 자체가 화면에 없다.
   // 이게 없으면 본시험의 녹색은 화면이 늘 그렇게 생긴 것과 구분되지 않는다.
-  await boot("?seed=20");
+  await boot("?seed=20&preset=veteran");
   const plain = await gym();
   check("control:fresh-save-is-not-at-the-ceiling", plain.rows.some((r) => r.tail !== "MAX"), plain.rows.filter((r) => r.tail === "MAX").length + "/" + plain.rows.length + " max");
   check("control:swap-row-is-absent-below-the-ceiling", plain.swap === null, plain.swap ? plain.swap.text : "absent");
 
   // 본시험. 만렙 저장에서 훈련장을 연다.
-  await boot("?seed=20&preset=maxed");
+  await boot("?seed=20&preset=maxed,veteran");
   const applied = await p.evaluate(() => window.__preset);
   check("preset:maxed-was-applied", Array.isArray(applied) && applied.includes("maxed"), JSON.stringify(applied));
   const maxed = await gym();

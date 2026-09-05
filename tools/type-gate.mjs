@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 // 문턱을 지어내지 않는다. 축은 전부 참거짓이고, 근거는 계획서가 이미 인용한 규칙이다.
 // 이름을 쓰면서 그 이름의 @font-face가 없으면 그것은 결함이다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const LINE = String.fromCharCode(10);
 const QUOTE = String.fromCharCode(39);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);

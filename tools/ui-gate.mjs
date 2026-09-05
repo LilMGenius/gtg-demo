@@ -4,7 +4,7 @@ import { chromium } from "playwright";
 // 대조군 둘이 붙어 있다. 세로 회전 안내와 조작법 패널 초기 접힘.
 // 둘이 기대대로 나오지 않으면 이 게이트가 무엇을 보고 있는지 모르는 것이다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const URL = "http://127.0.0.1:10310/web/index.html?seed=" + (process.argv[2] || 7);
+const URL = "http://127.0.0.1:10310/web/index.html?seed=" + (process.argv[2] || 7) + "&preset=veteran";
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 80000);
 t.unref();
 
