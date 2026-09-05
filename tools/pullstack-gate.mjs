@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { PULL_COST, PULL_BULK, TICKET_CAP, TICKET_PER_CLEAN, pullBill, ticketGain } from "../src/roster.mjs";
+import { PULL_COST, PULL_BULK, pullYield, TICKET_CAP, TICKET_PER_CLEAN, pullBill, ticketGain } from "../src/roster.mjs";
 import { TICKETS_HELD } from "../web/src/state/inject.mjs";
 
 // 이적시장 이용권과 두 자리의 자. 한 장만 뽑을 수 있으면 모아서 지르는 자리가 없고,
@@ -46,12 +46,23 @@ try {
   await p.goto("http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,ticketed", { waitUntil: "load" });
   await p.waitForSelector("#go", { timeout: 15000 });
   await p.click("#go", { force: true });
+  await p.waitForTimeout(900);
+  /* 처음 온 계정은 카드부터 열린다. 그 흐름을 안 달고 상점을 열면 개봉 덮개가 클릭을 먹어
+     값이 안 나간 것으로 읽힌다. 사람도 똑같이 닫고 나서 상점에 간다. */
+  for (let i = 0; i < 6; i += 1) {
+    if (await p.evaluate(() => document.getElementById("pull").hidden)) break;
+    await p.click("#pull", { force: true });
+    await p.waitForTimeout(350);
+  }
   await p.waitForTimeout(1300);
   const applied = await p.evaluate(() => window.__preset);
   check("preset:ticketed-was-applied", Array.isArray(applied) && applied.includes("ticketed"), JSON.stringify(applied));
 
   await p.evaluate(() => window.__shop(true));
   await p.waitForSelector("#shop .buy[data-want]", { timeout: 8000 });
+  /* 판이 뒤에서 계속 돈다. 구가 끝날 때마다 육수가 들어오므로, 두 시점의 잔고를 비교하는 축은
+     그 사이에 굴러간 구를 뽑기가 쓴 값으로 읽는다. 재는 동안 판을 멈춘다. */
+  await p.evaluate(() => window.__lockRound());
   const wants = await p.evaluate(() => [...document.querySelectorAll("#shop .buy[data-want]")].map((e) => Number(e.dataset.want)));
   /* 뽑으면 개봉 화면이 상점 위를 통째로 덮는다. 사람도 그것을 닫아야 다음 버튼에 닿으므로
      계기도 같은 문을 쓴다. 안 닫고 다음 클릭을 보내면 덮개가 먹어 아무 일도 안 일어나고,
@@ -78,7 +89,9 @@ try {
   await p.waitForTimeout(500);
   const after = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin, squad: window.__squad().squad.slice() }));
   const want = pullBill(PULL_BULK, before.t, before.coin);
-  check("pullstack:a-bulk-draw-lands-that-many-keepers", after.squad.length - before.squad === PULL_BULK,
+  /* 값은 열 장어치를 내고 열한 장이 온다. 청구는 want로, 도착은 그 회차의 산출로 잰다.
+     둘을 같은 수로 재면 묶음 보너스가 결함으로 읽힌다. */
+  check("pullstack:a-bulk-draw-lands-that-many-keepers", after.squad.length - before.squad === pullYield(PULL_BULK),
     before.squad + " to " + after.squad.length);
   check("pullstack:tickets-are-spent-before-money", before.t - after.t === want.free && before.coin - after.coin === want.cost,
     "tickets " + before.t + " to " + after.t + ", coin " + before.coin + " to " + after.coin);

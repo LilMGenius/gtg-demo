@@ -775,6 +775,11 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #shop .buy.pull u{position:absolute;top:-9px;left:50%;translate:-50% 0;text-decoration:none;
   padding:2px 8px 3px;background:var(--bad);color:#0d110c;font-size:11px;font-weight:700;
   border:2px solid var(--edge);white-space:nowrap}
+/* 묶음 보너스. 사유 배지와 같은 자리를 쓰되 반대쪽 모서리에 서서 둘이 겹치지 않는다.
+   이득은 노랑이고 사유는 빨강이라 색만으로도 어느 쪽인지가 갈린다. */
+#shop .buy.pull s{position:absolute;top:-9px;right:-8px;text-decoration:none;
+  padding:2px 8px 3px;background:#ffd83d;color:#0d110c;font-family:var(--disp);font-size:13px;
+  font-weight:400;border:2px solid var(--edge)}
 /* 한 장과 열 장을 나란히 둔다. 세로로 쌓으면 카드가 한 줄만큼 길어지고,
    세로 390px짜리 가로 모바일에서 그만큼 상점이 밀려 위쪽 탭이 화면 밖으로 나간다. */
 #shop .card .buys{display:flex;gap:9px;margin-top:13px}

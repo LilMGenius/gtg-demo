@@ -161,6 +161,16 @@ export const PULL_COST = 380;
 // 묶음이 싸면 한 장 자리가 죽고, 뽑기가 값을 고르는 일이 아니라 한 번에 지르는 일이 된다.
 export const PULL_BULK = 10;
 
+/* 열 장을 한 번에 까면 한 장이 더 나온다. 값은 열 배 그대로이므로 이것이 묶음의 유일한 이득이고,
+   그래서 한 장 자리가 안 죽는다. 이 장르가 오래 쓴 자리라 처음 보는 사람도 무엇인지 안다.
+   보너스를 값 할인으로 주면 열 장이 싸지고, 그때부터 한 장 버튼은 아무도 안 누른다. */
+export const PULL_BONUS = 1;
+
+// 그 회차에 실제로 나오는 장수. 화면과 판정이 이 함수 하나를 읽어야 둘이 안 갈린다.
+export function pullYield(want) {
+  return Number(want) === PULL_BULK ? PULL_BULK + PULL_BONUS : Number(want) || 0;
+}
+
 // 완봉 한 판이 주는 이용권. 다섯 슛을 다 막아야 나오므로 방치로는 잘 안 쌓이고,
 // 훈련 포인트가 시간에 붙는 것과 달리 이쪽은 실력에 붙는다. 두 축이 같은 자원을 주면 하나가 죽는다.
 export const TICKET_PER_CLEAN = 1;

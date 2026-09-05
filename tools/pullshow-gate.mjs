@@ -27,6 +27,13 @@ try {
   await p.waitForSelector("#go", { timeout: 15000 });
   await p.click("#go", { force: true });
   await p.waitForTimeout(900);
+  /* 처음 온 계정은 카드부터 연다. 그 흐름을 안 닫고 상점을 열면 이 자의 판정이
+     첫 진입 개봉과 상점 개봉을 섞어 읽는다. 사람도 똑같이 닫고 나서 상점에 간다. */
+  for (let i = 0; i < 6; i += 1) {
+    if (await p.evaluate(() => document.getElementById("pull").hidden)) break;
+    await p.click("#pull", { force: true });
+    await p.waitForTimeout(350);
+  }
   await p.evaluate(() => window.__shop(true));
   await p.waitForSelector("#shop .buy.pull", { timeout: 8000 });
 

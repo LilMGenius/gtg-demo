@@ -1,7 +1,7 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
 import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain, judgeWindow, GEAR_STEP } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
-import { KEEPERS, KICKERS, keeperCost, kickerCost, kickerByName, ROLES, ROLE_SLOTS, ELEVEN, defaultEleven, TRAITS, PULL_COST, PULL_BULK, TICKET_CAP, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
+import { KEEPERS, KICKERS, keeperCost, kickerCost, kickerByName, ROLES, ROLE_SLOTS, ELEVEN, defaultEleven, TRAITS, PULL_COST, PULL_BULK, PULL_BONUS, pullYield, TICKET_CAP, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
@@ -90,6 +90,9 @@ state.record = readRecord(saved);
   state.kickers = got.kickers;
   state.eleven = got.eleven;
 }
+/* 첫 진입이 어디까지 왔는지. 옛 저장에는 이 칸이 없고, 그때는 이미 한참 한 판이므로
+   끝난 것으로 읽는다. 이미 하던 사람에게 튜토리얼을 다시 열면 그 판이 뒤집힌다. */
+state.onboard = Number.isFinite(saved?.onboard) ? saved.onboard : (saved ? 2 : 0);
 // 장비. 몸에 걸치는 여섯은 그 키퍼가 들고, 서는 자리 둘은 계정이 든다.
 // 저장에 실린 하나짜리 장비는 옛 판이므로 모든 키퍼에게 같은 것을 입혀 이어 붙인다.
 const savedGear = readGear(saved?.gear);
@@ -370,7 +373,7 @@ function markDive(dive, mine) {
 
 // 저장은 항상 보유 목록 전체로 나간다. 뛰는 키퍼만 저장하면 나머지가 다음 저장에서 지워진다.
 function persist() {
-save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets, state.social, state.kickers, state.eleven);
+save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets, state.social, state.kickers, state.eleven, state.onboard);
 }
 
 // 봇 크레딧은 실시간으로 줄어든다. 구 수로 세면 탭을 열어두고 안 누르는 쪽이 이득이 된다.
@@ -1616,7 +1619,74 @@ function paintPull() {
   const now = box.querySelector('.now');
   void now.offsetWidth;
   now.classList.add('turn');
-  box.onclick = () => { if (shown >= lastPull.length) stopReveal(); else revealAll(); };
+  box.onclick = () => {
+    if (shown < lastPull.length) return revealAll();
+    stopReveal();
+    // 첫 진입은 두 마디다. 키퍼를 닫으면 그 자리에서 키커가 이어 열린다.
+    onboardStep();
+  };
+}
+
+
+/* 첫 진입. 가입 직후 아무것도 안 뽑고 시작하면 첫 키퍼와 주전 열하나가 조용히 배정된다.
+   플레이어는 자기가 무엇을 들고 시작하는지를 본 적이 없고, 이 장르가 파는 첫 순간을 건너뛴다.
+   그래서 직접 눌러 연다. 0은 키퍼 한 장, 1은 키커 열 장(보너스로 열한 장), 2는 끝난 상태다.
+   키퍼 한 장은 결과가 동네형으로 못 박혀 있다. 첫 판이 무작위로 갈리면 처음 오는 사람마다
+   다른 게임을 하게 되고, 튜토리얼이 설 자리가 사라진다. 뒤집는 손맛은 그대로 남는다. */
+const ONBOARD_KEEPER = 0;
+const ONBOARD_KICKERS = 1;
+const ONBOARD_DONE = 2;
+
+function onboardStep() {
+  if (state.onboard >= ONBOARD_DONE) return false;
+  if (state.onboard === ONBOARD_KEEPER) {
+    // 첫 키퍼. 명단의 가장 싼 이름이고 그 사람이 이 게임의 출발점이다.
+    const first = KEEPERS.slice().sort((a, b) => keeperCost(a) - keeperCost(b))[0];
+    stopReveal();
+    lastPull = [first];
+    state.onboard = ONBOARD_KICKERS;
+    /* 명단에서 온 사람으로 갈아 세운다. 처음 세워지는 무명 키퍼를 그대로 두면 방금 뽑은 카드가
+       판에 안 서고, 뽑기가 결과를 안 바꾸는 연출이 된다. */
+    state.squad[0] = recruit(first);
+    state.pick = 0;
+    state.keeper = state.squad[0];
+    stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
+    persist();
+    pips();
+    revealNext();
+    return true;
+  }
+  // 키커 열 장. 묶음 보너스가 붙어 열한 장이고, 나온 사람이 그대로 주전을 채운다.
+  const pool = KICKERS.filter((k) => state.kickers.indexOf(k.name) < 0);
+  const left = pool.slice();
+  const drawn = [];
+  for (let i = 0; i < pullYield(PULL_BULK); i += 1) {
+    const pick = pullFrom(left, Math.random);
+    if (!pick) break;
+    left.splice(left.indexOf(pick), 1);
+    drawn.push(pick);
+  }
+  if (!drawn.length) { state.onboard = ONBOARD_DONE; return false; }
+  for (const k of drawn) state.kickers.push(k.name);
+  /* 뽑은 사람으로 주전을 다시 세운다. 정원 안에서 뽑힌 사람을 먼저 넣고 모자란 자리는
+     시작 열하나가 채운다. 뽑았는데 아무도 안 뛰면 그 열한 장이 무엇을 산 것인지 화면에 없다. */
+  const filled = [];
+  for (const role of ROLES) {
+    const want = ROLE_SLOTS[role];
+    const mine = drawn.filter((k) => k.role === role).map((k) => k.name);
+    const rest = defaultEleven().filter((n) => { const e = kickerByName(n); return e && e.role === role; });
+    for (const n of mine.concat(rest)) {
+      if (filled.filter((x) => kickerByName(x).role === role).length >= want) break;
+      if (filled.indexOf(n) < 0) filled.push(n);
+    }
+  }
+  state.eleven = filled;
+  state.onboard = ONBOARD_DONE;
+  stopReveal();
+  lastPull = drawn.slice();
+  persist();
+  revealNext();
+  return true;
 }
 
 function pullShelf(all) {
@@ -1640,7 +1710,10 @@ function pullShelf(all) {
     const price = bill.cost > 0 ? SW(bill.cost) : IC_TICKET + bill.free;
     const why = !pool.length ? '품절' : (!bill.afford ? '잔고 부족' : (left < want ? '남은 카드 ' + left : ''));
     return '<button class="buy pull" data-want="' + want + '"' + (off ? ' disabled' : '') + '>'
-      + (why ? '<u>' + why + '</u>' : '') + '<b>' + want + '회</b><i>' + price + '</i></button>';
+      + (why ? '<u>' + why + '</u>' : '')
+      // 보너스가 붙는 회차는 그 사실이 버튼에 있어야 한다. 눌러 봐야 아는 이득은 이득이 아니다.
+      + (want === PULL_BULK ? '<s>+' + PULL_BONUS + '</s>' : '')
+      + '<b>' + want + '회</b><i>' + price + '</i></button>';
   }).join('');
   /* 확률은 사는 자리가 아니라 확인하는 자리다. 본문에 두 줄로 깔면 살 것을 고르는 눈이
      매번 그 줄을 지나간다. 눌러야 열리는 칸으로 뺀다. */
@@ -1805,7 +1878,10 @@ function renderShop() {
     // 뽑은 카드는 풀에서 즉시 빠진다. 안 빼면 한 묶음 안에서 같은 이름이 두 번 나온다.
     const left = here.slice();
     const drawn = [];
-    for (let i = 0; i < want; i += 1) {
+    /* 열 장 회차는 열한 장이 나온다. 값은 열 배 그대로이므로 이것이 묶음의 유일한 이득이고,
+       그래서 한 장 자리가 안 죽는다. 뽑는 수는 판정이 소유하는 함수가 정한다. */
+    const take = pullYield(want);
+    for (let i = 0; i < take; i += 1) {
       const pick = pullFrom(left, Math.random);
       if (!pick) break;
       left.splice(left.indexOf(pick), 1);
@@ -1971,4 +2047,7 @@ stage.setCity(state.gear.city, state.gear.citySkin);
 stage.setGoal(state.gear.frame, state.gear.frameSkin);
   // 밀린 훈련이 있어도 공부터 온다. 쓸지 말지는 훈련장 버튼이 들고 있다.
   nextSet();
+  /* 처음 온 사람은 공보다 카드가 먼저다. 판은 뒤에서 이미 돌고 있고 개봉 화면이 그 위를 덮으므로,
+     닫는 순간 바로 첫 구가 온다. 이미 하던 사람에게는 아무 일도 안 일어난다. */
+  onboardStep();
 });

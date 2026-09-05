@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { KEEPERS, PULL_COST, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, keeperCost, pullWeight } from "../src/roster.mjs";
+import { KEEPERS, PULL_COST, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, PULL_BULK, pullYield, keeperCost, pullWeight } from "../src/roster.mjs";
 
 // 뽑기 갈래의 자. 갈래가 하나뿐이면 뽑을 이유도 하나뿐이고, 모아서 지를 자리가 없다.
 //
@@ -60,6 +60,14 @@ try {
   await p.goto("http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,ticketed", { waitUntil: "load" });
   await p.waitForSelector("#go", { timeout: 15000 });
   await p.click("#go", { force: true });
+  await p.waitForTimeout(900);
+  /* 처음 온 계정은 카드부터 열린다. 그 흐름을 안 달고 상점을 열면 개봉 덮개가 클릭을 먹어
+     값이 안 나간 것으로 읽힌다. 사람도 똑같이 닫고 나서 상점에 간다. */
+  for (let i = 0; i < 6; i += 1) {
+    if (await p.evaluate(() => document.getElementById("pull").hidden)) break;
+    await p.click("#pull", { force: true });
+    await p.waitForTimeout(350);
+  }
   await p.waitForTimeout(1300);
   await p.evaluate(() => window.__shop(true));
   await p.waitForSelector("#shop .kind", { timeout: 8000 });
@@ -107,7 +115,9 @@ try {
   const after = await p.evaluate(() => window.__squad().squad.slice());
   const drawn = after.slice(before.length);
   const fameOf = (n) => (KEEPERS.find((k) => k.name === n) || {}).fame || 0;
-  check("pullkind:a-legend-draw-returns-only-legends", drawn.length === 10 && drawn.every((n) => fameOf(n) >= 9),
+  /* 열 장어치를 내고 열한 장이 온다. 장수를 상수로 적으면 묶음 보너스가 결함으로 읽힌다.
+     이 축이 묻는 것은 장수가 아니라 나온 이름이 전부 하한 위인가다. */
+  check("pullkind:a-legend-draw-returns-only-legends", drawn.length === pullYield(PULL_BULK) && drawn.every((n) => fameOf(n) >= 9),
     drawn.length + " drawn, lowest fame " + (drawn.length ? Math.min.apply(null, drawn.map(fameOf)) : "none"));
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");

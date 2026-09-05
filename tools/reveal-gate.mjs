@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { PULL_BULK } from "../src/roster.mjs";
+import { PULL_BULK, pullYield } from "../src/roster.mjs";
 
 // 뽑기 연출의 자. 열 장이 한 번에 결과 문자열로 뜨면 뽑은 것이 아니라 통보받은 것이다.
 //
@@ -43,7 +43,10 @@ try {
     await p.waitForTimeout(400);
   }
   const mid = walk[0];
-  check("instrument:the-draw-registered", mid.drawn === PULL_BULK, mid.drawn + " drawn");
+  /* 열 장 회차는 보너스가 붙어 열한 장이 나온다. 값은 열 배 그대로이므로 이 수는 판정이 정하고,
+     계기가 열이라고 적으면 묶음 보너스가 결함으로 읽힌다. */
+  const yields = pullYield(PULL_BULK);
+  check("instrument:the-draw-registered", mid.drawn === yields, mid.drawn + " drawn of " + yields);
   check("reveal:the-first-look-does-not-show-them-all", mid.shown < mid.drawn, mid.shown + " of " + mid.drawn + " up");
   const rising = walk.every((w, i) => i === 0 || w.shown >= walk[i - 1].shown);
   check("reveal:the-count-only-goes-up", rising, walk.map((w) => w.shown).join(" "));
@@ -52,7 +55,7 @@ try {
 
   // 연출이 도는 중에 이미 치러져 있어야 한다. 이것이 없으면 뒤집기는 결과를 늦추는 장치다.
   const during = await p.evaluate(() => ({ coin: window.__wallet().coin, t: window.__tickets(), squad: window.__squad().squad.length }));
-  check("reveal:the-bill-was-settled-before-the-flip", during.squad - before.squad === PULL_BULK && during.t < before.t,
+  check("reveal:the-bill-was-settled-before-the-flip", during.squad - before.squad === yields && during.t < before.t,
     "squad " + before.squad + " to " + during.squad + ", tickets " + before.t + " to " + during.t);
 
   // 눌러서 남은 것을 연다. 개봉은 상점 카드 안이 아니라 화면 전체를 덮는 자리로 옮겼다.
@@ -68,7 +71,7 @@ try {
     return { up: up.length, named: up.filter((e) => e.textContent.trim().length > 0).length,
       down: document.querySelectorAll("#pull .now.back").length };
   });
-  check("reveal:every-open-card-carries-a-name", faces.up === PULL_BULK && faces.named === faces.up && faces.down === 0,
+  check("reveal:every-open-card-carries-a-name", faces.up === yields && faces.named === faces.up && faces.down === 0,
     faces.up + " up, " + faces.named + " named, " + faces.down + " still down");
 
   // 대조군. 상점을 닫으면 개봉도 걷히고 다음에 열었을 때 지난 결과가 안 남는다.
