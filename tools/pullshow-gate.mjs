@@ -82,9 +82,20 @@ try {
     };
     im.src = "data:image/png;base64," + x;
   }), s);
+  /* 카드는 뒤집기 애니메이션 340ms를 지나며 scaleX(.04)까지 눌린다. 그 국면에 찍으면 카드가
+     실선이라 금테도 배경도 화소에 없고, 폴링 간격이 애니메이션과 같은 340ms라 어느 국면을 잡을지가
+     무작위였다. 실측으로 같은 코드가 47.8과 3.3과 0.5를 오갔다. 찍기 전에 애니메이션이 끝났는지를
+     묻고, 안 끝났으면 끝날 때까지 기다린다. 대상이 아니라 계기의 시점이 문제였다. */
+  const settled = () => p.evaluate(() => {
+    const el = document.querySelector("#pull .now");
+    if (!el) return Promise.resolve(false);
+    const anims = el.getAnimations ? el.getAnimations() : [];
+    return Promise.all(anims.map((a) => a.finished.catch(() => null))).then(() => true);
+  });
   let rare = null, plain = null;
   for (let i = 0; i < 24; i += 1) {
     const st = await p.evaluate(() => ({ r: window.__reveal(), rare: Boolean(document.querySelector("#pull .now.rare")) }));
+    if ((st.rare && !rare) || (!st.rare && !plain)) await settled();
     if (st.rare && !rare) rare = await mean(await shot());
     if (!st.rare && !plain) plain = await mean(await shot());
     if (rare && plain) break;
