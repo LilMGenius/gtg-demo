@@ -805,7 +805,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
    결과 통보가 아니라 파는 물건 자체라, 화면을 통째로 쓰고 한 장씩 선다.
    덮개가 상점보다 진한 이유는 뒤에 남은 선반이 읽히면 눈이 그쪽으로 새기 때문이다. */
 #pull{position:absolute;inset:0;pointer-events:auto;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:16px;background:#060803ef;cursor:pointer}
+  align-items:center;justify-content:center;gap:16px;background:#060803ef}
 #pull[hidden]{display:none}
 /* 몇 장째인지. 열 장을 여는 동안 남은 수가 없으면 언제 끝나는지를 모른 채 기다린다. */
 #pull .count{font-family:var(--disp);font-size:clamp(13px,1.6vw,17px);font-weight:400;color:var(--dim)}
@@ -850,7 +850,13 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   border:2px solid var(--edge);background:#2b3a22}
 #pull .done i.rare{background:#3a3312;color:#ffd83d;border-color:#ffd83d}
 /* 넘기는 법. 연출 중에는 건너뛰기, 다 열리면 닫기라고 같은 자리에서 말이 바뀐다. */
-#pull .hint{font-size:12px;font-weight:700;color:var(--dim)}
+/* 누름을 받는 자리. 판 전체를 덮되 보이는 것은 아래쪽 안내 한 줄뿐이다.
+   div에 핸들러를 걸면 화면에는 눌러도 된다는 신호가 안 남고 키보드로는 아예 못 닿는다.
+   카드 위에 놓이므로 배경은 없고, 버튼은 글꼴을 물려받지 않으니 여기서 다시 준다. */
+#pull .tap{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;
+  padding-bottom:22px;background:none;border:0;cursor:pointer;font:inherit;
+  font-size:12px;font-weight:700;color:var(--dim)}
+#pull .tap:focus-visible{outline:2px solid var(--dim);outline-offset:-6px}
 @keyframes flip{from{transform:translateY(6px) scaleY(.4)}to{transform:none}}
 #shop .got{display:block;margin-top:11px;font-size:15px;color:var(--good)}
 #shop .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);

@@ -1625,13 +1625,15 @@ function paintPull() {
     + '<img alt="' + k.name + '" src="' + thumbURL('card', k, lookOf({}, k.name)) + '">'
     + '<b>' + k.name + '</b></div>'
     + '<div class="done">' + done + '</div>'
-    + '<div class="hint">' + (over ? '눌러서 닫기' : '눌러서 건너뛰기') + '</div>';
+    /* 누름을 받는 것은 판이 아니라 버튼이다. div에 핸들러를 걸면 누를 수 있다는 신호가
+       화면에 안 남고 키보드로는 닿지도 않는다. 판 전체를 덮는 투명 버튼이 그 자리를 맡는다. */
+    + '<button class="tap">' + (over ? '눌러서 닫기' : '눌러서 건너뛰기') + '</button>';
   box.hidden = false;
   // 애니메이션은 클래스를 다시 붙여야 다시 돈다. 같은 노드를 재사용하면 두 번째 장이 안 뒤집힌다.
   const now = box.querySelector('.now');
   void now.offsetWidth;
   now.classList.add('turn');
-  box.onclick = () => {
+  box.querySelector('.tap').onclick = () => {
     if (shown < lastPull.length) return revealAll();
     stopReveal();
     // 첫 진입은 두 마디다. 키퍼를 닫으면 그 자리에서 키커가 이어 열린다.
