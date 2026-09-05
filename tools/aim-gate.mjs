@@ -7,7 +7,9 @@ import { MOUTH_X } from "../web/src/render/units.mjs";
 // 골 게이트는 공이 골문 안에 보이는지만 잰다. 어느 자리인지는 묻지 않는다.
 
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=";
+// veteran은 첫 진입 개봉을 마친 저장이다. 개봉판이 화면을 덮은 채로는 이 자가
+// 재려는 종점이 덮개 뒤에서 굴러 아무도 못 본다.
+const BASE = "http://127.0.0.1:10310/web/index.html?preset=veteran&seed=";
 const SEEDS = [11, 20, 33, 47, 58];
 // 주어가 다르면 축도 다르다. 공이 혼자 골문으로 가는 갈래는 겨냥을 따라야 하고,
 // 몸이 공을 데리고 들어가거나 몸 위로 굴려 보내는 갈래는 몸을 따라야 한다.
@@ -18,7 +20,11 @@ const KINDS = BALL_KINDS.concat(BODY_KINDS).concat(["gloveGone"]);
 // 채취는 잠이 아니라 프레임으로 잡는다. 잠으로 잡으면 그날의 부하가 시점을 정한다.
 const STEP = 1 / 60;
 const TAIL_STEPS = 31;
-const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 300000);
+/* 서른 판을 각각 새 컨텍스트에서 연다. 여섯 사건에 다섯 시드이고 판마다 페이지를 띄우고
+   다이빙이 실제로 몸을 내보낼 때까지 기다린다. 300초는 그 일의 실측 소요와 같은 자리라
+   기계가 조금만 바빠도 자기 사망 시각에 먼저 닿았다. 재는 양을 줄이면 축이 약해지므로
+   자에게 시간을 준다. 러너는 이 수를 소스에서 읽어 여유를 얹는다. */
+const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 600000);
 t.unref();
 
 const fails = [], notes = [];
