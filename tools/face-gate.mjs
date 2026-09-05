@@ -74,6 +74,62 @@ try {
   check("control:the-same-player-bakes-the-same-portrait", again[0] === urls[0],
     again[0] === urls[0] ? "identical" : "drifted");
 
+  /* 수염의 자리. 얼굴이 갈린다는 것과 그 얼굴이 사람으로 읽힌다는 것은 다른 명제다.
+     덥수룩한 수염이 눈 옆까지 올라와 초상에서 두건으로 읽혔는데 위의 축은 여덟이 서로 다르다는
+     것만 재서 초록이었다. 같은 사람을 수염 있는 채로와 민 채로 두 번 굽는다. 흰자 두 개 사이의
+     눈높이 화소는 두 장이 같아야 하고, 입 아래 턱 화소는 두 장이 갈려야 한다. 살색을 절대값으로
+     재면 어두운 피부가 수염으로 읽히므로, 자는 같은 피부의 두 장 사이 차이만 본다. */
+  const withBeard = KEEPERS.find((k) => faceOf(k.name).beard === 2);
+  const spots = await p.evaluate(async (name) => {
+    const m = await import("/web/src/render/thumb.mjs");
+    const r = await import("/src/roster.mjs");
+    const g = await import("/web/src/state/gear.mjs");
+    const byName = {};
+    for (const k of r.KEEPERS) byName[k.name] = k;
+    const read = (url) => new Promise((res) => {
+      const im = new Image();
+      im.onload = () => {
+        const cv = document.createElement("canvas");
+        cv.width = im.width; cv.height = im.height;
+        const c = cv.getContext("2d");
+        c.drawImage(im, 0, 0);
+        const d = c.getImageData(0, 0, cv.width, cv.height).data;
+        // 흰자는 빛을 안 받는 재질이라 화소가 그 색 그대로다. 그 상자가 눈높이와 눈 사이를 준다.
+        let n = 0, sx = 0, sy = 0, top = cv.height, bot = -1;
+        for (let y = 0; y < cv.height; y += 1) for (let x = 0; x < cv.width; x += 1) {
+          const i = (y * cv.width + x) * 4;
+          if (d[i] < 236 || d[i + 1] < 236 || d[i + 2] < 226) continue;
+          n += 1; sx += x; sy += y;
+          if (y < top) top = y; if (y > bot) bot = y;
+        }
+        const eyeY = Math.round(sy / n), midX = Math.round(sx / n), eyeH = bot - top + 1;
+        const lum = (x, y) => { const i = (y * cv.width + x) * 4; return Math.round(0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]); };
+        /* 턱 밑은 반구광의 아래쪽이 닿아 민 얼굴도 어둡다. 실측으로 어두운 피부의 턱 밑이 42로
+           수염과 같은 수였다. 수염이 닿는지는 옆 턱선에서 잰다. 흰자 높이 0.53r을 자로 써서
+           눈에서 그만큼 내려가고 그만큼 옆으로 간 자리가 입 옆 볼이고, 열쇠광이 닿는 쪽이다. */
+        const jaw = Math.round((lum(midX - Math.round(eyeH * 0.85), eyeY + Math.round(eyeH * 0.85))
+          + lum(midX + Math.round(eyeH * 0.85), eyeY + Math.round(eyeH * 0.85))) / 2);
+        res({ whites: n, between: lum(midX, eyeY), jaw });
+      };
+      im.src = url;
+    });
+    const look = g.lookOf({}, name);
+    const bearded = await read(m.thumbURL("face", byName[name], look));
+    const shaved = await read(m.thumbURL("face", byName[name], Object.assign({}, look, { face: Object.assign({}, look.face, { beard: 0 }) })));
+    return { bearded, shaved };
+  }, withBeard.name);
+  const { bearded, shaved } = spots;
+  check("instrument:both-portraits-show-two-eyes", bearded.whites > 40 && shaved.whites > 40,
+    bearded.whites + " and " + shaved.whites + " white pixels on " + withBeard.name);
+  // 같은 자리 같은 빛이라 수염이 안 닿으면 화소가 그대로다. 조명 잡음은 실측으로 0이다.
+  check("beard:starts-below-the-eyes", Math.abs(bearded.between - shaved.between) <= 4,
+    "between the eyes " + bearded.between + " bearded vs " + shaved.between + " shaved");
+  /* 방향은 안 묻는다. 쿠폰은 금발 수염에 어두운 피부라 수염 쪽이 18 밝다. 수염이 닿았다는 것은
+     화소가 피부와 갈렸다는 것이고, 어느 쪽으로 갈렸는지는 머리색이 정한다. 15는 조명 잡음 0 위에
+     가장 가까운 머리색과 피부색 쌍이 남기는 차다. */
+  check("beard:covers-the-jaw-beside-the-mouth", Math.abs(shaved.jaw - bearded.jaw) >= 15,
+    "jaw " + bearded.jaw + " bearded vs " + shaved.jaw + " shaved");
+
   /* 화면. 좌상단 칩과 선수단과 아웃문그램이 같은 얼굴을 쓴다.
      구웠다는 것과 그 칸에 서 있다는 것은 다른 명제라 셋을 각각 연다. */
   const chip = await p.evaluate(() => {

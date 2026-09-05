@@ -394,14 +394,25 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
      수염은 턱을 감싸는 얇은 껍데기다. 1은 짧고 2는 덥수룩해서 볼까지 올라온다. */
   const beard = face && face.beard ? face.beard : 0;
   if (beard) {
-    const up = beard === 2 ? 0.62 : 0.44;
-    const b = new THREE.SphereGeometry(r * 1.02, 12, 8, Math.PI * (dir > 0 ? 0.62 : 1.62), Math.PI * 1.76,
-      Math.PI * (1 - up) * 0.5 + Math.PI * 0.22, Math.PI * up * 0.5);
-    b.scale(1, 1, 1.02);
-    b.translate(0, -r * 0.1, 0);
-    shellGeos.push(b);
-    // 수염은 머리보다 한 단 어둡다. 같은 색이면 턱과 머리가 한 덩어리로 붙는다.
-    shellColors.push(hairTone === undefined ? 0x1c1712 : hairTone);
+    /* 수염은 눈 아래에서 시작한다. 덥수룩한 단계가 위도 0.41파이에서 시작해 정수리 쪽 y가 +0.18r였고,
+       흰자 바닥은 -0.10r이라 눈 바깥 절반과 볼 전체가 수염 색으로 덮여 초상에서 두건으로 읽혔다.
+       두 조각이다. 턱선 고리는 0.54파이(y -0.125r)에서 입 높이까지 내려오며 정면에 입 창을 남기고,
+       턱 덮개는 그 아래를 창 없이 감싼다. 창은 입 반폭 0.21r을 덮지 않는 0.28r이다.
+       한 조각으로 창을 끝까지 내면 턱 밑이 비어 수염이 아니라 구레나룻 띠로 읽힌다. */
+    const c = beard === 2 ? { rad: 1.06, len: 0.36, gap: 0.20 } : { rad: 1.02, len: 0.30, gap: 0.24 };
+    // 입 웨지의 아래 끝이 -0.49r이고 0.66파이가 -0.49r이다. 고리는 거기서 끝나고 덮개가 잇는다.
+    const jawEnd = 0.66;
+    const ring = new THREE.SphereGeometry(r * c.rad, 12, 6, Math.PI * (0.5 + c.gap * 0.5 + (dir > 0 ? 0 : 1)),
+      Math.PI * (2 - c.gap), Math.PI * 0.54, Math.PI * (jawEnd - 0.54));
+    const chin = new THREE.SphereGeometry(r * c.rad, 12, 6, 0, Math.PI * 2,
+      Math.PI * jawEnd, Math.PI * (0.54 + c.len - jawEnd));
+    for (const g of [ring, chin]) {
+      g.scale(1, 1, c.rad);
+      g.translate(0, -r * 0.06, 0);
+      shellGeos.push(g);
+      // 수염은 머리보다 한 단 어둡다. 같은 색이면 턱과 머리가 한 덩어리로 붙는다.
+      shellColors.push(hairTone === undefined ? 0x1c1712 : hairTone);
+    }
   }
   // 뒤로 묶은 머리. 뒤통수에서 뒤로 뻗는 덩어리 하나면 실루엣이 갈린다.
   if (face && face.tail) {
