@@ -922,7 +922,7 @@ function renderGram() {
   /* 계정 머리. 초상과 계정명과 숫자 두 칸이다. 계정을 여는 첫 신호는 이름이 아니라 얼굴이라
      48px 판때기가 먼저 서고(명단 한 줄의 얼굴은 38px이다. 여기는 계정 주인의 자리라 더 크다),
      맞팔 수가 팔로워 증가에 곱해지므로 그 배율은 맞팔 칸의 배지로 붙는다. 배율을 설명하는 문장은
-     그 칸의 툴팁이 갖는다. 머리에 서는 것은 숫자고, 문장은 손을 얹은 사람에게만 온다. */
+     그 칸의 title과 aria-label이 갖는다. 머리에 서는 것은 숫자고, 문장은 손을 얹은 사람에게만 온다. */
   const myFace = thumbURL('face', state.keeper, lookOf(state.gear, state.keeper.name));
   const mut = mutualCount(state.social);
   const boost = Math.round((mutualBoost(state.social) - 1) * 100);
@@ -944,13 +944,14 @@ function renderGram() {
     const off = isFollowing(state.social, key) ? ' disabled' : '';
     return '<button class="fol" data-key="' + key + '" data-tier="' + tier + '"' + off + '>' + label + '</button>';
   };
-  /* 반응 줄. 아이콘이 먼저 서고 수가 따라온다. 옛 저장의 글에는 좋아요 칸이 아예 없고 그때는 그 자리를
-     비운다. 없는 것을 0으로 그리면 아무도 안 본 글로 읽힌다. 팔로워는 오른 글에만 붙는다. */
+  /* 반응 줄. 아이콘이 먼저 서고 수가 따라온다. 옛 저장의 글에는 좋아요 칸이 아예 없는데,
+     그때 줄을 통째로 비우면 한 장은 반응 줄이 서고 한 장은 안 서서 아이콘과 수의 자리가 흔들린다.
+     없는 수는 0으로 세운다. 팔로워는 오른 글에만 붙는다. */
   const react = (p) => {
-    const seen = p.l ? '<i class="like">' + IC_LIKE + '<em>' + p.l + '</em></i>'
-      + '<i class="talk">' + IC_CMT + '<em>' + (p.cm ? 1 : 0) + '</em></i>' : '';
+    const seen = '<i class="like">' + IC_LIKE + '<em>' + (Number(p.l) > 0 ? p.l : 0) + '</em></i>'
+      + '<i class="talk">' + IC_CMT + '<em>' + (p.cm ? 1 : 0) + '</em></i>';
     const fans = p.g > 0 ? '<i class="fans">' + IC_FANS + '<em>+' + p.g + '</em></i>' : '';
-    return seen || fans ? '<div class="react">' + seen + fans + '</div>' : '';
+    return '<div class="react">' + seen + fans + '</div>';
   };
   /* 굵게 서는 이름은 남의 이름이다. 내 계정에서 내 이름은 담담하게 서고, 내가 올린 글에서 굵은 것은
      그 판의 키커다. 앞에 내 이름을 굵게 세우면 그 글이 부르는 이름이 바뀐다. */
