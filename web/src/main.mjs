@@ -1508,6 +1508,17 @@ function specLines(kind, rank) {
   return specRows(kind, rank).map((r) => (r.v ? r.k + ' ' + r.v : r.k));
 }
 
+/* 카드가 파는 것을 한 줄로 말한다. 값이 붙은 항목만 세운다. 값 없는 항목은 그 자체로 정보가 없고,
+   기간과 횟수는 카드의 보조행이 따로 받으므로 여기서 빠진다. 항목과 값을 가른 표는 효과 칸의 몫이다. */
+function cardLine(kind, rank) {
+  return specRows(kind, rank).filter((r) => r.v && !/[분슛]$/.test(r.v))
+    .map((r) => r.k + ' ' + r.v).join(', ');
+}
+
+/* 카드 테두리가 말하는 등급. 선반이 스스로 매긴 순번을 그대로 쓴다. 장비는 0에서 3, 봇은 1에서 3이다.
+   버프 셋은 값이 220에서 300까지 한 칸 안이라 매길 순번이 없어 같은 등급으로 선다. */
+const BUFF_RARE = 1;
+
 /* 왼쪽 기둥의 효과 칸. 카드에 손을 올린 것만 여기에 뜬다.
    표로 세운다. 항목과 값이 한 줄에 이어 붙으면 어디까지가 이름이고 어디부터가 수인지를
    줄마다 다시 갈라야 하고, 카드 넷을 훑는 동안 그 가르기를 네 번 한다. */
@@ -1616,9 +1627,13 @@ function gearShelf(kind) {
         + '" data-rank="' + rank + '" data-skin="' + i + '" title="' + v.name
         + '" style="--sw:#' + v.tone.toString(16).padStart(6, '0') + '"></button>').join('') + '</div>';
     }
-    return '<div class="card gear" data-spec="' + kind + '" data-at="' + rank + '"><div class="shot" data-kind="' + kind + '" data-rank="' + rank + '"></div>'
-      + '<b>' + g.name + '</b><em>' + g.note + '</em>' + skins
-      + '<button class="buy' + (bad ? ' bad-price' : '') + '" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
+    /* 그림이 먼저 서고 이름과 효과 한 줄이 따라오며 값 배지가 오른쪽 아래를 받는다.
+       변형 조각은 썸네일 위에 겹쳐 눕는다. 값 버튼 위에 한 줄로 깔면 그 줄만큼 카드가 길어지고,
+       그림이 카드에서 차지하는 몫이 그만큼 줄어 다시 글자가 먼저 읽힌다. */
+    return '<div class="card gear" data-spec="' + kind + '" data-at="' + rank + '" data-rare="' + rank + '">'
+      + '<div class="pic"><div class="shot" data-kind="' + kind + '" data-rank="' + rank + '"></div>' + skins + '</div>'
+      + '<b>' + g.name + '</b><em>' + cardLine(kind, rank) + '</em>'
+      + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
   return '<h4>' + s.head + '</h4><div class="rack">' + rows.join('') + '</div>';
 }
@@ -1656,7 +1671,8 @@ function bindGear(box) {
     const url = thumbURL(s.field, state.keeper, arg);
     if (!url) continue;
     shot.innerHTML = '<img alt="" src="' + url + '">';
-    const card = shot.parentNode;
+    // 썸네일은 이제 변형 조각과 한 상자에 산다. 부모를 그대로 쓰면 카드가 아니라 그 상자에 손이 걸린다.
+    const card = shot.closest('.card');
     card.onpointerenter = () => startSpin(shot, s.field, state.keeper, arg);
     card.onpointerleave = () => stopSpin();
     // 카드를 누르면 산 것이 아니라 걸쳐 본다. 값은 buy 버튼이 따로 받는다.
@@ -1981,13 +1997,32 @@ function botShelf() {
       label = '상위 보유';
       off = true;
     }
-    return '<div class="card gear" data-spec="bot" data-at="' + b.tier + '"><b>' + b.name + '</b><em>판단력 ' + b.judge + '</em><small class="duration">' + duration + '</small>'
-      + '<button class="buy' + (bad ? ' bad-price' : '') + '" data-bot="' + b.tier + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
+    // 봇도 장비와 같은 카드다. 파는 것이 클론의 모습이므로 글자보다 그림이 먼저 선다.
+    return '<div class="card gear" data-spec="bot" data-at="' + b.tier + '" data-rare="' + b.tier + '">'
+      + '<div class="pic"><div class="shot" data-kind="bot" data-rank="' + b.tier + '"></div></div>'
+      + '<b>' + b.name + '</b>'
+      + '<em>' + cardLine('bot', b.tier) + '<small class="duration">' + duration + '</small></em>'
+      + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-bot="' + b.tier + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
   return '<h4>봇</h4><div class="rack">' + rows.join('') + '</div>';
 }
 
+/* 봇과 버프 카드의 그림. 장비와 달리 몸에 걸치는 것이 아니라 등급 하나가 곧 그 그림이라
+   걸친 모습을 지어낼 것이 없다. 걸쳐 보는 것도 없으므로 카드 누름은 효과 칸만 받는다. */
+function bindShots(box, kind) {
+  for (const shot of box.querySelectorAll('.shot[data-kind="' + kind + '"]')) {
+    const at = Number(shot.dataset.rank);
+    const url = thumbURL(kind, state.keeper, at);
+    if (!url) continue;
+    shot.innerHTML = '<img alt="" src="' + url + '">';
+    const card = shot.closest('.card');
+    card.onpointerenter = () => startSpin(shot, kind, state.keeper, at);
+    card.onpointerleave = () => stopSpin();
+  }
+}
+
 function bindBot(box) {
+  bindShots(box, 'bot');
   for (const b of box.querySelectorAll('.buy[data-bot]')) {
     b.onclick = () => {
       if (b.disabled) return;
@@ -2007,7 +2042,7 @@ function bindBot(box) {
 // 버프 선반. 소모형이라 SHELVES 한 덩어리에 안 들어간다. 봇과 같은 이유로 별도 렌더러다.
 function buffShelf() {
   const cur = state.buff;
-  const rows = BUFFS.map((b) => {
+  const rows = BUFFS.map((b, at) => {
     let label = SW(b.cost);
     let duration = b.shots + '슛';
     let off = false;
@@ -2026,14 +2061,18 @@ function buffShelf() {
       label = '보유';
       off = true;
     }
-    const effect = specLines('buff', b.kind).filter((line) => !/[분슛]$/.test(line)).join(', ');
-    return '<div class="card gear" data-spec="buff" data-at="' + b.kind + '"><b>' + b.name + '</b><em>' + effect + '</em><small class="duration">' + duration + '</small>'
-      + '<button class="buy' + (bad ? ' bad-price' : '') + '" data-buff="' + b.kind + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div>';
+    // 그림은 목록 순번으로 굽는다. 종류 이름을 그림 쪽에 다시 적으면 목록이 바뀐 날 두 곳이 갈린다.
+    return '<div class="card gear" data-spec="buff" data-at="' + b.kind + '" data-rare="' + BUFF_RARE + '">'
+      + '<div class="pic"><div class="shot" data-kind="buff" data-rank="' + at + '"></div></div>'
+      + '<b>' + b.name + '</b>'
+      + '<em>' + cardLine('buff', b.kind) + '<small class="duration">' + duration + '</small></em>'
+      + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-buff="' + b.kind + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
   return '<h4>버프</h4><div class="rack">' + rows.join('') + '</div>';
 }
 
 function bindBuff(box) {
+  bindShots(box, 'buff');
   for (const b of box.querySelectorAll('.buy[data-buff]')) {
     b.onclick = () => {
       if (b.disabled) return;

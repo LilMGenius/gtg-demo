@@ -11,8 +11,16 @@ import { chromium } from "playwright";
 // 맥락은 하나여야 한다. 카드마다 WebGL을 열면 열 몇 장에서 상한에 걸려 조용히 검은 칸이 된다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
-// 몸에 걸치는 여섯 선반만 굽는다. 골대와 동네와 봇과 버프는 몸이 아니라 다른 주어라 아직 안 굽는다.
-const WORN = ["glove", "boot", "kit", "sock", "hair", "ink"];
+/* 어느 탭을 재는지는 화면이 정한다. 진열 격자를 세우는 탭은 전부 상품을 파는 선반이고,
+   목록을 여기 손으로 적으면 선반이 하나 늘어난 날 그 하나만 조용히 안 재고 초록이 난다. */
+// 썸네일 칸의 바탕. hud.css가 이 칸에 준 색이라, 이 색만 남은 칸은 그림이 없는 칸이다.
+const SHOT_BG = [0x12, 0x18, 0x0f];
+// 바탕과 다르다고 볼 채널합 거리. 안티에일리어싱 잔파동은 한 자리 수라 24는 그 위다.
+const SHOT_DELTA = 24;
+/* 칸이 그림을 든다고 부를 최소 화소 비율. 실측으로 그림이 든 칸은 21.1퍼센트(머리)에서
+   99.9퍼센트(동네) 사이이고 빈 칸은 0.0퍼센트였다. 0.10은 가장 마른 칸의 절반이라
+   그림이 조금 작아지는 것으로는 안 울고, 칸이 비면 반드시 운다. */
+const SHOT_INK = 0.1;
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();
@@ -36,16 +44,65 @@ try {
 
   const grab = async (tab) => p.evaluate((t) => { for (const x of document.querySelectorAll("#shop .tab")) if (x.dataset.tab === t) x.click(); return new Promise((res) => setTimeout(() => { const cards = [...document.querySelectorAll("#shop .rack .card")]; res(cards.map((c) => { const i = c.querySelector(".shot img"); return i ? i.getAttribute("src") : ""; })); }, 260)); }, tab);
 
+  /* 화면에 걸린 칸을 그대로 찍어 화소를 센다. 구운 그림의 주소를 읽는 것으로는
+     그림이 사람 눈에 닿았다고 말할 수 없다. 주소가 멀쩡한 채로 칸이 0px이거나,
+     칸이 접혔거나, 그림이 칸 밖으로 밀려도 주소는 그대로다. */
+  const inkOf = async (i) => {
+    const box = p.locator("#shop .rack .card").nth(i).locator(".shot");
+    if (await box.count() === 0) return { w: 0, h: 0, ink: 0 };
+    const png = (await box.screenshot({ timeout: 8000 })).toString("base64");
+    return p.evaluate(([s, bg, delta]) => new Promise((res) => {
+      const im = new Image();
+      im.onload = () => {
+        const cv = document.createElement("canvas");
+        cv.width = im.width; cv.height = im.height;
+        const g = cv.getContext("2d");
+        g.drawImage(im, 0, 0);
+        const d = g.getImageData(0, 0, im.width, im.height).data;
+        let n = 0;
+        for (let k = 0; k < d.length; k += 4) {
+          if (Math.abs(d[k] - bg[0]) + Math.abs(d[k + 1] - bg[1]) + Math.abs(d[k + 2] - bg[2]) > delta) n += 1;
+        }
+        res({ w: im.width, h: im.height, ink: n });
+      };
+      im.src = "data:image/png;base64," + s;
+    }), [png, SHOT_BG, SHOT_DELTA]);
+  };
+
+  // 진열 격자를 세우는 탭만 선반이다. 이적시장은 사는 자리라 격자가 없다.
+  const SHELF = await p.evaluate(() => {
+    const out = [];
+    for (const tab of [...document.querySelectorAll("#shop .tab")]) {
+      tab.click();
+      const rack = document.querySelector("#shop .rack");
+      if (rack && rack.querySelectorAll(".card").length) out.push(tab.dataset.tab);
+    }
+    return out;
+  });
+  check("instrument:every-shelf-tab-was-found", SHELF.length > 0, SHELF.join(", "));
+
   let drawn = 0;
-  for (const tab of WORN) {
+  const thin = [];
+  for (const tab of SHELF) {
     const urls = await grab(tab);
     const painted = urls.filter((u) => u && u.indexOf("data:image") === 0);
     drawn += painted.length;
-    check("thumb:" + tab + ":every-card-carries-a-picture", urls.length > 0 && painted.length === urls.length, painted.length + " of " + urls.length);
+    // 칸마다 그려진 화소 비율. 가장 마른 칸이 이 선반의 답이다.
+    const ratio = [];
+    for (let i = 0; i < urls.length; i += 1) {
+      const m = await inkOf(i);
+      ratio.push(m.w * m.h ? m.ink / (m.w * m.h) : 0);
+    }
+    const worst = ratio.length ? Math.min.apply(null, ratio) : 0;
+    if (worst < SHOT_INK) thin.push(tab + " " + (worst * 100).toFixed(1) + "%");
+    check("thumb:" + tab + ":every-card-carries-a-picture",
+      urls.length > 0 && painted.length === urls.length && worst >= SHOT_INK,
+      painted.length + " of " + urls.length + " baked, thinnest box " + (worst * 100).toFixed(1) + "% painted");
     const uniq = new Set(painted);
     check("thumb:" + tab + ":ranks-do-not-share-one-picture", painted.length > 1 && uniq.size === painted.length, uniq.size + " distinct of " + painted.length);
   }
   check("instrument:some-card-was-painted", drawn > 0, drawn + " pictures");
+  check("thumb:no-shelf-shows-a-blank-box", thin.length === 0, thin.join(", ") || SHELF.length + " shelves clear the floor");
 
   // 이름이 형태를 말하는 선반들. 머리는 깎아준 머리와 투블럭과 기른 머리와 모히칸이고,
   // 축구화는 실내화와 닳은 축구화와 스터드 여섯 개와 스파이크다.

@@ -23,7 +23,14 @@ const BAKE_H = 205;
    프레임 가로 2.03m 안에 좌우 여백과 함께 들어가는 비율이다. */
 const BODY_W = 336;
 const BODY_H = 448;
-const sizeOf = (kind) => (kind === "body" ? [BODY_W, BODY_H] : [BAKE_W, BAKE_H]);
+/* 봇과 버프는 선반 카드에만 서는 칸이다. 카드의 썸네일 자리가 카드 폭의 60%라
+   448x205로 구우면 위아래로 24%가 빈 띠로 남고 그만큼 상품이 작아진다.
+   새로 여는 두 칸은 처음부터 그 자리의 비율로 굽는다. 옛 여덟 칸의 겨냥은 205 높이에 맞춰
+   하나씩 실측으로 잡힌 값이라 같이 안 옮긴다. */
+const CARD_W = 448;
+const CARD_H = 269;
+const sizeOf = (kind) => (kind === "body" ? [BODY_W, BODY_H]
+  : kind === "bot" || kind === "buff" ? [CARD_W, CARD_H] : [BAKE_W, BAKE_H]);
 
 // 상품마다 봐야 할 곳이 다르다. 장갑을 온몸 썸네일로 보여 주면 손은 여덟 화소가 된다.
 // part는 무엇을 겨냥하는지, dist는 그 부위가 칸을 채우는 거리, lift는 시선 높이 보정,
@@ -169,6 +176,105 @@ function cityRig(pick) {
   return { grp, at: new THREE.Vector3(0, 0.85, -1), dist: 9.5, high: 0.26 };
 }
 
+/* 봇 한 대. 봇은 나를 대신 세우는 클론이라 파는 것이 곧 내 실루엣이다.
+   색을 하나로 눕히면 얼굴과 옷이 사라지고 형태만 남아, 사람이 아니라 대역으로 읽힌다.
+   재질은 복제한 뒤 칠한다. 눈동자 재질은 경기장이 같이 쓰는 한 장이라, 그것을 그대로 칠하면
+   상점에서 구운 한 장이 경기장의 눈까지 같이 물들인다.
+   등급은 몸이 아니라 몸에 그은 회로가 말한다. 판단력이 3에서 9로 오르는 만큼 줄이 늘고 밝아진다. */
+const BOT_SKIN = 0x5a6672;
+const BOT_TRACE = [0x6f8f5a, 0x63d3e8, 0xffd83d];
+function botRig(pick, keeper) {
+  const tier = Math.min(BOT_TRACE.length, Math.max(1, Math.floor(Number(pick && pick.rank) || 1)));
+  const k = keeper && keeper.height ? keeper : { height: 188, weight: 84 };
+  const h = k.height / 100;
+  const grp = new THREE.Group();
+  const body = buildKeeper(k.height, k.weight);
+  body.traverse((o) => {
+    if (!o.material) return;
+    o.material = o.material.clone();
+    if (o.material.color) o.material.color.setHex(BOT_SKIN);
+  });
+  body.updateMatrixWorld(true);
+  grp.add(body);
+  const mid = new THREE.Vector3();
+  body.userData.torso.getWorldPosition(mid);
+  // 줄은 가슴 앞에 뜬다. 몸통 반지름은 몸무게를 타므로 상수로 두면 무거운 몸에서 줄이 안으로 잠긴다.
+  const front = (body.userData.girth || 0.3) * 0.55 + 0.02;
+  const glow = new THREE.MeshBasicMaterial({ color: BOT_TRACE[tier - 1] });
+  // 가슴을 가로지르는 줄과 그 끝의 마디. 길이를 번갈아 두어야 회로로 읽히고,
+  // 같은 길이로 쌓으면 회로가 아니라 사다리가 된다.
+  const n = 3 + (tier - 1) * 2;
+  const top = mid.y + 0.40;
+  for (let i = 0; i < n; i += 1) {
+    const w = 0.13 + (i % 2) * 0.09;
+    const x = i % 2 ? 0.04 : -0.04;
+    const y = top - i * 0.05;
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(w, 0.016, 0.016), glow);
+    bar.position.set(x, y, front);
+    grp.add(bar);
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 5), glow);
+    dot.position.set(x + w / 2, y, front);
+    grp.add(dot);
+  }
+  // 세로 한 줄. 가로줄만 있으면 회로가 아니라 갈비뼈로 읽힌다.
+  const spine = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.05 * (n - 1), 0.016), glow);
+  spine.position.set(0, top - 0.05 * (n - 1) / 2, front);
+  grp.add(spine);
+  /* 온몸이 아니라 머리부터 허리까지 잡는다. 서 있는 사람을 가로 칸에 통째로 담으면
+     사람이 칸 폭의 16퍼센트만 쓰고, 그 크기에서 회로는 점 몇 개가 된다. */
+  return { grp, at: new THREE.Vector3(0, h * 0.7, 0), dist: h, high: 0.04 };
+}
+
+/* 버프 한 통. 마시고 뿌리고 던지는 물건이라 손에 쥐는 그 하나가 곧 상품이다.
+   원시 도형으로 세운다. 캔은 원통, 스프레이는 원통 위의 노즐, 떡밥은 뭉친 덩어리다.
+   순서는 buff.mjs 목록의 순서다. 여기서 종류 이름을 다시 적으면 목록이 바뀐 날 두 곳이 갈린다. */
+const BUFF_TONE = [
+  { body: 0xd8842f, trim: 0xf2d64b },
+  { body: 0xd9536b, trim: 0x8f5a2f },
+  { body: 0xe4e8ea, trim: 0x3f7fbf }
+];
+function buffRig(pick) {
+  const at = Math.min(BUFF_TONE.length - 1, Math.max(0, Math.floor(Number(pick && pick.rank) || 0)));
+  const c = BUFF_TONE[at];
+  const grp = new THREE.Group();
+  const skin = new THREE.MeshLambertMaterial({ color: c.body });
+  const trim = new THREE.MeshLambertMaterial({ color: c.trim });
+  if (at === 0) {
+    const can = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.058, 0.2, 14), skin);
+    can.position.y = 0.1;
+    grp.add(can);
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.058, 0.022, 14), trim);
+    lid.position.y = 0.211;
+    grp.add(lid);
+  } else if (at === 1) {
+    // 한 덩이만 두면 공이다. 작은 덩이 셋을 붙여야 뭉친 것으로 읽힌다.
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 9), skin);
+    ball.position.y = 0.095;
+    grp.add(ball);
+    for (let i = 0; i < 3; i += 1) {
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.04, 9, 7), trim);
+      b.position.set(Math.cos(i * 2.1) * 0.074, 0.095 + Math.sin(i * 2.1) * 0.066, 0.05);
+      grp.add(b);
+    }
+  } else {
+    const can = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.19, 14), skin);
+    can.position.y = 0.095;
+    grp.add(can);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.038, 0.05, 12), trim);
+    cap.position.y = 0.215;
+    grp.add(cap);
+    const noz = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.018, 0.05), trim);
+    noz.position.set(0, 0.238, 0.032);
+    grp.add(noz);
+  }
+  // 0.49는 0.24m짜리 물건이 칸 높이의 85퍼센트를 쓰는 거리다. 더 멀면 칸의 대부분이 빈 자리가 된다.
+  return { grp, at: new THREE.Vector3(0, 0.12, 0), dist: 0.49, high: 0.24 };
+}
+
+/* 몸에 안 걸치는 칸들. 등급이 곧 그 장면이라 조각을 통째로 갈아 끼운다.
+   이 표가 어느 칸이 장면인지의 정본이라, 새 칸은 여기 한 줄만 늘리면 붙는다. */
+const SCENE = { frame: goalRig, city: cityRig, bot: botRig, buff: buffRig };
+
 let R = null;
 let scene = null;
 let cam = null;
@@ -217,13 +323,13 @@ function frame(kind, keeper, look, yaw, over) {
     cam.aspect = fw / fh;
     cam.updateProjectionMatrix();
   }
-  // 장면 칸은 사람을 안 세운다. 골대와 동네는 등급이 곧 그 장면이라 조각을 통째로 갈아 끼운다.
-  if (kind === "frame" || kind === "city") {
+  // 장면 칸은 AIM 겨냥을 안 쓴다. 무엇을 겨냥할 몸이 없거나, 몸 자체가 상품이기 때문이다.
+  if (SCENE[kind]) {
     if (rig) { scene.remove(rig); rig = null; }
     clearScene();
     // 옛 호출은 등급 하나만 넘겼다. 숫자로 오면 그 등급의 기본 변형으로 읽는다.
     const pick = typeof look === "number" ? { rank: look, skin: 0 } : look;
-    const made = kind === "frame" ? goalRig(pick) : cityRig(pick);
+    const made = SCENE[kind](pick, keeper);
     sceneRig = made.grp;
     scene.add(sceneRig);
     // 동네는 하늘이 상품의 절반이다. 골대 칸은 배경을 비워 그물이 칸을 채우게 둔다.
@@ -252,7 +358,7 @@ function frame(kind, keeper, look, yaw, over) {
 }
 
 export function thumbURL(kind, keeper, look) {
-  if (!AIM[kind] && kind !== "frame" && kind !== "city") return "";
+  if (!AIM[kind] && !SCENE[kind]) return "";
   frame(kind, keeper, look);
   return R.domElement.toDataURL("image/png");
 }
@@ -261,7 +367,7 @@ let spinning = null;
 
 // 호버에서 천천히 돈다. 정지한 그림은 무엇을 샀는지 한 면만 보여 준다.
 export function startSpin(host, kind, keeper, look) {
-  if (!AIM[kind] && kind !== "frame" && kind !== "city") return;
+  if (!AIM[kind] && !SCENE[kind]) return;
   boot();
   stopSpin();
   const cv = R.domElement;
