@@ -5,6 +5,9 @@ import { chromium } from "playwright";
 // 둘이 기대대로 나오지 않으면 이 게이트가 무엇을 보고 있는지 모르는 것이다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const URL = "http://127.0.0.1:10310/web/index.html?seed=" + (process.argv[2] || 7) + "&preset=veteran";
+// 손가락이 닿는 최소 크기. 애플 44와 구글 48 중 낮은 쪽을 바닥으로 둔다.
+// mobile-gate가 다이빙 존에 쓰는 값과 같은 44라, 상단 칩의 초상화만 다른 바닥 위에 서지 않는다.
+const TOUCH = 44;
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 80000);
 t.unref();
 
@@ -186,6 +189,69 @@ try {
   const labels = seen.map((v) => v.id + ":" + JSON.stringify(v.text) + "/" + JSON.stringify(v.label));
   const labelOk = seen.every((v) => v.text === "" && v.label.length > 0);
   check("icon:no-text-face-but-aria-label", labelOk, labels.join(" "));
+
+  /* 좌상단 자원 띠. 칩과 칩 사이 간격은 --gap-2 하나가 소유한다. 손으로 고른 px이 섞이면
+     한 띠 안에 간격이 세 가지가 되고, 어느 값끼리 한 덩어리인지가 화면에서 안 읽힌다.
+
+     재는 것은 배치 상자다. #top은 -1.1deg 기울어 있어 자식마다 축정렬 상자가 좌우로 늘어나고,
+     26px 높이 칩에서 한쪽 0.5px씩 먹어 8px 간격이 7px로 읽힌다. 기운 것은 띠 전체라
+     칩과 칩 사이 거리는 배치 좌표에 그대로 남고, 그 거리가 --gap-2가 정한 값이다. */
+  const strip = async (w, h) => {
+    await p.setViewportSize({ width: w, height: h });
+    await p.waitForTimeout(400);
+    return p.evaluate(() => {
+      // 문턱을 게이트가 적지 않는다. --gap-2가 지금 몇 px인지는 페이지가 대답한다.
+      const probe = document.createElement("span");
+      probe.style.cssText = "position:fixed;visibility:hidden;width:var(--gap-2)";
+      document.body.append(probe);
+      const unit = Math.round(parseFloat(getComputedStyle(probe).width) * 100) / 100;
+      probe.remove();
+      const chips = [...document.querySelectorAll("#purse .cur")];
+      const gaps = [];
+      for (let i = 1; i < chips.length; i += 1) {
+        const a = chips[i - 1], c = chips[i];
+        gaps.push(Math.round((c.offsetLeft - a.offsetLeft - a.offsetWidth) * 100) / 100);
+      }
+      const size = chips.map((c) => c.querySelector("b,i,u")).filter(Boolean)
+        .map((n) => Math.round(parseFloat(getComputedStyle(n).fontSize) * 100) / 100);
+      const por = document.getElementById("meBtn").getBoundingClientRect();
+      return { unit, gaps, size, chips: chips.length,
+        por: [Math.round(por.width), Math.round(por.height)] };
+    });
+  };
+  const wide = await strip(1280, 720);
+  const narrow = await strip(740, 360);
+  // 칩이 둘 이하로 잡히면 간격 축은 잴 것이 없이 초록이 된다. 띠의 바닥은 팔로워·육수·스폰 셋이다.
+  check("instrument:the-resource-bar-carries-three-chips", wide.chips >= 3 && narrow.chips >= 3,
+    wide.chips + " wide, " + narrow.chips + " narrow");
+  const tight = [["1280x720", wide], ["740x360", narrow]]
+    .map(([tag, s]) => s.gaps.filter((g) => g < s.unit).map((g) => tag + " " + g + "px"))
+    .reduce((a, c) => a.concat(c), []);
+  check("layout:every-resource-chip-clears-the-gap-token", tight.length === 0,
+    tight.join(", ") || "gaps " + wide.gaps.join("/") + " against " + wide.unit + "px");
+  // 세 숫자가 한 등급이라는 주장은 선언이 아니라 그려진 크기다. --fs-num은 폭을 따라 굽으므로
+  // 뷰포트를 섞어 세지 않고 한 폭 안에서만 같은 값인지 묻는다.
+  const spread = [["1280x720", wide], ["740x360", narrow]]
+    .filter((r) => new Set(r[1].size).size !== 1).map((r) => r[0] + " " + r[1].size.join("/"));
+  check("layout:every-resource-number-renders-at-one-size",
+    wide.size.length >= 3 && narrow.size.length >= 3 && spread.length === 0,
+    wide.size.join("/") + " at 1280, " + narrow.size.join("/") + " at 740");
+  check("layout:the-portrait-takes-a-finger", wide.por[0] >= TOUCH && wide.por[1] >= TOUCH,
+    wide.por.join("x") + " against " + TOUCH + "px");
+  /* 심어서 증명한다. 칩 사이 여백을 지우면 이 축이 그것을 잡아야 한다.
+     칩에 인라인 값을 박으면 안 된다. 판이 도는 동안 매 구 pips()가 띠를 통째로 다시 그려
+     심은 것이 400ms 안에 지워지고, 그러면 이 자는 심은 적 없는 화면을 재고 초록을 낸다.
+     시트는 다시 그려도 남는다. */
+  await p.evaluate(() => {
+    const s = document.createElement("style");
+    s.id = "gapProbe";
+    s.textContent = "#purse .cur + .cur{margin-left:0!important}";
+    document.head.append(s);
+  });
+  const planted = await strip(1280, 720);
+  await p.evaluate(() => { const s = document.getElementById("gapProbe"); if (s) s.remove(); });
+  check("instrument:a-planted-tight-chip-is-caught", planted.gaps.some((g) => g < planted.unit),
+    planted.gaps.join("/") + " against " + planted.unit + "px");
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
 
