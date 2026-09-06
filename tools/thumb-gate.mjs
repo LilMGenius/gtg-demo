@@ -13,8 +13,9 @@ const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win6
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 /* 어느 탭을 재는지는 화면이 정한다. 진열 격자를 세우는 탭은 전부 상품을 파는 선반이고,
    목록을 여기 손으로 적으면 선반이 하나 늘어난 날 그 하나만 조용히 안 재고 초록이 난다. */
-// 썸네일 칸의 바탕. hud.css가 이 칸에 준 색이라, 이 색만 남은 칸은 그림이 없는 칸이다.
-const SHOT_BG = [0x12, 0x18, 0x0f];
+/* 썸네일 칸의 바탕은 화면에서 읽는다. 여기 상수로 베껴 두면 hud.css가 그 색을 바꾼 날
+   모든 화소가 바탕과 멀어져 잉크로 읽히고, 이 자의 모든 축이 영원히 초록이 된다.
+   베낀 값이 틀렸다는 것을 아무도 못 보는 자리라, 아래의 빈 칸 대조군이 그 짝이다. */
 // 바탕과 다르다고 볼 채널합 거리. 안티에일리어싱 잔파동은 한 자리 수라 24는 그 위다.
 const SHOT_DELTA = 24;
 /* 칸이 그림을 든다고 부를 최소 화소 비율. 실측으로 그림이 든 칸은 21.1퍼센트(머리)에서
@@ -47,8 +48,7 @@ try {
   /* 화면에 걸린 칸을 그대로 찍어 화소를 센다. 구운 그림의 주소를 읽는 것으로는
      그림이 사람 눈에 닿았다고 말할 수 없다. 주소가 멀쩡한 채로 칸이 0px이거나,
      칸이 접혔거나, 그림이 칸 밖으로 밀려도 주소는 그대로다. */
-  const inkOf = async (i) => {
-    const box = p.locator("#shop .rack .card").nth(i).locator(".shot");
+  const inkAt = async (box, bg) => {
     if (await box.count() === 0) return { w: 0, h: 0, ink: 0 };
     const png = (await box.screenshot({ timeout: 8000 })).toString("base64");
     return p.evaluate(([s, bg, delta]) => new Promise((res) => {
@@ -66,8 +66,9 @@ try {
         res({ w: im.width, h: im.height, ink: n });
       };
       im.src = "data:image/png;base64," + s;
-    }), [png, SHOT_BG, SHOT_DELTA]);
+    }), [png, bg, SHOT_DELTA]);
   };
+  const inkOf = (i) => inkAt(p.locator("#shop .rack .card").nth(i).locator(".shot"), SHOT_BG);
 
   // 진열 격자를 세우는 탭만 선반이다. 이적시장은 사는 자리라 격자가 없다.
   const SHELF = await p.evaluate(() => {
@@ -80,6 +81,16 @@ try {
     return out;
   });
   check("instrument:every-shelf-tab-was-found", SHELF.length > 0, SHELF.join(", "));
+
+  // 바탕색은 화면이 소유한다. 칸을 하나 잡아 계산된 배경을 읽어 오고, 못 읽으면 재지 않는다.
+  const SHOT_BG = await p.evaluate(() => {
+    const e = document.querySelector("#shop .rack .card .shot");
+    if (!e) return null;
+    const m = getComputedStyle(e).backgroundColor.match(/[0-9.]+/g);
+    return m && m.length >= 3 ? m.slice(0, 3).map(Number) : null;
+  });
+  check("instrument:the-box-background-came-from-the-page", SHOT_BG !== null,
+    SHOT_BG ? "rgb(" + SHOT_BG.join(",") + ") read from getComputedStyle" : "could not read the shot background");
 
   let drawn = 0;
   const thin = [];
@@ -103,6 +114,31 @@ try {
   }
   check("instrument:some-card-was-painted", drawn > 0, drawn + " pictures");
   check("thumb:no-shelf-shows-a-blank-box", thin.length === 0, thin.join(", ") || SHELF.length + " shelves clear the floor");
+
+  /* 대조군. 같은 규칙을 입힌 빈 칸을 선반에 심어, 잉크 자가 그것을 그림 없는 칸으로 읽는지 본다.
+     이 자가 재는 것은 바탕에서 멀어진 화소 수인데, 바탕값이 틀리면 빈 칸조차 가득 찬 것으로 읽히고
+     위의 모든 축이 뜻 없이 초록이 된다. 0이 아니라 문턱 아래인지를 묻는 이유는 칸에 테두리가 있고,
+     그 2px 테두리가 반투명 흰색이라 바탕 위에서 실제로 잉크로 잡히기 때문이다. */
+  await p.evaluate(() => {
+    const rack = document.querySelector("#shop .rack");
+    const card = document.createElement("div");
+    card.className = "card gear";
+    card.id = "inkProbe";
+    const pic = document.createElement("div");
+    pic.className = "pic";
+    const shot = document.createElement("div");
+    shot.className = "shot";
+    pic.appendChild(shot);
+    card.appendChild(pic);
+    rack.appendChild(card);
+  });
+  await p.waitForTimeout(120);
+  const blank = await inkAt(p.locator("#inkProbe .shot"), SHOT_BG);
+  const blankRatio = blank.w * blank.h ? blank.ink / (blank.w * blank.h) : -1;
+  check("control:a-blank-box-does-not-clear-the-ink-floor",
+    blankRatio >= 0 && blankRatio < SHOT_INK,
+    (blankRatio * 100).toFixed(1) + "% painted on an empty box, floor " + (SHOT_INK * 100).toFixed(0) + "%");
+  await p.evaluate(() => { const q = document.getElementById("inkProbe"); if (q) q.remove(); });
 
   // 이름이 형태를 말하는 선반들. 머리는 깎아준 머리와 투블럭과 기른 머리와 모히칸이고,
   // 축구화는 실내화와 닳은 축구화와 스터드 여섯 개와 스파이크다.

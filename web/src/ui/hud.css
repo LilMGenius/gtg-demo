@@ -992,12 +992,23 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
    가장 큰 덩어리가 되고, 그림보다 먼저 읽힌다. */
 #shop .card.gear .buy{flex:0 0 auto;width:auto;margin:0;padding:6px 11px 8px;font-size:var(--fs-num)}
 #shop .card.gear:nth-child(2n){transform:rotate(.5deg)}
-/* 세로가 480px 아래인 가로 모바일. 선반이 보이는 높이는 52vh라 360px에서 187px이고,
-   그림 몫을 그대로 두면 카드 한 장이 228px이라 값 배지가 접힌 자리 아래로 내려간다.
-   무엇을 파는지는 보이고 얼마인지는 굴려야 보이는 상태다. 12/5는 카드 한 장이 188px로 서서
-   그림과 이름과 값이 한 번에 잡히는 비율이고, 굽는 비율 448x205와도 가까워 빈 띠가 거의 없다. */
+/* 세로가 480px 아래인 가로 모바일. 이 높이에서는 상점 자체가 이미 구른다(실측: 740x360에서
+   #shop 안 높이 360에 내용 503, 탈의실 기둥 혼자 446). 그 위에 선반이 제 창을 또 가지면
+   구르는 면이 둘이 되고, 바깥을 굴려 선반을 찾은 다음 안을 다시 굴려야 값이 보인다.
+   실측으로 선반 창이 52vh인 187px인데 카드 한 장이 216px이라, 첫 장이 y[138,354]에 서고
+   창은 322에서 끊겨 값 배지가 17px 잘렸다. 창을 걷으면 카드가 통째로 서고 첫 장의 아래끝
+   354가 360px 화면 안에 들어, 그림과 이름과 효과와 값이 굴리지 않고 한 번에 잡힌다.
+   12/5는 그 354를 만드는 비율이다. 5/3 그대로면 카드가 252px이 되어 아래끝이 390으로
+   화면 밖에 서므로, 짧은 화면에서만 그림 몫을 이만큼 내주고 카드 한 장을 산다.
+   넓은 화면은 안 바뀐다. 1280x720에서 선반은 52vh인 374px이고 카드 한 줄이 289px이라
+   애초에 넘치지 않으므로, 계획이 정한 5/3 비율이 그대로 남는다.
+   효과 한 줄도 여기서만 한 줄로 자른다. 축이 둘인 동네 선반은 두 줄로 접혀 카드가 376px이 되고,
+   그때 값 배지의 아래끝이 360으로 화면의 마지막 줄에 딱 붙는다. 한 줄로 자르면 그 선반도
+   354로 서서 여덟 탭이 같은 높이가 되고 배지 아래에 여백이 남는다. */
 @media (max-height:480px){
+  #shop .rack{max-height:none;overflow-y:visible}
   #shop .card.gear .shot{aspect-ratio:12 / 5}
+  #shop .card.gear em{-webkit-line-clamp:1}
 }
 #shop .buy{width:100%;margin-top:13px;padding:10px 0 12px;
   border:var(--line) solid var(--edge);background:#2b3a22;color:var(--ink);
