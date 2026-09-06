@@ -128,7 +128,19 @@ try {
 
   /* 여기부터는 장부가 아니라 화면의 모양을 잰다. 담벼락과 계정을 가르는 것은 수가 아니라 배치다.
      계정 머리에 얼굴이 화소로 찍혔는가, 숫자가 두 칸으로 서는가, 글 한 장이 카드 요소인가,
-     좋아요 수 앞에 아이콘이 서는가. 클래스 이름은 사람이 그것을 봤다는 증거가 아니라서 상자를 잰다. */
+     좋아요 수 앞에 아이콘이 서는가. 클래스 이름은 사람이 그것을 봤다는 증거가 아니라서 상자를 잰다.
+     표본에는 남이 찍은 사진 한 장과 좋아요 칸이 없는 옛 글 한 장을 심는다. 둘 다 실제 저장에 서는
+     모양인데 도는 판에서는 안 나오고, 안 재면 이 축들이 사람의 저장에서 처음 빨개진다. */
+  await p.evaluate(() => {
+    const posts = window.__posts();
+    const k = window.__keeperStats();
+    /* 행인이 찍은 사진. 행인은 생김새가 저장에 없어 초상이 실루엣으로 선다.
+       그림 없는 판때기를 그림과 같은 자로 재면 주소가 빈 문자열이라 -1이 나온다. */
+    posts.push({ n: "심은행인", c: false, g: 0, t: "심은 사진 한 장", lb: 4, ct: 0, l: 5,
+      ph: { city: 0, passer: 0, tier: 2, h: k.height, w: k.weight, look: {} } });
+    // 좋아요 칸이 없던 옛 글. l 자체가 없는 모양이고 화면은 그 자리를 0으로 채운다.
+    posts.push({ n: "옛글", c: false, g: 0, t: "좋아요 칸이 없던 시절의 글" });
+  });
   await p.evaluate(() => window.__gram(true));
   await p.waitForTimeout(360);
   const shape = await p.evaluate(() => {
@@ -173,12 +185,21 @@ try {
         if (!plate) return null;
         const q = plate.getBoundingClientRect();
         const url = /url\("([^"]+)"\)/.exec(getComputedStyle(plate).backgroundImage);
-        return { w: Math.round(q.width), h: Math.round(q.height), src: url ? url[1] : "" };
+        /* 초상 없는 사람은 실루엣 판때기다. 아이콘이 그 자리를 채우므로 그림 주소가 아니라
+           그려진 아이콘을 센다. 둘을 한 자로 재면 실루엣이 안 그려진 그림으로 잡힌다. */
+        return { w: Math.round(q.width), h: Math.round(q.height), src: url ? url[1] : "",
+          anon: plate.classList.contains("anon"), icons: plate.querySelectorAll("svg").length,
+          iconBox: (() => {
+            const g = plate.querySelector("svg");
+            if (!g) return null;
+            const r = g.getBoundingClientRect();
+            return { w: Math.round(r.width), h: Math.round(r.height) };
+          })() };
       })
     };
   });
   console.log("  header " + shape.pw + "x" + shape.ph + " portrait, " + shape.cells.length + " number cells, "
-    + shape.tags.length + " cards");
+    + shape.tags.length + " cards, " + shape.avas.filter((a) => a && a.anon).length + " of them anonymous");
 
   // 계정을 여는 첫 신호는 이름이 아니라 얼굴이다. 계획이 적은 48px을 상자로 확인한다.
   check("gram:the-account-header-carries-a-drawn-portrait",
@@ -203,7 +224,10 @@ try {
     plates.length === shape.tags.length && plates.length > 0 && plates.every((a) => a.w >= 40 && a.h >= 40),
     plates.length + " plates over " + shape.tags.length + " posts, sizes "
       + ([...new Set(plates.map((a) => a.w + "x" + a.h))].join(",") || "none"));
-  // 초상은 그림이라 클래스가 아니라 화소로 본다. 빈 판때기에도 주소는 붙는다.
+  /* 얼굴을 든 판때기는 그림이라 클래스가 아니라 화소로 본다. 빈 판때기에도 주소는 붙는다.
+     실루엣은 그림이 아니라서 이 자의 표본이 아니다. 섞어 재면 설계대로 선 실루엣이
+     안 그려진 초상으로 잡혀, 사진에 태그된 사람의 저장이 전부 빨개진다. */
+  const faced = plates.filter((a) => !a.anon);
   const ink = await p.evaluate((list) => Promise.all(list.map((s) => new Promise((res) => {
     const im = new Image();
     im.onload = () => {
@@ -218,35 +242,87 @@ try {
     };
     im.onerror = () => res(-1);
     im.src = s;
-  }))), plates.map((a) => a.src));
+  }))), faced.map((a) => a.src));
   check("gram:the-author-plate-is-actually-drawn",
-    ink.length > 0 && ink.every((x) => x > 8),
-    ink.map((x) => x.toFixed(1) + "%").slice(0, 4).join(", ") || "no plate");
+    faced.length > 0 && ink.length === faced.length && ink.every((x) => x > 8),
+    ink.map((x) => x.toFixed(1) + "%").slice(0, 4).join(", ") + " over " + faced.length + " faced plates of " + plates.length);
+  /* 얼굴이 없는 사람의 판때기. 그림이 안 오는 자리라 빈 칸으로 두면 그 카드만 작성자가 사라진다.
+     그 자리를 실루엣이 채웠는지는 아이콘 상자와 화소 둘로 본다. 상자만 보면 안 그려진 아이콘도
+     통과하므로, 아이콘을 껐다 켜서 그 상자 안의 밝기가 얼마나 달라지는지를 같이 센다.
+     자와 문턱 8%는 staticon 게이트가 내 정보 창 아이콘에 쓰는 그것과 같다. */
+  const anon = plates.filter((a) => a.anon);
+  const ANON = "#gram .post .ava.anon";
+  const win = await p.evaluate((sel) => {
+    const e = document.querySelector(sel);
+    const g = e ? e.querySelector("svg") : null;
+    if (!e || !g) return null;
+    const a = e.getBoundingClientRect(), c = g.getBoundingClientRect();
+    return { x: (c.left - a.left) / a.width, y: (c.top - a.top) / a.height, w: c.width / a.width, h: c.height / a.height };
+  }, ANON);
+  let mark = -1;
+  if (win) {
+    const one = p.locator(ANON).first();
+    const on = (await one.screenshot()).toString("base64");
+    await p.evaluate((sel) => { document.querySelector(sel + " svg").style.visibility = "hidden"; }, ANON);
+    const off = (await one.screenshot()).toString("base64");
+    await p.evaluate((sel) => { document.querySelector(sel + " svg").style.visibility = ""; }, ANON);
+    mark = await p.evaluate(([a, c, box]) => {
+      const load = (s) => new Promise((res) => {
+        const im = new Image();
+        im.onload = () => {
+          const cv = document.createElement("canvas");
+          cv.width = im.width; cv.height = im.height;
+          const g = cv.getContext("2d");
+          g.drawImage(im, 0, 0);
+          res(g.getImageData(0, 0, im.width, im.height));
+        };
+        im.src = "data:image/png;base64," + s;
+      });
+      return Promise.all([load(a), load(c)]).then(([A, B]) => {
+        const L = (d, i) => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+        const x0 = Math.floor(box.x * A.width), y0 = Math.floor(box.y * A.height);
+        const x1 = Math.ceil((box.x + box.w) * A.width), y1 = Math.ceil((box.y + box.h) * A.height);
+        let hit = 0, n = 0;
+        // 화소차 6 미만은 안티에일리어싱 잔파동과 구분되지 않으므로 세지 않는다.
+        for (let y = y0; y < y1 && y < A.height; y += 1) {
+          for (let x = x0; x < x1 && x < A.width; x += 1) {
+            const i = (y * A.width + x) * 4;
+            n += 1;
+            if (Math.abs(L(A.data, i) - L(B.data, i)) >= 6) hit += 1;
+          }
+        }
+        return n ? hit / n : -1;
+      });
+    }, [on, off, win]);
+  }
+  check("gram:a-faceless-author-still-gets-a-silhouette",
+    anon.length > 0 && anon.every((a) => a.icons === 1 && a.iconBox && a.iconBox.w >= 12 && a.iconBox.h >= 12) && mark >= 0.08,
+    anon.length + " anonymous plates, mark "
+      + (anon[0] && anon[0].iconBox ? anon[0].iconBox.w + "x" + anon[0].iconBox.h : "no box")
+      + ", " + (mark * 100).toFixed(1) + "% of the plate changes when the mark is hidden");
 
-  /* 남이 올린 사진 한 장을 심어 선팔 버튼의 자리를 잰다. 신규 저장은 라포가 0이라 아무도 나를 안 찍고,
-     그 표본에는 버튼이 한 개도 없어 잴 자리가 없다. 재고 나서 도로 뺀다. */
+  /* 심어 둔 사진 글에서 선팔 버튼의 자리를 잰다. 신규 저장은 라포가 0이라 아무도 나를 안 찍고,
+     안 심은 표본에는 버튼이 한 개도 없어 잴 자리가 없다. */
   const spot = await p.evaluate(() => {
-    const posts = window.__posts();
-    const k = window.__keeperStats();
-    posts.push({ n: "심은행인", c: false, g: 0, t: "심은 사진 한 장", lb: 4, ct: 0, l: 5,
-      ph: { city: 0, passer: 0, tier: 2, h: k.height, w: k.weight, look: {} } });
-    window.__gram(false);
-    window.__gram(true);
     const card = document.querySelector("#gram .post.shot");
     const btn = card ? card.querySelector(".by .fol") : null;
-    const out = card && btn
+    return card && btn
       ? { right: Math.round(card.getBoundingClientRect().right - btn.getBoundingClientRect().right),
         top: Math.round(btn.getBoundingClientRect().top - card.getBoundingClientRect().top),
         w: Math.round(btn.getBoundingClientRect().width), h: Math.round(btn.getBoundingClientRect().height),
         label: btn.textContent.trim() }
       : null;
-    posts.pop();
-    return out;
   });
   check("gram:the-follow-button-sits-small-at-the-card-top-right",
     Boolean(spot) && spot.right >= 0 && spot.right <= 16 && spot.top >= 0 && spot.top <= 16 && spot.h <= 34,
     spot ? spot.label + " " + spot.w + "x" + spot.h + ", " + spot.right + "px in from the right, "
       + spot.top + "px down from the top" : "no photo card");
+  // 심은 둘을 도로 뺀다. 남겨 두면 뒤에 붙는 축이 심은 글을 판이 낳은 글로 읽는다.
+  await p.evaluate(() => {
+    const posts = window.__posts();
+    posts.pop();
+    posts.pop();
+  });
 
   /* 쪽지는 카드 아래에 접혀 있다. 접힌 자리에 대화가 이미 그려져 있으면 접힌 것이 아니고,
      쪽지함이 피드 위에 서면 계정을 여는 첫 화면이 남의 대화가 된다. */
