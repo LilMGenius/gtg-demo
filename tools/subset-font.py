@@ -43,7 +43,14 @@ def build(name, chars):
     opts.flavor = "woff2"
     opts.desubroutinize = True
     opts.layout_features = ["*"]
-    font = TTFont(cache)
+    # recalcTimestamp=False. 기본값은 저장할 때마다 head.modified를 그 시각으로 다시 쓴다.
+    # 글자 집합이 그대로인데 woff2 바이트가 매번 달라져서, 실려 있는 서체를
+    # 다시 구워 대조해 보는 길이 없었다. 이 플래그로 세 번 구워 같은 바이트가 나왔다.
+    #   regular sha256 7ff569da425e67c2255c2814322ba2278b787759ab46439a412a6dfc54792a6d
+    #   bold    sha256 17979c8b4c3bd7a11507f72dc69f22cfaa943b616534801013148fd9b7d1d81c
+    # 굽고 나서 git diff가 뜨면 실려 있는 바이트가 이 플래그 없이 구운 것이고,
+    # 그때 달라지는 표는 head 하나다. 실측으로 cmap 1114자와 표 14개가 양쪽 같았다.
+    font = TTFont(cache, recalcTimestamp=False)
     sub = subset.Subsetter(options=opts)
     sub.populate(text="".join(sorted(chars)))
     sub.subset(font)

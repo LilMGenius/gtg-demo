@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-// 폰트 게이트. Black Han Sans는 한글 2733자만 담고 있다. 완성형 11172자가 아니다.
+// 폰트 게이트. Black Han Sans의 cmap은 2733자이고 그중 한글은 2581자다. 완성형 11172자가 아니다.
 // 담기지 않은 음절은 다른 서체로 대체 렌더되어 그 글자만 굵기와 자폭이 달라진다.
 // 이 검사가 없을 때 로스터에 담기지 않은 이름 하나가 들어가 그대로 나갔다.
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "");
@@ -92,15 +92,16 @@ for (const [ch, files] of miss) console.log("  FAIL glyph:" + ch + " U+" + ch.co
 // woff2는 압축이라 여기서 못 읽고, 읽더라도 물어볼 것은 같다. 소스가 움직였는데
 // 글꼴을 다시 안 깎았는가다. 지문이 어긋나면 새로 들어온 글자가 다른 서체로 떨어진다.
 const META = join(ROOT, "web/assets/fonts/pretendard-subset.json");
+const seen = new Set();
+for (const f of walk(ROOT, [])) for (const ch of readFileSync(f, "utf8")) seen.add(ch);
+for (let c = 0x20; c < 0x7f; c += 1) seen.add(String.fromCharCode(c));
+// 코퍼스 글자 수와 지문은 매니페스트가 없어도 요약 줄이 찍어야 하므로 try 밖에서 잰다.
+const kept = [...seen].filter((c) => c.trim() !== "" || c === " ").sort();
+const sig = createHash("sha256").update(kept.join(""), "utf8").digest("hex");
 let bodyOk = false;
 let bodyWhy = "manifest missing";
 try {
   const meta = JSON.parse(readFileSync(META, "utf8"));
-  const seen = new Set();
-  for (const f of walk(ROOT, [])) for (const ch of readFileSync(f, "utf8")) seen.add(ch);
-  for (let c = 0x20; c < 0x7f; c += 1) seen.add(String.fromCharCode(c));
-  const text = [...seen].filter((c) => c.trim() !== "" || c === " ").sort().join("");
-  const sig = createHash("sha256").update(text, "utf8").digest("hex");
   bodyOk = sig === meta.sha256;
   bodyWhy = bodyOk ? meta.chars + " glyphs, corpus " + sig.slice(0, 16) : "corpus " + sig.slice(0, 16) + " but font built for " + String(meta.sha256).slice(0, 16) + ", rerun tools/subset-font.py";
 } catch (e) {
@@ -108,6 +109,9 @@ try {
 }
 console.log("  " + (bodyOk ? "ok  " : "FAIL") + " body:subset-matches-the-source-corpus " + bodyWhy);
 const ok = ctlIn && ctlOut && miss.size === 0 && bodyOk;
-console.log("font " + (ok ? "PASS " + cov.size : "FAIL " + (miss.size + (bodyOk ? 0 : 1))));
+// 요약 줄은 이 게이트가 재는 것을 찍는다. 여기 있던 2733은 black-han-sans의 cmap 크기라
+// 코퍼스가 움직여도 서브셋이 움직여도 그대로였고, 빨간불은 축 개수라 초록과 나란히 못 읽었다.
+// 이제 양쪽 다 뒤에 코퍼스 글자 수와 지문 앞자리를 달고 나온다.
+console.log("font " + (ok ? "PASS" : "FAIL " + (miss.size + (bodyOk ? 0 : 1))) + " " + kept.length + " " + sig.slice(0, 8));
 process.exit(ok ? 0 : 1);
 
