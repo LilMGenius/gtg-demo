@@ -3,7 +3,7 @@
 // 어깨와 고관절을 끝단 피벗으로 세우고, 각도를 데이터로 둔다. 과장은 여기서 나온다.
 import * as THREE from '../../../vendor/three.module.min.js';
 import { flat, flatMap, flatVertex, mergeGeos, standOnGround } from '../units.mjs';
-import { clothTex } from '../texture.mjs';
+import { clothTex, inkTex } from '../texture.mjs';
 import { jitterMesh, addOutline } from '../handmade.mjs';
 
 // 동공은 연출이 바꿔 끼우므로 재질을 밖에서 소유한다.
@@ -442,13 +442,19 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
 // 캡슐을 중앙 피벗으로 두면 어깨를 돌렸을 때 팔이 몸통을 관통한다.
 // 사지에는 외곽선을 안 건다. 팔 여덟 개가 각자 복제본을 달면 드로우콜이 두 배가 되고,
 // 가늘어서 어차피 선만 남는다. 실루엣을 만드는 건 몸통과 머리다.
-function seg(radius, len, color, tag, salt, cuff, span, girth) {
+function seg(radius, len, color, tag, salt, cuff, span, girth, ink) {
   const geo = new THREE.CapsuleGeometry(radius, len, 3, 6);
   geo.translate(0, -len / 2, 0);
   // 마디 중간에 밝은 띠를 하나 병합한다. 드로우콜은 그대로다.
   // 피벗 쪽에 두면 어깨 구와 몸통 측면에 묻혀 화면에 안 나온다.
   let m;
-  if (cuff) {
+  if (Number.isFinite(ink)) {
+    /* 문신은 팔에 끼운 고리가 아니라 살갗에 새긴 그림이다. 고리로 그리면 등급이 굵기만 바꾸고
+       스티커와 이름 석 자와 먹토시가 화면에서 같은 물건으로 선다. 무늬를 캡슐 UV에 굽는다.
+       재질 색을 흰색으로 두고 소매 색까지 텍스처가 칠하는 이유는 texture.mjs inkTex가 적어 뒀다.
+       메시는 그대로 하나라 드로우콜도 그대로다. 고리 갈래는 반바지 밑단이 계속 쓴다. */
+    m = new THREE.Mesh(geo, flatMap(0xffffff, inkTex(color, cuff, ink, span, girth)));
+  } else if (cuff) {
     // 띄의 높이를 데이터가 정한다. 아랫단은 그대로 두고 위로만 자라 어깨를 향해 덮는다.
     const h = len * (span || 0.16);
     // 감는 두께도 등급이 정한다. 면적만 늘리면 먹토시가 스티커를 길게 늘인 것으로 읽힌다.
@@ -540,7 +546,7 @@ function buildBody(o) {
       pad.position.set(side * o.armR * 0.45, o.armR * 1.15 + th * 0.3, 0);
       sh.add(pad);
     }
-    const upper = seg(o.armR, o.upperLen, o.sleeve, tag, side < 0 ? 21 : 22, o.cuffSleeve, o.cuffSpan, o.cuffGirth);
+    const upper = seg(o.armR, o.upperLen, o.sleeve, tag, side < 0 ? 21 : 22, o.cuffSleeve, o.cuffSpan, o.cuffGirth, o.inkGrade);
     sh.add(upper);
     const el = joint(sh, 0, -o.upperLen, 0);
     const fore = seg(o.armR * 0.92, o.foreLen, o.skin, tag, side < 0 ? 23 : 24);
@@ -694,6 +700,8 @@ export function buildKeeper(height, weight, look) {
     sleeve: 0x073239, skin: (look && look.face && look.face.skin) || 0xe8c39a,
     shorts: 0x2b3b4e, socks: (look && look.sock) || 0x63d3e8, sockCut: look && look.sockCut,
     cuffSleeve: (look && look.ink) || 0x5f8f93, cuffSpan: (look && look.inkSpan) || 0.16, cuffGirth: (look && look.inkGirth) || 1,
+    // 등급이 무늬를 고른다. 상점에 손댄 적 없는 사람은 0등급이라 맨살이고, 그것도 무늬 표의 한 칸이다.
+    inkGrade: (look && look.inkGrade) || 0,
     cuffShorts: 0x6d8898, gloveTone: (look && look.glove) || 0xf2d64b,
     gloveCut: look && look.gloveCut,
     bootTone: (look && look.boot) || 0x2a241c, bootCut: look && look.bootCut,

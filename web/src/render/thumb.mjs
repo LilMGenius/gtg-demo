@@ -6,6 +6,8 @@
 import * as THREE from "../../vendor/three.module.min.js";
 import { buildKeeper } from "./objects/actors.mjs";
 import { meshPanel, buildPassers } from "./objects/pitch.mjs";
+import { placeCardGeo } from "./objects/places.mjs";
+import { flatVertex, mergeGeos } from "./units.mjs";
 import { skinAt, placeAt } from "../state/gear.mjs";
 
 // 행인 수는 경기장이 쓰는 그 규칙이다. 다섯에서 시작해 등급마다 둘이 는다.
@@ -149,14 +151,21 @@ function cityRig(pick) {
   grp.add(ground);
   /* 지평선 한 조각. 인원과 하늘만으로는 네 칸이 같은 장소의 다른 시간대로 읽혔다.
      경기장과 같은 규칙으로 등급이 높을수록 건물이 솟는다. 다섯 동이면 칸 폭을 채우고,
-     행인 뒤에 서므로 사람을 안 가린다. */
+     행인 뒤에 서므로 사람을 안 가린다. 다섯을 한 지오메트리로 붙여 칸 하나가 메시 하나다. */
+  const far = [];
   for (let i = 0; i < 5; i += 1) {
     const h = (1.6 + (i % 3) * 0.7) * place.rise;
-    const b = new THREE.Mesh(new THREE.BoxGeometry(1.5, h, 1.2),
-      new THREE.MeshLambertMaterial({ color: place.fence }));
-    b.position.set(-3.2 + i * 1.6, h / 2, -4.6);
-    grp.add(b);
+    const b = new THREE.BoxGeometry(1.5, h, 1.2);
+    b.translate(-3.2 + i * 1.6, h / 2, -10.4);
+    far.push(b);
   }
+  grp.add(new THREE.Mesh(mergeGeos(far), new THREE.MeshLambertMaterial({ color: place.fence })));
+  /* 그 동네의 물건. 밟는 면과 지평선 높이만 갈리던 동안 네 칸이 색만 다른 같은 벌판이었다.
+     경기장 배치를 그대로 담으면 60m짜리 담이 이 칸에서 실 한 오라기가 되므로, 칸의 배치는
+     places.mjs가 따로 쥔다. 어느 동네인지는 한 곳이 정하고 어떻게 담을지만 칸마다 다르다.
+     굽고 나면 clearScene이 이 리그의 지오메트리를 버린다. 사본을 주지 않으면 같은 칸을
+     두 번째로 구울 때 이미 버려진 지오메트리를 그리게 된다. */
+  grp.add(new THREE.Mesh(placeCardGeo(rank).clone(), flatVertex(0xffffff)));
   // 행인 수는 경기장과 같은 식으로 센다. 다섯에서 시작해 등급마다 둘씩 는다.
   const n = PASSER_BASE + PASSER_STEP * rank;
   const who = buildPassers(grp, n);
@@ -395,6 +404,41 @@ export function stopSpin() {
    좌표는 그림 몫이다. 왼쪽 위가 0,0이고 오른쪽 아래가 1,1이라 프레임 크기가 바뀌어도 축이 안 흔들린다.
    반지름이 둘인 이유는 프레임이 정사각이 아니기 때문이다. 같은 크기가 가로로 넓은 칸에서는
    x 몫으로 더 작게 선다. url을 같이 돌려주어, 잰 그림과 화면에 걸린 그림이 같은 장인지 대조할 수 있다. */
+/* 구운 한 장 안에서 위팔이 어디에 섰는지. 머리는 headBox가 답하고 위팔은 이것이 답한다.
+   문신을 재는 자가 온 프레임을 재면 몸통과 장갑과 빈 배경이 같이 들어와, 팔에서 일어난 일이
+   그 넓이에 묻힌다. 실측: 온 프레임 화소 분산이 0등급과 2등급 사이에서 1145와 1159로,
+   1퍼센트만 움직였다. 팔만 골라 재면 같은 두 등급이 몇 배로 갈린다.
+   팔꿈치 아래는 뺀다. 어깨 관절의 자식 중 메시만 보면 삼각근과 위팔이고, 팔꿈치는 관절이라
+   그 아래의 아래팔과 장갑이 통째로 빠진다. 좌표 몫은 headBox와 같아 왼쪽 위가 0,0이다. */
+export function armBox(kind, keeper, look) {
+  if (!AIM[kind]) return null;
+  frame(kind, keeper, look);
+  const sh = rig && rig.userData.arms && rig.userData.arms[0];
+  if (!sh) return null;
+  const b = new THREE.Box3();
+  let n = 0;
+  for (const ch of sh.children) {
+    if (!ch.isMesh) continue;
+    b.expandByObject(ch);
+    n += 1;
+  }
+  if (!n) return null;
+  const v = new THREE.Vector3();
+  let x0 = 1;
+  let x1 = -1;
+  let y0 = 1;
+  let y1 = -1;
+  for (let i = 0; i < 8; i += 1) {
+    v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).project(cam);
+    x0 = Math.min(x0, v.x);
+    x1 = Math.max(x1, v.x);
+    y0 = Math.min(y0, v.y);
+    y1 = Math.max(y1, v.y);
+  }
+  return { parts: n, x0: (x0 + 1) / 2, x1: (x1 + 1) / 2, y0: (1 - y1) / 2, y1: (1 - y0) / 2,
+    url: R.domElement.toDataURL("image/png") };
+}
+
 export function headBox(kind, keeper, look, over) {
   if (!AIM[kind]) return null;
   frame(kind, keeper, look, undefined, over);

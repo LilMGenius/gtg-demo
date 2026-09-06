@@ -387,7 +387,8 @@ export function lookOf(gear, name) {
     hairCut: bought ? h.cut : undefined,
     // 이름이 얼굴의 정본이다. 저장에 안 실으므로 옛 저장도 그대로 얼굴을 갖는다.
     face: name === undefined ? undefined : faceOf(name),
-    ink: t.tone, inkSpan: t.cut.span, inkGirth: t.cut.girth,
+    // 팔 무늬는 등급이 고른다. 색과 덮는 비율만 넘기면 렌더가 스티커와 먹토시를 못 가른다.
+    ink: t.tone, inkSpan: t.cut.span, inkGirth: t.cut.girth, inkGrade: inkAt(gear && gear.ink).ink,
     glove: gl.tone, gloveCut: gl.cut,
     boot: bo.tone, bootCut: bo.cut,
     shirt: ki.tone, kitCut: ki.cut,

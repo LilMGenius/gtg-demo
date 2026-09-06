@@ -3,10 +3,12 @@ import * as THREE from '../../../vendor/three.module.min.js';
 import { flat, flatMap, flatLit, flatVertex, mergeGeos, R_HALF_W, R_H } from '../units.mjs';
 import { dirtTex, scuffTex, paintScuffBase, clothTex, chippedTex, cloudTex, windowTex, windowTexFor } from '../texture.mjs';
 import { loadDecor } from '../decor.mjs';
+import { placeGeo } from './places.mjs';
 import { jitterMesh, seeded, addOutline, INK } from '../handmade.mjs';
 import { MARK_LINES, ARC_R, ARC_HALF, SPOT_Z, FAR_W } from './markspec.mjs';
 import { addFace } from './actors.mjs';
 import { skinAt } from '../../state/gear.mjs';
+import { PERSONAS, personaKindAt } from '../../state/passer.mjs';
 
 // 사각 그물 한 장. wireframe 평면은 삼각형 대각선이 남아 그물이 아니라 격자무늬로 읽힌다.
 // 팽팽한 격자는 그물이 아니라 방충망이다. 가운데를 배가 부르게 늘어뜨려야 천으로 읽힌다.
@@ -419,6 +421,15 @@ export function buildPitch(scene) {
   backFence.position.set(0, 1.7, -30);
   scene.add(backFence);
 
+  /* 동네가 소유한 땅 위의 물건. 등급마다 지오메트리 한 장이고, 서 있는 것은 언제나 한 장이라
+     드로우콜도 하나다. 넷을 각각 메시로 세우고 보이기만 끄면 예산은 같아도 지오메트리 넷이
+     GPU에 올라가고, 등급을 안 산 사람이 안 보는 동네 셋의 정점을 계속 들고 있게 된다.
+     계측이 광선으로 되묻는 면은 밟는 흙이라, 지평선 건물과 같은 이유로 광선은 통과시킨다. */
+  const props = new THREE.Mesh(placeGeo(0), flatVertex(0xffffff));
+  props.name = 'place';
+  props.userData.probeIgnore = true;
+  scene.add(props);
+
   // 건물 실루엣. 지평선 위가 비지 않게만 세운다. 디테일은 없다.
   // 구운 GLB가 오면 이걸 치우고 그 자리에 선다. 14개 드로우콜이 1개가 된다.
   // 로드가 실패하면 이게 남는다. 에셋 하나로 화면이 비지는 않는다.
@@ -504,6 +515,9 @@ export function buildPitch(scene) {
        하늘색만 바꾸던 동안 공터와 번화가가 같은 흙바닥에 같은 지평선이었다.
        값은 선반 데이터가 소유한다. 여기 배열을 따로 두면 상점 썸네일과 경기장이 갈린다. */
     setPlace: (place) => {
+      // 이름이 말하는 장소가 화면에도 서야 한다. 색만 갈던 동안 공터와 번화가가 같은 빈 벌판이었다.
+      // 등급 번호는 선반 데이터가 들고 있다. 여기서 순서를 다시 세면 상점 카드와 경기장이 갈린다.
+      props.geometry = placeGeo(place.city);
       ground.material.color.setHex(place.ground);
       /* 골문 앞 밟힌 자리도 같은 면이다. 이것만 흙으로 두었더니 잔디와 아스팔트 위에
          흙 사각형이 하나 떠 있었다. 색을 따로 적지 않고 바닥에서 밝기만 올려 만든다.
@@ -530,127 +544,164 @@ export function buildPitch(scene) {
 
 // 행인. 펜스 너머를 지나간다. 아무도 없는 운동장은 연습장이지 경기장이 아니다.
 // 집중력 스탯이 여기에 걸린다. 지금은 걷기만 한다.
+//
+// 전원 같은 캡슐에 색만 다르면 색칠한 볼링핀이다. 몸은 passer.mjs의 페르소나가 소유하고
+// 여기서는 그 비율과 각으로 조각을 세우기만 한다. 같은 번호는 어느 동네에서도 같은 몸이다.
+// 소지품마다 메시를 세우면 열한 명이 예산을 통째로 먹는다. 실측: 옛 배치는 한 명이 4에서 7
+// 드로우콜을 썼고 번화가에서 134콜이었다. 몸통과 팔과 머리와 소지품을 한 지오메트리로 붙이면
+// 한 명이 셋이고, 얼굴이 붙는 0번만 넷이다.
 export function buildPassers(scene, count = 5) {
-  // 전원 같은 캡슐에 색만 다르면 색칠한 볼링핀 다섯 개다.
-  // 키와 폭을 흩고, 다리를 따로 달고, 0번만 실루엣을 다르게 준다.
-  // 집중력 판정이 지목하는 미인 행인이 0번이고, 그 하나는 멀리서도 구분돼야 한다.
   const passers = [];
   // 0번은 키커와 나란히 서는 유일한 행인이다. 붉은 계열을 주면 키커 셔츠(0xc9483a)와
   // 같은 빨간 캡슐 둘이 되고, 화면에서 사람이 바뀐 것 자체가 안 읽힌다.
-  // 키커에도 다른 행인에도 없는 색을 준다.
   const shirt = [0xf2e9ff, 0x4a72c4, 0xe0a23c, 0x7a4fb0, 0x3fa37a];
+  // 코트 색 셋. 직장인 넷이 같은 코트를 입으면 페르소나가 제복이 된다.
+  const coat = [0x3f4450, 0x6b5a44, 0x2f3a3f];
   const rnd = seeded(0x9a55e7);
   for (let i = 0; i < count; i += 1) {
-    // 동네 등급이 올라가면 인원이 늘어난다. 색은 다섯 개뿐이라 감아 쓴다.
     const tint = shirt[i % shirt.length];
+    const kind = personaKindAt(i);
+    const P = PERSONAS[kind];
     const g = new THREE.Group();
-    // 0.85~1.20은 원경에서 화소 몇 개 차이라 다섯이 같은 키로 읽혔다. 폭을 넓힌다.
-    const tall = 0.76 + rnd() * 0.54;
-    const wide = 0.85 + rnd() * 0.35;
-    // 머리만 사람이고 아래는 페인트 통이었다. 팔이 없으면 서 있는 것인지 꽂혀 있는 것인지가 안 갈린다.
-    // 별도 메시로 달면 다섯 명에게 10번의 드로우콜이 붙는다. 몸통 지오메트리에 미리 붙여 버린다.
+    // 회차마다 흔드는 것은 크기 하나다. 비율까지 흔들면 실루엣 비를 재는 자가 재는 것이
+    // 페르소나가 아니라 그날 굴린 난수가 된다. 0.92에서 1.12는 원경에서 키가 갈려 읽히는 폭이다.
+    const s = 0.92 + rnd() * 0.2;
+    const tall = P.tall * s;
+    const wide = P.wide * s;
+    // 다리가 짧으면 골반과 머리가 그만큼 내려앉는다. 발은 어느 페르소나에서도 땅에 있다.
+    const legLen = 0.46 * tall * P.leg;
+    const drop = 0.46 * tall - legLen;
+    const hipY = 0.86 * tall - drop + P.bob;
     const torsoR = 0.22 * wide;
-    const torsoGeo = new THREE.CapsuleGeometry(torsoR, 0.62 * tall, 3, 6);
-    // 0.42는 몸통 윗반에서 끝나 어깨 봉으로 보였다. 팔은 허리를 지나야 팔로 읽힌다.
+    // 몸에 붙는 것은 전부 골반 기준 좌표다. 노인은 이 덩어리를 골반에서 통째로 굽히므로
+    // 여기에 월드 높이를 그대로 적으면 굽힐 때 소지품만 제자리에 남는다.
+    const at = (y) => (y - 0.86) * tall;
+    const parts = [new THREE.CapsuleGeometry(torsoR, 0.62 * tall, 3, 6)];
+    const colors = [tint];
     const armLen = 0.62 * tall;
-    const armParts = [torsoGeo];
-    // 팔이 셔츠와 같은 색이면 흰 몸통에 흰 팔이 묻혀 사각형 한 장으로 읽힌다.
-    // 메시를 나누면 드로우콜이 열 개 붙으므로 정점색으로만 가른다.
-    const armColors = [tint];
-    for (const s of [-1, 1]) {
-      const a = new THREE.CapsuleGeometry(0.072, armLen, 3, 5);
+    for (const side of [-1, 1]) {
+      const a = new THREE.CapsuleGeometry(0.072 * wide, armLen, 3, 5);
       // 캡슐은 중앙이 원점이다. 그대로 돌리면 어깨가 아니라 팔 한가운데가 축이 된다.
       a.translate(0, -armLen / 2, 0);
-      // 0.13은 팔이 몸에 붙어 실루엣에서 옷 옆선과 구분이 안 됐다. 공간을 벌려 띄운다.
-      a.rotateZ(-s * 0.34);
+      // 팔이 몸에서 벌어지는 각은 페르소나가 정한다. 원경에서 사람을 가르는 것이 이 각이다.
+      a.rotateZ(-side * P.arm);
       // 어깨는 몸통 꼭대기가 아니라 그 한 칸 아래다. 꼭대기에 달면 목에서 팔이 난다.
-      a.translate(s * (torsoR + 0.05), 0.22 * tall, 0);
-      armParts.push(a);
-      armColors.push(0xe0b48c);
+      a.translate(side * (torsoR + 0.05), 0.22 * tall, 0);
+      parts.push(a);
+      colors.push(0xe0b48c);
     }
+    if (kind === 'beauty') {
+      // 긴 머리 한 덩이. 반경 0.17은 머리(0.15)보다 커서 얼굴을 삼켰다. 뒤통수 쪽으로 물린다.
+      const hair = new THREE.CapsuleGeometry(0.115 * wide, 0.34 * tall, 3, 6);
+      hair.translate(0, at(1.44), -0.13);
+      parts.push(hair);
+      colors.push(0x2b1d14);
+      // 머리 하나만으로는 멀리서 남녀가 안 갈린다. 치마가 실루엣 밑변을 벌려 준다.
+      const skirt = new THREE.ConeGeometry(0.27 * wide, 0.42 * tall, 8);
+      skirt.translate(0, at(0.62), 0);
+      parts.push(skirt);
+      colors.push(0xb98ad6);
+    } else if (kind === 'student') {
+      // 등에 가방 하나, 옆으로 멘 가방 하나. 등가방은 앞에서 안 보이므로 옆가방이 폭을 만든다.
+      const bag = new THREE.BoxGeometry(0.34 * wide, 0.42 * tall, 0.2);
+      bag.translate(0, at(0.92), -0.24);
+      parts.push(bag);
+      colors.push(0x2f4f43);
+      const satchel = new THREE.BoxGeometry(0.26 * wide, 0.3 * tall, 0.16);
+      satchel.translate(0.42 * wide, at(0.6), 0.06);
+      parts.push(satchel);
+      colors.push(0x6b4f2f);
+    } else if (kind === 'worker') {
+      // 무릎까지 오는 코트. 몸통과 허벅지를 한 통으로 덮어 실루엣이 위아래로 곧게 선다.
+      const c = new THREE.CylinderGeometry(0.27 * wide, 0.32 * wide, 0.72 * tall, 8);
+      c.translate(0, at(0.6), 0);
+      parts.push(c);
+      colors.push(coat[i % coat.length]);
+    }
+    if (kind !== 'beauty') {
+      // 얼굴이 붙는 것은 0번뿐이다. 나머지 머리는 몸에 붙여 드로우콜을 안 늘린다.
+      const hd = new THREE.SphereGeometry(0.15, 8, 6);
+      hd.translate(0, at(1.36), 0);
+      parts.push(hd);
+      colors.push(0xe0b48c);
+    }
+    const bodyGeo = mergeGeos(parts, colors);
+    // 노인. 굽은 등이 실루엣의 전부다. 조각을 하나씩 기울이면 어깨와 머리가 따로 논다.
+    // 실측: 0.62라디안은 실루엣 비 1.42를 냈고 학생 1.39와 2.2퍼센트밖에 안 갈렸다.
+    // 0.88은 머리가 골반 앞으로 확실히 나와 비가 1.1대로 내려가면서도 얼굴은 아직 앞을 본다.
+    if (kind === 'elder') bodyGeo.rotateX(0.88);
     const bodyMat = flatVertex(0xffffff);
     bodyMat.map = clothTex();
-    const body = new THREE.Mesh(mergeGeos(armParts, armColors), bodyMat);
-    body.position.y = 0.86 * tall;
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = hipY;
     // 다리 한 덩어리는 옆에 선 키퍼의 두 다리와 나란히 놓이면 통짜 기둥으로 읽힌다.
-    // 같은 재질이라 지오메트리만 둘로 갈라도 드로우콜은 그대로다.
+    // 0.082 반경에 0.08 간격은 두 캡슐이 서로 파묻혀 다시 한 기둥이 됐다. 사이로 흙이 보여야 갈린다.
     const legGeos = [];
-    for (const s of [-1, 1]) {
-      // 0.082 반경에 0.08 간격은 두 캡슐이 서로 파묻혀 다시 한 기둥으로 읽혔다.
-      // 사이로 흙이 보여야 다리가 둘로 갈린다.
-      const l = new THREE.CapsuleGeometry(0.068 * wide, 0.46 * tall, 3, 5);
-      l.translate(s * 0.115 * wide, 0, 0);
+    const legCols = [];
+    const legsY = 0.15 * tall + legLen / 2;
+    for (const side of [-1, 1]) {
+      const l = new THREE.CapsuleGeometry(0.068 * wide, legLen, 3, 5);
+      // 보폭. 한 발이 앞이고 한 발이 뒤다. 나란히 두면 걷는 사람이 아니라 세워 둔 인형이다.
+      l.translate(side * 0.115 * wide, 0, side * P.stride * 0.14);
       legGeos.push(l);
+      legCols.push(0x30384a);
     }
-    const legs = new THREE.Mesh(mergeGeos(legGeos), flat(0x30384a));
-    legs.position.y = 0.38 * tall;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), flat(0xe0b48c));
-    head.position.y = 1.36 * tall;
-    const parts = [body, legs, head];
-    // 실루엣 세 종. 색만 다른 다섯은 멀리서 한 사람이 다섯 번 지나가는 것으로 읽힌다.
-    // 머리 윗마리만 바꿔도 멀리서 구분된다. 몸통 비율을 건드리면 모두 땅만해진다.
-    if (i === 0) {
-      // 긴 머리 한 덩이. 이 하나로 멀리서도 다른 사람으로 읽힌다.
-      // 반경 0.17은 머리(0.15)보다 커서 얼굴을 통째로 삼켰다. 뒤통수 쪽으로 물린다.
-      const hair = new THREE.Mesh(new THREE.CapsuleGeometry(0.115, 0.34, 3, 6), flat(0x2b1d14));
-      hair.position.set(0, 1.44 * tall, -0.13);
-      // 머리 하나만으로는 멀리서 남녀가 안 갈린다. 치마가 실루엣 밑변을 벌려 준다.
-      // 몸통 비율은 안 건드린다. 건드리면 다섯이 전부 땅딸해진다.
-      // 상의도 치마도 흰 계열이면 근경에서 원통 하나로 뭉친다. 치마에 색과 천 무늬를 준다.
-      const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.27 * wide, 0.42 * tall, 8, 1, true), flatMap(0xb98ad6, clothTex()));
-      skirt.position.y = 0.62 * tall;
-      skirt.material.side = THREE.DoubleSide;
-      // 눈에 띄는 사람은 화면에서도 눈에 띄어야 한다. 머리 위 반짝임 하나가 시선을 잡는다.
-      const spark = new THREE.Mesh(new THREE.OctahedronGeometry(0.11, 0), new THREE.MeshBasicMaterial({ color: 0xffe98a }));
-      spark.position.y = 1.88 * tall;
-      g.userData.spark = spark;
-      // 이 행인은 한눈팔기 연출에서 골대 앞까지 걸어온다. 화면 한복판에 서는데
-      // 얼굴이 없으면 키퍼만 눈이 있고 옆에는 달걀이 서 있다. 하트가 떠도 왜 한눈파는지가 픽셀에 없다.
-      // 다른 넷은 펜스 너머에만 있으므로 얼굴을 안 준다. 드로우콜은 이 하나만 늘린다.
-      // 머리 반경 0.15는 치마와 몸통 옆에서 전구만 해졌다. 얼굴을 붙여도 얼굴이 안 읽힌다.
-      // 몸통은 그대로 두고 머리만 키운다. 병맛 2등신 쪽으로 가는 편이 이 게임에 맞다.
+    if (kind === 'elder') {
+      // 지팡이. 굽은 등과 짝이라 하나만 있으면 그냥 굽은 사람이다.
+      // 다리 덩어리에 붙인다. 몸에 붙이면 등을 굽힐 때 지팡이도 같이 굽어 땅에서 떨어진다.
+      // 위는 손에 붙고 아래는 몸 밖으로 벌어진다. 곧게 세우면 다리 옆에 붙은 막대라
+      // 실루엣 폭이 안 늘고, 그러면 노인과 학생의 비가 2.2퍼센트밖에 안 갈린다(실측).
+      const cane = new THREE.CylinderGeometry(0.03 * wide, 0.03 * wide, 0.95 * tall, 5);
+      cane.rotateZ(0.2);
+      cane.translate(0.49 * wide, 0.95 * tall * 0.5 - legsY, 0.12);
+      legGeos.push(cane);
+      legCols.push(0x8a6b4a);
+    }
+    const legs = new THREE.Mesh(mergeGeos(legGeos, legCols), flatVertex(0xffffff));
+    legs.position.y = legsY;
+    const meshes = [body, legs];
+    if (kind === 'beauty') {
+      /* 이 행인은 한눈팔기 연출에서 골대 앞까지 걸어온다. 화면 한복판에 서는데 얼굴이 없으면
+         키퍼만 눈이 있고 옆에는 달걀이 선다. 하트가 떠도 왜 한눈파는지가 화소에 없다.
+         머리 반경 0.15는 치마와 몸통 옆에서 전구만 해졌다. 몸통은 두고 머리만 키운다. */
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), flat(0xe0b48c));
       head.scale.setScalar(1.3);
-      // 몸통 캡슐 꼭대기가 1.39*tall이다. 머리 중심을 1.4에 두면 목까지 몸에 묻혀
-      // 눈만 어깨 위에 뜬 것처럼 보인다. 목 한 칸만큼 올린다.
-      head.position.y = 1.54 * tall;
+      // 몸통 캡슐 꼭대기가 1.39*tall이다. 머리 중심을 1.4에 두면 목까지 몸에 묻힌다.
+      head.position.y = 1.54 * tall - drop + P.bob;
       addFace(head, 0.15, 1, 0xe0b48c);
-      // 눈만으로는 행인 넷과 안 갈린다. 볼 두 점이 멀리서도 이 하나를 다르게 만든다.
-      const blushMat = new THREE.MeshBasicMaterial({ color: 0xff8fa3 });
-      for (const s of [-1, 1]) {
-        const bl = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 5), blushMat);
-        bl.position.set(s * 0.088, -0.022, 0.126);
-        bl.scale.set(1.1, 0.7, 0.4);
-        head.add(bl);
+      // 볼 두 점. 눈만으로는 행인 넷과 안 갈린다. 둘을 한 지오메트리로 붙여 드로우콜은 하나다.
+      const blush = [];
+      for (const side of [-1, 1]) {
+        const bl = new THREE.SphereGeometry(0.045, 6, 5);
+        bl.scale(1.1, 0.7, 0.4);
+        bl.translate(side * 0.088, -0.022, 0.126);
+        blush.push(bl);
       }
-      parts.push(hair, skirt, spark);
-    } else if (i % 2 === 1) {
-      // 학생. 등에 가방 한 덩어리. 실루엣이 뒤로 불룩해져 머리 없이도 구분된다.
-      const bag = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.2), flat(0x2f4f43));
-      bag.position.set(0, 0.92 * tall, -0.24);
-      parts.push(bag);
-    } else {
-      // 아저씨. 챙 달린 모자. 챙을 안 달면 머리에 그릇을 엎은 것으로 보인다.
-      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.09, 8), flat(0x8d3f3f));
-      cap.position.y = 1.47 * tall;
-      const brim = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 0.18), flat(0x8d3f3f));
-      brim.position.set(0, 1.44 * tall, 0.16);
-      parts.push(cap, brim);
+      head.add(new THREE.Mesh(mergeGeos(blush), new THREE.MeshBasicMaterial({ color: 0xff8fa3 })));
+      // 눈에 띄는 사람은 화면에서도 눈에 띄어야 한다. 머리 위 반짝임 하나가 시선을 잡는다.
+      // 연출이 이것을 돌리고 키우므로 병합하지 않고 메시로 남긴다.
+      const spark = new THREE.Mesh(new THREE.OctahedronGeometry(0.11, 0), new THREE.MeshBasicMaterial({ color: 0xffe98a }));
+      spark.position.y = 1.88 * tall - drop + P.bob;
+      g.userData.spark = spark;
+      meshes.push(head, spark);
     }
-    for (const [pi, m] of parts.entries()) { jitterMesh(m, 0.02, 70 + i * 5 + pi); m.userData.probeIgnore = true; }
+    for (const [pi, m] of meshes.entries()) { jitterMesh(m, 0.02, 70 + i * 5 + pi); m.userData.probeIgnore = true; }
     addOutline(body, 0.03);
-    g.add(...parts);
+    g.add(...meshes);
     // 9.5씩 끊어 놓으면 다섯이 같은 간격으로 지나간다. 행렬이지 행인이 아니다.
-    // 시작 위치를 흩고 걸음 위상을 따로 준다. 같은 순간에 같은 쪽으로 기우는 것이 가장 티가 났다.
     // 깊이까지 흩어야 원근이 크기를 갈라 준다. 한 줄에 세우면 키만 다른 같은 인형이다.
     // 0번은 한눈팔기 연출에서 골대 앞까지 걸어오므로 거리 밴드를 그대로 둔다.
     const z = i === 0 ? 31.6 + rnd() * 1.8 : 26.8 + rnd() * 12.4;
-    // 9.5씩 밀면 여섯 번째부터 화면 오른쪽 되돌림 지점(42) 밖에서 태어난다.
-    // 걷는 구간 [-42, 42]로 감아 넣는다. 다섯까지는 감기지 않아 좌표가 그대로다.
+    // 9.5씩 밀면 여섯 번째부터 화면 오른쪽 되돌림 지점(42) 밖에서 태어난다. [-42, 42]로 감는다.
     const raw = -25 + i * 9.5 + (rnd() - 0.5) * 9.8;
     g.position.set(((raw + 42) % 84 + 84) % 84 - 42, 0, z);
-    g.userData.speed = 1.15 + rnd() * 1.3;
+    // 걷는 속도는 보폭에서 나온다. 노인이 학생을 따라 걸으면 보폭 표가 화면에 없는 것이 된다.
+    // scene.mjs가 이 값으로 걸음과 대기 흔들림 주기를 같이 돌린다.
+    g.userData.speed = 1.05 + P.stride * 0.95;
     g.userData.phase = rnd() * Math.PI * 2;
     g.userData.homeZ = g.position.z;
+    // 계기가 어느 몸인지 되물을 수 있어야 한다. 실루엣이 갈렸다는 주장은 임자를 알아야 재진다.
+    g.userData.persona = kind;
     scene.add(g);
     passers.push(g);
   }

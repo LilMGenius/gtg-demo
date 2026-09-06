@@ -429,3 +429,154 @@ export function windowTexFor(variant, w, h, salt = 0) {
   t.repeat.set(Math.max(1, Math.round(w / BAY_M)), Math.max(1, Math.round(h / FLOOR_M)));
   return t;
 }
+
+/* 팔뚝 문신. 옛 방식은 팔에 고리 하나를 끼우는 것이라, 등급이 바꾸는 것이 고리의 굵기와 색뿐이었다.
+   스티커와 이름 석 자와 먹토시가 화면에서 굵기만 다른 같은 고리였다. 무늬는 살갗에 있어야 한다.
+   캡슐 UV에 굽는다. u가 팔 둘레이고 v가 팔 길이이며, 캡슐을 위로 당겨 놓았으므로 v 0이 팔꿈치
+   쪽이고 v 1이 어깨 쪽이다. three가 텍스처를 세로로 뒤집어 물리므로 캔버스 y는 (1 - v) * H다.
+   소매 색까지 여기 칠하는 이유는, 재질 색이 맵과 곱해지기 때문이다. 키퍼 소매는 0x073239라
+   그 위에 무늬를 얹으면 어떤 색을 써도 검은 팔 하나로 눌린다. 재질은 흰색으로 두고 바탕을 여기서 칠한다. */
+const INK_W = 128;
+const INK_H = 256;
+/* 잉크가 시작하는 자리. 팔꿈치 쪽 0.30 지점이고 span이 거기서 어깨로 자란다.
+   0.14였을 때는 낮은 등급의 띠가 상점 칸 밖에 있었다. 실측: 잉크 칸이 굽는 팔 확대에서
+   v 0.22 아래는 자기 색 화소가 0이고, 0.28에서 11, 0.34에서 1623이라 팔꿈치 쪽 3할이
+   그림에 안 들어온다. 겨냥은 계획이 그대로 두라고 했으므로 무늬가 보이는 자리로 올라간다.
+   선반의 span은 이 자리에서 어깨까지를 덮는 비율이라 값의 뜻은 안 바뀐다. */
+const INK_FOOT = 0.3;
+// 무늬는 팔 둘레를 세 번 돈다. 하나면 팔을 돌릴 때 무늬가 없는 면이 절반이고,
+// 여섯이면 원경에서 점무늬로 뭉친다. 셋이면 어느 각에서도 한 개 반이 보인다.
+const INK_COLS = 3;
+
+const rgb = (v) => 'rgb(' + ((v >> 16) & 255) + ',' + ((v >> 8) & 255) + ',' + (v & 255) + ')';
+const mix = (a, b, w) => 'rgb(' + Math.round(((a >> 16) & 255) * (1 - w) + ((b >> 16) & 255) * w)
+  + ',' + Math.round(((a >> 8) & 255) * (1 - w) + ((b >> 8) & 255) * w)
+  + ',' + Math.round((a & 255) * (1 - w) + (b & 255) * w) + ')';
+
+// 별. 스티커 문신은 별이 제일 흔하다. 다섯 꼭짓점을 안팎으로 번갈아 잇는다.
+function star(c, cx, cy, r) {
+  c.beginPath();
+  for (let i = 0; i < 10; i += 1) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rr = i % 2 ? r * 0.42 : r;
+    if (i) c.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+    else c.moveTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+  }
+  c.closePath();
+  c.fill();
+}
+
+// 번개. 먹토시 위에 밝은 색으로 그어야 검은 소매가 통짜 원통으로 안 읽힌다.
+function bolt(c, cx, cy, r) {
+  c.beginPath();
+  c.moveTo(cx + r * 0.2, cy - r);
+  c.lineTo(cx - r * 0.55, cy + r * 0.12);
+  c.lineTo(cx - r * 0.05, cy + r * 0.12);
+  c.lineTo(cx - r * 0.35, cy + r);
+  c.lineTo(cx + r * 0.6, cy - r * 0.2);
+  c.lineTo(cx + r * 0.08, cy - r * 0.2);
+  c.closePath();
+  c.fill();
+}
+
+// 글씨. 획으로 세운다. 캔버스 글꼴로 찍으면 기계마다 다른 글자가 나오고 폰트 게이트 밖의
+// 글꼴이 화면에 선다. 세로획 하나에 가로획 둘과 빗획 하나면 원경에서 새긴 글씨로 읽힌다.
+function glyph(c, cx, cy, r) {
+  const t = Math.max(1, r * 0.26);
+  c.fillRect(cx - r * 0.5, cy - r, t, r * 2);
+  c.fillRect(cx - r * 0.5, cy - r, r * 1.1, t);
+  c.fillRect(cx - r * 0.5, cy - t / 2, r * 0.9, t);
+  c.save();
+  c.translate(cx + r * 0.35, cy + r * 0.45);
+  c.rotate(-0.5);
+  c.fillRect(-t / 2, -r * 0.7, t, r * 1.4);
+  c.restore();
+}
+
+const MARK = [null, star, glyph, bolt];
+
+export function inkTex(base, tone, grade, span, girth) {
+  const gd = Math.max(0, Math.min(MARK.length - 1, Math.floor(Number(grade) || 0)));
+  const sp = Math.max(0.02, Math.min(1, Number(span) || 0.16));
+  const gr = Math.max(0.5, Math.min(2, Number(girth) || 1));
+  return memo('ink:' + base + ':' + tone + ':' + gd + ':' + sp.toFixed(3) + ':' + gr.toFixed(3), () => {
+    const cv = document.createElement('canvas');
+    cv.width = INK_W;
+    cv.height = INK_H;
+    const c = cv.getContext('2d');
+    c.fillStyle = rgb(base);
+    c.fillRect(0, 0, INK_W, INK_H);
+    const v1 = Math.min(1, INK_FOOT + sp);
+    const y1 = (1 - v1) * INK_H;
+    const y0 = (1 - INK_FOOT) * INK_H;
+    const r = rng(0x4b21e7 + gd * 7919 + (tone & 0xffff));
+    /* 0등급 칸도 팔에 자국이 남는 갈래를 판다(햇볕에 탄 자국, 붕대 감은 팔). 무늬만 안
+       새기고 띠는 깐다. 띠가 없으면 그 칸이 파는 셋이 화면에서 같은 맨팔 하나가 되고,
+       칸이 칠하는 화소가 0이 된다. 실측: 끝단 한 줄만 남겼을 때 잉크 칸 그림의 자기 색
+       화소가 0이었다. 0.42는 옅게 깔라는 뜻이다. 무늬 없는 등급이 1등급보다 진하면
+       값을 치른 쪽이 더 흐려 보인다. */
+    if (!MARK[gd]) {
+      c.fillStyle = mix(base, tone, 0.42);
+      c.fillRect(0, y1, INK_W, y0 - y1);
+      c.fillStyle = mix(base, tone, 0.85);
+      c.fillRect(0, y0 - 4, INK_W, 4);
+      return finish(cv);
+    }
+    // 먹토시는 소매를 통째로 덮는 잉크다. 무늬만 얹으면 3등급이 2등급의 큰 판본이 된다.
+    if (gd >= 3) {
+      c.fillStyle = mix(base, tone, 0.94);
+      c.fillRect(0, y1, INK_W, y0 - y1);
+    }
+    const band = y0 - y1;
+    /* 3등급은 어깨까지 채운 먹토시라 둘레를 셋만 돌면 무늬 사이가 벌어져, 검은 소매 위에
+       그림 몇 개가 뜬 것으로 읽힌다. 이 등급만 칸을 넷으로 늘려 무늬가 서로 닿게 한다. */
+    const cols = gd >= 3 ? 4 : INK_COLS;
+    // 무늬 한 개의 크기. 띠가 좁으면 띠 높이가, 넓으면 둘레 간격이 크기를 정한다.
+    const rad = Math.max(4, Math.min(band * 0.42, INK_W / (cols * 2.2))) * gr;
+    /* 줄 간격. 3등급만 2.6이 아니라 1.5다. 채운 소매는 줄과 줄이 겹쳐야 한 벌로 읽힌다.
+       실측: 번개 한 종류를 2.6 간격 네 줄로 놓았을 때 팔 화소 분산이 1421.9로, 고리 방식의
+       1472.9 아래였다. */
+    const rows = Math.max(1, Math.round(band / (rad * (gd >= 3 ? 1.5 : 2.6))));
+    const face = gd >= 3 ? mix(tone, 0xffffff, 0.62) : tone;
+    // 무늬는 팔 둘레에서 감긴다. 한 번만 그리면 텍스처 이음선에서 반 토막이 난다.
+    const wrap = (fn) => { fn(0); fn(-INK_W); fn(INK_W); };
+    for (let ry = 0; ry < rows; ry += 1) {
+      for (let cx = 0; cx < cols; cx += 1) {
+        const x = ((cx + 0.5) / cols) * INK_W + (ry % 2 ? INK_W / (cols * 2) : 0);
+        const y = y1 + ((ry + 0.5) / rows) * band;
+        /* 3등급은 별과 글씨와 번개를 줄과 칸마다 돌려 쓴다. 한 무늬만 반복하면 3등급이
+           2등급을 크게 늘인 판이라, 등급이 바꾸는 것이 다시 크기뿐이 된다. 먹토시는 여러
+           무늬를 채워 넣은 한 벌이고, 그래야 팔에 새긴 것이 화면에서 세어진다. */
+        const mk = gd >= 3 ? MARK[1 + ((ry + cx) % 3)] : MARK[gd];
+        /* 1등급은 붙이는 스티커다. 허연 필름이 밑에 깔려야 살갗과 밝기가 크게 갈린다.
+           고리 방식이 못 내던 것이 이 대비다. 실측: 고리의 잉크색(0x3a4f7a)은 휘도 78이고
+           소매(0x073239)는 41이라 차이가 37뿐이었다. 필름은 휘도 170대로 올라가 차이가 130이다. */
+        if (gd === 1) {
+          wrap((dx) => {
+            c.fillStyle = mix(base, 0xffffff, 0.72);
+            c.fillRect(x + dx - rad * 1.15, y - rad * 1.15, rad * 2.3, rad * 2.3);
+            c.fillStyle = mix(base, 0xffffff, 0.3);
+            c.fillRect(x + dx - rad * 1.15, y + rad * 0.72, rad * 2.3, rad * 0.43);
+          });
+        }
+        // 2등급은 새긴 글씨다. 밝은 획을 반 칸 밀어 깔고 그 위에 진한 획을 얹으면 파인 것으로 읽힌다.
+        if (gd === 2) wrap((dx) => { c.fillStyle = mix(base, 0xffffff, 0.52); MARK[gd](c, x + dx + rad * 0.18, y + rad * 0.18, rad); });
+        wrap((dx) => {
+          // 테두리 먼저. 문신은 선을 긋고 안을 채우므로 바깥 한 겹이 더 진하다.
+          c.fillStyle = mix(face, 0x000000, 0.45);
+          mk(c, x + dx, y, rad * 1.18);
+          c.fillStyle = rgb(face);
+          mk(c, x + dx, y, rad);
+        });
+      }
+    }
+    // 번짐. 땀에 번진 스티커도 오래된 먹도 가장자리가 깨끗하지 않다.
+    // 알갱이가 있어야 화소 분산이 고리 방식을 넘고, 없으면 색만 다른 판판한 도형이다.
+    for (let i = 0; i < 260; i += 1) {
+      const y = y1 + r() * band;
+      c.fillStyle = r() > 0.5 ? mix(face, 0x000000, 0.3) : mix(base, 0xffffff, 0.28);
+      c.fillRect(Math.floor(r() * INK_W), Math.floor(y), 1 + Math.floor(r() * 2), 1);
+    }
+    return finish(cv);
+  });
+}
