@@ -5,19 +5,6 @@ import { useAccount, hasLegacy, adoptLegacy } from '../state/save.mjs';
 
 export function mountTitle(onStart) {
   const title = document.getElementById('title');
-  const btn = document.getElementById('helpBtn');
-  const panel = document.getElementById('helpPanel');
-
-  const setOpen = (open) => {
-    btn.setAttribute('aria-expanded', String(open));
-    panel.hidden = !open;
-  };
-  btn.onclick = (e) => { e.stopPropagation(); setOpen(panel.hidden); };
-  document.addEventListener('pointerdown', (e) => {
-    if (!panel.hidden && !panel.contains(e.target) && !btn.contains(e.target)) setOpen(false);
-  });
-  addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
-
   const gate = document.getElementById('gate');
   const go = document.getElementById('go');
   const who = gate.querySelector('.who');

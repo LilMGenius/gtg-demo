@@ -9,7 +9,7 @@ import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dmLine, gazeAct } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord, readSquadKickers, useAccount, saveKey } from './state/save.mjs';
 import { currentId } from './state/account.mjs';
-import { coinGain, readWallet, COIN_DRILL, COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP } from './state/wallet.mjs';
+import { coinGain, readWallet, COIN_DRILL } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
@@ -20,6 +20,7 @@ import { passerName } from './state/passer.mjs';
 import { DATE_COST, MOVES, dateOdds, dateOutcome, applyDate, dateGate } from './state/date.mjs';
 import { applyPreset, ONBOARD_KEEPER, ONBOARD_KICKERS, ONBOARD_DONE } from './state/inject.mjs';
 import { thumbURL, startSpin, stopSpin } from './render/thumb.mjs';
+import { wikiHTML, wikiBody } from './ui/wiki.mjs';
 
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
@@ -749,7 +750,7 @@ function renderGym() {
 // 어떤 창도 안 열린다. 개봉판은 화면 전체를 덮어 사람의 클릭을 이미 막고 있으므로, 열리는 창은
 // 손잡이로만 열리는 창이고 그때 첫 진입 개봉이 조용히 걷힌다. 처음 오는 사람이 자기가 무엇을
 // 들고 시작하는지를 못 보고 지나가는 자리이고, 계기가 사람이 못 가는 상태를 재게 되는 자리다.
-const PANEL_SHUT = { gym: closeGym, roster: closeRoster, gram: closeGram, me: closeMe, date: closeDate, shop: closeShop, earn: closeEarn, pull: stopReveal };
+const PANEL_SHUT = { gym: closeGym, roster: closeRoster, gram: closeGram, me: closeMe, date: closeDate, shop: closeShop, wiki: closeWiki, pull: stopReveal };
 function shutOthers(keep) {
   if (keep !== 'pull' && !el('pull').hidden) return false;
   const spare = keep === 'date' ? ['me', 'date'] : [keep];
@@ -1073,33 +1074,29 @@ function openGram() {
   renderGram();
 }
 
-// 재화를 눌렀을 때 여는 창. 파는 곳이 아니라 버는 곳이다.
-// 값은 원장에서 그대로 읽는다. 여기에 숫자를 다시 적으면 원장이 바뀐 날 화면이 거짓말을 한다.
-function renderEarn() {
-  const box = el('earn');
-  const top = COIN_SAVE + COIN_FAME_STEP * 9;
-  /* 표 두 칸이다. 왼쪽은 버는 자리의 이름, 오른쪽은 값 하나. 값 옆에 한 줄짜리 설명을 달면
-     그 줄이 창에서 가장 긴 글자가 되어, 숫자를 읽으러 온 눈이 문장을 먼저 읽는다. */
-  const ways = [
-    [IC_SWEAT, '막으면', COIN_SAVE],
-    [IC_SWEAT, '최상급', top],
-    [IC_SWEAT, '먹혀도', COIN_CONCEDED],
-    [IC_SWEAT, '훈련 대신', COIN_DRILL],
-    [IC_SPON, '스폰', '결제']
-  ];
-  const rows = ways.map((w) => '<div class="way">' + w[0] + '<b>' + w[1] + '</b><i>' + w[2] + '</i></div>').join('');
-  box.innerHTML = '<h4>버는 법</h4><div class="ways">' + rows + '</div><button class="close">닫기</button>';
-  box.querySelector('.close').onclick = closeEarn;
+// 위키. 물음표 하나가 여는 카테고리 가이드다. 재화 칩이 열던 버는 법도 이 안의 한 칸이다.
+// 표의 수는 wiki.mjs가 상수에서 읽으므로 이 자리는 화면에 붙이는 일만 한다.
+let wikiAt = 'hand';
+function paintWiki() {
+  const box = el('wiki');
+  box.innerHTML = wikiHTML(wikiAt);
+  box.querySelector('.body').innerHTML = wikiBody(wikiAt,
+    { notices: SHOP_NOTICES_FOR_WIKI, shelves: SHELF_NOTES_FOR_WIKI, mishaps: MISHAP_SHELF });
+  for (const b of box.querySelectorAll('.cats [data-cat]')) b.onclick = () => { wikiAt = b.dataset.cat; paintWiki(); };
+  box.querySelector('.close').onclick = closeWiki;
 }
 
-function openEarn() {
-  if (!shutOthers('earn')) return;
-  el('earn').hidden = false;
-  renderEarn();
+function openWiki(cat) {
+  if (!shutOthers('wiki')) return;
+  if (cat) wikiAt = cat;
+  el('wiki').hidden = false;
+  el('wikiBtn').setAttribute('aria-expanded', 'true');
+  paintWiki();
 }
 
-function closeEarn() {
-  el('earn').hidden = true;
+function closeWiki() {
+  el('wiki').hidden = true;
+  el('wikiBtn').setAttribute('aria-expanded', 'false');
 }
 
 function closeGram() {
@@ -1482,6 +1479,13 @@ const AXIS_WORD = {
 };
 // 축마다 단위가 다르다. 확률은 %p, 시간은 ms, 사람은 명이다.
 const AXIS_UNIT = { delay: 'ms', passer: '명', crowd: '%', tear: '%p', spill: '%p', carry: '%p', landing: '%p', neteat: '%p' };
+
+/* 사고를 깎는 선반. 축 이름과 선반 이름을 코드에서 맞대므로 위키가 짝을 옮겨 적지 않는다.
+   오르는 축인 그물과 동네는 사고가 아니라 이득이라 빠지고, 남는 것은 다섯 줄이다. */
+const MISHAP_SHELF = Object.keys(SHELVES)
+  .map((k) => [SHELVES[k].field, SHELVES[k].head])
+  .filter((p) => GEAR_STEP[p[0]])
+  .flatMap((p) => GEAR_STEP[p[0]].filter((st) => !st.up).map((st) => [AXIS_WORD[st.axis], p[1]]));
 
 /* 효과 한 줄을 항목과 값으로 가른다. 표는 칸이 둘이라 표이고, 이어 붙인 한 줄은 문장이다.
    가르는 자리를 여기 하나로 두어야 선반 카드가 쓰는 한 줄과 효과 표가 같은 수를 말한다. */
@@ -2271,9 +2275,15 @@ el('shopBtn').onpointerdown = (e) => {
   e.stopPropagation();
   if (el('shop').hidden) openShop(); else closeShop();
 };
+el('wikiBtn').onpointerdown = (e) => {
+  e.stopPropagation();
+  if (el('wiki').hidden) openWiki(); else closeWiki();
+};
+// 닫는 길이 둘이다. 버튼 하나뿐이면 열린 판이 화면을 계속 가린다.
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el('wiki').hidden) closeWiki(); });
 el('purse').onpointerdown = (e) => {
   e.stopPropagation();
-  if (el('earn').hidden) openEarn(); else closeEarn();
+  if (el('wiki').hidden) openWiki('coin'); else closeWiki();
 };
 // 진단용. __pick은 화소 피킹이 이미 쓴다.
 window.__squad = () => ({ squad: state.squad.map((k) => k.name), pick: state.pick, coin: state.wallet.coin });
@@ -2291,7 +2301,9 @@ window.__me = (open) => { if (open) openMe(); else closeMe(); };
 // 만남은 내 정보 안의 버튼으로만 열린다. 게이트가 그 버튼까지 클릭해서 오게 하려면 좌표가 필요하다.
 window.__date = (city, passer) => { if (city === undefined) closeDate(); else openDate(city, passer); };
 window.__shop = (open) => { if (open) openShop(); else closeShop(); };
-window.__earn = (open) => { if (open) openEarn(); else closeEarn(); };
+// 재화 칩이 열던 버는 법은 위키의 재화 칸이 가져갔다. 훅 이름은 계기 아흔 곳이 읽으므로 그대로 둔다.
+window.__earn = (open) => { if (open) openWiki('coin'); else closeWiki(); };
+window.__wiki = (open, cat) => { if (open) openWiki(cat); else closeWiki(); };
 // 이용권 잔고. 완봉 보상과 뽑기 차감을 계기가 데이터에서 읽는다.
 window.__tickets = () => state.tickets;
 // 주전 열하나. 계기는 화면 글자가 아니라 장부를 읽어야 마크업이 바뀌어도 판정이 안 흔들린다.
