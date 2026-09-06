@@ -763,6 +763,7 @@ function openGym() {
 function closeGym() {
   el('gym').hidden = true;
 }
+
 /* 포지션 넷의 그림과 약어. 탭이 이름 글자로만 서면 넷이 같은 폭의 덩어리로 읽히고,
    좁은 폭에서는 세 글자 이름이 접힌다. 아이콘이 자리를 말하고 약어가 이름을 말한다.
    그림은 3px 격자 픽셀 SVG다. 상단 칩과 상점 탭이 이미 쓰는 관례라 손그림 톤이 안 갈린다. */
@@ -779,7 +780,6 @@ const POS_ICON = {
 };
 // 약어는 축구가 쓰는 그것을 그대로 쓴다. 한 글자로 줄이면 넷이 안 갈리고, 세 글자는 탭 폭을 먹는다.
 const POS_ABBR = { gk: 'GK', '수비수': 'DF', '미드필더': 'MF', '공격수': 'FW' };
-
 
 // 선수단. 명단 전체를 걸어놓고 보유한 것만 뛸 수 있다.
 // 보유 판정은 이름으로 한다. 로스터 항목과 저장된 키퍼는 다른 객체이기 때문이다.
@@ -938,6 +938,9 @@ function openRoster() {
 
 function closeRoster() {
   el('roster').hidden = true;
+  /* 보던 포지션은 창과 함께 닫는다. 남겨 두면 다음에 연 사람이 공격수 칸을 먼저 보고
+     자기 키퍼를 찾으러 탭을 눌러야 한다. 내 정보의 meTab과 상점 선반이 이미 쓰는 규칙이다. */
+  squadTab = 'gk';
 }
 
 /* 계정 화면이 쓰는 아이콘 둘. 상단 잔고 아이콘 표와 같은 3px 격자에 그린다.
@@ -1111,6 +1114,7 @@ function hiddenBand(key, v) {
 // 내 정보. 오른쪽 기둥이 찼으므로 좌상단 레벨 칩이 진입이다.
 // 상대 전적. 만나본 키커만 올린다. 명단 77명을 다 깔면 읽을 것이 사라진다.
 // 먹힌 수를 먼저 세워 누구한테 약한지가 맨 위에 오게 한다.
+function recordRows() {
   /* 최근 열 판. 내가 선 판만 센다. 남이 찍어 올린 사진과 셀카는 판이 아니라 글이라,
      같이 세면 막지도 먹히지도 않은 줄이 전적에 섞인다. 최근이 위로 오게 뒤집는다. */
   const played = state.posts.filter((p) => !p.ph && !p.sf).slice(-10);
@@ -1118,15 +1122,14 @@ function hiddenBand(key, v) {
     ? '<div class="log">' + played.map((p) => '<span>' + p.n
       + '<b class="' + (p.c ? 'gone' : 'save') + '"></b></span>').reverse().join('') + '</div>'
     : '<div class="note dim"><span></span></div>';
-function recordRows() {
   const names = Object.keys(state.record);
   names.sort((a, b) => {
     const x = state.record[a];
     const y = state.record[b];
     return (y.conceded - x.conceded) || (y.saved + y.conceded - x.saved - x.conceded) || a.localeCompare(b);
+  });
   /* 상대 전적은 표다. 줄로 깔면 이름 길이에 따라 수가 줄마다 다른 자리에 서서, 어느 칸이
      막은 수인지를 줄마다 다시 읽어야 한다. 얼굴이 첫 칸이라 누구한테 약한지가 글자 앞에 온다. */
-  });
   const rows = names.map((n) => {
     const r = state.record[n];
     const k = kickerByName(n);
@@ -1159,11 +1162,11 @@ function recruit(entry) {
   return k;
 }
 
+// 아는 얼굴. 라포는 이미 판정과 팔로워에 붙는데 화면 어디에도 없어서 플레이어가 늘어난 줄을 몰랐다.
 /* 단계 바의 칸 수. 판정이 가진 문턱 수를 되물어 만든다. 여기 3을 적으면 문턱이 늘어난 날
    바가 조용히 짧아지고, 화면은 다 찼다고 말하는데 판정은 아직 한 칸 남았다고 센다. */
 const TIER_TOP = rapportTier({ '0:0': 999 }, 0, 0);
 
-// 아는 얼굴. 라포는 이미 판정과 팔로워에 붙는데 화면 어디에도 없어서 플레이어가 늘어난 줄을 몰랐다.
 function rapportRows() {
   const keys = Object.keys(state.rapport || {});
   const head = '<div class="note"><b>아는 얼굴</b><i>라포</i></div>';
@@ -1188,9 +1191,9 @@ function rapportRows() {
        지금 어디까지 왔는지가 수를 읽기 전에 보인다. 생김새는 저장에 없으므로 실루엣이다. */
     return '<div class="note met"><span class="ava anon">' + IC_FANS + '</span>'
       + '<b>' + cityAt(city).name + '에서 마주친 ' + who + '</b><i>말 섞은 횟수 ' + n
+      + '. ' + face + '. 한눈팔기 ' + aid + '% 감소, 팔로워 +' + fans + '%</i>'
       + '<span class="bar">' + Array.from({ length: TIER_TOP }, (_, at) =>
         '<u' + (at < tier ? ' class="on"' : '') + '></u>').join('') + '</span>'
-      + '. ' + face + '. 한눈팔기 ' + aid + '% 감소, 팔로워 +' + fans + '%</i>'
       + '<button class="go' + (g.short > 0 ? ' bad-price' : '') + '" data-city="' + city + '" data-passer="' + passer + '"' + (g.open ? '' : ' disabled') + '>' + dateLabel(g) + '</button></div>';
   }).join('');
   return head + rows;

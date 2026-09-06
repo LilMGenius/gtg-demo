@@ -455,10 +455,14 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #roster[hidden]{display:none}
 #roster h4{font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
+  text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
 /* 포지션 탭 넷. 상점 선반 탭과 같은 판때기 문법이라 한 창에서 배운 조작이 다른 창에서 안 달라진다.
    지금 열린 자리는 aria-selected가 소유하고 색이 그것을 따라간다. 색이 소유하면 상태가 화면에만 남는다. */
 #roster .kinds{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--gap-2)}
-#roster .kind{display:inline-flex;align-items:center;gap:var(--gap-1);padding:6px 14px 8px;
+/* 44px. 손가락 하나가 닿는 최소 높이이고, 이 파일이 초상화 버튼에서 이미 쓰는 바닥이다.
+   실측으로 740x360에서 이 탭이 39px이라 5px 모자랐다. */
+#roster .kind{display:inline-flex;align-items:center;justify-content:center;min-height:44px;
+  gap:var(--gap-1);padding:6px 14px 8px;
   border:var(--line) solid var(--edge);background:var(--panel);color:var(--dim);
   font-family:var(--body);font-size:var(--fs-body);font-weight:400;
   box-shadow:4px 4px 0 var(--edge), var(--bevel);transform:rotate(-.7deg)}
@@ -466,7 +470,6 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #roster .kind svg{width:16px;height:16px;flex:none}
 #roster .kind[aria-selected="true"]{background:#2b3a22;color:#ffd83d}
 #roster .kind:active{box-shadow:1px 1px 0 var(--edge)}
-  text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
 #roster .row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;
   width:min(94vw,940px);max-height:52vh;overflow-y:auto;padding:4px}
 #roster .row button{padding:9px 11px 11px;
@@ -486,10 +489,10 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
    em이 블록이면 상태가 또 한 줄을 먹어 다섯 칸 격자에서 카드가 그만큼 길어진다. */
 #roster .row button .nm{display:block}
 #roster .row button em{display:inline-block;font-style:normal;font-size:var(--fs-num);font-weight:700;
+  color:var(--good);margin-top:3px}
 #roster .row button .tag{font-style:normal;font-size:var(--fs-body);color:var(--dim);margin-left:var(--gap-2)}
 #roster .row button:disabled .tag{color:#f6efdc44}
 #roster .row button.here .tag{color:#ffd83d}
-  color:var(--good);margin-top:3px}
 /* 지금 뛰는 자리와 육수가 모자란 카드. 눌러도 아무 일이 없다는 것이 먼저 보여야 한다. */
 #roster .row button:disabled{color:#f6efdc5c;background:#141a12;cursor:default}
 #roster .row button:disabled em{color:#f6efdc44}
@@ -653,15 +656,15 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #gram .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 
+/* 내 정보. 오른쪽 기둥은 286px에서 찼고 다음 칸은 크로스바 325px를 넘는다. 그래서 좌상단 레벨 칩이 진입이다. */
 /* 세 단이 서면서 칸이 세로 360px짜리 가로 모바일보다 길어졌다. 넘치면 창이 스스로 굴러야
    첫 단이 화면 밖으로 안 밀린다. safe center는 짧을 때는 가운데, 길 때는 위쪽부터 세운다. */
-/* 내 정보. 오른쪽 기둥은 286px에서 찼고 다음 칸은 크로스바 325px를 넘는다. 그래서 좌상단 레벨 칩이 진입이다. */
 #me{position:absolute;inset:0;pointer-events:auto;
   display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:12px;
   overflow:auto;padding:var(--gap-2) 0;
+  background:#080b07c4}
 /* 세로 flex의 자식은 기본으로 줄어든다. 칸이 화면보다 길어지면 초상과 큰 수가 같이 눌린다. */
 #me > *{flex:none}
-  background:#080b07c4}
 #me[hidden]{display:none}
 /* 첫 단. 초상과 이름이 한 줄, 그 아래가 레벨과 체격과 컨디션이다. 초상을 제목 안에 두는 것은
    계정 머리가 이미 쓰는 규칙이라 두 창의 첫 줄이 같은 문법으로 선다. */
@@ -669,22 +672,22 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   justify-items:start;align-items:center;
   font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
+  text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
 #me h4 .pfp{grid-row:1 / span 2;grid-column:1;width:48px;height:48px;object-fit:cover;
   object-position:center top;image-rendering:pixelated;border:2px solid var(--edge);background:#141a12}
-  text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
 /* 창 이름 아래 붙는 수. 제목과 점으로 잇지 않고 줄을 나눈다. 세 창이 같은 규칙을 쓴다. */
 #me h4 small,#gym h4 small,#roster h4 small{display:block;font-size:var(--fs-title);color:var(--ink);
   -webkit-text-stroke:2px var(--edge);text-shadow:2px 3px 0 var(--edge);margin-top:4px}
 /* 값 셋을 가운뎃점으로 이으면 화면에서는 목록 기호로 읽혀 세 값이 한 항목처럼 붙는다.
-#me h4 small{grid-column:2}
    14px. 글자 13px보다 넓어야 사이가 기호 없이도 갈린다. */
+#me h4 small{grid-column:2}
 #me h4 small i{font-style:normal;margin-right:14px}
+#me h4 small i:last-child{margin-right:0}
 /* 컨디션. 상단 칩이 낸 그림을 그대로 옮겨 온 자리라 크기만 여기서 정한다. */
 #me h4 .cond{display:inline-flex;vertical-align:-3px;-webkit-text-stroke:0}
 #me h4 .cond svg{width:18px;height:18px}
 #me h4 .cond .up{color:var(--good)}
 #me h4 .cond .dn{color:var(--bad)}
-#me h4 small i:last-child{margin-right:0}
 /* 초상화와 걸친 것과 칸 셋은 늘 보인다. 긁어야 나오는 것은 칸의 내용뿐이라 스크롤을 안쪽으로 옮겼다.
    카드가 통째로 긁히면 지금 누구를 보고 있는지가 화면 밖으로 밀려난다. */
 #me .card{display:flex;flex-direction:column;gap:9px;
@@ -745,9 +748,9 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #me .wear .on{flex:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 12px;align-content:start}
 #me .wear .on h5{grid-column:1 / -1;margin:0;font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:var(--dim);letter-spacing:.02em;line-height:1.25}
+#me .wear .on h5:not(:first-child){margin-top:6px}
 /* 이름이 아주 긴 장비 하나가 그 줄만 두 줄로 만들면 첫 단의 높이가 걸친 것에 따라 흔들린다.
    한 줄로 못 박고 넘치는 꼬리는 말줄임으로 자른다. 전체 이름은 상점 칸이 소유한다. */
-#me .wear .on h5:not(:first-child){margin-top:6px}
 #me .wear .on i{font-style:normal;font-family:var(--body);font-size:var(--fs-body);font-weight:400;color:var(--ink);
   line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* 칸 이름과 걸친 것 이름이 한 줄에 선다. 이름을 위에 얹으면 여덟 줄이 열여섯 줄이 되어
@@ -757,7 +760,9 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 /* 칸 셋. 상점 선반 탭과 같은 그림 언어를 쓴다. 한 창에서 배운 조작이 다른 창에서 달라 보이면
    같은 화면 안에서 문법이 둘이 된다. 아이콘이 없어 좌우 여백만 상점보다 넓게 잡았다. */
 #me .tabs{display:flex;justify-content:center;gap:9px;margin:2px 0 1px}
-#me .tab{padding:7px 15px 9px;border:var(--line) solid var(--edge);
+/* 같은 44px 바닥. 실측으로 740x360에서 41px이었다. */
+#me .tab{display:inline-flex;align-items:center;justify-content:center;min-height:44px;
+  padding:7px 15px 9px;border:var(--line) solid var(--edge);
   background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);font-weight:400;
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(-.8deg)}
 #me .tab:nth-child(2n){transform:rotate(1deg)}
