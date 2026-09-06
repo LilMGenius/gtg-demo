@@ -22,11 +22,11 @@ export function passerCountAt(city) {
 export const PERSONAS = {
   // 미인. 굽 있는 신에 긴 머리라 제일 높고 좁다. 한눈팔기 연출이 지목하는 그 사람이다.
   beauty: { tall: 1.10, wide: 0.92, stride: 0.42, bob: 0.030, arm: 0.30, leg: 1 },
-  // 학생. 가방을 메고 다리가 짧다. 팔을 크게 젓고 제일 빨리 걷는다.
+  // 학생. 가방을 메고 다리가 짧다. 팔을 크게 흔들고 제일 빨리 걷는다.
   student: { tall: 0.94, wide: 1.02, stride: 0.82, bob: 0.075, arm: 0.52, leg: 0.78 },
   // 직장인. 무릎까지 오는 코트에 팔은 몸에 붙는다. 넷 중 제일 곧게 선다.
   worker: { tall: 1.06, wide: 1.00, stride: 0.58, bob: 0.040, arm: 0.24, leg: 1 },
-  // 노인. 등이 굽고 지팡이를 짚는다. 보폭이 제일 좁아 제일 느리다.
+  // 노인. 등이 굽고 막대를 짚는다. 보폭이 제일 좁아 제일 느리다.
   elder: { tall: 0.86, wide: 1.18, stride: 0.22, bob: 0.014, arm: 0.12, leg: 0.92 }
 };
 
