@@ -19,12 +19,12 @@ build/
 .env.*
 !.env.example
 
-# scratch. named *.local.* or *.local/ and deleted the moment its one use is over
-*.local.*
-*.local/
+# scratch. named *.local* and deleted the moment its one use is over
+*.local*
 
 # agent workflow state. plans, drafts, research journals and evidence live with the session, not the product
 .omo/
+.re0/
 
 # run results. regenerating these costs nothing
 sim/out/
