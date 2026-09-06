@@ -42,6 +42,10 @@ try {
      0은 자리가 비어 있는 것과 화면에서 안 갈린다. 두 이름을 심어 세 수가 전부 살아 있게 한다.
      판이 계속 돌면 그 사이에 장부가 또 움직이므로, 심기 전에 판을 멈춘다. */
   await p.evaluate(() => window.__freeze(true));
+  /* 판도 같이 세운다. 얼리기는 그림만 세우고 구는 계속 도는데, 한 세트가 끝나면 개봉 창이 열리고
+     그때부터 openMe가 shutOthers에서 조용히 되돌아간다. 그러면 이 자는 숨은 옛 화면을 읽는다.
+     실측으로 기계가 바쁜 랩에서 컨디션 축이 그 옛 화면을 읽고 빨개졌다. */
+  await p.evaluate(() => window.__lockRound());
   await p.evaluate((names) => {
     const r = window.__record();
     r[names[0]] = { saved: 7, conceded: 3 };
@@ -87,6 +91,8 @@ try {
       };
     })();
     return {
+      // 창이 정말 열려 있는가. 숨은 판은 옛 그림을 그대로 들고 있어, 안 물으면 지난 렌더가 답이 된다.
+      open: !document.getElementById("me").hidden,
       tabs,
       current: [...box.querySelectorAll('.tab[aria-current="true"]')].map((e) => e.dataset.tab),
       /* 자식 선택자다. span 하나로 세면 칸 안의 이름 span까지 같이 세어 열다섯이 서른으로 찍힌다.
@@ -112,7 +118,10 @@ try {
               && r.left >= q.left - 1 && r.right <= q.right + 1 };
         })(),
         text: box.querySelector("h4") ? box.querySelector("h4").textContent.trim() : "",
-        cond: box.querySelectorAll("h4 .cond svg").length
+        cond: box.querySelectorAll("h4 .cond svg").length,
+        // 칸이 든 것과 칩이 든 것. 둘을 같이 들고 나와야 옮겨 온 것인지 따로 그린 것인지가 갈린다.
+        mark: (() => { const c = box.querySelector("h4 .cond"); return c ? c.innerHTML : ""; })(),
+        chip: (() => { const f = document.getElementById("form"); return f ? f.innerHTML : ""; })()
       },
       // 둘째 단. 큰 수 셋이다.
       big: [...box.querySelectorAll(".big > span")].map((e) => {
@@ -165,8 +174,9 @@ try {
     seen[id] = await read();
   }
 
-  check("instrument:the-three-panes-were-found", TABS.every((id) => seen[id].tabs.join(",") === TABS.join(",")),
-    seen.stat.tabs.join(", ") || "no tabs");
+  check("instrument:the-three-panes-were-found",
+    TABS.every((id) => seen[id].open && seen[id].tabs.join(",") === TABS.join(",")),
+    seen.stat.tabs.join(", ") + " with the panel open " + TABS.map((id) => seen[id].open).join("/"));
   check("mepane:one-pane-stands-at-a-time", TABS.every((id) => seen[id].current.length === 1 && seen[id].current[0] === id),
     TABS.map((id) => id + " -> " + seen[id].current.join("/")).join(", "));
   check("mepane:the-stat-pane-holds-the-growth-slots", seen.stat.stats > 0 && seen.face.stats === 0 && seen.log.stats === 0,
@@ -230,15 +240,27 @@ try {
   /* 컨디션. 상단 칩이 그 값의 유일한 소유자라 여기서는 칩이 낸 판정을 그대로 옮긴다.
      기복은 판당 한 번 굴러서 기다릴 수 없으므로 값을 넣어 두 상태를 다 본다.
      대조군이 없으면 늘 서 있는 아이콘 하나로도 이 축이 통과한다. */
+  /* 다시 그리는 길은 탭 누르기다. 닫았다 여는 길은 다른 창이 열려 있으면 되돌아가고,
+     그때 판은 숨은 채 옛 그림을 들고 있어 이 축이 지난 렌더를 읽는다. */
   const condAt = async (v) => {
-    await p.evaluate((x) => { window.__form(x); window.__me(false); window.__me(true); }, v);
-    await p.waitForTimeout(300);
-    return (await read()).head.cond;
+    await p.evaluate((x) => { window.__form(x); }, v);
+    await p.click('#me .tab[data-tab="face"]', { force: true });
+    await p.waitForTimeout(200);
+    await p.click('#me .tab[data-tab="stat"]', { force: true });
+    await p.waitForTimeout(240);
+    const got = await read();
+    return { cond: got.head.cond, mark: got.head.mark, chip: got.head.chip, open: got.open };
   };
-  const condUp = await condAt(1);
-  const condFlat = await condAt(0);
-  check("mepane:the-condition-follows-the-chip", condUp === 1 && condFlat === 0,
-    "form 1 -> " + condUp + " icon, form 0 -> " + condFlat + " icon");
+  /* 칩이 세 갈래를 다 그리게 된 뒤로 '아이콘 없음'은 상태가 아니다. 그래서 묻는 것은 둘이다.
+     칸이 든 그림이 칩이 든 그것과 같은가, 그리고 세 갈래가 서로 다른 그림인가.
+     앞이 소유 관계를 재고 뒤가 대조군이다. 하나만 재면 늘 같은 아이콘 하나로도 통과한다. */
+  const shots = [];
+  for (const v of [1, 0, -1]) shots.push(await condAt(v));
+  const copied = shots.every((r) => r.open && r.cond === 1 && r.mark === r.chip);
+  const apart = new Set(shots.map((r) => r.mark)).size === 3;
+  check("mepane:the-condition-follows-the-chip", copied && apart,
+    "form 1/0/-1 -> " + shots.map((r) => r.cond).join("/") + " icon, copied from the chip "
+    + copied + ", three states apart " + apart);
 
   // 아는 얼굴. 줄이 아니라 카드다. 실루엣과 단계 바와 만남 버튼이 한 장에 같이 선다.
   await p.evaluate(() => { window.__form(0.5); window.__me(false); window.__me(true); });
