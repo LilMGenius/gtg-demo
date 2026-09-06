@@ -6,7 +6,7 @@ import { chromium } from "playwright";
 // 그래서 둘을 같이 잰다. 본문에 수치가 없다와 칸이 카드마다 다른 것을 말한다.
 //
 // 다름을 재는 축에는 같음을 재는 대조군이 붙는다. 같은 카드에 두 번 손을 올리면 같은 문장이 와야
-// 하고, 손을 떼면 안내로 돌아가야 한다. 그 둘이 없으면 달라진 문장이 카드 때문인지 잡음인지 모른다.
+// 하고, 손을 떼면 칸이 다시 비어야 한다. 그 둘이 없으면 달라진 문장이 카드 때문인지 잡음인지 모른다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const LINE = String.fromCharCode(10);
@@ -33,7 +33,8 @@ try {
 
   const spec = () => p.evaluate(() => {
     const e = document.querySelector("#shop .fitting .spec");
-    return e ? { text: e.innerText.trim(), at: e.dataset.at || "", rows: e.querySelectorAll("i").length, seen: e.getClientRects().length > 0 } : null;
+    return e ? { text: e.innerText.trim(), at: e.dataset.at || "", rows: e.querySelectorAll("i").length,
+      seen: e.getClientRects().length > 0, h: Math.round(e.getBoundingClientRect().height) } : null;
   });
 
   // 탭 줄의 세로 위치. 카드에 손을 올렸다고 이것이 움직이면 손이 다른 곳을 누른다.
@@ -41,10 +42,16 @@ try {
     const e = document.querySelector("#shop .tabs");
     return e ? Math.round(e.getBoundingClientRect().top) : -1;
   });
-  const tops = [], clipped = [];
+  const shelfTops = [], allTops = [], clipped = [];
   const idle = await spec();
   check("instrument:the-panel-exists-and-is-on-screen", Boolean(idle && idle.seen), idle ? "visible" : "missing");
-  check("spec:the-panel-starts-as-an-invitation", Boolean(idle) && idle.at === "" && idle.rows === 1, idle ? JSON.stringify(idle.text) : "missing");
+  /* 손을 올리라는 안내 문장은 지워졌고 빈 칸이 그 자리를 대신한다. 그래서 묻는 것이 둘로 갈린다.
+     어느 카드에도 안 묶여 있는가, 그리고 비어 있어도 칸이 제 높이를 들고 있는가.
+     칸이 접히면 왼쪽 기둥이 짧아지고 그만큼 탭 줄이 뛴다. 빈 칸과 없는 칸은 다르다. */
+  const IDLE_BOX = 120; // hud.css가 이 칸에 준 flex 기준 높이. 빈 상태로 잰 값은 선반별 120/128/154px이었다
+  check("spec:the-panel-starts-empty-and-holds-its-box",
+    Boolean(idle) && idle.at === "" && idle.rows === 0 && idle.h >= IDLE_BOX,
+    idle ? JSON.stringify(idle.text) + " box " + idle.h + "px" : "missing");
 
   // 효과를 갖는 선반 넷을 돈다. 판정에 들어가는 것, 외형만 바꾸는 것, 소모형 둘을 섞는다.
   const tabs = ["glove", "hair", "bot", "buff"];
@@ -57,6 +64,10 @@ try {
     await p.waitForSelector(sel, { timeout: 8000 }).catch(() => {});
     const cards = await p.evaluate((q) => document.querySelectorAll(q).length, sel);
     if (cards === 0) { empty.push(tab); continue; }
+    // 이 선반의 빈 칸 자리부터 잰다. 채우기 전과 후가 한 통에 있어야 채움이 민 거리가 나온다.
+    await p.mouse.move(4, 4);
+    await p.waitForTimeout(140);
+    const mine = [await tabTop()];
     for (let i = 0; i < cards; i += 1) {
       const card = p.locator(sel).nth(i);
       await card.hover();
@@ -64,7 +75,7 @@ try {
       const s = await spec();
       if (!s || s.rows === 0 || s.at === "") { stuck.push(tab + "#" + i); continue; }
       seen.push(tab + "#" + i + " " + s.text.replace(/\n/g, " / "));
-      tops.push(await tabTop());
+      mine.push(await tabTop());
       // 칸이 잘리면 마지막 줄이 반만 남는다. 그 줄은 화면에 있지만 읽을 수 없다.
       // scrollHeight로 재면 padding-bottom이 초과분으로 잡혀 잘리지 않은 칸도 빨개진다.
       // 마지막 줄의 아래끝이 칸의 안쪽 아래끝을 넘는지 직접 잰다.
@@ -87,6 +98,8 @@ try {
       }, s.text.split("\n"));
       if (echoed) wall.push(tab + "#" + i);
     }
+    shelfTops.push({ tab: tab, travel: Math.max.apply(null, mine) - Math.min.apply(null, mine), n: mine.length });
+    allTops.push.apply(allTops, mine);
   }
   check("instrument:every-shelf-had-cards", empty.length === 0, empty.join(", ") || tabs.length + " shelves, " + seen.length + " cards");
   check("spec:every-card-fills-the-panel", stuck.length === 0, stuck.join(", ") || seen.length + " cards filled it");
@@ -94,9 +107,19 @@ try {
   const uniq = new Set(seen.map((s) => s.slice(s.indexOf(" ") + 1)));
   check("spec:the-panel-says-something-different-per-card", uniq.size === seen.length, uniq.size + " distinct of " + seen.length);
   check("spec:the-panel-does-not-repeat-the-card-body", wall.length === 0, wall.join(", ") || "no card had its own line read back to it");
-  // 문장 길이에 따라 기둥이 자라면 상점 상자가 통째로 뛰고, 그 순간 눌린 탭은 원하던 탭이 아니다.
-  const spread = tops.length ? Math.max.apply(null, tops) - Math.min.apply(null, tops) : -1;
-  check("spec:filling-the-panel-does-not-move-the-tabs", spread === 0, spread + "px of travel over " + tops.length + " cards");
+  /* 문장 길이에 따라 기둥이 자라면 상점 상자가 통째로 뛰고, 그 순간 눌린 탭은 원하던 탭이 아니다.
+     옛 축은 네 선반의 표본을 한 통에 넣고 최대-최소를 쟀다. 선반마다 진열 높이가 달라
+     (goods 460/434/334/360px) 상자가 매번 다시 가운데로 서므로, 그 통에는 칸을 채운 이동과
+     선반을 바꾼 이동이 섞인다. 이 축이 묻는 것은 앞쪽 하나다. 그래서 선반 안에서만 재고,
+     선반 사이 이동은 판정에서 빼되 수로 남긴다. 빈 칸 자리를 표본에 넣었으므로 문턱은 그대로 0px이고,
+     표본이 하나뿐인 선반은 0px이 공짜로 나오므로 같이 막는다. */
+  const worst = shelfTops.reduce((a, s) => (s.travel > a.travel ? s : a), { tab: "none", travel: -1, n: 0 });
+  const thin = shelfTops.filter((s) => s.n < 2).map((s) => s.tab);
+  const across = allTops.length ? Math.max.apply(null, allTops) - Math.min.apply(null, allTops) : -1;
+  check("spec:filling-the-panel-does-not-move-the-tabs",
+    worst.travel === 0 && thin.length === 0 && shelfTops.length === tabs.length,
+    (thin.length ? "thin shelf " + thin.join(", ") + ", " : "") + worst.travel + "px inside a shelf (worst "
+    + worst.tab + ", " + shelfTops.length + " shelves), " + across + "px across the shelf switches");
   check("spec:no-line-is-cut-off-inside-the-panel", clipped.length === 0, clipped.join(", ") || "every line fits");
 
   // 대조군 하나. 같은 카드에 두 번 손을 올리면 같은 문장이어야 한다.
@@ -113,11 +136,14 @@ try {
   const a2 = await spec();
   check("control:the-same-card-says-the-same-thing", a1.text === a2.text && a1.text.length > 0, JSON.stringify(a1.text.slice(0, 40)));
 
-  // 대조군 둘. 손을 떼면 안내로 돌아간다.
+  /* 대조군 둘. 손을 떼면 카드에 묶인 상태가 풀리고 칸이 빈다. 빈 문자열 둘을 맞대면
+     칸이 죽어 있어도 통과하므로, 직전에 차 있었다는 것과 칸이 남아 있다는 것을 같이 본다. */
   await p.mouse.move(4, 4);
   await p.waitForTimeout(160);
   const off = await spec();
-  check("control:leaving-the-card-returns-the-invitation", off.at === "" && off.text === idle.text, JSON.stringify(off.text));
+  check("control:leaving-the-card-empties-the-panel",
+    a2.rows > 0 && off.at === "" && off.rows === 0 && off.text === "" && off.h >= IDLE_BOX,
+    "filled " + a2.rows + " rows -> " + JSON.stringify(off.text) + " box " + off.h + "px");
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
