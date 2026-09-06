@@ -908,73 +908,101 @@ function closeRoster() {
   el('roster').hidden = true;
 }
 
-// 아웃문그램. 구가 끝날 때마다 쌓인 글을 최신 순으로 건다.
+/* 계정 화면이 쓰는 아이콘 둘. 상단 잔고 아이콘 표와 같은 3px 격자에 그린다.
+   맞팔. 화살표 둘이 서로 반대로 서면 한쪽만 건 선팔과 그림이 갈린다. 24 격자에서 막대 둘을 9칸 띄운다. */
+const IC_MUTUAL = G('맞팔', R(3, 6, 15, 3) + R(18, 6, 3, 3) + R(15, 3, 3, 3) + R(15, 9, 3, 3)
+  + R(6, 15, 15, 3) + R(3, 15, 3, 3) + R(6, 12, 3, 3) + R(6, 18, 3, 3));
+// 댓글. 말풍선 하나. 18x9 몸통에 꼬리 두 칸이면 13px에서도 하트(좋아요)와 실루엣이 안 겹친다.
+const IC_CMT = G('댓글', R(3, 3, 18, 3) + R(3, 6, 18, 3) + R(3, 9, 18, 3)
+  + R(6, 12, 9, 3) + R(6, 15, 3, 3));
+
+// 아웃문그램. 계정 머리 아래로 글이 카드로 쌓인다. 최신 순이다.
 function renderGram() {
   const box = el('gram');
-  /* 열려 있는 쪽지. 맞팔인 사람만 이 자리에 선다. 선팔은 내가 건 것이고 맞팔은 상대도 걸어 준 것이라,
-     대화가 시작되는 자리는 뒤엣것이다. 미연시를 따로 열 필요가 없는 이유가 여기 있다. */
-  if (dmOpen) return renderDm();
-  /* 남이 올린 글. 그림은 저장에 안 들어 있고 그때의 차림만 남아 있어, 열 때마다 그 차림으로 다시 굽는다.
-     한 장이 47KB라 열두 장을 저장에 실으면 한도를 위협하고, 굽는 비용은 상점이 이미 스물넉 장으로 치른다. */
-  /* 내가 올린 셀카. 주어가 둘이라 상대 이름이 사진 위에 서고, 팔로워는 그 자리에서 이미 올랐다.
-     사진은 남이 찍은 것과 같은 방식으로 그때의 차림에서 다시 굽는다. */
-  const selfieCard = (p) => '<div class="post shot mine">'
-    + '<div class="by"><b>' + p.n + '</b><span>님과 함께</span></div>'
-    + '<img alt="' + p.n + '과 찍은 사진" src="' + thumbURL('body', { height: p.sf.h, weight: p.sf.w }, p.sf.look) + '">'
-    + '<span>' + p.t + '</span>'
-    + '<i>' + IC_FANS + ' +' + p.g + IC_LIKE + p.l + '</i></div>';
-  const photoCard = (p) => {
-    const key = whoKey(p.ph.city, p.ph.passer);
+  /* 계정 머리. 초상과 계정명과 숫자 두 칸이다. 계정을 여는 첫 신호는 이름이 아니라 얼굴이라
+     48px 판때기가 먼저 서고(명단 한 줄의 얼굴은 38px이다. 여기는 계정 주인의 자리라 더 크다),
+     맞팔 수가 팔로워 증가에 곱해지므로 그 배율은 맞팔 칸의 배지로 붙는다. 배율을 설명하는 문장은
+     그 칸의 툴팁이 갖는다. 머리에 서는 것은 숫자고, 문장은 손을 얹은 사람에게만 온다. */
+  const myFace = thumbURL('face', state.keeper, lookOf(state.gear, state.keeper.name));
+  const mut = mutualCount(state.social);
+  const boost = Math.round((mutualBoost(state.social) - 1) * 100);
+  const tip = '맞팔 ' + mut + '명이면 팔로워가 ' + boost + '% 더 붙는다';
+  const head = '<img class="pfp" alt="' + state.keeper.name + '" src="' + myFace + '">'
+    + '<span class="who">' + state.keeper.name + '</span>'
+    + '<small><span class="stat">' + IC_FANS + '<em>' + state.fans.toLocaleString() + '</em></span>'
+    + '<span class="stat" title="' + tip + '" aria-label="' + tip + '">' + IC_MUTUAL
+    + '<em>' + mut + '</em><i>+' + boost + '%</i></span></small>';
+  /* 작성자 초상. img가 아니라 판때기 배경으로 깐다. img로 세우면 사진 글의 첫 그림이 초상이 되고,
+     사진을 화소로 재는 자들이 얼굴을 그 글의 사진으로 읽는다. 행인은 생김새가 저장에 없어 실루엣이다. */
+  const plate = (face) => (face
+    ? '<span class="ava" style="background-image:url(' + face + ')"></span>'
+    : '<span class="ava anon">' + IC_FANS + '</span>');
+  // 선팔 버튼. 카드 우측 상단의 작은 판때기다. 관계가 바뀌는 자리라 지금 상태가 글자로 서 있다.
+  const folBtn = (city, passer, tier) => {
+    const key = whoKey(city, passer);
     const label = isMutual(state.social, key) ? '맞팔' : (isFollowing(state.social, key) ? '팔로우 중' : '선팔');
     const off = isFollowing(state.social, key) ? ' disabled' : '';
-    return '<div class="post shot' + (p.c ? ' bad' : '') + '">'
-      + '<div class="by"><b>' + p.n + '</b><span>님이 회원님을 태그했습니다</span>'
-      + '<button class="fol" data-key="' + key + '" data-tier="' + p.ph.tier + '"' + off + '>' + label + '</button></div>'
-      + '<img alt="' + p.n + '이 찍은 사진" src="' + thumbURL('body', { height: p.ph.h, weight: p.ph.w }, p.ph.look) + '">'
-      + '<span>' + p.t + '</span>'
-      + '<i>' + IC_LIKE + p.l + '</i></div>';
+    return '<button class="fol" data-key="' + key + '" data-tier="' + tier + '"' + off + '>' + label + '</button>';
   };
-  /* 글 한 장이 들고 있는 것 셋. 문장과 좋아요와 댓글이다. 문장 안에 이미 상대 이름이 박혀 있어
-     앞에 한 번 더 걸면 같은 이름이 두 번 읽힌다. 옛 저장의 글에는 좋아요와 댓글 칸이 없고,
-     그때는 그 자리를 비운다. 없는 것을 0으로 그리면 아무도 안 본 글로 읽힌다. */
-  const cmtRow = (p) => {
-    if (!p.cm) return '';
-    const key = whoKey(p.cm.city, p.cm.passer);
-    const state3 = isMutual(state.social, key) ? '맞팔' : (isFollowing(state.social, key) ? '팔로우 중' : '선팔');
-    const off = isFollowing(state.social, key) ? ' disabled' : '';
-    return '<div class="cmt"><b>' + p.cm.who + '</b><span>' + p.cm.text + '</span>'
-      + '<button class="fol" data-key="' + key + '" data-tier="' + p.cm.tier + '"' + off + '>' + state3 + '</button></div>';
+  /* 반응 줄. 아이콘이 먼저 서고 수가 따라온다. 옛 저장의 글에는 좋아요 칸이 아예 없고 그때는 그 자리를
+     비운다. 없는 것을 0으로 그리면 아무도 안 본 글로 읽힌다. 팔로워는 오른 글에만 붙는다. */
+  const react = (p) => {
+    const seen = p.l ? '<i class="like">' + IC_LIKE + '<em>' + p.l + '</em></i>'
+      + '<i class="talk">' + IC_CMT + '<em>' + (p.cm ? 1 : 0) + '</em></i>' : '';
+    const fans = p.g > 0 ? '<i class="fans">' + IC_FANS + '<em>+' + p.g + '</em></i>' : '';
+    return seen || fans ? '<div class="react">' + seen + fans + '</div>' : '';
   };
+  /* 굵게 서는 이름은 남의 이름이다. 내 계정에서 내 이름은 담담하게 서고, 내가 올린 글에서 굵은 것은
+     그 판의 키커다. 앞에 내 이름을 굵게 세우면 그 글이 부르는 이름이 바뀐다. */
+  const mineBy = plate(myFace) + '<span class="nm">' + state.keeper.name + '</span>';
+  /* 내가 올린 셀카. 주어가 둘이라 상대 이름이 작성자 줄 끝에 서고, 팔로워는 그 자리에서 이미 올랐다.
+     사진은 저장에 안 들어 있고 그때의 차림만 남아 있어, 열 때마다 그 차림으로 다시 굽는다. */
+  const selfieCard = (p) => '<article class="post shot mine">'
+    + '<div class="by">' + mineBy + '<b class="tag">' + p.n + '</b></div>'
+    + '<img class="pic" alt="' + p.n + '과 찍은 사진" src="' + thumbURL('body', { height: p.sf.h, weight: p.sf.w }, p.sf.look) + '">'
+    + '<p class="txt">' + p.t + '</p>' + react(p) + '</article>';
+  /* 남이 올린 사진. 그림은 저장에 안 들어 있고 그때의 차림만 남아 있어 열 때마다 다시 굽는다.
+     한 장이 47KB라 열두 장을 저장에 실으면 한도를 위협하고, 굽는 비용은 상점이 이미 스물넉 장으로 치른다. */
+  const photoCard = (p) => '<article class="post shot' + (p.c ? ' bad' : '') + '">'
+    + '<div class="by">' + plate('') + '<b class="nm">' + p.n + '</b>'
+    + folBtn(p.ph.city, p.ph.passer, p.ph.tier) + '</div>'
+    + '<img class="pic" alt="' + p.n + '이 찍은 사진" src="' + thumbURL('body', { height: p.ph.h, weight: p.ph.w }, p.ph.look) + '">'
+    + '<p class="txt">' + p.t + '</p>' + react(p) + '</article>';
+  // 댓글. 카드 안에 있되 한 칸 들여써야 남이 쓴 줄로 읽힌다. 그 사람도 선팔이 걸리는 사람이다.
+  const cmtRow = (p) => (p.cm
+    ? '<div class="cmt"><b>' + p.cm.who + '</b><span>' + p.cm.text + '</span>'
+      + folBtn(p.cm.city, p.cm.passer, p.cm.tier) + '</div>'
+    : '');
+  const myCard = (p) => '<article class="post' + (p.c ? ' bad' : '') + '">'
+    + '<div class="by">' + mineBy + '</div>'
+    + '<p class="txt">' + p.t.replace(p.n, '<b>' + p.n + '</b>') + '</p>'
+    + react(p) + cmtRow(p) + '</article>';
   const feed = state.posts.length
-    ? state.posts.slice().reverse().map((p) => (p.ph ? photoCard(p) : (p.sf ? selfieCard(p) : '<div class="post' + (p.c ? ' bad' : '') + '">'
-      + '<span>' + p.t.replace(p.n, '<b>' + p.n + '</b>') + '</span>'
-      + '<i>' + IC_FANS + ' +' + p.g + (p.l ? IC_LIKE + p.l : '') + '</i>'
-      + cmtRow(p) + '</div>'))).join('')
-    : '<div class="post empty"><span>아직 올린 글이 없다. 한 슛 막고 오면 생긴다</span></div>';
-  // 계정 요약. 맞팔이 몇인지가 팔로워 증가에 곱해지므로 그 수가 화면에 있어야 한다.
-  const mut = mutualCount(state.social);
-  const head = 'Outmoongram<small>' + IC_FANS + ' ' + state.fans.toLocaleString()
-    + ' 맞팔 ' + mut + '명, 팔로워 ' + Math.round((mutualBoost(state.social) - 1) * 100) + '% 더 붙는다</small>';
-  /* 답장을 기다리는 사람. 맞팔이 된 뒤 세 판이 지나면 다시 이 줄에 선다.
-     계정을 여는 이유가 글을 보는 것 하나뿐이면 그 창은 읽고 닫는 창으로 굳는다. */
-  const clock = dmClock(state.record);
-  const waiting = dmWaiting(state.social, clock);
-  const inbox = waiting.length
-    ? '<div class="inbox">' + waiting.map((key) => {
+    ? state.posts.slice().reverse().map((p) => (p.ph ? photoCard(p) : (p.sf ? selfieCard(p) : myCard(p)))).join('')
+    : '<article class="post empty"><p class="txt">글 없음</p></article>';
+  /* 쪽지는 피드 아래에 접혀 있다가 이름을 누르면 그 자리에서 펴진다. 예전에는 창을 통째로 덮어서
+     계정을 연 사람이 제 글보다 남의 대화를 먼저 봤다. 대화는 계정의 일부지 계정의 첫 화면이 아니다.
+     맞팔이 된 뒤 세 판이 지나면 그 사람이 다시 이 줄에 선다. */
+  const keys = dmWaiting(state.social, dmClock(state.record));
+  // 답장을 보낸 사람은 대기 목록에서 빠진다. 펴 둔 대화가 그 자리에서 사라지지 않게 손잡이를 남긴다.
+  if (dmOpen && keys.indexOf(dmOpen) < 0) keys.unshift(dmOpen);
+  const dms = keys.length
+    ? '<section class="dms">' + keys.map((key) => {
       const part = key.split(':');
       const city = Number(part[0]);
       const passer = Number(part[1]);
       const tier = rapportTier(state.rapport, city, passer);
-      return '<button class="dmOpen" data-key="' + key + '">' + passerName(city, passer, tier) + '<em>새 쪽지</em></button>';
-    }).join('') + '</div>'
+      const on = key === dmOpen;
+      return '<button class="dmOpen' + (on ? ' on' : '') + '" data-key="' + key + '">' + IC_CMT
+        + '<span>' + passerName(city, passer, tier) + '</span>'
+        + (on ? '' : '<em>새 쪽지</em>') + '</button>'
+        + (on ? renderDm(city, passer, tier) : '');
+    }).join('') + '</section>'
     : '';
-  /* 계정 머리에 프로필 사진을 세운다. SNS 화면에서 계정을 여는 첫 신호는 이름이 아니라 얼굴이고,
-     그 자리가 비어 있으면 이 창이 누구의 계정인지가 글자로만 서 있다. */
-  const avatar = '<img class="pfp" alt="' + state.keeper.name + '" src="'
-    + thumbURL('face', state.keeper, lookOf(state.gear, state.keeper.name)) + '">';
-  box.innerHTML = '<h4>' + avatar + head + '</h4>' + inbox + '<div class="feed">' + feed + '</div><button class="close">닫기</button>';
+  box.innerHTML = '<h4>' + head + '</h4><div class="feed">' + feed + '</div>' + dms
+    + '<button class="close">닫기</button>';
   for (const b of box.querySelectorAll('.dmOpen')) {
-    b.onclick = () => { dmOpen = b.dataset.key; dmSaid = null; renderGram(); };
+    b.onclick = () => { dmOpen = dmOpen === b.dataset.key ? null : b.dataset.key; dmSaid = null; renderGram(); };
   }
   for (const b of box.querySelectorAll('.fol')) {
     b.onclick = () => {
@@ -984,7 +1012,17 @@ function renderGram() {
       renderGram();
     };
   }
-  box.querySelector('.close').onclick = closeGram;
+  if (dmOpen) {
+    const part = dmOpen.split(':');
+    const city = Number(part[0]);
+    const passer = Number(part[1]);
+    const tier = rapportTier(state.rapport, city, passer);
+    for (const b of box.querySelectorAll('[data-dm]')) b.onclick = () => sendDm(city, passer, tier, b.dataset.dm);
+    const fold = box.querySelector('.close.fold');
+    if (fold) fold.onclick = () => { dmOpen = null; dmSaid = null; renderGram(); };
+  }
+  // 접기 버튼도 .close라 첫 번째를 잡으면 창이 아니라 대화가 닫힌다. 창을 닫는 것은 뒤엣것이다.
+  box.querySelector('.close:not(.fold)').onclick = closeGram;
 }
 
 function openGram() {
@@ -1159,14 +1197,9 @@ function closeMe() {
 let dmOpen = null;
 let dmSaid = null;
 
-// 쪽지 한 통. 맞팔이라야 오고, 답장하면 다음 말은 세 판 뒤에 온다.
-function renderDm() {
-  const box = el('gram');
-  const part = dmOpen.split(':');
-  const city = Number(part[0]);
-  const passer = Number(part[1]);
-  const tier = rapportTier(state.rapport, city, passer);
-  const who = passerName(city, passer, tier);
+/* 쪽지 한 통. 맞팔이라야 오고, 답장하면 다음 말은 세 판 뒤에 온다.
+   피드 아래 접힌 자리에서 펴지므로 이 함수는 창을 갈아 끼우지 않고 그 자리에 들어갈 조각을 돌려준다. */
+function renderDm(city, passer, tier) {
   const said = dmSaid && dmSaid.key === dmOpen ? dmSaid : null;
   const body = said
     ? '<div class="line them">' + said.said + '</div><div class="line me">' + said.pick + '</div>'
@@ -1175,10 +1208,7 @@ function renderDm() {
     : '<div class="line them">' + dmSay(city, passer, tier) + '</div>'
       + '<div class="pick">' + DM_MOVES.map((m) => '<button data-dm="' + m.id + '">' + m.label
         + '<em>' + CAUSE_LABEL[m.stat] + ' ' + state.keeper[m.stat] + '로 성공 ' + dmOdds(state.keeper, m.id) + '%</em></button>').join('') + '</div>';
-  box.innerHTML = '<h4>' + who + '<small>쪽지</small></h4><div class="dm">' + body + '</div>'
-    + '<button class="close">계정으로</button>';
-  box.querySelector('.close').onclick = () => { dmOpen = null; dmSaid = null; renderGram(); };
-  for (const b of box.querySelectorAll('[data-dm]')) b.onclick = () => sendDm(city, passer, tier, b.dataset.dm);
+  return '<div class="dm">' + body + '</div><button class="close fold">접기</button>';
 }
 
 /* 먼저 온 말은 한 번 뽑아 그 대화가 열려 있는 동안 고정한다. 매 렌더마다 다시 뽑으면
