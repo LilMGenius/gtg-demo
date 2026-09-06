@@ -111,7 +111,12 @@ const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0x14100c, side: THREE.B
 // 씬 전체가 한 벌을 쓴다. 이 표시가 있어야 전경만 따로 칠하려는 쪽이 복제할 자리를 안다.
 OUTLINE_MAT.userData.shared = true;
 
-export function addOutline(mesh, width = 0.035) {
+// 펜 굵기 표. 굵기가 수치 하나로 정해지므로 부르는 자리마다 상수를 적으면 펜이 여러 자루가 된다.
+// 0.035가 손으로 그은 선이고, 기둥 0.02는 판정 경계라 굵히면 골 폭이 달라 보인다.
+// 공 0.012는 화면에서 지름 34화소짜리 물건이라 그보다 굵으면 흰 공이 검게 먹힌다.
+export const INK = { base: 0.035, post: 0.02, ball: 0.012 };
+
+export function addOutline(mesh, width = INK.base) {
   if (mesh.userData.outlined) return null;
   const g = mesh.geometry;
   if (!g.boundingBox) g.computeBoundingBox();

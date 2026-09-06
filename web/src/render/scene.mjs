@@ -10,11 +10,11 @@ import {
   R_HALF_W, R_H, SX, SY, MOUTH_X, lerp, ease
 } from './units.mjs';
 import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, pushPose, setPose } from './objects/actors.mjs';
-import { buildPitch, buildPassers } from './objects/pitch.mjs';
+import { buildPitch, buildPassers, BOX_Z } from './objects/pitch.mjs';
 import { skinAt, placeAt } from '../state/gear.mjs';
 import { gazeMood } from '../ui/lines.mjs';
 import { createImpact } from './objects/impact.mjs';
-import { jitterMesh, addOutline, blobGeo, ballGeo } from './handmade.mjs';
+import { jitterMesh, addOutline, blobGeo, ballGeo, INK } from './handmade.mjs';
 
 // 몸이 무너지는 포즈는 빨리 잡히고, 발이 살아 있는 포즈는 그 중간이다.
 const WRECK_POSES = new Set([POSES.faceplant, POSES.sprawlR, POSES.sprawlL, POSES.hugfall]);
@@ -28,6 +28,12 @@ const SCUFF_POSES = new Set([POSES.faceplant, POSES.sprawlR, POSES.sprawlL, POSE
 export function createScene(canvas) {
   const sfx = mountSfx();
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  // 그림자 지도 한 장. 발밑 원판은 접지를 말하지만 몸이 드리운 그늘은 못 그린다.
+  // PCFSoft는 가장자리를 흐린다. 딱딱한 경계는 종이를 오려 붙인 것으로 읽힌다.
+  // 1024는 아래 그림자 카메라가 덮는 20미터를 한 텍셀 2센티로 나눈다. 재는 것이 발밑 그늘 하나라
+  // 그보다 잘게 나눌 자리가 없다.
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   // 알파를 전경 마스크로 쓴다. 아무것도 그려지지 않은 화소가 0이면 전경으로 읽힌다.
   renderer.setClearAlpha(1);
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -49,6 +55,9 @@ export function createScene(canvas) {
   // 풀해상도로 깨끗하게 그린 로우폴리는 에셋스토어 템플릿으로 읽힌다. 여기서 그 지문을 지운다.
   // 세로 288은 골키퍼 얼굴이 뭉개져 사라졌고 540은 원본과 구분이 안 갔다. 384가 계단이 보이면서 형태가 남는 높이다.
   const RT_H = 384;
+  // 풀해상 갈래. ?pix=0이면 384 타깃을 건너뛰고 캔버스 해상도 그대로 굽는다.
+  // 기본은 확대 쪽이다. 이 갈래는 픽셀 확대가 무엇을 덮고 있는지 볼 때만 쓴다.
+  const PIX = new URLSearchParams(location.search).get('pix') !== '0';
   const rt = new THREE.WebGLRenderTarget(683, RT_H, {
     // 선형 보간으로 늘리면 뿌옇기만 하고 픽셀이 안 보인다. 계단이 보여야 저해상도로 읽힌다.
     // 스텐실을 켠다. 공이 자기 화소에 표식을 남기고 임팩트 플래시가 그 자리를 비켜 가려면 이 버퍼가 있어야 한다.
@@ -62,7 +71,9 @@ export function createScene(canvas) {
   const postMat = new THREE.ShaderMaterial({
     // 배경과 인물에 같은 자를 대면 화면이 한 겹 필터로 읽힌다. 배경은 더 잘게 끊어 물러나고,
     // 인물은 굵게 끊어 색면이 남는다. 알파 채널이 둘을 가르는 마스크다.
-    uniforms: { tDiffuse: { value: rt.texture }, steps: { value: 9.0 }, stepsFg: { value: 5.0 }, texel: { value: new THREE.Vector2(1 / 683, 1 / RT_H) } },
+    // 전경 단수는 toon이 가져간다. 재질이 이미 세 단으로 끊은 면을 셰이더가 다섯 단으로 다시 끊으면
+    // 단 경계가 두 벌 서서 밴드가 여섯 개로 읽힌다. 0이면 전경은 끊지 않고 통과시킨다.
+    uniforms: { tDiffuse: { value: rt.texture }, steps: { value: 9.0 }, stepsFg: { value: 0.0 }, texel: { value: new THREE.Vector2(1 / 683, 1 / RT_H) } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
     fragmentShader: [
       'uniform sampler2D tDiffuse; uniform float steps; uniform float stepsFg; uniform vec2 texel; varying vec2 vUv;',
@@ -86,6 +97,8 @@ export function createScene(canvas) {
       '  float nb = 1.0 - step(0.6, min(min(a1, a2), min(a3, a4)));',
       '  float edge = clamp(nb - fg, 0.0, 1.0);',
       '  float st = mix(steps, stepsFg, fg);',
+      // stepsFg가 0이면 전경은 자를 대지 않는다. 재질이 이미 끊어 놓은 단을 그대로 내보낸다.
+      '  float keep = step(st, 0.5);',
       // 색을 끊기 전에 잡음을 섞는다. 끊고 나서 섞으면 계단 위에 모래를 뿌린 것으로 보인다.
       // 잡음의 좌표는 화면 픽셀이 아니라 렌더타깃 텍셀이다. gl_FragCoord로 뽑으면 덩어리
       // 픽셀 하나 안에서 값이 서너 번 갈려 저해상도 질감이 깨지고 벽이 반짝인다.
@@ -108,8 +121,9 @@ export function createScene(canvas) {
       // floor만 쓰면 화면 전체가 어두워진다. 반 칸 올려 원래 밝기를 지킨다.
       // 음수 칸은 막는다. 한 칸 아래는 어두운 색이 아니라 색이 뒤집힌 값이다.
       // 디더는 배경에서 질감이고 인물 위에서는 때다. 인물 쪽 세기를 낮춘다.
-      '  float qe = (max(floor((e + (n - 0.5) / st * mix(0.34, 0.12, fg)) * st), 0.0) + 0.5) / st;',
-      '  float ql = pow(qe, 2.2);',
+      '  float sd = max(st, 1.0);',
+      '  float qe = (max(floor((e + (n - 0.5) / sd * mix(0.34, 0.12, fg)) * sd), 0.0) + 0.5) / sd;',
+      '  float ql = mix(pow(qe, 2.2), l, keep);',
       // 나누는 밝기는 잡음을 타지 않은 원래 값이다. 잡음 섞인 값으로 나누면 색비가 픽셀마다 흔들린다.
       '  c *= ql / max(l, 0.001);',
       // 잉크선은 양자화 뒤, sRGB 인코딩 전에 곱한다. 인코딩 뒤에 곱하면 선이 회색으로 뜬다.
@@ -196,7 +210,7 @@ export function createScene(canvas) {
   // 지점마다 손으로 다는 대신 add를 감싸는 이유는, 한 서브시스템이 최상위에 여러 개를
   // 흩뿌려도 누락 없이 전부 귀속되기 때문이다.
   let subTag = 'stage';
-  // stage 구간에서 add되는 것은 아래 조명 다섯뿐이고 __subs는 조명을 세지 않는다. 그래서
+  // stage 구간에서 add되는 것은 아래 조명 셋뿐이고 __subs는 조명을 세지 않는다. 그래서
   // __subs에 stage가 0인 것은 하네스 결함이 아니라 설계상 필연이고, stage 컷도 나오지 않는다.
   const rawAdd = scene.add.bind(scene);
   scene.add = (...objs) => {
@@ -204,19 +218,37 @@ export function createScene(canvas) {
     return rawAdd(...objs);
   };
 
-  // 암빛을 한 덩어리로 뿌리면 모든 면이 같은 밝기로 서고, 입체는 색칠한 오려붙이기가 된다.
-  // 키·필·림을 나누고 바닥 반사를 따로 준다. 전체 노출은 그대로 두고 방향만 쪼갠다.
-  scene.add(new THREE.AmbientLight(0xd8e6dc, 0.62));
-  // 하늘은 차갑게, 흙바닥은 따뜻하게. 이 한 줄이 바운스 광 역할을 한다.
-  scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x8a7048, 1.05));
-  // 키. 카메라 쪽 왼쪽 위에서 얼굴과 장갑을 친다.
+  // 조명 셋. 방향 없는 암빛과 반대편 필은 밝기만 한 겹씩 더하고 있었고, 그 몫은 반구광의
+  // 하늘색과 땅색에 접어 넣을 수 있다. 밝기는 그대로 두고 방향이 살아 있는 빛만 남긴다.
+  // 실측: 하늘 0xd8edfe 땅 0xaeac9d 세기 1.7이면 위를 보는 면이 받던 빛이 다섯 개 시절과 같고,
+  // 흙 화소 휘도 p10/p50/p90이 64/93/148 그대로다.
+  scene.add(new THREE.HemisphereLight(0xd8edfe, 0xaeac9d, 1.7));
+  // 키. 카메라 쪽 왼쪽 위에서 얼굴과 장갑을 친다. 그림자를 드리우는 빛도 이 하나다.
+  // 둘이 드리우면 같은 몸이 두 방향으로 눕고, 그 그림은 조명이 둘이라는 정보가 아니라
+  // 그림자가 잘못 그려졌다는 인상으로 읽힌다.
   const key = new THREE.DirectionalLight(0xfff4dc, 2.05);
-  key.position.set(-6, 8, -4);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  // 그림자 카메라는 페널티 박스를 덮는다. 몸이 서는 땅이 그 판이고, 더 넓히면 같은 1024칸이
+  // 더 넓은 땅에 흩어져 발밑이 뭉갠다. 반폭 10은 박스 반폭 8.25에 누운 몸의 여유를 더한 값이다.
+  const SHADOW_HALF = 10;
+  key.shadow.camera.left = -SHADOW_HALF;
+  key.shadow.camera.right = SHADOW_HALF;
+  key.shadow.camera.top = SHADOW_HALF;
+  key.shadow.camera.bottom = -SHADOW_HALF;
+  key.shadow.camera.near = 12;
+  key.shadow.camera.far = 44;
+  key.shadow.camera.updateProjectionMatrix();
+  // 면과 그림자 지도가 같은 깊이를 다투면 자기 그림자가 줄무늬로 앉는다. 법선 쪽으로 밀어 피한다.
+  key.shadow.normalBias = 0.04;
+  key.shadow.bias = -0.0004;
+  /* 빛을 박스 중심축으로 옮긴다. 방향 벡터는 (-6, 8, -4)를 2.4배 한 것이라 그대로이고,
+     명암은 한 화소도 안 움직인다. 움직이는 것은 그림자 카메라가 덮는 땅뿐이다.
+     타깃은 씬에 안 붙인다. 붙이면 조명이 아닌 자식이 하나 늘어 __subs의 stage 칸이 열린다. */
+  key.position.set(-14.4, 19.2, -9.6 + BOX_Z);
+  key.target.position.set(0, 0, BOX_Z);
+  key.target.updateMatrixWorld();
   scene.add(key);
-  // 필. 반대편에서 약하고 차게. 그림자 안이 검게 먹히는 것만 막는다.
-  const fill = new THREE.DirectionalLight(0x9fc0e8, 0.55);
-  fill.position.set(7, 3.5, -2);
-  scene.add(fill);
   // 림. 뒤에서 치면 어깨와 머리 윤곽에 선이 생기고, 인물이 배경에서 떨어진다.
   const rim = new THREE.DirectionalLight(0xffd9a0, 1.9);
   rim.position.set(2, 6, 12);
@@ -274,12 +306,33 @@ export function createScene(canvas) {
       o.material = tagFg(o.material);
     });
   };
+  /* 그림자를 드리우는 몸. 실루엣을 만드는 조각만 캐스터로 세운다. 온몸을 세우면 그림자 패스의
+     드로우콜이 배우 하나당 열 몇 개씩 늘고, 발밑 그늘 하나를 얻자고 예산 게이트를 먼저 죽인다.
+     실측: 캐스터 일곱에서 드로우콜이 111에서 118로 올랐고 상한은 120이다.
+     키퍼는 몸통과 두 허벅지다. 다이빙과 드리블은 다리를 벌리는 자세라 그늘의 길이를 다리가 만든다.
+     키커는 10미터 뒤에 서고 그 거리에서 머리 그늘은 몇 화소라 몸통 하나만 세운다.
+     팔과 장갑 그늘은 몸통 그늘 안에 거의 들어가 화면에서 갈리지 않는다. */
+  const castFrom = (actor, legs) => {
+    const list = [actor.userData.torso];
+    if (legs) {
+      for (const k of ['hipL', 'hipR']) {
+        const j = actor.userData.joints[k];
+        const m = j && j.children.find((o) => o.isMesh);
+        if (m) list.push(m);
+      }
+    }
+    for (const o of list) {
+      if (!o) continue;
+      o.castShadow = true;
+      o.userData.caster = true;
+    }
+  };
   for (const p of passers) markForeground(p);
 
   const ball = new THREE.Mesh(ballGeo(BALL_R), flatVertex(0xfdfdf6));
   // 흰 공이 밝은 하늘 앞을 지나면 사라진다. 외곽선 하나가 그걸 끝낸다.
   jitterMesh(ball, 0.006, 5);
-  addOutline(ball, 0.012);
+  addOutline(ball, INK.ball);
   ball.userData.probeIgnore = true;
   scene.add(ball);
   markForeground(ball);
@@ -453,11 +506,13 @@ const TOUCHED = new Set(['contact']);
   subTag = 'kicker';
   scene.add(kicker);
   markForeground(kicker);
+  castFrom(kicker);
 
   let keeper = buildKeeper(188, 84);
   subTag = 'keeper';
   scene.add(keeper);
   markForeground(keeper);
+  castFrom(keeper, true);
 
   // 동네 등급은 버프가 아니라 교환이다. 배경이 바뀌는 것은 화면이고, 확률은 chain이 쥔다.
   function setCity(city, skin) {
@@ -487,6 +542,7 @@ const TOUCHED = new Set(['contact']);
     keeper.userData.sub = 'keeper';
     scene.add(keeper);
     markForeground(keeper);
+    castFrom(keeper, true);
   }
 
   // 화면 흔들림. 카메라 본체를 흔들면 골대 프레이밍과 키퍼 접지 측정이 같이 흔들린다.
@@ -674,7 +730,9 @@ const TOUCHED = new Set(['contact']);
     camera.updateProjectionMatrix();
     fovBase = camera.fov;
     // 저해상도 버퍼도 화면 비율을 따라간다. 고정 폭이면 화면이 넓어질 때 가로로 늘어난다.
-    rt.setSize(Math.max(2, Math.round(RT_H * (w / Math.max(1, h)))), RT_H);
+    // 풀해상 갈래는 캔버스가 실제로 가진 화소 수를 그대로 쓴다. 그 수가 곧 뷰포트 DPR이다.
+    if (PIX) rt.setSize(Math.max(2, Math.round(RT_H * (w / Math.max(1, h)))), RT_H);
+    else rt.setSize(Math.max(2, renderer.domElement.width), Math.max(2, renderer.domElement.height));
     // 색수차 폭은 텍셀 단위다. 여기서 안 갱신하면 창을 넓힐수록 색이 벌어진다.
     postMat.uniforms.texel.value.set(1 / rt.width, 1 / rt.height);
   }
@@ -2105,6 +2163,26 @@ const TOUCHED = new Set(['contact']);
   // 프리즈 중에 카메라가 움직이면 세계시계가 새는 것인지 카메라 경로만 새는 것인지
   // 화면으로는 구분이 안 된다. 렌더 쪽 시간 변수를 그대로 내보낸다.
   window.__camDbg = () => ({ vnow, camEvLeft, shakeLeft, dutchLeft, stopLeft, fovBase, fov: camera.fov, frozen, frames });
+
+  // 어느 해상도로 구웠는지. 캔버스 크기만 보면 두 갈래가 같은 수를 내므로 밖에서 못 가른다.
+  window.__pixState = () => ({
+    on: PIX,
+    rt: [rt.width, rt.height],
+    canvas: [renderer.domElement.width, renderer.domElement.height],
+    dpr: renderer.getPixelRatio()
+  });
+
+  // 전경을 몇 단으로 끊을지. 0이면 안 끊고 재질이 그린 단을 그대로 내보낸다.
+  // 밴드를 누가 그렸는지는 이 수를 0과 5로 놓은 두 화면을 맞대야 갈린다.
+  window.__fgSteps = (n) => { postMat.uniforms.stepsFg.value = Math.max(0, Number(n) || 0); return postMat.uniforms.stepsFg.value; };
+
+  // 그림자가 누구 것인지는 그 사람만 캐스터에서 뺀 프레임과 맞대야 안다. 발밑 원판은 두 프레임에
+  // 다 남으므로, 남는 차이는 그림자 지도가 그린 것뿐이다.
+  window.__castOff = (on) => {
+    let n = 0;
+    keeper.traverse((o) => { if (o.userData.caster) { o.castShadow = !on; n += 1; } });
+    return n;
+  };
 
   // 표정을 바꾸는 코드가 돌았다는 것과 표정이 화면에 있다는 것은 다른 주장이다.
   // 뒤통수를 향한 머리에 하트 눈을 넣어도 관객이 보는 것은 검은 반구다.
