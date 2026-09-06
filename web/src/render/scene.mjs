@@ -166,6 +166,8 @@ export function createScene(canvas) {
      0.02를 부하 아래서 넘었다. 구가 열릴 때 0으로 되돌리면 흔들림은 구 안의 시간만 읽는다.
      리셋이 setPose(…, 0)으로 위상을 0에 놓고 다음 프레임에 세계시각으로 뛰던 튐도 같이 사라진다. */
   let swayT0 = 0;
+  // 음수면 흔들림이 세계시각을 읽는다. 0 이상이면 그 값에서 멈춘다. window.__swayPin이 놓는다.
+  let swayPin = -1;
   let realLast = performance.now() / 1000;
   let stopLeft = 0;
   // 사건 선언 시점의 장갑 좌표는 다이빙 전 몸 옆이다. 공이 손에 붙는 것은 그 뒤 꼬리 연출 중이다.
@@ -794,7 +796,7 @@ const TOUCHED = new Set(['contact']);
     // 정지 프레임 두 장을 비교하는 계측이 그 수렴을 잡음 바닥으로 읽었다.
     // 감쇠를 dt로 환산하면 dt가 0일 때 0이 되고, 프레임률이 흔들려도 같은 속도로 도착한다.
     poseNow[key] = lerpPose(poseNow[key], target, 1 - Math.pow(1 - rate, stepDt * 60));
-    setPose(actor[key], poseNow[key], vnow - swayT0);
+    setPose(actor[key], poseNow[key], swayPin >= 0 ? swayPin : vnow - swayT0);
   }
 
   let cue = null;
@@ -2218,6 +2220,12 @@ const TOUCHED = new Set(['contact']);
   // 게이트는 프레임 수를 세어 시점을 잡는다. 그러면 사건 이후 흐른 세계시간이 프레임 수 곱하기 폭이다.
   window.__fixedStep = (sec) => { fixedDt = Number(sec) || 0; return fixedDt; };
   window.__frames = () => frames;
+
+  /* 대기 자세 흔들림의 위상을 상수로 못 박는 손잡이. 위상은 구가 열린 시각부터 흐른 세계시간인데,
+     그 시각은 시작 버튼과 개봉 카드가 어느 프레임에 눌렸는지가 정하고 그 프레임은 벽시계가 정한다.
+     그래서 시계를 고정 폭으로 못 박아도 같은 프레임의 몸이 회차마다 조금씩 다른 자리에 선다.
+     실측으로 같은 사건의 그림자 차분이 1435와 1443 화소로 갈렸다. 음수면 평소대로 세계시각을 읽는다. */
+  window.__swayPin = (t) => { swayPin = Number.isFinite(Number(t)) ? Number(t) : -1; return swayPin; };
 
   // 게이트가 사건을 걸 프레임과 세계를 멈출 프레임을 미리 맡긴다.
   // kind가 비면 사건은 안 걸고 멈춤만 맞는다. 장부를 읽는 동안 판이 더 돌면
