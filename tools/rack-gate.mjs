@@ -40,23 +40,30 @@ const COUNT = () => { const out = {}; for (const tab of [...document.querySelect
 const FIT = () => {
   const tab = document.querySelector('#shop .tab[data-tab="hair"]');
   if (tab) tab.click();
-  const span = (e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; };
-  const rack = document.querySelector("#shop .rack");
-  const goods = document.querySelector("#shop .goods");
-  /* 접힌 자리. 선반이 제 창을 가지면 그 창의 아래끝이고, 안 가지면 상자의 아래끝이다.
-     상자 높이가 아니라 clientHeight를 쓰는 이유는, 넘친 내용은 상자 밖에 그려지지 않기 때문이다. */
-  const box = rack ? rack.getBoundingClientRect() : null;
-  const top = box ? Math.round(box.top) : null;
-  const fold = box ? Math.round(box.top) + rack.clientHeight : null;
-  const one = document.querySelector("#shop .rack .card");
-  const badge = one ? one.querySelector(".buy") : null;
-  const rect = (e) => { const r = e.getBoundingClientRect(); return [Math.round(r.top), Math.round(r.bottom)]; };
-  /* 값을 지금 읽어 둔다. 아래의 시착 누름이 상점을 통째로 다시 그리므로, 노드를 들고 있다가
-     그 뒤에 재면 화면에서 떨어져 나간 상자를 재게 되고 좌표가 전부 0으로 온다. */
-  const card = one ? rect(one) : null;
-  const px = badge ? rect(badge) : null;
+  // 시착 누름이 상점을 다시 그리는 마지막 손질이다. 재는 것은 전부 그 뒤로 미룬다.
   const pick = [...document.querySelectorAll("#shop .rack .card.gear")].filter((c) => typeof c.onclick === "function")[0];
   if (pick) pick.click();
+  /* 상자는 누름 뒤에 다시 찾는다. 누르기 전에 잡아 둔 손잡이는 다시 그리는 순간 화면에서 떨어져 나가고,
+     떨어진 상자는 좌표를 전부 0으로 돌려준다. 0은 0 안에 들어가므로 담김을 묻는 축이 조용히 통과한다
+     (실측: 선반 x[0,0] in 기둥 x[0,0]으로 초록, 같은 자리를 다시 찾아 재면 x[229,725]).
+     한 번 이 함정에 빠져 카드와 배지만 앞으로 옮겼고, 같은 재정렬이 깨뜨린 나머지 둘은 뒤에 남았다. */
+  const span = (e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; };
+  const rect = (e) => { const r = e.getBoundingClientRect(); return [Math.round(r.top), Math.round(r.bottom)]; };
+  const rack = document.querySelector("#shop .rack");
+  const goods = document.querySelector("#shop .goods");
+  const one = document.querySelector("#shop .rack .card");
+  const badge = one ? one.querySelector(".buy") : null;
+  /* 접힌 자리. 선반이 제 창을 가지면 그 창의 아래끝이고, 안 가지면 상자의 아래끝인데,
+     상자가 화면보다 길면 그 아래끝은 화면 밖에 있다. 화면 밖의 선은 접힘이 아니라 그냥 안 보이는
+     자리라, 둘 중 위에 있는 것이 진짜 접힘이다(실측: 상자 아래끝 582에 화면 360. 582로 재면
+     카드를 330px로 부풀려 배지가 화면 아래 93px에 서도 두 축이 초록이었다). */
+  const box = rack ? rack.getBoundingClientRect() : null;
+  const top = box ? Math.round(box.top) : null;
+  const fold = box ? Math.min(Math.round(box.top) + rack.clientHeight, innerHeight) : null;
+  const bar = rack ? span(rack) : null;
+  const col = goods ? span(goods) : null;
+  const card = one ? rect(one) : null;
+  const px = badge ? rect(badge) : null;
   const hit = (sel) => {
     const e = document.querySelector(sel);
     if (!e) return { own: false, live: false, who: "missing" };
@@ -67,8 +74,7 @@ const FIT = () => {
     return { own: Boolean(top) && (top === e || e.contains(top)), live: !e.disabled,
       who: top ? top.tagName.toLowerCase() + cls : "null" };
   };
-  return { rack: rack ? span(rack) : null, goods: goods ? span(goods) : null,
-    top: top, fold: fold, card: card, px: px,
+  return { rack: bar, goods: col, top: top, fold: fold, card: card, px: px,
     all: hit("#shop .fitting .all"), strip: hit("#shop .fitting .strip") };
 };
 
@@ -148,9 +154,13 @@ try {
   /* 선반이 제 기둥을 안 넘는가. 실측으로 740x360에서 선반 상자가 x[129,825]에 서고
      기둥은 x[229,725]였다. 넘친 200px이 왼쪽 탈의실 위로 올라가 카드 두 장이 그 기둥을 덮었다. */
   const h = hand.fit;
-  const inside = Boolean(h.rack && h.goods) && h.rack[0] >= h.goods[0] && h.rack[1] <= h.goods[1];
+  /* 폭이 0인 상자는 통과가 아니라 실패다. 담김만 물으면 x[0,0]이 x[0,0] 안에 들어가므로,
+     아무것도 못 잰 판이 가장 깨끗한 초록으로 온다. 재기 전에 잰 것이 있는지부터 묻는다. */
+  const drawn = Boolean(h.rack && h.goods) && h.rack[1] > h.rack[0] && h.goods[1] > h.goods[0];
+  const inside = drawn && h.rack[0] >= h.goods[0] && h.rack[1] <= h.goods[1];
   check("rack:the-shelf-stays-inside-its-column", inside,
-    "rack x[" + (h.rack || "none") + "] in goods x[" + (h.goods || "none") + "] at " + HAND_W + "x" + HAND_H);
+    "rack x[" + (h.rack || "none") + "] in goods x[" + (h.goods || "none") + "] at " + HAND_W + "x" + HAND_H
+      + (drawn ? "" : ", one of the two boxes measured no width"));
   // 덮였는지는 좌표가 답한다. 두 버튼 한가운데를 찍어 돌아오는 것이 그 버튼 자신인지 본다.
   check("rack:the-fitting-buttons-take-their-own-taps", h.all.own && h.strip.own,
     "buy -> " + h.all.who + (h.all.live ? "" : " (disabled)") + ", strip -> " + h.strip.who + (h.strip.live ? "" : " (disabled)"));
