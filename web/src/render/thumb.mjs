@@ -17,6 +17,13 @@ const PASSER_STEP = 2;
 // 칸의 비율로 구우면 같은 물건이 같은 자리에서 두 배 넓게 선다.
 const BAKE_W = 448;
 const BAKE_H = 205;
+/* 온몸만 세로로 굽는다. 사람은 세로로 긴 피사체라 448x205 가로 칸에 세우면 정사각 미리보기에서
+   contain이 높이를 205로 줄이고, 그때 사람이 칸 높이의 45%만 써서 막대로 읽힌다.
+   긴 변은 그대로 두고 눕힌 것을 세운다. 336폭은 준비 자세로 벌린 팔 1.63m(측정: 키 205)가
+   프레임 가로 2.03m 안에 좌우 여백과 함께 들어가는 비율이다. */
+const BODY_W = 336;
+const BODY_H = 448;
+const sizeOf = (kind) => (kind === "body" ? [BODY_W, BODY_H] : [BAKE_W, BAKE_H]);
 
 // 상품마다 봐야 할 곳이 다르다. 장갑을 온몸 썸네일로 보여 주면 손은 여덟 화소가 된다.
 // part는 무엇을 겨냥하는지, dist는 그 부위가 칸을 채우는 거리, lift는 시선 높이 보정,
@@ -46,9 +53,17 @@ const AIM = {
   // 겨냥점이 어깨 관절이라 그 거리에서는 몸통이 칸을 채우고 잉크는 왼쪽 변에 남는다.
   // 위팔 한가운데로 내려가 붙어서 잡는다.
   ink: { part: "arm", dist: 0.58, lift: -0.12, high: 0.08 },
-  // 탈의실의 온몸. 부위가 아니라 사람을 보여 준다. 무엇을 걸쳤는지가 아니라
-  // 걸친 뒤의 내가 어떻게 보이는지가 이 칸이 답하는 질문이다.
-  body: { part: "torso", dist: 2.7, lift: 0.02 }
+  /* 탈의실의 온몸. 부위가 아니라 사람을 보여 준다. 무엇을 걸쳤는지가 아니라
+     걸친 뒤의 내가 어떻게 보이는지가 이 칸이 답하는 질문이다.
+     겨냥은 머리다. 몸통을 잡으면 카메라가 허리를 보고 정수리는 프레임 위로 밀린다
+     (측정: 키 205에서 머리 중심이 프레임 위 -0.15 지점, 위쪽 8% 행에 잘린 머리 화소 936개).
+     머리에 걸면 여백이 체격을 따라간다. 키가 40cm 갈려도 정수리와 프레임 위 사이는 제자리에 남고
+     발만 아래로 자란다(측정: 정수리 여백 키 205에서 12%, 165에서 14.5%).
+     4.73은 키 205의 정수리부터 발까지 2.25m가 프레임 세로의 83%를 쓰는 거리이고,
+     -0.675는 프레임 가운데를 머리 아래 몸통 중간에 놓아 발까지 담는 보정이다.
+     내려다보지 않는다. 기본 눈높이 0.22로 잡으면 정수리를 위에서 보게 되어
+     온몸 그림이 머리 뚜껑부터 시작한다. */
+  body: { part: "head", dist: 4.73, lift: -0.675, high: 0 }
   ,
   /* 개봉 카드의 한 사람. 탈의실 칸은 정사각인데 카드는 세로로 길어서, 같은 그림을 잘라 키우면
      위아래가 남고 좌우가 깎인다. 그러면 머리가 프레임 밖으로 나간다.
@@ -193,6 +208,14 @@ function partPoint(k, part) {
 // 한 장을 굽는다. 같은 자세와 같은 각도로 구워야 등급끼리의 차이가 색과 모양에서만 나온다.
 function frame(kind, keeper, look, yaw) {
   boot();
+  /* 프레임 비율은 칸마다 다르다. 세로로 긴 피사체를 가로 칸에 구우면 담기는 것은 사람이 아니라 여백이다.
+     크기가 그대로면 아무것도 안 한다. 매번 다시 잡으면 굽는 한 장마다 그리기 버퍼를 새로 만든다. */
+  const [fw, fh] = sizeOf(kind);
+  if (R.domElement.width !== fw || R.domElement.height !== fh) {
+    R.setSize(fw, fh, false);
+    cam.aspect = fw / fh;
+    cam.updateProjectionMatrix();
+  }
   // 장면 칸은 사람을 안 세운다. 골대와 동네는 등급이 곧 그 장면이라 조각을 통째로 갈아 끼운다.
   if (kind === "frame" || kind === "city") {
     if (rig) { scene.remove(rig); rig = null; }
@@ -257,4 +280,27 @@ export function stopSpin() {
   if (spinning) cancelAnimationFrame(spinning);
   spinning = null;
   if (R && R.domElement.parentNode) R.domElement.parentNode.removeChild(R.domElement);
+}
+
+/* 구운 한 장 안에서 머리가 어디에 얼마나 크게 서 있는지. 시착실 자가 읽는 계기다.
+   화소만 세면 머리와 어깨가 안 갈려서, 정수리가 잘렸는지는 화소가 답해도 반지름 상자가
+   프레임 안인지는 못 답한다. 그 질문은 투영만 답한다.
+   좌표는 그림 몫이다. 왼쪽 위가 0,0이고 오른쪽 아래가 1,1이라 프레임 크기가 바뀌어도 축이 안 흔들린다.
+   반지름이 둘인 이유는 프레임이 정사각이 아니기 때문이다. 같은 크기가 가로로 넓은 칸에서는
+   x 몫으로 더 작게 선다. url을 같이 돌려주어, 잰 그림과 화면에 걸린 그림이 같은 장인지 대조할 수 있다. */
+export function headBox(kind, keeper, look) {
+  if (!AIM[kind]) return null;
+  frame(kind, keeper, look);
+  const head = rig && rig.userData.head;
+  if (!head) return null;
+  const at = new THREE.Vector3();
+  head.getWorldPosition(at);
+  const r = head.geometry.parameters.radius;
+  const crown = at.clone();
+  crown.y += r;
+  const to = (v) => ({ x: (v.x + 1) / 2, y: (1 - v.y) / 2 });
+  const mid = to(at.clone().project(cam));
+  const top = to(crown.clone().project(cam));
+  const ry = Math.abs(mid.y - top.y);
+  return { x: mid.x, y: mid.y, ry, rx: ry * (R.domElement.height / R.domElement.width), url: R.domElement.toDataURL("image/png") };
 }

@@ -1366,7 +1366,9 @@ const AXIS_WORD = {
 // 축마다 단위가 다르다. 확률은 %p, 시간은 ms, 사람은 명이다.
 const AXIS_UNIT = { delay: 'ms', passer: '명', crowd: '%', tear: '%p', spill: '%p', carry: '%p', landing: '%p', neteat: '%p' };
 
-function specLines(kind, rank) {
+/* 효과 한 줄을 항목과 값으로 가른다. 표는 칸이 둘이라 표이고, 이어 붙인 한 줄은 문장이다.
+   가르는 자리를 여기 하나로 두어야 선반 카드가 쓰는 한 줄과 효과 표가 같은 수를 말한다. */
+function specRows(kind, rank) {
   const n = Number(rank);
   const s = SHELVES[kind];
   if (s) {
@@ -1374,43 +1376,51 @@ function specLines(kind, rank) {
     // 외형 선반은 판정에 안 들어간다. 대신 소문에 붙는 승수가 있고, 그것도 값이다.
     if (!steps) {
       const gain = Math.round(0.05 * n * 100);
-      return n > 0 ? ['소문 확산 +' + gain + '%', '외형 효과'] : ['효과 없음'];
+      return n > 0 ? [{ k: '소문 확산', v: '+' + gain + '%' }, { k: '외형 효과', v: '' }] : [{ k: '효과 없음', v: '' }];
     }
-    if (n === 0) return ['효과 없음'];
+    if (n === 0) return [{ k: '효과 없음', v: '' }];
     return steps.map((st) => {
       const v = Math.round(st.per * n * 10) / 10;
       const u = AXIS_UNIT[st.axis] || '';
-      return AXIS_WORD[st.axis] + (st.up ? ' +' : ' -') + v + u;
+      return { k: AXIS_WORD[st.axis], v: (st.up ? '+' : '-') + v + u };
     });
   }
   if (kind === 'bot') {
     const b = botAt(rank);
     if (!b) return [];
     // 팔로워가 안 붙는다는 사실은 선반 머리글이 이미 말한다. 여기는 성능과 기간만 말한다.
-    return ['판단력 ' + b.judge];
+    return [{ k: '판단력', v: String(b.judge) }];
   }
   if (kind === 'buff') {
     const b = buffAt(rank);
     if (!b) return [];
     // 카드 본문이 이미 든 문장을 여기서 되풀이하면 이 칸이 새 정보를 안 준다. 수로 말한다.
-    const dose = b.shots + '슛';
+    const dose = { k: '횟수', v: b.shots + '슛' };
     if (b.kind === 'tonic') {
       const cut = Math.round((1 - TONIC_FOCUS) * 100);
-      return ['한눈팔기 -' + cut + '%', '수다 -' + cut + '%', dose];
+      return [{ k: '한눈팔기', v: '-' + cut + '%' }, { k: '수다', v: '-' + cut + '%' }, dose];
     }
-    if (b.kind === 'hype') return ['소문 확산 +' + Math.round((HYPE_BOOST - 1) * 100) + '%', dose];
+    if (b.kind === 'hype') return [{ k: '소문 확산', v: '+' + Math.round((HYPE_BOOST - 1) * 100) + '%' }, dose];
     // 송진은 장갑 한 등급을 더 얹는 물건이라, 장갑 선반이 파는 그 두 축을 그대로 쓴다.
-    return GEAR_STEP.grip.map((st) => AXIS_WORD[st.axis] + ' -' + st.per + (AXIS_UNIT[st.axis] || '')).concat([dose]);
+    return GEAR_STEP.grip.map((st) => ({ k: AXIS_WORD[st.axis], v: '-' + st.per + (AXIS_UNIT[st.axis] || '') })).concat([dose]);
   }
   return [];
 }
 
-// 왼쪽 기둥의 효과 칸. 카드에 손을 올린 것만 여기에 뜬다.
+// 카드 한 줄이 쓰는 형태. 항목과 값을 한 칸에 이어 붙인다.
+function specLines(kind, rank) {
+  return specRows(kind, rank).map((r) => (r.v ? r.k + ' ' + r.v : r.k));
+}
+
+/* 왼쪽 기둥의 효과 칸. 카드에 손을 올린 것만 여기에 뜬다.
+   표로 세운다. 항목과 값이 한 줄에 이어 붙으면 어디까지가 이름이고 어디부터가 수인지를
+   줄마다 다시 갈라야 하고, 카드 넷을 훑는 동안 그 가르기를 네 번 한다. */
 function showSpec(name, kind, rank) {
   const box = el('shop') && el('shop').querySelector('.spec');
   if (!box) return;
-  const lines = specLines(kind, rank);
-  box.innerHTML = '<b>' + name + '</b>' + lines.map((t) => '<i>' + t + '</i>').join('');
+  const rows = specRows(kind, rank);
+  box.innerHTML = '<b>' + name + '</b>'
+    + rows.map((r) => '<i><em>' + r.v + '</em><span>' + r.k + '</span></i>').join('');
   box.dataset.at = kind + String(rank);
 }
 
@@ -1426,28 +1436,33 @@ export const SHOP_NOTICES_FOR_WIKI = ['봇이 대신 막은 슛에는 팔로워�
 
 // 탈의실. 지금 내 모습과 걸쳐 본 것을 한 자리에서 보여 준다.
 // 값을 치르기 전에 자기 몸에서 확인할 수 있어야 꾸미는 재미가 산다.
+// 초상과 온몸을 같이 세운다. 온몸 칸에서 머리는 그림 높이의 15%라, 방금 바꾼 머리와 문신이
+// 그 크기에서는 색 한 점으로 뭉친다. 얼굴 한 장이 그 질문만 따로 받는다.
 function fittingRoom() {
-  const url = thumbURL('body', state.keeper, fittedLook());
+  const look = fittedLook();
+  const url = thumbURL('body', state.keeper, look);
+  const face = thumbURL('face', state.keeper, look);
   // 변형은 값이 없는 칸이라 청구서와 걸친 목록에서 빠진다. 값 0짜리 줄이 서면
   // 전부 사기 버튼이 0원을 부르며 켜지고, 벗기 목록에 이름 없는 줄이 하나 생긴다.
   const tried = Object.keys(fitting).filter((f) => shelfOfField(f));
   const bill = tried.reduce((n, f) => n + costOfField(f, fitting[f]), 0);
-  // 걸친 줄마다 벗는 자리를 둔다. 다시 카드를 찾아 누르는 것이 유일한 길이면,
-  // 무엇을 걸쳤는지 아는 자리와 그것을 무르는 자리가 갈려 있다.
-  const lines = tried.length
-    ? tried.map((f) => '<i data-off="' + f + '">' + nameOfField(f, fitting[f]) + '<b>X</b></i>').join('')
-    : '';
+  /* 걸친 것은 칩으로 눕는다. 칩마다 벗는 자리를 달고 있어, 무엇을 걸쳤는지 아는 자리와
+     그것을 무르는 자리가 안 갈린다. 세로로 쌓으면 여덟 칸을 걸쳤을 때 기둥이 여덟 줄 길어지고
+     그만큼 아래 효과 표가 잘린다. */
+  const chips = tried.map((f) => '<i data-off="' + f + '">' + nameOfField(f, fitting[f]) + '<b>X</b></i>').join('');
   const canAll = tried.length > 0 && bill <= state.wallet.coin;
-  const allLabel = tried.length === 0 ? '구매'
-    : SW(canAll ? bill : bill - state.wallet.coin);
+  /* 합계 배지는 사는 버튼이 든다. 시착 게이트가 청구서를 이 버튼 안의 .px[data-coin]에서 읽으므로
+     배지를 버튼 밖으로 빼면 값을 재는 자가 눈을 잃는다. 살 수 있으면 합계, 모자라면 모자란 만큼이다. */
+  const badge = tried.length ? SW(canAll ? bill : bill - state.wallet.coin) : '';
   const allClass = tried.length > 0 && !canAll ? ' bad-price' : '';
   return '<div class="fitting">'
+    + '<div class="who"><span class="face">' + (face ? '<img alt="" src="' + face + '">' : '') + '</span>'
+    + '<b>' + state.keeper.name + '</b></div>'
     + '<div class="me">' + (url ? '<img alt="" src="' + url + '">' : '') + '</div>'
-    + '<b>' + state.keeper.name + '</b>'
-    + '<div class="tried">' + lines + '</div>'
+    + '<div class="tried">' + chips + '</div>'
     + '<div class="acts">'
-    + '<button class="all' + allClass + '"' + (canAll ? '' : ' disabled') + '>' + allLabel + '</button>'
-    + (tried.length ? '<button class="strip">벗기</button>' : '')
+    + '<button class="all' + allClass + '"' + (canAll ? '' : ' disabled') + '>구매' + badge + '</button>'
+    + '<button class="strip"' + (tried.length ? '' : ' disabled') + '>벗기</button>'
     + '</div>'
     // 효과 칸. 카드 본문은 이름과 한 줄만 들고, 수치는 손을 올린 카드의 것만 여기 뜬다.
     + '<div class="spec"></div>'
