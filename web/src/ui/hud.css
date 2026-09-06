@@ -767,6 +767,11 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #shop .buy:disabled{background:#141a12;color:#f6efdc5c;cursor:default}
 #shop .bad-price .px,#me .bad-price .px{color:var(--bad)}
 #shop .buy.bad-price .px{color:var(--bad)}
+/* 숫자는 .px 안의 b에 있고, #shop .card b와 #shop .fitting b가 그 b를 직접 노랑으로 칠한다.
+   부모만 칠하면 상속이 안 닿아 부족 표시가 노란 숫자로 남는다(측정: 장갑·봇·버프·시착실에서
+   붉은 화소 0, 노란 화소 279~321). 같은 b를 짚어 한 단계 높은 특정도로 물려받게 한다.
+   색은 위 줄이 정한 것을 그대로 쓰므로 부족 색은 여전히 한 곳에서만 정해진다. */
+#shop .bad-price .px b,#me .bad-price .px b{color:inherit}
 /* 갈래 한 줄 소개와 보유 이용권. 문장은 왼쪽, 수는 오른쪽에 선다. 한 줄 안에 두면
    설명을 읽는 눈과 잔고를 세는 눈이 같은 높이에서 끝난다. */
 #shop .card .lede{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left}
@@ -877,7 +882,6 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   font-size:var(--fs-body);font-weight:700;color:var(--dim)}
 #pull .tap:focus-visible{outline:2px solid var(--dim);outline-offset:-6px}
 @keyframes flip{from{transform:translateY(6px) scaleY(.4)}to{transform:none}}
-#shop .got{display:block;margin-top:11px;font-size:var(--fs-num);color:var(--good)}
 #shop .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
   background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
