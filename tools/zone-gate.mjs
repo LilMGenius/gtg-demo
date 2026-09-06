@@ -37,6 +37,19 @@ t.unref();
 const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 const one = (x) => x.toFixed(1);
+/* 길이 어느 쪽으로 갈라져도 판정 줄 수는 이만큼이다. 줄 수를 세는 축 자신은 빼고 센 값이다. */
+const ROWS = 20;
+/* 봇이 갈린 구를 안 내주면 그 뒤 축들은 잴 기회가 없다. 그때 줄을 통째로 빼면 못 잰 축이 통과한 축으로
+   읽히고 판정 수만 조용히 줄어든다. 못 쟀다고 적어 빨간 줄로 남긴다. */
+const unmeasured = (names, why) => { for (const n of names) check(n, false, "unmeasured: " + why); };
+const BADGE_AXES = [
+  "control:the-two-bare-corners-match-each-other",
+  "zone:the-bot-badge-actually-looks-different-from-a-bare-corner",
+  "zone:the-bot-mark-and-the-hand-mark-do-not-look-the-same",
+  "zone:the-next-ball-clears-the-badge-but-not-the-preference",
+  "zone:the-cleared-corner-matches-a-bare-corner-in-pixels",
+];
+const SPLIT_AXES = ["zone:a-bot-ball-marks-the-side-the-bot-chose"].concat(BADGE_AXES);
 
 /* 한 장의 화면에서 여러 네모의 평균 밝기를 한꺼번에 뽑는다. 네모마다 따로 찍으면 그 사이에 구가 커밋돼
    대기 판(46.5)과 비활성 판(38.0)이 한 표본 안에 섞인다. 실측으로 그 섞임이 같은 처지의 두 판을 8.6까지
@@ -169,9 +182,6 @@ try {
     const r0 = away(rest, iOf(restMarks, 0));
     check("control:the-two-unpreferred-plates-match-each-other",
       r0.twin < TWIN, "left " + one(rest[0]) + " right " + one(rest[2]) + " apart " + one(r0.twin));
-    check("zone:the-standing-preference-actually-looks-different",
-      r0.gap > SEEN && r0.gap > r0.twin * 4,
-      "centre " + one(rest[1]) + " against " + one(rest[0]) + " and " + one(rest[2]));
 
     // 누른 구가 나는 동안. 표시는 왼쪽으로 옮겨 갔고 가운데는 나머지와 같은 판으로 돌아갔다.
     const air = await frame(p, rects);
@@ -199,16 +209,24 @@ try {
       kept = f.lum; keptMarks = f.ms;
       if (keptMarks.every((m) => !m.off)) break;
     }
-    /* 이 프레임에서는 같은 순간의 두 무표시 판이 대조군이 못 된다. 가운데 화살표가 옆 화살표보다 굵어서
-       켜져 있을 때 구조적으로 밝다. 실측으로 대기 상태의 좌우 두 판은 0.1로 만나지만 가운데와 오른쪽은
-       7.0 갈리고, 그 차는 표시가 아니라 글리프 모양이다. 그래서 대조군을 시간축에서 잡는다.
-       한 번도 선호였던 적이 없는 오른쪽 판은 대기 프레임과 이 프레임에서 같은 값을 읽어야 한다. */
+    /* 판을 견주는 축은 두 종류이고, 가운데 판이 낀 같은 순간 비교는 믿을 수 없다. 가운데 화살표가 옆
+       화살표보다 굵어서 판이 켜져 있는 것만으로 5.3에서 7.0 밝고, 그 수가 SEEN 3을 넘는다. 실제로 pref
+       클래스를 통째로 뗀 화면에서 가운데 50.0 대 44.6/44.7이 초록으로 지나간 적이 있다. 좌우 두 판은
+       서로 거울이라 0.1로 만나므로 같은 순간에 견줄 수 있는 짝은 그것뿐이다. 나머지는 시간축으로 옮긴다.
+       아래 두 축이 그것이고, 둘 다 패드가 열린 두 프레임만 쓴다. 비활성 흐림이 섞이면 표시와 구별이 안 된다.
+       계기가 두 프레임 사이에 흔들렸는지는 한 번도 선호가 아니었던 오른쪽 판이 잰다. */
     const iR = iOf(keptMarks, 1);
+    const iC = iOf(restMarks, 0);
     const drift = Math.abs(kept[iR] - rest[iR]);
+    // 표시의 폭. 누름이 선호를 왼쪽으로 옮긴 뒤 가운데 판은 한 번도 선호가 아니므로 두 프레임의 차가 그것이다.
+    const shed = Math.abs(rest[iC] - kept[iC]);
     const r2 = away(kept, iOf(keptMarks, -1));
     check("control:the-never-preferred-plate-reads-the-same-on-the-next-ball",
       drift < TWIN && keptMarks.every((m) => !m.off),
       "right " + one(rest[iR]) + " then " + one(kept[iR]) + " apart " + one(drift));
+    check("zone:the-standing-preference-actually-looks-different",
+      shed > SEEN && shed > drift * 4,
+      "centre " + one(rest[iC]) + " preferred then " + one(kept[iC]) + " bare, shed " + one(shed));
     check("zone:the-next-ball-keeps-the-preference",
       onlyAt(keptMarks, -1, "pref") && keptMarks.every((m) => !m.badge), fmt(keptMarks));
     check("zone:the-kept-preference-still-looks-different",
@@ -303,12 +321,15 @@ try {
         check("zone:the-cleared-corner-matches-a-bare-corner-in-pixels",
           c1.gap < CORNER && Math.abs(after[k] - corner[k]) > SEEN,
           "cleared " + one(after[k]) + " off bare by " + one(c1.gap) + ", was " + one(corner[k]));
-      }
-    }
+      } else unmeasured(BADGE_AXES, "the split ball carried no badged button");
+    } else unmeasured(SPLIT_AXES, "no bot ball left the preferred side within " + BOT_BALLS + " balls");
     await ctx.close();
   }
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
+  /* 못 잰 축을 빨간 줄로 남기는 것과 그 줄이 실제로 다 나왔는지는 다른 주장이다. 뒤엣것을 여기서 센다. */
+  const drawn = notes.length + fails.length;
+  check("instrument:every-axis-reported-a-row", drawn === ROWS, drawn + " rows against " + ROWS);
   console.log("표본 범위: veteran 손 모드 대기·왼쪽 누름·다음 두 구, rich 크레딧 봇 한 구와 그 다음 구, 1280x720");
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
