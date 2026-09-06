@@ -10,6 +10,9 @@ const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win6
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const OLD = "카드깡";
 const NEW = "이적시장";
+// 서는 두 회차. roster.mjs의 낱장 1과 PULL_BULK 10이고, 화면에도 이 순서로 선다.
+// 회차 뒤 단위 낱말이 사라져 버튼에는 수만 남았으므로, 그 수가 무엇인지는 이 값이 잡는다.
+const DRAWS = [1, 10];
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);
 t.unref();
@@ -81,15 +84,31 @@ try {
     const buys = [...document.querySelectorAll("#shop .buy.pull")];
     const det = document.querySelector("#shop .odds");
     const held = document.querySelector("#shop .held");
+    // 사람이 보는 자리만 센다. 상자가 없거나 꺼진 것은 화면에 없는 것이다.
+    const lit = (e) => {
+      if (!e || !e.getClientRects().length) return false;
+      const s = getComputedStyle(e);
+      return s.display !== "none" && s.visibility !== "hidden";
+    };
     return {
       n: buys.length,
-      // 회차와 값이 각자 자기 자리에 있는가. 값은 글자가 아니라 데이터에서 읽는다.
-      shaped: buys.map((e) => ({
-        times: (e.querySelector("b") || {}).textContent || "",
-        coin: e.querySelector("[data-coin]") ? Number(e.querySelector("[data-coin]").dataset.coin) : null,
-        ticket: Boolean(e.querySelector("i svg")),
-        text: e.textContent
-      })),
+      /* 회차와 값이 각자 자기 자리에 있는가. 회차는 큰 글자 자리가, 값은 그 아래 자리가 든다.
+         값은 데이터에서도 읽고 그려진 숫자로도 읽는다. 데이터만 읽으면 사람이 못 보는 값도 통과한다. */
+      shaped: buys.map((e) => {
+        const times = e.querySelector("b");
+        const slot = e.querySelector("i");
+        const px = e.querySelector("i .px[data-coin]");
+        return {
+          times: times ? times.textContent.trim() : "",
+          timesLit: lit(times),
+          coin: px ? Number(px.dataset.coin) : null,
+          // 값 자리에 그려진 숫자. 값을 치르는 회차면 육수 수이고, 이용권으로 다 내면 이용권 수다.
+          shown: slot ? slot.textContent.replace(/[^0-9]/g, "") : "",
+          priceLit: lit(slot),
+          icon: Boolean(slot && slot.querySelector("svg")),
+          text: e.textContent
+        };
+      }),
       oddsOpen: det ? det.open : null,
       oddsText: det ? (det.querySelector("em") || {}).textContent || "" : "",
       heldText: held ? held.textContent.trim() : null,
@@ -98,9 +117,14 @@ try {
   });
 
   check("instrument:both-draw-buttons-stand", shelf.n === 2, shelf.n + " buttons");
+  /* 회차 뒤 단위 낱말이 없어졌으니 낱말 대신 수를 읽는다. 몇 회인지는 그 수가 실제 회차와 같은지로,
+     얼마인지는 값 자리에 아이콘과 숫자가 같이 서 있고 그 숫자가 데이터와 같은지로 판정한다. */
   check("market:each-button-says-how-many-and-what-it-costs",
-    shelf.shaped.every((s) => /^[0-9]+회$/.test(s.times) && (s.coin !== null || s.ticket)),
-    shelf.shaped.map((s) => s.times + " " + (s.coin === null ? "ticket" : s.coin)).join(", "));
+    shelf.shaped.length === DRAWS.length && shelf.shaped.every((s, i) =>
+      /^[0-9]+$/.test(s.times) && Number(s.times) === DRAWS[i] && s.timesLit
+      && s.priceLit && s.icon && /^[0-9]+$/.test(s.shown)
+      && (s.coin === null || s.shown === String(s.coin))),
+    shelf.shaped.map((s) => s.times + " " + (s.coin === null ? "ticket " + s.shown : s.shown)).join(", "));
   // 버튼이 설명문이 되던 자리. 셋 다 장르가 상태로 말하는 것을 글자로 적고 있었다.
   const chatty = ["모자라다", "뿐이다", "내고", "다 모았다"];
   check("market:no-button-explains-itself-in-a-sentence",
@@ -116,6 +140,7 @@ try {
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 
+  console.log("표본 범위: 이적시장 기본 갈래의 두 회차 버튼, 그리고 화면 전체 옛 이름 스캔 한 바퀴");
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
   console.log(fails.length ? "market FAIL " + fails.length : "market PASS " + notes.length);
