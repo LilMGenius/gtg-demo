@@ -449,9 +449,9 @@ function seg(radius, len, color, tag, salt, cuff, span, girth, ink) {
   // 피벗 쪽에 두면 어깨 구와 몸통 측면에 묻혀 화면에 안 나온다.
   let m;
   if (Number.isFinite(ink)) {
-    /* 문신은 팔에 끼운 고리가 아니라 살갗에 새긴 그림이다. 고리로 그리면 등급이 굵기만 바꾸고
+    /* 문신은 팔에 끼운 고리가 아니라 맨살에 새긴 그림이다. 고리로 그리면 등급이 굵기만 바꾸고
        스티커와 이름 석 자와 먹토시가 화면에서 같은 물건으로 선다. 무늬를 캡슐 UV에 굽는다.
-       재질 색을 흰색으로 두고 소매 색까지 텍스처가 칠하는 이유는 texture.mjs inkTex가 적어 뒀다.
+       재질 색을 흰색으로 두고 소매 색까지 텍스처가 칠하는 이유는 texture.mjs inkTex가 적어 둔다.
        메시는 그대로 하나라 드로우콜도 그대로다. 고리 갈래는 반바지 밑단이 계속 쓴다. */
     m = new THREE.Mesh(geo, flatMap(0xffffff, inkTex(color, cuff, ink, span, girth)));
   } else if (cuff) {
