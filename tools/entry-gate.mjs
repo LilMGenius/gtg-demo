@@ -51,6 +51,31 @@ try {
   check("entry:currency-does-not-open-the-shop", hitPurse && !(await shown("shop")), hitPurse ? "shop " + (await shown("shop")) : "#purse missing");
   check("entry:currency-opens-how-to-earn", hitPurse && (await shown("earn")), hitPurse ? "earn " + (await shown("earn")) : "#purse missing");
 
+  // 재화 띠는 칩 셋이 한 손잡이 안에 선다. 하나만 눌러 나온 초록은 나머지 둘을 아무도 안 잰 초록이다.
+  const chips = await p.evaluate(() => document.querySelectorAll("#purse .cur").length);
+  const deaf = [];
+  for (let i = 0; i < chips; i += 1) {
+    await shut();
+    const c = (await p.$$("#purse .cur"))[i];
+    if (!c) { deaf.push("chip" + i); continue; }
+    await c.click({ force: true });
+    await p.waitForTimeout(240);
+    if (!(await shown("earn"))) deaf.push("chip" + i);
+  }
+  check("entry:every-currency-chip-opens-how-to-earn", chips >= 3 && deaf.length === 0,
+    chips + " chips, " + (deaf.join(",") || "all opened"));
+
+  // 버는 법은 문장이 아니라 표다. 항목 한 칸과 값 한 칸이고, 값 칸은 숫자거나 두 글자 명사다.
+  // 라벨 문법 계약이 값 자리에 허락하는 모양은 그 둘뿐이다.
+  await tap("#purse");
+  const sheet = await p.evaluate(() => [...document.querySelectorAll("#earn .ways .way")]
+    .map((row) => [...row.querySelectorAll("b,i")].map((cell) => cell.textContent.trim())));
+  const prose = sheet.filter((c) => c.length !== 2 || !(/^[0-9,]+$/.test(c[1]) || [...c[1]].length <= 2))
+    .map((c) => c.join(" | "));
+  check("entry:how-to-earn-answers-in-two-columns", sheet.length >= 4 && prose.length === 0,
+    prose.slice(0, 3).join(" / ") || sheet.length + " rows");
+  await shut();
+
   // 누름을 받는 것은 button이어야 한다. 글자 조각에 붙은 핸들러는 누를 수 있다는 신호를 화면에 안 낸다.
   const handlers = await p.evaluate(() => { const bad = []; for (const el of document.querySelectorAll("#hud *")) { if (!el.onclick && !el.onpointerdown) continue; if (el.tagName !== "BUTTON") bad.push((el.id || el.className || el.tagName) + ":" + el.tagName.toLowerCase()); } return bad; });
   check("affordance:every-hud-click-target-is-a-button", handlers.length === 0, handlers.join(", ") || "all buttons");

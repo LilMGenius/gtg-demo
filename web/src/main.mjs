@@ -331,10 +331,12 @@ function pips() {
     btn.dataset.who = who;
     btn.innerHTML = '<img alt="' + who + '" src="' + thumbURL('face', state.keeper, lookOf(state.gear, who)) + '">';
   }
-  el('fans').innerHTML = IC_FANS + '<b>' + state.fans.toLocaleString() + '</b>';
-  // 육수와 스폰은 갈래가 다른 잔고다. 붙여 두면 한 줄의 숫자 띠로 읽혀 어느 것으로 사는지가
-  // 상점을 열어야 아는 정보가 된다. 팔로워와 지갑을 가르는 것과 같은 세로선으로 둘을 가른다.
-  el('purse').innerHTML = '<span class="cur">' + IC_SWEAT + '<b>' + state.wallet.coin.toLocaleString() + '</b></span>'
+  /* 재화 띠. 팔로워와 육수와 스폰이 한 줄에 선다. 세 값은 갈래가 달라도 등급이 같아서,
+     따로 떨어져 있으면 지금 무엇을 얼마나 들고 있는지가 화면 두 자리를 읽어야 아는 값이 된다.
+     갈래는 크기가 아니라 칩 사이에 선 세로선이 가른다. 띠 전체가 한 손잡이라 어느 칩을 눌러도
+     버는 법이 열린다. */
+  el('purse').innerHTML = '<span class="cur" id="fans">' + IC_FANS + '<b>' + state.fans.toLocaleString() + '</b></span>'
+    + '<span class="cur">' + IC_SWEAT + '<b>' + state.wallet.coin.toLocaleString() + '</b></span>'
     + '<span class="cur">' + IC_SPON + '<i>' + state.wallet.cash.toLocaleString() + '</i></span>'
     // 남은 버프도 같은 줄에 선다. 몇 판 뒤에 꺼지는지를 상점을 열어야 알면 계획이 안 선다.
     + (state.buff.shots > 0 ? '<span class="cur">' + buffIcon(state.buff.kind) + '<u>' + state.buff.shots + '</u></span>' : '');
@@ -369,8 +371,15 @@ function aura() {
 /* 컨디션의 유일한 자리. 0.4는 화살표를 세우는 문턱이고, 이 값을 읽는 곳이 여기 하나뿐이라
    두 자리가 다른 수를 쓸 일이 없다. */
 function formChip() {
-  el('form').innerHTML = state.form > 0.4 ? '<span class="up">' + IC_UP + '</span>'
-    : state.form < -0.4 ? '<span class="dn">' + IC_DOWN + '</span>' : '';
+  const box = el('form');
+  const up = state.form > 0.4;
+  const dn = state.form < -0.4;
+  box.innerHTML = up ? '<span class="up">' + IC_UP + '</span>'
+    : dn ? '<span class="dn">' + IC_DOWN + '</span>' : '';
+  // 아이콘만 서는 자리라 이름은 라벨이 맡는다. 화살표가 없는 날은 빈 칸이고,
+  // 빈 칸에 이름을 붙이면 읽는 자에게 없는 것이 있다고 말한다.
+  if (up || dn) box.setAttribute('aria-label', '컨디션 ' + (up ? '좋음' : '나쁨'));
+  else box.removeAttribute('aria-label');
 }
 
 function setPad(on) {
@@ -1060,11 +1069,14 @@ function openGram() {
 function renderEarn() {
   const box = el('earn');
   const top = COIN_SAVE + COIN_FAME_STEP * 9;
+  /* 표 두 칸이다. 왼쪽은 버는 자리의 이름, 오른쪽은 값 하나. 값 옆에 한 줄짜리 설명을 달면
+     그 줄이 창에서 가장 긴 글자가 되어, 숫자를 읽으러 온 눈이 문장을 먼저 읽는다. */
   const ways = [
-    [IC_SWEAT, '막으면 ' + COIN_SAVE, '유명한 키커일수록 더 준다. 명단 최상급을 막으면 ' + top + '이다'],
-    [IC_SWEAT, '먹혀도 ' + COIN_CONCEDED, '못 막는 날에도 진행이 멈추지 않는다'],
-    [IC_SWEAT, '훈련 대신 ' + COIN_DRILL, '올릴 칸이 없을 때 훈련 한 회를 이 값으로 바꿔 받는다'],
-    [IC_SPON, '스폰은 결제로만', '결제 경로는 아직 안 열렸다. 지금은 저장 자리만 지킨다']
+    [IC_SWEAT, '막으면', COIN_SAVE],
+    [IC_SWEAT, '최상급', top],
+    [IC_SWEAT, '먹혀도', COIN_CONCEDED],
+    [IC_SWEAT, '훈련 대신', COIN_DRILL],
+    [IC_SPON, '스폰', '결제']
   ];
   const rows = ways.map((w) => '<div class="way">' + w[0] + '<b>' + w[1] + '</b><i>' + w[2] + '</i></div>').join('');
   box.innerHTML = '<h4>버는 법</h4><div class="ways">' + rows + '</div><button class="close">닫기</button>';

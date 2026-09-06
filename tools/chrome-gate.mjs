@@ -22,8 +22,13 @@ const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 
 // 화면 위 조작 전부. 상태 칩 #top은 조작이 아니라 표시라 여기 안 들어간다.
-// 갈래가 둘이다. 켜고 끄는 토글과 창을 여는 버튼은 다른 일을 하므로 다른 기둥에 선다.
-const TOGGLES = ["mute", "auto", "out"];
+// 갈래가 둘이다. 켜고 끄는 토글과 창을 여는 버튼은 다른 일을 하므로 다른 판때기를 쓴다.
+// 토글 안에서도 자리가 갈린다. 판을 굴리는 둘은 왼쪽 기둥에 서고, 소리는 판이 아니라
+// 기기를 만지는 설정이라 오른쪽 기둥 맨 위 제 칸을 쓴다. 판때기는 자리가 아니라 하는 일을
+// 따라가므로, 소리는 오른쪽으로 가서도 토글 판때기 그대로다.
+const PLAY = ["auto", "out"];
+const SETTINGS = ["mute"];
+const TOGGLES = SETTINGS.concat(PLAY);
 const OPENERS = ["gymBtn", "rosterBtn", "gramBtn", "shopBtn"];
 const IDS = TOGGLES.concat(OPENERS);
 
@@ -71,7 +76,8 @@ try {
     await fresh.close();
   }
 
-  const scan = await p.evaluate((ids) => {
+  const scan = await p.evaluate((arg) => {
+    const ids = arg.ids;
     const out = [];
     for (const id of ids) {
       const e = document.getElementById(id);
@@ -101,11 +107,19 @@ try {
     const lift = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--lift")) || 0;
     const span = (list) => list.map((id) => document.getElementById(id).getBoundingClientRect());
     const cols = {
-      toggleRight: Math.max(...span(["mute", "auto", "out"]).map((r) => r.right)),
-      openerLeft: Math.min(...span(["gymBtn", "rosterBtn", "gramBtn", "shopBtn"]).map((r) => r.left))
+      toggleRight: Math.max(...span(arg.play).map((r) => r.right)),
+      openerLeft: Math.min(...span(arg.openers).map((r) => r.left)),
+      settingsBottom: mute.bottom,
+      openerTop: Math.min(...span(arg.openers).map((r) => r.top))
     };
-    return { out, cols, chipGap: Math.round(mute.top - top.bottom), lift };
-  }, IDS);
+    /* 소리와 상태 칩이 세로로 겹쳐 있을 때는 위아래 거리 하나로 충분했다. 둘이 좌우로 갈라선
+       지금 세로만 재면 늘 0이 나와, 판때기가 칩에서 화면 반대편에 있어도 빨갛다.
+       갈라선 축을 재야 같은 질문이 계속 성립한다. 두 축 다 0이면 겹친 것이다. */
+    const dx = Math.max(0, Math.max(top.left - mute.right, mute.left - top.right));
+    const dy = Math.max(0, Math.max(top.top - mute.bottom, mute.top - top.bottom));
+    const chipGap = (dx === 0 && dy === 0) ? 0 : Math.round(Math.max(dx, dy));
+    return { out, cols, chipGap, lift };
+  }, { ids: IDS, play: PLAY, openers: OPENERS });
 
   check("instrument:every-control-was-found", scan.out.every((s) => !s.missing),
     scan.out.filter((s) => s.missing).map((s) => s.id).join(", ") || IDS.length + " controls");
@@ -123,6 +137,10 @@ try {
     [...plate(TOGGLES)].join(",") + " against " + [...plate(OPENERS)].join(","));
   check("chrome:the-two-kinds-stand-in-different-columns", scan.cols.toggleRight < scan.cols.openerLeft,
     "toggles end at " + scan.cols.toggleRight.toFixed(0) + "px, openers start at " + scan.cols.openerLeft.toFixed(0) + "px");
+  // 설정 칸은 창 기둥 위에 선다. 아래 버튼을 물면 소리를 끄려다 훈련장이 열린다.
+  check("chrome:the-settings-slot-clears-the-window-column",
+    scan.cols.openerTop - scan.cols.settingsBottom >= scan.lift,
+    Math.round(scan.cols.openerTop - scan.cols.settingsBottom) + "px against " + scan.lift + "px");
   // 칩과 버튼은 갈래가 다른 조작이라 gap 게이트가 안 본다. 여기서 본다.
   check("chrome:the-sound-toggle-clears-the-status-chip", scan.chipGap >= scan.lift,
     scan.chipGap + "px against " + scan.lift + "px");
