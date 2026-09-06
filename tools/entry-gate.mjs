@@ -53,7 +53,7 @@ try {
   await p.waitForTimeout(1200);
 
   const shown = (id) => p.evaluate((i) => { const e = document.getElementById(i); return Boolean(e) && !e.hidden; }, id);
-  const shut = async () => { await p.evaluate(() => { for (const i of ["me", "shop", "gym", "roster", "gram", "earn"]) { const e = document.getElementById(i); if (e) e.hidden = true; } document.body.classList.remove("panelOpen"); }); await p.waitForTimeout(120); };
+  const shut = async () => { await p.evaluate(() => { for (const i of ["me", "shop", "gym", "roster", "gram", "wiki"]) { const e = document.getElementById(i); if (e) e.hidden = true; } document.body.classList.remove("panelOpen"); }); await p.waitForTimeout(120); };
   const tap = async (sel) => { await shut(); const e = await p.$(sel); if (!e) return false; await e.click({ force: true }); await p.waitForTimeout(260); return true; };
 
   // 대조군. 이미 button인 훈련장이 훈련장을 연다. 여기가 거짓이면 이 자의 클릭이 안 닿는 것이다.
@@ -64,7 +64,7 @@ try {
   await p.mouse.click(640, 400);
   await p.waitForTimeout(200);
   const stray = [];
-  for (const id of ["me", "shop", "gym", "roster", "gram", "earn"]) if (await shown(id)) stray.push(id);
+  for (const id of ["me", "shop", "gym", "roster", "gram", "wiki"]) if (await shown(id)) stray.push(id);
   check("control:an-empty-spot-opens-nothing", stray.length === 0, stray.join(",") || "none");
 
   const hitMe = await tap("#meBtn");
@@ -73,7 +73,7 @@ try {
   check("entry:the-shop-has-its-own-button", hitShop && (await shown("shop")), hitShop ? "opened " + (await shown("shop")) : "#shopBtn missing");
   const hitPurse = await tap("#purse");
   check("entry:currency-does-not-open-the-shop", hitPurse && !(await shown("shop")), hitPurse ? "shop " + (await shown("shop")) : "#purse missing");
-  check("entry:currency-opens-how-to-earn", hitPurse && (await shown("earn")), hitPurse ? "earn " + (await shown("earn")) : "#purse missing");
+  check("entry:currency-opens-how-to-earn", hitPurse && (await shown("wiki")), hitPurse ? "wiki " + (await shown("wiki")) : "#purse missing");
 
   // 재화 띠는 칩 셋이 한 손잡이 안에 선다. 하나만 눌러 나온 초록은 나머지 둘을 아무도 안 잰 초록이다.
   const chips = await p.evaluate(() => document.querySelectorAll("#purse .cur").length);
@@ -84,7 +84,7 @@ try {
     if (!c) { deaf.push("chip" + i); continue; }
     await c.click({ force: true });
     await p.waitForTimeout(240);
-    if (!(await shown("earn"))) deaf.push("chip" + i);
+    if (!(await shown("wiki"))) deaf.push("chip" + i);
   }
   check("entry:every-currency-chip-opens-how-to-earn", chips >= 3 && deaf.length === 0,
     chips + " chips, " + (deaf.join(",") || "all opened"));
@@ -92,8 +92,8 @@ try {
   // 버는 법은 문장이 아니라 표다. 항목 한 칸과 값 한 칸이고, 값 칸은 숫자거나 두 글자 명사다.
   // 라벨 문법 계약이 값 자리에 허락하는 모양은 그 둘뿐이다.
   await tap("#purse");
-  const sheet = await p.evaluate(() => [...document.querySelectorAll("#earn .ways .way")]
-    .map((row) => [...row.querySelectorAll("b,i")].map((cell) => cell.textContent.trim())));
+  const sheet = await p.evaluate(() => [...document.querySelectorAll("#wiki .body tbody tr")]
+    .map((row) => [...row.querySelectorAll("th,td")].map((cell) => cell.textContent.trim())));
   const prose = sheet.filter((c) => c.length !== 2 || !(/^[0-9,]+$/.test(c[1]) || [...c[1]].length <= 2))
     .map((c) => c.join(" | "));
   check("entry:how-to-earn-answers-in-two-columns", sheet.length >= 4 && prose.length === 0,

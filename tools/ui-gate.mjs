@@ -54,9 +54,9 @@ try {
   await p.goto(URL, { waitUntil: "load" });
   await p.waitForTimeout(1200);
 
-  // 대조군 1. 조작법 패널은 처음에 접혀 있어야 한다.
-  const panelClosed = await p.evaluate(() => document.getElementById("helpPanel").hidden);
-  check("control:helpPanel-initially-folded", panelClosed === true, String(panelClosed));
+  // 대조군 1. 위키는 처음에 접혀 있어야 한다. 물음표를 눌러야 열린다.
+  const panelClosed = await p.evaluate(() => { const e = document.getElementById("wiki"); return e ? e.hidden : null; });
+  check("control:wiki-initially-folded", panelClosed === true, String(panelClosed));
 
   // 대조군 2. 가로에서는 회전 안내가 안 보이고 세로에서는 보여야 한다.
   const rotLand = await p.evaluate(() => getComputedStyle(document.getElementById("rotate")).display);

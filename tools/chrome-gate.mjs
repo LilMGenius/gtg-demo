@@ -174,7 +174,7 @@ try {
   // 판이 작은 훈련장에서는 그대로 읽혀서 같은 덮개가 창마다 다른 말을 했다.
   // 그래서 조작은 밝기가 아니라 좌표로 잰다. 뷰포트를 벗어나면 창마다 같은 말이 된다.
   // 칩은 잔고를 보며 사는 자리라 남아야 하고, 남는 이상 덮여야 한다.
-  const WINDOWS = ["shop", "gym", "roster", "gram", "me", "earn"];
+  const WINDOWS = ["shop", "gym", "roster", "gram", "me", "wiki"];
   const boxes = () => p.evaluate((ids) => ids.map((id) => {
     const r = document.getElementById(id).getBoundingClientRect();
     return { id, left: r.left, right: r.right, off: r.right <= 0 || r.left >= innerWidth };

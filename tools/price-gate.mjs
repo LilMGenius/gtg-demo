@@ -169,7 +169,7 @@ try {
 
   // 값이 없는 창에도 글자는 있다. 불렛과 옛 단위와 재화 이름은 값과 무관하게 나오므로
   // 값을 재는 축과 글자를 재는 축은 순회 목록이 다르다. 여기는 글자만 본다.
-  const PROSE = [["gram", "__gram"], ["me", "__me"], ["earn", "__earn"], ["top", null], ["caption", null]];
+  const PROSE = [["gram", "__gram"], ["me", "__me"], ["wiki", "__wiki"], ["top", null], ["caption", null]];
   let letters = "", oldUnit = "", dots = "", swept = 0;
   for (const [id, hook] of PROSE) {
     if (hook) { await p.evaluate((h) => { window[h](true); }, hook); await p.waitForTimeout(320); }

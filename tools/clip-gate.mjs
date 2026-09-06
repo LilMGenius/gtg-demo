@@ -21,7 +21,7 @@ t.unref();
 
 const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
-const WINS = ["shop", "gym", "roster", "gram", "me", "earn"];
+const WINS = ["shop", "gym", "roster", "gram", "me", "wiki"];
 
 let b;
 try {

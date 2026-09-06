@@ -83,31 +83,8 @@ try {
     const clipped = await p.evaluate(SCAN);
     check("title:" + tag + ":no-text-is-clipped", clipped.length === 0, clipped.join(", ") || "nothing overruns its box");
 
-    // 조작법은 접혀 있다가 눌러야 열린다. 처음부터 펼쳐져 있으면 이름이 화면에서 밀린다.
-    const folded = await p.evaluate(() => ({ hidden: document.getElementById("helpPanel").hidden, aria: document.getElementById("helpBtn").getAttribute("aria-expanded") }));
-    check("help:" + tag + ":starts-folded", folded.hidden === true && folded.aria === "false", "hidden " + folded.hidden + " aria " + folded.aria);
-    await p.click("#helpBtn");
-    await p.waitForTimeout(120);
-    const open = await p.evaluate(() => ({ hidden: document.getElementById("helpPanel").hidden, aria: document.getElementById("helpBtn").getAttribute("aria-expanded"), rows: document.querySelectorAll("#helpPanel li").length }));
-    check("help:" + tag + ":opens-with-rows", open.hidden === false && open.aria === "true" && open.rows >= 2, "hidden " + open.hidden + " aria " + open.aria + " rows " + open.rows);
-    const clippedOpen = await p.evaluate(SCAN);
-    check("help:" + tag + ":open-panel-is-not-clipped", clippedOpen.length === 0, clippedOpen.join(", ") || "nothing overruns its box");
-    const wrapped = await p.evaluate(WRAP);
-    check("help:" + tag + ":no-word-is-cut-across-lines", wrapped.length === 0, wrapped.slice(0, 3).join(", ") || "every break falls on a space");
-
-    // 바깥을 누르면 닫힌다. 닫는 길이 버튼 하나뿐이면 펼친 패널이 화면을 계속 가린다.
-    await p.mouse.click(Math.floor(w * 0.5), Math.floor(h * 0.85));
-    await p.waitForTimeout(120);
-    const byOutside = await p.evaluate(() => document.getElementById("helpPanel").hidden);
-    check("help:" + tag + ":outside-click-closes", byOutside === true, String(byOutside));
-    // 키보드로도 닫힌다.
-    await p.click("#helpBtn");
-    await p.waitForTimeout(120);
-    await p.keyboard.press("Escape");
-    await p.waitForTimeout(120);
-    const byEsc = await p.evaluate(() => ({ hidden: document.getElementById("helpPanel").hidden, aria: document.getElementById("helpBtn").getAttribute("aria-expanded") }));
-    check("help:" + tag + ":escape-closes", byEsc.hidden === true && byEsc.aria === "false", "hidden " + byEsc.hidden + " aria " + byEsc.aria);
-
+    /* 조작법 패널은 이 화면을 떠나 판 안의 위키로 옮겼다. 접힘과 여닫이를 재던 다섯 축은
+       그 표면을 따라가 wiki 게이트가 갖는다. 여기서는 타이틀이 이름과 문 하나만 세우는지를 본다. */
     // 시작하면 타이틀이 사라지고 몸통에 표시가 붙는다. 두 번 눌러도 한 번만 시작한다.
     await p.click("#go", { force: true });
     await p.waitForTimeout(400);
