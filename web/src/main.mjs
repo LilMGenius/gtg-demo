@@ -1303,21 +1303,29 @@ function fittedLook() {
   return lookOf(Object.assign({}, state.gear, fitting), state.keeper.name);
 }
 
-// 확률은 명단이 아니라 지금 남은 풀에서 다시 센다. 뽑을수록 남은 풀이 바뀌므로
-// 고정 문구를 걸면 뒤로 갈수록 화면이 거짓말을 한다.
+/* 확률은 명단이 아니라 지금 남은 풀에서 다시 센다. 뽑을수록 남은 풀이 바뀌므로
+   고정 문구를 걸면 뒤로 갈수록 화면이 거짓말을 한다.
+   등급은 셋으로 가르고 서로 안 겹치게 둔다. 겹치면 남은 수를 세로로 더했을 때 풀보다 커져,
+   표를 읽는 사람이 같은 카드를 두 번 센다. */
+const ODDS_BANDS = [
+  { name: '명성 10', at: (f) => f >= 10 },
+  { name: '명성 9', at: (f) => f === 9 },
+  { name: '명성 8 이하', at: (f) => f <= 8 }
+];
+
+// 등급 한 줄에 확률과 남은 수. 세 칸이 한 줄에 서므로 문장으로 잇지 않는다.
 function shopOdds(pool) {
   let total = 0;
-  let top = 0;
-  let high = 0;
-  for (const k of pool) {
-    const w = pullWeight(k);
-    total += w;
-    if (k.fame >= 10) top += w;
-    if (k.fame >= 9) high += w;
-  }
+  for (const k of pool) total += pullWeight(k);
   if (!total) return '';
-  // 두 확률을 점으로 잇지 않는다. 화면에서 그 점은 목록 기호로 읽히고, 값 둘이 한 항목처럼 붙는다.
-  return '명성 10이 나올 확률 ' + (top / total * 100).toFixed(1) + '%, 명성 9 이상은 ' + (high / total * 100).toFixed(1) + '%';
+  const rows = ODDS_BANDS.map((band) => {
+    const list = pool.filter((k) => band.at(Number(k.fame) || 0));
+    let w = 0;
+    for (const k of list) w += pullWeight(k);
+    return '<span><i>' + band.name + '</i><b>' + (w / total * 100).toFixed(1)
+      + '%</b><u>' + list.length + '</u></span>';
+  }).join('');
+  return '<span class="head"><i>등급</i><b>확률</b><u>남은 수</u></span>' + rows;
 }
 
 // 장비 칸 둘의 규칙이 같으므로 선반도 하나로 둔다. 선반을 칸마다 복제하면
@@ -1608,31 +1616,64 @@ function bindGear(box) {
 }
 
 
-/* 카드 한 장에 쓰는 시간. 뒤집기 0.34초가 끝나고도 앞면이 서 있어야 이름이 읽히므로
-   그보다 길어야 한다. 열 장이면 6.4초다. 상점 안 칩이 1.3초에 끝나던 것보다 길지만,
-   이 장르에서 뽑는 순간은 결과 통보가 아니라 파는 물건 자체다. 급하면 눌러서 건너뛴다.
-   명성 9 이상은 한 박자 더 세워 둔다. 마흔여섯 중 여덟이라 그 멈춤이 자주 오지 않는다. */
-const REVEAL_MS = 640;
-const RARE_HOLD_MS = 420;
-// 뒤집는 데 걸리는 시간. hud.css의 pullFlip과 같은 값이어야 앞면이 뒤집기 도중에 안 뜬다.
-const FLIP_MS = 340;
+/* 카드 한 장이 다섯 단을 지난다. 봉인, 등급 신호, 실루엣, 이름과 초상, 능력치 다섯 줄이고
+   마지막 단이 끝나면 그 장은 아래 줄로 축소되며 확정된다. 한 프레임에 다 털어놓으면 뽑는 순간이
+   결과 통보가 되는데, 이 장르에서 그 순간은 파는 물건 자체다. 급하면 눌러서 건너뛴다.
+   봉인이 0.3초인 것은 카드가 놓이는 0.16초가 끝난 뒤에도 뒷면이 한 박자 서 있어야 덮인 것으로
+   읽히기 때문이고, 실루엣이 0.34초로 가장 긴 것은 누구인지 묻는 자리이기 때문이다.
+   합이 한 장에 쓰는 시간이라 보통 1.6초이고 열한 장이면 18초다. */
+const STAGE_MS = [300, 400, 340, 240, 320];
+/* 등급 단만 카드마다 갈린다. 명성 9 이상은 0.4초에 0.8초를 더해 1.2초를 서고 나머지는 0.4초다.
+   마흔여섯 중 여덟이라 그 멈춤이 자주 안 오고, 세 배 차이라야 길어진 빛이 지연이 아니라 신호로 읽힌다. */
+const RARE_HOLD_MS = 800;
+// 등급 단의 번호. 위 표에서 두 번째 자리다.
+const BEAM_STAGE = 1;
+// 마지막 단의 번호. 다섯 단이므로 4다.
+const STAGE_LAST = STAGE_MS.length - 1;
+// 지금 카드가 선 단. 화면은 이 수 하나를 읽어 어느 층까지 보여 줄지 정한다.
+let pullStage = 0;
 
 // 한 장씩 연다. 예약을 하나만 들고 있으므로 다시 뽑으면 앞의 연출이 끊긴다.
 function revealNext() {
   revealTimer = 0;
   if (shown >= lastPull.length) return;
   shown += 1;
+  pullStage = 0;
   paintPull();
-  if (shown < lastPull.length) {
-    const rare = lastPull[shown - 1].fame >= 9;
-    revealTimer = setTimeout(revealNext, REVEAL_MS + (rare ? RARE_HOLD_MS : 0));
-  }
+  holdStage();
 }
 
-// 남은 것을 한 번에 연다. 기다리는 것이 연출이지 벌은 아니다.
+/* 한 단이 서 있는 시간만큼 기다렸다가 다음 단으로 올린다. 마지막 단이 끝나면 그 장은 확정이고,
+   남은 것이 있으면 다음 장이 온다. 예약이 하나라 건너뛰기가 이 사슬을 통째로 끊는다. */
+function holdStage() {
+  if (revealTimer) { clearTimeout(revealTimer); revealTimer = 0; }
+  const k = lastPull[Math.max(0, shown - 1)];
+  const rare = Boolean(k) && k.fame >= 9;
+  revealTimer = setTimeout(() => {
+    revealTimer = 0;
+    if (pullStage < STAGE_LAST) {
+      pullStage += 1;
+      paintStage();
+      holdStage();
+      return;
+    }
+    revealNext();
+  }, STAGE_MS[pullStage] + (rare && pullStage === BEAM_STAGE ? RARE_HOLD_MS : 0));
+}
+
+/* 단만 바꾼다. 판을 다시 그리면 그림이 단마다 다시 디코딩되고 카드가 놓이는 동작이 처음부터 돈다.
+   층은 이미 전부 서 있고 무엇이 보이는지는 hud.css가 이 수를 읽어 정한다. */
+function paintStage() {
+  const now = el('pull').querySelector('.now');
+  if (!now) return;
+  now.dataset.stage = String(pullStage);
+}
+
+// 남은 것을 한 번에 연다. 기다리는 것이 연출이지 벌은 아니다. 서 있던 장도 마지막 단까지 같이 열린다.
 function revealAll() {
   if (revealTimer) { clearTimeout(revealTimer); revealTimer = 0; }
   shown = lastPull.length;
+  pullStage = STAGE_LAST;
   paintPull();
 }
 
@@ -1640,33 +1681,59 @@ function stopReveal() {
   if (revealTimer) { clearTimeout(revealTimer); revealTimer = 0; }
   lastPull = [];
   shown = 0;
+  pullStage = 0;
   el('pull').hidden = true;
 }
 
+/* 카드 마지막 단에 서는 능력치 다섯 줄. 키퍼와 키커는 판정이 읽는 칸이 다르므로 표도 둘이다.
+   열다섯 칸을 다 세우면 카드가 아니라 명세서가 되므로, 그 사람을 고를 때 보는 칸만 올린다. */
+const PULL_STATS = {
+  keeper: ['diving', 'handling', 'reflex', 'judgement', 'agility'],
+  kicker: ['finishing', 'power', 'composure', 'curve', 'flair']
+};
+// 키커 칸 이름. 키퍼 쪽은 ledger의 CAUSE_LABEL이 이미 소유하므로 여기 다시 적지 않는다.
+const KICKER_LABEL = { finishing: '결정력', power: '슛파워', composure: '침착성', curve: '슛커브', flair: '개인기' };
+
+// 카드가 든 사람의 능력치 줄. 키퍼 칸이 없으면 키커다.
+function pullStatRows(k) {
+  const keys = k.diving === undefined ? PULL_STATS.kicker : PULL_STATS.keeper;
+  return keys.map((s) => '<span><i>' + (CAUSE_LABEL[s] || KICKER_LABEL[s]) + '</i><b>'
+    + (k[s] === undefined ? 0 : k[s]) + '</b></span>').join('');
+}
+
 /* 개봉 화면. 지금 서는 한 장과 이미 나온 줄과 남은 수를 그린다.
-   상점을 다시 그리지 않는다. 뒤에서 선반이 다시 서면 뒤집는 도중에 화면이 한 번 튄다. */
+   상점을 다시 그리지 않는다. 뒤에서 선반이 다시 서면 카드가 놓이는 도중에 화면이 한 번 튄다. */
 function paintPull() {
   const box = el('pull');
   if (!lastPull.length) { box.hidden = true; return; }
   const at = Math.max(0, shown - 1);
   const k = lastPull[at];
   const rare = k.fame >= 9;
-  const done = lastPull.slice(0, Math.max(0, shown - 1))
-    .map((c) => '<i class="' + (c.fame >= 9 ? 'rare' : '') + '">' + c.name + '</i>').join('');
+  // 이미 나온 줄. 마지막 칸만 방금 확정된 장이라 제자리로 축소되는 동작을 한 번 받는다.
+  const done = lastPull.slice(0, at)
+    .map((c, i) => '<i class="' + (c.fame >= 9 ? 'rare' : '') + (i === at - 1 ? ' just' : '')
+      + '">' + c.name + '</i>').join('');
   // 마지막 장까지 열렸으면 넘길 것이 없다. 그때부터 이 화면은 닫는 화면이다.
   const over = shown >= lastPull.length;
   box.innerHTML = '<div class="count">' + shown + ' / ' + lastPull.length + '</div>'
     /* 카드 안에 사람이 없으면 이름을 적은 빈 판이다. 선수단과 상점이 이미 쓰는 전신 그림을
-       그대로 굽는다. 걸친 것은 내 장비가 아니라 기본 차림이다. 아직 내 선수가 아니기 때문이다. */
-    + '<div class="now' + (rare ? ' rare' : '') + '"><u>' + k.fame + '</u>'
+       그대로 굽는다. 걸친 것은 내 장비가 아니라 기본 차림이다. 아직 내 선수가 아니기 때문이다.
+       층은 봉인부터 능력치까지 한 번에 세우고, 어느 층이 보이는지는 data-stage가 정한다. */
+    + '<div class="now' + (rare ? ' rare' : '') + '" data-stage="' + pullStage + '">'
+    + '<span class="seal"></span>'
+    // 등급 신호는 테두리 안쪽을 도는 빛이고, 서 있는 길이를 카드가 직접 들고 온다.
+    + '<span class="beam" style="--beam-ms:'
+    + (STAGE_MS[BEAM_STAGE] + (rare ? RARE_HOLD_MS : 0)) + 'ms"></span>'
+    + '<u>' + k.fame + '</u>'
     + '<img alt="' + k.name + '" src="' + thumbURL('card', k, lookOf({}, k.name)) + '">'
-    + '<b>' + k.name + '</b></div>'
+    + '<div class="foot"><b>' + k.name + '</b>'
+    + '<div class="stats">' + pullStatRows(k) + '</div></div></div>'
     + '<div class="done">' + done + '</div>'
     /* 누름을 받는 것은 판이 아니라 버튼이다. div에 핸들러를 걸면 누를 수 있다는 신호가
        화면에 안 남고 키보드로는 닿지도 않는다. 판 전체를 덮는 투명 버튼이 그 자리를 맡는다. */
-    + '<button class="tap">' + (over ? '눌러서 닫기' : '눌러서 건너뛰기') + '</button>';
+    + '<button class="tap">' + (over ? '닫기' : '건너뛰기') + '</button>';
   box.hidden = false;
-  // 애니메이션은 클래스를 다시 붙여야 다시 돈다. 같은 노드를 재사용하면 두 번째 장이 안 뒤집힌다.
+  // 놓이는 동작은 클래스를 다시 붙여야 다시 돈다. 같은 노드를 재사용하면 두 번째 장이 안 움직인다.
   const now = box.querySelector('.now');
   void now.offsetWidth;
   now.classList.add('turn');
@@ -1677,7 +1744,6 @@ function paintPull() {
     onboardStep();
   };
 }
-
 
 /* 첫 진입. 가입 직후 아무것도 안 뽑고 시작하면 첫 키퍼와 주전 열하나가 조용히 배정된다.
    플레이어는 자기가 무엇을 들고 시작하는지를 본 적이 없고, 이 장르가 파는 첫 순간을 건너뛴다.
@@ -1769,17 +1835,19 @@ function pullShelf(all) {
       + (want === PULL_BULK ? '<s>+' + PULL_BONUS + '</s>' : '')
       + '<b>' + want + '</b><i>' + price + '</i></button>';
   }).join('');
-  /* 확률은 사는 자리가 아니라 확인하는 자리다. 본문에 두 줄로 깔면 살 것을 고르는 눈이
-     매번 그 줄을 지나간다. 눌러야 열리는 칸으로 뺀다. */
+  /* 확률과 남은 카드는 사는 자리가 아니라 확인하는 자리다. 본문에 깔면 살 것을 고르는 눈이
+     매번 그 줄을 지나가므로, 표시 하나로 접어 두고 눌렀을 때만 선반 위에 뜬다.
+     문장이 아니라 표다. 등급과 확률과 남은 수가 세 칸으로 서면 어느 등급이 몇 장 남았는지가
+     한 줄에서 끝난다. */
   const odds = pool.length
-    ? '<details class="odds"><summary>확률과 남은 카드</summary><em>' + shopOdds(pool)
-      + '<br>남은 카드 ' + pool.length + '장</em></details>'
+    ? '<details class="odds"><summary aria-label="확률과 남은 카드"><i>i</i></summary><em>'
+      + shopOdds(pool) + '</em></details>'
     : '';
   /* 보유 이용권은 문장이 아니라 숫자다. 지금 몇 장 있다고 말하는 대신 아이콘 옆에 수를 세운다.
      이 갈래가 이용권을 안 받으면 그 줄을 안 세운다. 없는 자원을 설명하는 줄은 읽을 것만 는다. */
   const bank = kind.ticketable ? '<span class="held">' + IC_TICKET + '<b>' + state.tickets + '</b></span>' : '';
   return '<h4>이적시장</h4>' + tabs + '<div class="card">'
-    + '<div class="lede"><em>' + kind.note + '</em>' + bank + '</div>' + odds
+    + '<div class="lede"><em>' + kind.note + '</em>' + bank + odds + '</div>'
     + '<div class="buys">' + rows + '</div>'
     + '</div>';
 }// 봇은 소모형이라 SHELVES에 못 넣는다. 등급을 갖는 게 아니라 분을 갖는다.
