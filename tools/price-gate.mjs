@@ -53,8 +53,9 @@ const NOUN_MAX = 2;
 const VALUE = "^[+]?[0-9,]+$";
 // 문장 끝. 종결 어미나 마침표로 끝나면 그것은 라벨이 아니라 문장이다.
 const SENTENCE = "(?:다|요)$|[.!?]$";
-// 이름 자리는 종결 어미 자를 못 받는다. 명단의 사람 이름 '레이나요'가 문장으로 잡힌다.
-const STOP = "[.!?]$";
+// 이름 자리도 문장은 못 받는다. 빼는 것은 '요' 하나뿐이고, 명단의 사람 이름 둘이 그 글자로 끝난다
+// (레이나요, 아구찜해요). 측정: 이름 자리에 서는 글자 257칸 중 '다'로 끝나는 것 0, 마침표로 끝나는 것 0.
+const STOP = "(?:다)$|[.!?]$";
 // 두 글자를 넘지만 계획 todo 4가 이름으로 지정한 상태 라벨. 지금은 하나뿐이고,
 // 이 목록이 길어지는 만큼 계약이 헐거워지므로 늘릴 때는 계획 문서가 근거여야 한다.
 const LONG_STATES = ["상위 보유"];
@@ -291,6 +292,27 @@ try {
     (OLD_LABELS.length - missedOld.length) + "/" + OLD_LABELS.length
     + (missedOld.length ? " missed " + missedOld.join(" | ") : " planted and caught"));
   await p.evaluate(() => { const q = document.getElementById("labelProbe"); if (q) q.remove(); });
+  // 이름 자리도 같은 문장을 받아야 한다. 탭과 갈래는 이름을 들어서 길이 자를 못 대는 자리인데,
+  // 문장 자까지 같이 빠져 있으면 그 두 자리는 계약 밖이 된다. 지운 탭 안내문을 세 자리에 심어 본다.
+  const NOTICE = "봇이 대신 막은 슛에는 팔로워가 안 붙는다";
+  await p.evaluate((s) => {
+    const box = document.createElement("div");
+    box.id = "slotProbe";
+    for (const cls of ["", "tab", "kind"]) {
+      const b = document.createElement("button");
+      if (cls) b.className = cls;
+      b.textContent = s;
+      box.appendChild(b);
+    }
+    document.querySelector("#shop .goods").appendChild(box);
+  }, NOTICE);
+  await p.waitForTimeout(120);
+  const plantedSlots = await p.evaluate(labelHits, Object.assign({ sel: "#slotProbe" }, labelCfg));
+  const slotHits = plantedSlots ? plantedSlots.sentence.concat(plantedSlots.shape) : [];
+  const slotCaught = slotHits.filter((s) => s === NOTICE).length;
+  check("instrument:a-sentence-in-a-name-slot-is-caught", slotCaught === 3,
+    slotCaught + "/3 planted in a plain button, a tab and a kind");
+  await p.evaluate(() => { const q = document.getElementById("slotProbe"); if (q) q.remove(); });
   // 부족 분기는 rich 프리셋에서 한 번도 안 그려진다. 지갑을 비워야 서는 자리라
   // 라벨 계약도 색도 이 판에서만 잴 것이 있다. 잰 뒤에는 값을 되돌린다.
   const coinFull = await p.evaluate(() => window.__wallet().coin);
@@ -378,8 +400,15 @@ try {
   await sweepLabels("poor:fitting", "#shop .fitting");
   const shortNodes = await p.evaluate(() => document.querySelectorAll("#shop .bad-price").length);
   await p.evaluate((c) => { window.__wallet().coin = c; }, coinFull);
-  check("instrument:the-drained-wallet-drew-the-shortfall-branch", shortSeen >= 11 && shortNodes > 0,
-    shortSeen + " shortfall digits over " + shopTabs.length + " shelves, " + shortNodes + " nodes on the last one");
+  // 걸쳐 본 것도 도로 벗긴다. 값만 되돌리고 나가면 뒤의 축들이 청구서가 선 시착실을 보고,
+  // 이 자가 만든 상태가 다음 축의 표본이 된다. 무르는 자리는 화면이 이미 들고 있다.
+  const strip = p.locator("#shop .fitting .strip");
+  if (await strip.count()) await strip.click({ force: true });
+  await p.waitForTimeout(180);
+  const basket = await p.evaluate(() => document.querySelectorAll("#shop .fitting .tried i[data-off]").length);
+  check("instrument:the-drained-wallet-drew-the-shortfall-branch", shortSeen >= 11 && shortNodes > 0 && basket === 0,
+    shortSeen + " shortfall digits over " + shopTabs.length + " shelves, " + shortNodes
+    + " nodes on the last one, basket " + basket + " after the strip");
   check("instrument:an-affordable-digit-on-the-same-shelf-stays-warm",
     warmSeen.length >= 10 && warmSeen.every((w) => w.bad === 0 && w.warm > 0),
     warmSeen.length + " controls, lowest warm " + (warmSeen.length ? Math.min.apply(null, warmSeen.map((w) => w.warm)) : -1)
