@@ -89,7 +89,9 @@ try {
     return {
       tabs,
       current: [...box.querySelectorAll('.tab[aria-current="true"]')].map((e) => e.dataset.tab),
-      stats: box.querySelectorAll(".grid span").length,
+      /* 자식 선택자다. span 하나로 세면 칸 안의 이름 span까지 같이 세어 열다섯이 서른으로 찍힌다.
+         문턱은 그대로 전부 보이는가이고, 바뀌는 것은 찍히는 수가 진짜 칸 수인지다. */
+      stats: box.querySelectorAll(".grid > span").length,
       logs: box.querySelectorAll(".log span").length,
       // 라포 줄은 사람에게 붙은 버튼을 들고 있다. 그 버튼이 곧 그 칸의 표식이다.
       faces: box.querySelectorAll(".note .go").length,
@@ -97,7 +99,18 @@ try {
       shot: box.querySelector(".wear .shot img") ? 1 : 0,
       // 첫 단. 누구를 보고 있는지가 초상과 이름과 레벨과 컨디션으로 선다.
       head: {
-        face: (() => { const im = box.querySelector("h4 img"); return im ? im.naturalWidth : 0; })(),
+        /* 그려진 상자를 잰다. naturalWidth는 구운 그림의 원래 크기라, 규칙이 통째로 안 걸려
+           초상이 0px으로 서 있어도 448을 낸다. 실측으로 21e0f33이 정확히 그 상태였다. */
+        face: (() => {
+          const im = box.querySelector("h4 img");
+          const h4 = box.querySelector("h4");
+          if (!im || !h4) return { w: 0, h: 0, inside: false };
+          const r = im.getBoundingClientRect();
+          const q = h4.getBoundingClientRect();
+          return { w: Math.round(r.width), h: Math.round(r.height),
+            inside: r.width > 0 && r.height > 0 && r.top >= q.top - 1 && r.bottom <= q.bottom + 1
+              && r.left >= q.left - 1 && r.right <= q.right + 1 };
+        })(),
         text: box.querySelector("h4") ? box.querySelector("h4").textContent.trim() : "",
         cond: box.querySelectorAll("h4 .cond svg").length
       },
@@ -127,7 +140,7 @@ try {
         const pane = box.querySelector(".pane");
         if (!pane) return 0;
         const r = pane.getBoundingClientRect();
-        return [...box.querySelectorAll(".grid span")].filter((e) => {
+        return [...box.querySelectorAll(".grid > span")].filter((e) => {
           const q = e.getBoundingClientRect();
           return q.top >= r.top - 1 && q.bottom <= r.bottom + 1;
         }).length;
@@ -206,9 +219,14 @@ try {
     tb ? tb.rows + " rows against " + ledger.n + " in the ledger" : "no table");
 
   // 첫 단. 초상과 이름과 레벨은 늘 서 있고 컨디션은 값이 있을 때만 선다.
-  const headOk = TABS.every((id) => seen[id].head.face > 0 && /Lv ?[0-9]/.test(seen[id].head.text));
+  /* 잘라 낸 초상은 정사각이다. 상자를 안 받은 img는 제 칸을 채우고 늘어나므로, 정사각인지를
+     묻는 것이 크기 상수를 여기 다시 적지 않고 규칙이 걸렸는지 묻는 방법이다.
+     실측으로 21e0f33의 초상이 454x217이었고 naturalWidth는 그때도 448이었다. */
+  const square = (f) => f.w > 0 && f.inside && Math.abs(f.w - f.h) <= 1;
+  const headOk = TABS.every((id) => square(seen[id].head.face) && /Lv ?[0-9]/.test(seen[id].head.text));
   check("mepane:the-top-tier-carries-the-face-and-the-level", headOk,
-    TABS.map((id) => id + " face " + seen[id].head.face).join(", ") + " text " + JSON.stringify(seen.stat.head.text));
+    TABS.map((id) => id + " face " + seen[id].head.face.w + "x" + seen[id].head.face.h
+      + " inside " + seen[id].head.face.inside).join(", ") + " text " + JSON.stringify(seen.stat.head.text));
   /* 컨디션. 상단 칩이 그 값의 유일한 소유자라 여기서는 칩이 낸 판정을 그대로 옮긴다.
      기복은 판당 한 번 굴러서 기다릴 수 없으므로 값을 넣어 두 상태를 다 본다.
      대조군이 없으면 늘 서 있는 아이콘 하나로도 이 축이 통과한다. */
@@ -253,6 +271,8 @@ try {
       kinds: [...box.querySelectorAll(".kind")].map((e) => ({
         pos: e.dataset.pos,
         sel: e.getAttribute("aria-selected"),
+        // 강조는 그려진 색으로 잰다. aria만 재면 규칙이 통째로 안 걸린 날에도 초록이 난다.
+        bg: getComputedStyle(e).backgroundColor,
         icon: e.querySelectorAll("svg").length,
         text: (e.querySelector("span") || e).textContent.trim()
       })),
@@ -305,7 +325,45 @@ try {
     flat.length + " cards, " + blind.length + " faceless, " + nameless.length + " nameless, "
     + stateless.length + " without a state or a price"
     + (stateless.length ? " first " + stateless[0].pos + " " + JSON.stringify(stateless[0].c) : ""));
-  await p.evaluate(() => window.__roster(false));
+  /* 강조. 열린 탭이 나머지 셋과 다른 색으로 서 있는가. 이 랩에서 통째로 빠졌던 자리다.
+     규칙 다섯이 다른 규칙 안에 갇힌 채 실려 나갔고, aria만 재던 자는 그 상태로도 초록을 냈다.
+     실측으로 그때 열린 탭과 닫힌 탭의 배경이 둘 다 rgb(240,240,240)이었다. */
+  const paint = POS.map((pos) => {
+    const on = board[pos].kinds.find((k) => k.sel === "true");
+    const off = board[pos].kinds.filter((k) => k.sel !== "true").map((k) => k.bg);
+    return { pos, on: on ? on.bg : "none", off,
+      ok: Boolean(on) && off.length === 3 && off.every((c) => c !== on.bg) };
+  });
+  check("roster:the-open-position-is-painted-apart-from-the-shut-ones", paint.every((r) => r.ok),
+    paint.map((r) => r.pos + " " + r.on + " against " + (r.off[0] || "none")).join(", "));
+
+  /* 대조군. 창을 닫고 다시 열면 골키퍼 칸이다. 내 정보의 칸이 이미 같은 규칙을 쓰고 있고,
+     남겨 두면 다음에 연 사람이 남의 포지션을 먼저 보고 자기 키퍼를 찾으러 탭을 눌러야 한다. */
+  await p.click('#roster .kind[data-pos="' + POS[3] + '"]', { force: true });
+  await p.waitForTimeout(220);
+  await p.evaluate(() => { window.__roster(false); window.__roster(true); });
+  await p.waitForTimeout(400);
+  const back = await rosterRead();
+  const open = back.kinds.filter((k) => k.sel === "true").map((k) => k.pos);
+  check("control:reopening-the-squad-lands-on-the-keeper-tab", open.join("") === POS[0],
+    "shut on " + POS[3] + ", opened on " + (open.join("/") || "none") + " with " + back.keys.length + " cards");
+
+  /* 손가락 바닥. 초상화 버튼이 이미 44px을 쓰고 탭만 그 아래였다(실측 39px과 41px).
+     좁은 화면에서 재는 이유는 탭 높이가 글자 토큰을 타고 화면 폭을 따라 줄기 때문이다. */
+  const TOUCH = 44;
+  await p.setViewportSize({ width: 740, height: 360 });
+  await p.waitForTimeout(450);
+  const kindH = await p.evaluate(() => [...document.querySelectorAll("#roster .kind")]
+    .map((e) => Math.round(e.getBoundingClientRect().height)));
+  await p.evaluate(() => { window.__roster(false); window.__me(true); });
+  await p.waitForTimeout(450);
+  const tabH = await p.evaluate(() => [...document.querySelectorAll("#me .tab")]
+    .map((e) => Math.round(e.getBoundingClientRect().height)));
+  await p.evaluate(() => window.__me(false));
+  const floor = kindH.concat(tabH);
+  check("layout:every-tab-clears-the-touch-floor-at-740x360",
+    floor.length === 7 && floor.every((v) => v >= TOUCH),
+    "position tabs " + kindH.join("/") + ", profile tabs " + tabH.join("/") + " against " + TOUCH + "px");
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
