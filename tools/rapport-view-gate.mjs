@@ -5,9 +5,11 @@ import { rapportTier, rapportGazeAid, rapportBoost } from '../web/src/state/rapp
 const FIX = { '0:0': 15, '0:2': 8, '0:3': 2 };
 const URL = 'http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran';
 const HEAD = '아는 얼굴';
-const SUB = '말 섞은 만큼 한눈을 덜 판다';
+// 머리글 옆 자리는 문장에서 낱말로 줄었다. 화면이 든 낱말 그대로 못 박아 문장이 되돌아오면 잡는다
+const SUB = '라포';
 const RECORD = '상대 전적';
-const EMPTY = '아직 얼굴을 튼 사람이 없다';
+// 0단계 줄이 드는 낱말. 이 자리도 문장이었고, 상수로 두어야 되돌아간 날 축이 먼저 빨개진다
+const TIER0 = '초면';
 
 const fails = [];
 const notes = [];
@@ -62,6 +64,12 @@ async function run(fixture) {
       };
       card.scrollTop = 0;
       const atTop = read();
+      // 머리글은 칸을 열자마자 눈에 들어와야 한다. DOM에 있다는 것과 사람이 본다는 것은 다르다.
+      // 두루마리 맨 위에서 재고, 넓이와 높이가 0이 아니며 카드 상자 안에 들어와 있어야 한다.
+      const cardTop = card.getBoundingClientRect();
+      const hr = head >= 0 ? kids[head].getBoundingClientRect() : null;
+      const headSeen = Boolean(hr && hr.width > 0 && hr.height > 0
+        && hr.top >= cardTop.top - 1 && hr.bottom <= cardTop.bottom + 1);
       // 한 위치에서 세 줄이 동시에 보이는지는 줄 높이가 늘면 깨지는 우연이다.
       // 축이 재려던 것은 도달 가능성이므로 줄마다 따로 불러 그때 카드 안에 있는지 본다.
       const reach = rows.map((n) => {
@@ -74,6 +82,7 @@ async function run(fixture) {
       const atBottom = read();
       return {
         headPresent: head >= 0,
+        headSeen,
         headSub: head >= 0 && kids[head].querySelector('i') ? kids[head].querySelector('i').textContent : '',
         rows: rows.map((n) => ({ b: n.querySelector('b').textContent, i: n.querySelector('i') ? n.querySelector('i').textContent : '' })),
         dim,
@@ -89,10 +98,12 @@ async function run(fixture) {
   } finally { await b.close(); }
 }
 
+// 0단계 줄에는 '단계'가 없다. indexOf가 -1이면 slice(i, -1)이 끝 글자를 먹으므로 꼬리가 없으면 끝까지 본다
 const num = (s, head, tail) => {
   const i = s.indexOf(head);
   if (i < 0) return NaN;
-  const rest = tail ? s.slice(i, s.indexOf(tail, i)) : s.slice(i);
+  const end = tail ? s.indexOf(tail, i) : -1;
+  const rest = end < 0 ? s.slice(i) : s.slice(i, end);
   const m = rest.match(/-?\d+/);
   return m ? Number(m[0]) : NaN;
 };
@@ -100,9 +111,16 @@ const num = (s, head, tail) => {
 const main = await run(FIX);
 const ctrl = await run({});
 
-// 대조군: 같은 주입 경로, 라포만 비운다. 표본 0으로 통과하는 축을 막는다
-check('ctrl:empty-rapport-note-only', ctrl.shot.headPresent && ctrl.shot.rows.length === 0 && ctrl.shot.dim.some((t) => t.includes(EMPTY)), 'rows=' + ctrl.shot.rows.length + ' dim=' + ctrl.shot.dim.length);
-check('view:head-note-present', main.shot.headPresent && main.shot.headSub === SUB, 'head=' + main.shot.headPresent);
+/* 대조군: 같은 주입 경로, 라포만 비운다. 표본 0으로 통과하는 축을 막는다.
+   빈 상태를 알리던 문장은 지워졌고 빈 줄 하나가 그 자리다. 그래서 묻는 것은 넷이다.
+   머리글이 눈에 들어와 있는가, 줄이 하나도 없는가, 빈 줄이 하나 서 있는가, 그 줄이 정말 빈가.
+   마지막 하나가 지워진 문장을 안 적고도 문장이 되돌아온 날을 잡는다. */
+check('ctrl:empty-rapport-note-only',
+  ctrl.shot.headSeen && ctrl.shot.rows.length === 0 && ctrl.shot.dim.length === 1
+  && ctrl.shot.dim.every((t) => t.trim() === ''),
+  'rows=' + ctrl.shot.rows.length + ' dim=' + ctrl.shot.dim.length + ' text=' + JSON.stringify(ctrl.shot.dim.join('')));
+check('view:head-note-present', main.shot.headSeen && main.shot.headSub === SUB,
+  'head=' + JSON.stringify(main.shot.headSub) + ' seen=' + main.shot.headSeen);
 
 const keys = Object.keys(FIX).sort((x, y) => FIX[y] - FIX[x]);
 check('view:row-count-matches-keys', main.shot.rows.length === keys.length, main.shot.rows.length + '/' + keys.length);
@@ -121,7 +139,7 @@ keys.forEach((k, idx) => {
   const tier = rapportTier(FIX, 0, passer);
   const gotAid = num(row.i, '한눈팔기', '감소');
   const gotFans = num(row.i, '팔로워');
-  const tierOk = tier === 0 ? row.i.includes('얼굴만 익었다') : row.i.includes(String(tier) + '단계');
+  const tierOk = tier === 0 ? row.i.includes(TIER0) : row.i.includes(String(tier) + '단계');
   if (counts[idx] !== FIX[k] || gotAid !== aid || gotFans !== fans || !tierOk) {
     mismatch.push(k + ' screen=' + counts[idx] + '/' + gotAid + '/' + gotFans + ' calc=' + FIX[k] + '/' + aid + '/' + fans + ' tier=' + tier);
   }
