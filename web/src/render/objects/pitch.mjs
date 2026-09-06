@@ -1,9 +1,9 @@
 // 무대. 흙 운동장 하나와 그 너머를 채우는 것들이다.
 import * as THREE from '../../../vendor/three.module.min.js';
-import { flat, flatMap, flatVertex, mergeGeos, R_HALF_W, R_H } from '../units.mjs';
+import { flat, flatMap, flatLit, flatVertex, mergeGeos, R_HALF_W, R_H } from '../units.mjs';
 import { dirtTex, scuffTex, paintScuffBase, clothTex, chippedTex, cloudTex, windowTex, windowTexFor } from '../texture.mjs';
 import { loadDecor } from '../decor.mjs';
-import { jitterMesh, seeded, addOutline } from '../handmade.mjs';
+import { jitterMesh, seeded, addOutline, INK } from '../handmade.mjs';
 import { MARK_LINES, ARC_R, ARC_HALF, SPOT_Z, FAR_W } from './markspec.mjs';
 import { addFace } from './actors.mjs';
 import { skinAt } from '../../state/gear.mjs';
@@ -129,21 +129,28 @@ export function meshPanel(w, h, cell, color, opacity, sag = 0, fadeFloor = false
   return m;
 }
 
+// 페널티 박스 판의 중심. 그림자 카메라가 덮을 땅이 이 판이라 조명 쪽도 같은 수를 읽는다.
+// 두 곳이 각자 8.2를 들고 있으면 판을 옮긴 날 그림자만 옛 자리를 비춘다.
+export const BOX_Z = 8.2;
+
 export function buildPitch(scene) {
   // 흙바닥. 잔디가 아니다. 동네 운동장이 이 게임의 무대다.
   // 단색 흙은 카펫으로 읽힌다. 얼룩과 발자국과 잔모래가 있어야 밟은 땅이 된다.
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), flatMap(0x9c7a4a, dirtTex()));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), flatLit(0x9c7a4a, dirtTex()));
   ground.rotation.x = -Math.PI / 2;
   ground.position.z = 24;
   ground.name = 'ground';
+  // 그림자를 받는 두 판. 몸이 드리운 그늘은 여기 말고 앉을 자리가 없다.
+  ground.receiveShadow = true;
   scene.add(ground);
 
   // 박스 안은 더 밟힌다. 같은 잡티를 다른 배율로 물려야 한 장이 두 땅으로 읽힌다.
   const scuff = scuffTex();
-  const box = new THREE.Mesh(new THREE.PlaneGeometry(16.5, 16.5), flatMap(0xb08e58, scuff));
+  const box = new THREE.Mesh(new THREE.PlaneGeometry(16.5, 16.5), flatLit(0xb08e58, scuff));
   box.rotation.x = -Math.PI / 2;
-  box.position.set(0, 0.01, 8.2);
+  box.position.set(0, 0.01, BOX_Z);
   box.name = 'box';
+  box.receiveShadow = true;
   scene.add(box);
 
   // 몸이 흙에 닿으면 흙이 파인다. 다음 구에 그 자리가 새 땅이면 방금 넘어진 일은 없던 일이 된다.
@@ -229,7 +236,9 @@ export function buildPitch(scene) {
     p.position.set(x, R_H / 2, 0);
     p.name = 'post';
     // 골대는 판정 경계다. 굵기를 흔들면 어디까지가 골인지 눈이 헷갈린다. 선만 얹는다.
-    addOutline(p, 0.02);
+    addOutline(p, INK.post);
+    // 골대도 그림자를 드리운다. 기둥 그늘이 없으면 골대만 땅에서 떠 보인다.
+    p.castShadow = true;
     // 완전한 수직은 새로 세운 규격 골대다. 동네 골대는 조금 기울어 있다.
     // 좌우를 같은 각도로 반대로 눕히면 그것도 대칭이다. 거울을 대면 겹친다.
     // 한쪽은 거의 서 있고 한쪽만 눈에 띄게 눕는다. 누가 한 번 들이받은 골대다.
@@ -240,7 +249,8 @@ export function buildPitch(scene) {
   bar.rotation.z = Math.PI / 2;
   bar.position.set(0, R_H, 0);
   bar.name = 'bar';
-  addOutline(bar, 0.02);
+  addOutline(bar, INK.post);
+  bar.castShadow = true;
   scene.add(bar);
 
   // 골망. 뒷면 한 장이 아니라 상자다. 평면 하나면 골대에 깊이가 없다.

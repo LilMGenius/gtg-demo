@@ -2,11 +2,27 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { GOAL_HALF_W, GOAL_H } from '../../../src/chain.mjs';
 
-export const flat = (c) => new THREE.MeshLambertMaterial({ color: c });
+/* 밝기를 세 단으로 끊는 자. 램버트는 면을 매끄럽게 깎아 3D 렌더로 읽히고, 끊긴 면은 그림으로 읽힌다.
+   Nearest로 물려야 단 사이가 계단으로 남는다. 선형으로 물리면 다시 매끄러운 면이 된다.
+   값은 셋이고 칸은 넷이다. 칸 수가 경계 자리를 정하기 때문이다. 세 칸이면 경계가 dotNL 0.33 두 곳에
+   못 박히는데, 카메라가 보는 등은 왼쪽 끝 -0.56에서 오른쪽 끝 0.56까지 가고 가운데가 0.37이라
+   그 경계로는 어두운 단이 왼쪽 한 줄만 먹었다. 실측으로 유니폼 화소의 4에서 10퍼센트였다.
+   네 칸이면 경계가 0과 0.5에 서고 등이 셋으로 갈린다. 값 0과 0.35와 1.0은 램버트가 그 세 구간에서
+   내던 평균 0과 0.25와 0.75 위에 얹은 것이라, 밝기는 그 자리에 두고 경계만 세운다. */
+const RAMP = new THREE.DataTexture(new Uint8Array([0, 0, 89, 255]), 4, 1, THREE.RedFormat);
+RAMP.minFilter = THREE.NearestFilter;
+RAMP.magFilter = THREE.NearestFilter;
+RAMP.generateMipmaps = false;
+RAMP.needsUpdate = true;
+
+export const flat = (c) => new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP });
 // 같은 색에 잡티를 얹은 재질. 색은 flat과 같고 밝기만 흔들린다.
-export const flatMap = (c, tex) => new THREE.MeshLambertMaterial({ color: c, map: tex });
+export const flatMap = (c, tex) => new THREE.MeshToonMaterial({ color: c, map: tex, gradientMap: RAMP });
 // 정점색을 쓰는 재질. 재질 색과 곱해지므로 밑색은 흰색에 가깝게 둔다.
-export const flatVertex = (c) => new THREE.MeshLambertMaterial({ color: c, vertexColors: true });
+export const flatVertex = (c) => new THREE.MeshToonMaterial({ color: c, vertexColors: true, gradientMap: RAMP });
+// 바닥 두 판은 평면이라 법선이 한 방향뿐이다. 세 단으로 끊어도 한 단만 쓰고 밝기만 오른다.
+// 흙은 조명 개수를 줄일 때 밝기를 맞대는 면이라 재질을 안 바꾼 채로 둔다.
+export const flatLit = (c, tex) => new THREE.MeshLambertMaterial({ color: c, map: tex });
 export const BALL_R = 0.14;
 
 // 먹힌 공이 설 수 있는 골 입구 안쪽 한계. 골대 반폭 2.2에서 공 반지름과 그물 두께를 뺀 자리다.
