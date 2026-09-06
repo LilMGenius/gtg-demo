@@ -426,6 +426,17 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #roster[hidden]{display:none}
 #roster h4{font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
+/* 포지션 탭 넷. 상점 선반 탭과 같은 판때기 문법이라 한 창에서 배운 조작이 다른 창에서 안 달라진다.
+   지금 열린 자리는 aria-selected가 소유하고 색이 그것을 따라간다. 색이 소유하면 상태가 화면에만 남는다. */
+#roster .kinds{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--gap-2)}
+#roster .kind{display:inline-flex;align-items:center;gap:var(--gap-1);padding:6px 14px 8px;
+  border:var(--line) solid var(--edge);background:var(--panel);color:var(--dim);
+  font-family:var(--body);font-size:var(--fs-body);font-weight:400;
+  box-shadow:4px 4px 0 var(--edge), var(--bevel);transform:rotate(-.7deg)}
+#roster .kind:nth-child(2n){transform:rotate(.8deg)}
+#roster .kind svg{width:16px;height:16px;flex:none}
+#roster .kind[aria-selected="true"]{background:#2b3a22;color:#ffd83d}
+#roster .kind:active{box-shadow:1px 1px 0 var(--edge)}
   text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
 #roster .row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;
   width:min(94vw,940px);max-height:52vh;overflow-y:auto;padding:4px}
@@ -442,7 +453,13 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #roster .row button img{width:38px;height:38px;object-fit:cover;object-position:center top;
   image-rendering:pixelated;display:block;margin:0 auto 5px;border:2px solid var(--edge);background:#141a12}
 #roster .row button:nth-child(3n){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
-#roster .row button em{display:block;font-style:normal;font-size:var(--fs-num);font-weight:700;
+/* 이름은 제 줄을 갖고 레벨과 상태가 그 아래 한 줄에 나란히 선다.
+   em이 블록이면 상태가 또 한 줄을 먹어 다섯 칸 격자에서 카드가 그만큼 길어진다. */
+#roster .row button .nm{display:block}
+#roster .row button em{display:inline-block;font-style:normal;font-size:var(--fs-num);font-weight:700;
+#roster .row button .tag{font-style:normal;font-size:var(--fs-body);color:var(--dim);margin-left:var(--gap-2)}
+#roster .row button:disabled .tag{color:#f6efdc44}
+#roster .row button.here .tag{color:#ffd83d}
   color:var(--good);margin-top:3px}
 /* 지금 뛰는 자리와 육수가 모자란 카드. 눌러도 아무 일이 없다는 것이 먼저 보여야 한다. */
 #roster .row button:disabled{color:#f6efdc5c;background:#141a12;cursor:default}
@@ -607,39 +624,82 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}
 #gram .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 
+/* 세 단이 서면서 칸이 세로 360px짜리 가로 모바일보다 길어졌다. 넘치면 창이 스스로 굴러야
+   첫 단이 화면 밖으로 안 밀린다. safe center는 짧을 때는 가운데, 길 때는 위쪽부터 세운다. */
 /* 내 정보. 오른쪽 기둥은 286px에서 찼고 다음 칸은 크로스바 325px를 넘는다. 그래서 좌상단 레벨 칩이 진입이다. */
 #me{position:absolute;inset:0;pointer-events:auto;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:12px;
+  overflow:auto;padding:var(--gap-2) 0;
+/* 세로 flex의 자식은 기본으로 줄어든다. 칸이 화면보다 길어지면 초상과 큰 수가 같이 눌린다. */
+#me > *{flex:none}
   background:#080b07c4}
 #me[hidden]{display:none}
-#me h4{font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
+/* 첫 단. 초상과 이름이 한 줄, 그 아래가 레벨과 체격과 컨디션이다. 초상을 제목 안에 두는 것은
+   계정 머리가 이미 쓰는 규칙이라 두 창의 첫 줄이 같은 문법으로 선다. */
+#me h4{display:grid;grid-template-columns:auto 1fr;column-gap:var(--gap-3);
+  justify-items:start;align-items:center;
+  font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
+#me h4 .pfp{grid-row:1 / span 2;grid-column:1;width:48px;height:48px;object-fit:cover;
+  object-position:center top;image-rendering:pixelated;border:2px solid var(--edge);background:#141a12}
   text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
 /* 창 이름 아래 붙는 수. 제목과 점으로 잇지 않고 줄을 나눈다. 세 창이 같은 규칙을 쓴다. */
 #me h4 small,#gym h4 small,#roster h4 small{display:block;font-size:var(--fs-title);color:var(--ink);
   -webkit-text-stroke:2px var(--edge);text-shadow:2px 3px 0 var(--edge);margin-top:4px}
 /* 값 셋을 가운뎃점으로 이으면 화면에서는 목록 기호로 읽혀 세 값이 한 항목처럼 붙는다.
+#me h4 small{grid-column:2}
    14px. 글자 13px보다 넓어야 사이가 기호 없이도 갈린다. */
 #me h4 small i{font-style:normal;margin-right:14px}
+/* 컨디션. 상단 칩이 낸 그림을 그대로 옮겨 온 자리라 크기만 여기서 정한다. */
+#me h4 .cond{display:inline-flex;vertical-align:-3px;-webkit-text-stroke:0}
+#me h4 .cond svg{width:18px;height:18px}
+#me h4 .cond .up{color:var(--good)}
+#me h4 .cond .dn{color:var(--bad)}
 #me h4 small i:last-child{margin-right:0}
 /* 초상화와 걸친 것과 칸 셋은 늘 보인다. 긁어야 나오는 것은 칸의 내용뿐이라 스크롤을 안쪽으로 옮겼다.
    카드가 통째로 긁히면 지금 누구를 보고 있는지가 화면 밖으로 밀려난다. */
 #me .card{display:flex;flex-direction:column;gap:9px;
-  width:min(94vw,720px);max-height:78vh;padding:4px 4px 10px}
+  width:min(94vw,720px);max-height:80vh;padding:4px 4px 10px}
+/* 둘째 단. 창을 여는 이유가 이 셋이라 탭 위에 선다. 실측으로 세 판때기가 69px을 쓰고,
+   그만큼을 걸친 것 목록과 능력치 격자에서 각각 덜어 능력치 열다섯이 한 화면에 그대로 남았다. */
+#me .big{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--gap-2)}
+#me .big span{display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 8px 7px;
+  border:var(--line) solid var(--edge);background:#1b2318;
+  box-shadow:6px 6px 0 var(--edge), var(--bevel)}
+#me .big span:nth-child(2n){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
+#me .big b{font-family:var(--disp);font-size:var(--fs-title);font-weight:400;color:#ffd83d;line-height:1.1}
+#me .big i{font-style:normal;font-family:var(--body);font-size:var(--fs-body);font-weight:400;
+  color:var(--dim);line-height:1.15}
 /* 46vh. 720px 화면에서 능력치 열다섯이 네 칸씩 네 줄로 한 번에 들어가는 높이다.
    38vh였을 때는 열다섯 중 아홉만 보이고 나머지는 긁어야 나왔는데,
    자기 선수의 능력치는 창을 연 이유 그 자체라 스크롤 아래에 두면 그 창이 답을 반만 한다.
    아래 여백 10px은 마지막 칸의 6px 그림자가 스크롤 경계에 잘리지 않게 둔 것이다. */
 #me .pane{display:flex;flex-direction:column;gap:9px;max-height:46vh;overflow-y:auto;padding:2px 2px 10px}
-/* 네 칸씩 네 줄. 세 칸이면 다섯 줄이 되어 한 화면에 안 들어간다. */
-#me .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
-#me .grid span{display:flex;justify-content:space-between;gap:8px;padding:7px 10px 9px;
+/* 세로가 짧은 가로 모바일. 첫 단과 둘째 단이 고정 높이라 칸 내용에 12px만 남았다(실측 740x360).
+   창이 이미 구르므로 여기서는 카드와 칸의 상한을 걷고 넘치는 만큼 창이 받게 한다.
+   구르는 상자가 창 하나면 손가락이 어디를 밀든 같은 것이 움직인다. */
+@media (max-height:520px){
+  #me .card{max-height:none}
+  #me .pane{max-height:none}
+  /* 걸친 것은 맨 아래로 간다. 창을 연 이유는 탭 안의 답이고 걸친 것은 그 답이 아닌데,
+     실측 740x360에서 첫 화면 360px 중 146px을 그 띠가 먹어 탭 내용이 한 줄도 안 보였다. */
+  #me .wear{order:1}
+}
+/* 다섯 칸씩 세 줄. 네 칸이면 네 줄이라, 둘째 단이 선 뒤 마지막 줄이 접힘 아래로 내려간다.
+   이름과 수를 위아래로 세우면 좁은 칸에서 이름이 안 접힌다. 실측으로 한 칸이 63px, 세 줄이 197px다. */
+#me .grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--gap-1)}
+/* 자식 선택자다. span 하나로 쓰면 이름을 든 안쪽 .who까지 같은 규칙을 받아 칸 안에 칸이 하나 더
+   생기고, 테두리와 여백이 두 번 붙는다. 실측으로 한 칸이 48px에서 104px로 자라 열다섯 중 다섯만
+   접힘 위에 남았다. 안쪽 이름은 제 규칙만 받는다. */
+#me .grid > span{display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 4px 6px;
   border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
-  font-family:var(--body);font-size:var(--fs-body);font-weight:400;
+  font-family:var(--body);font-size:var(--fs-body);font-weight:400;line-height:1.15;
   box-shadow:6px 6px 0 var(--edge), var(--bevel)}
-#me .grid span > b{font-size:var(--fs-num)}
-#me .grid span:nth-child(4n+1){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
-#me .grid span:nth-child(4n){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
+/* 이름은 한 줄로 못 박는다. 접히면 칸 높이가 줄마다 달라져 세 줄이 다시 네 줄만큼 길어진다. */
+#me .grid > span .who{white-space:nowrap}
+#me .grid > span > b{font-size:var(--fs-num);line-height:1.1}
+#me .grid > span:nth-child(5n+1){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
+#me .grid > span:nth-child(5n){box-shadow:8px 5px 0 var(--edge), var(--bevel)}
 #me .grid span b{color:#ffd83d;font-weight:400}
 /* 만렙 칸. 더 줄 곳이 없다는 것이 수치보다 먼저 보여야 한다. */
 #me .grid span.max b{color:var(--good)}
@@ -649,16 +709,22 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #me .wear{display:flex;gap:10px;padding:9px 12px 9px;
   border:var(--line) solid var(--edge);background:#1b2318;
   box-shadow:6px 6px 0 var(--edge), var(--bevel)}
-#me .wear .shot{flex:0 0 116px;height:120px;background:#12180f;border:2px solid #ffffff14}
+#me .wear .shot{flex:0 0 96px;height:104px;background:#12180f;border:2px solid #ffffff14}
 #me .wear .shot img{width:100%;height:100%;object-fit:contain;display:block}
-/* 여덟 줄을 두 칸으로 접으면 네 줄이 되어 초상화보다 길어진다. 네 칸이면 두 줄이다. */
-#me .wear .on{flex:1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 12px;align-content:start}
+/* 세 칸. 네 칸이면 한 칸이 135px이라 '장갑 장터 목장갑'이 두 줄로 접히고, 여덟 줄이 열여섯 줄이
+   되어 첫 단이 256px을 먹는다. 세 칸은 185px이라 같은 줄 수로 접히지 않는다. */
+#me .wear .on{flex:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 12px;align-content:start}
 #me .wear .on h5{grid-column:1 / -1;margin:0;font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:var(--dim);letter-spacing:.02em;line-height:1.25}
+/* 이름이 아주 긴 장비 하나가 그 줄만 두 줄로 만들면 첫 단의 높이가 걸친 것에 따라 흔들린다.
+   한 줄로 못 박고 넘치는 꼬리는 말줄임으로 자른다. 전체 이름은 상점 칸이 소유한다. */
 #me .wear .on h5:not(:first-child){margin-top:6px}
 #me .wear .on i{font-style:normal;font-family:var(--body);font-size:var(--fs-body);font-weight:400;color:var(--ink);
-  line-height:1.35}
-#me .wear .on i b{display:block;font-weight:400;font-size:var(--fs-body);color:var(--dim)}
+  line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 칸 이름과 걸친 것 이름이 한 줄에 선다. 이름을 위에 얹으면 여덟 줄이 열여섯 줄이 되어
+   첫 단이 170px에서 240px로 자라고, 그만큼 능력치가 접힘 아래로 내려간다. */
+#me .wear .on i b{display:inline;font-weight:400;font-size:var(--fs-body);color:var(--dim);
+  margin-right:var(--gap-1)}
 /* 칸 셋. 상점 선반 탭과 같은 그림 언어를 쓴다. 한 창에서 배운 조작이 다른 창에서 달라 보이면
    같은 화면 안에서 문법이 둘이 된다. 아이콘이 없어 좌우 여백만 상점보다 넓게 잡았다. */
 #me .tabs{display:flex;justify-content:center;gap:9px;margin:2px 0 1px}
@@ -675,17 +741,40 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #me .note i{display:block;font-style:normal;font-size:var(--fs-body);font-weight:700;
   color:var(--good);margin-top:3px}
 #me .note.dim{color:var(--dim);text-align:center}
-/* 상대 전적. 두 칸씩 끊는다. 이름이 긴 키커가 많아 세 칸으로 깔면 수치가 줄바꿈된다. */
-#me .log{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+/* 최근 열 판. 두 칸씩 끊는다. 이름이 긴 키커가 많아 세 칸으로 깔면 표시가 줄바꿈된다. */
+#me .log{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--gap-1)}
 #me .log span{display:flex;justify-content:space-between;gap:10px;padding:7px 10px 9px;
   border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
   font-family:var(--body);font-size:var(--fs-body);font-weight:400;
   box-shadow:6px 6px 0 var(--edge), var(--bevel)}
 #me .log span:nth-child(2n){box-shadow:4px 7px 0 var(--edge), var(--bevel)}
-/* 막은 수는 좋은 색, 먹힌 수는 노랑. 두 숫자가 같은 색이면 어느 쪽이 늘었는지 안 읽힌다. */
-#me .log span b{color:#ffd83d;font-weight:400;white-space:nowrap}
-#me .log span em{font-style:normal;color:var(--good)}
-#me .log span i{font-style:normal;color:var(--dim);margin:0 3px}
+/* 막았는지 먹혔는지는 네모 하나가 말한다. 상단 구슬과 같은 색이라 한 화면에서 두 번 배울 것이 없다. */
+#me .log span b{flex:none;width:14px;height:14px;border:2px solid var(--edge);background:#ffffff4d}
+#me .log span b.save{background:var(--good)}
+#me .log span b.gone{background:var(--bad)}
+/* 상대 전적 표. 얼굴 칸과 수 칸의 폭을 못 박아, 이름 길이와 상관없이 수가 한 줄에 선다. */
+#me .pane table{width:100%;border-collapse:collapse;font-family:var(--body);font-size:var(--fs-body)}
+#me .pane th{padding:3px 8px 5px;text-align:left;color:var(--dim);font-weight:400}
+#me .pane td{padding:3px 8px 5px;border-top:2px solid #ffffff14;color:var(--ink)}
+#me .pane td:first-child{width:36px;padding-right:0}
+#me .pane td img{width:30px;height:30px;object-fit:cover;object-position:center top;
+  image-rendering:pixelated;border:2px solid var(--edge);background:#141a12;display:block}
+#me .pane th:nth-child(3),#me .pane th:nth-child(4),
+#me .pane td:nth-child(3),#me .pane td:nth-child(4){text-align:right;width:60px}
+#me .pane td em{font-style:normal;color:var(--good);font-weight:700}
+#me .pane td i{font-style:normal;color:#ffd83d;font-weight:700}
+/* 아는 얼굴 한 장. 실루엣과 이름 줄과 단계 바와 만남 버튼이 한 판때기 안에 선다.
+   버튼은 줄 끝에 세운다. 아래로 내리면 카드 하나가 두 배로 길어져 넷째 장부터 접힘 아래다. */
+#me .note.met{display:grid;grid-template-columns:auto 1fr auto;column-gap:var(--gap-2);align-items:center}
+#me .note.met .ava{grid-row:1 / span 3;width:40px;height:40px;background-color:#141a12;
+  border:2px solid var(--edge);display:grid;place-items:center;color:var(--dim)}
+#me .note.met .ava svg{width:20px;height:20px}
+#me .note.met b,#me .note.met i,#me .note.met .bar{grid-column:2}
+/* 단계 바. 칸 수는 판정의 문턱 수를 그대로 받고, 찬 칸만 색이 다르다. */
+#me .note.met .bar{display:flex;gap:3px;margin-top:4px}
+#me .note.met .bar u{flex:1;height:7px;background:#ffffff26;border:2px solid var(--edge)}
+#me .note.met .bar u.on{background:var(--good)}
+#me .note.met .go{grid-column:3;grid-row:1 / span 3;width:auto;margin-top:0;align-self:center}
 #me .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
   background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);
   box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(1.2deg)}

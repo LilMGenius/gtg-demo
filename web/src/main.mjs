@@ -754,6 +754,23 @@ function openGym() {
 function closeGym() {
   el('gym').hidden = true;
 }
+/* 포지션 넷의 그림과 약어. 탭이 이름 글자로만 서면 넷이 같은 폭의 덩어리로 읽히고,
+   좁은 폭에서는 세 글자 이름이 접힌다. 아이콘이 자리를 말하고 약어가 이름을 말한다.
+   그림은 3px 격자 픽셀 SVG다. 상단 칩과 상점 탭이 이미 쓰는 관례라 손그림 톤이 안 갈린다. */
+const POS_ICON = {
+  // 벙어리장갑. 이 자리에서만 손으로 막는다.
+  gk: G('골키퍼', R(6, 6, 12, 15) + R(3, 9, 3, 6)),
+  // 방패. 아래로 좁아져야 막는 물건으로 읽힌다.
+  '수비수': G('수비수', R(3, 3, 18, 3) + R(3, 6, 18, 6) + R(6, 12, 12, 6) + R(9, 18, 6, 3)),
+  // 가운데가 높은 기둥 셋. 가운데를 지키는 자리라 가운데가 길다.
+  '미드필더': G('미드필더', R(3, 9, 3, 9) + R(10.5, 3, 3, 18) + R(18, 9, 3, 9)),
+  // 오른쪽으로 뻗은 화살. 앞으로 나가는 자리다.
+  '공격수': G('공격수', R(3, 10.5, 15, 3) + R(12, 4.5, 3, 3) + R(15, 7.5, 3, 3)
+    + R(18, 10.5, 3, 3) + R(15, 13.5, 3, 3) + R(12, 16.5, 3, 3))
+};
+// 약어는 축구가 쓰는 그것을 그대로 쓴다. 한 글자로 줄이면 넷이 안 갈리고, 세 글자는 탭 폭을 먹는다.
+const POS_ABBR = { gk: 'GK', '수비수': 'DF', '미드필더': 'MF', '공격수': 'FW' };
+
 
 // 선수단. 명단 전체를 걸어놓고 보유한 것만 뛸 수 있다.
 // 보유 판정은 이름으로 한다. 로스터 항목과 저장된 키퍼는 다른 객체이기 때문이다.
@@ -769,7 +786,10 @@ function renderRoster() {
       /* 이름만 늘어놓으면 명단이 글자 목록이라 누가 누군지가 이름을 읽어야 안다.
          얼굴을 앞에 세우면 세우려는 사람을 찾는 눈이 글자를 안 지난다. */
       + '<img alt="' + k.name + '" src="' + thumbURL('face', k, lookOf({}, k.name)) + '">'
-      + k.name + '<em>Lv ' + k.level + ', ' + tail + '</em></button>';
+      /* 이름과 레벨과 상태를 각각 제 칸에 세운다. 한 줄로 이으면 쉼표가 셋을 한 덩어리로 묶어
+         레벨이 상태의 일부로 읽히고, 카드 폭이 줄면 그 덩어리가 통째로 접힌다. */
+      + '<span class="nm">' + k.name + '</span><em>Lv ' + k.level + '</em>'
+      + '<i class="tag">' + tail + '</i></button>';
   }).join('');
   // 아직 없는 사람만 영입 줄에 선다. 가진 사람이 값과 함께 다시 뜨면 두 번 살 수 있는 것처럼 읽힌다.
   const pool = KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name));
@@ -778,13 +798,15 @@ function renderRoster() {
     const off = state.wallet.coin < cost;
     return '<button data-n="' + entry.name + '"' + (off ? ' disabled' : '') + '>'
       + '<img alt="' + entry.name + '" src="' + thumbURL('face', entry, lookOf({}, entry.name)) + '">'
-      + entry.name + '<em>' + SW(cost) + '</em></button>';
+      + '<span class="nm">' + entry.name + '</span><em>' + SW(cost) + '</em></button>';
   }).join('');
   /* 포지션 줄. 골키퍼 한 명과 필드 열하나는 다른 질문이라 같은 목록에 못 섞는다.
      골키퍼는 세우는 사람이 하나뿐이고, 키커는 정원 안에서 열하나를 고른다. */
-  const tabs = '<div class="kinds">' + [['gk', '골키퍼']].concat(ROLES.map((r) => [r, r]))
-    .map(([id, label]) => '<button class="kind" data-pos="' + id + '"'
-      + (squadTab === id ? ' aria-current="true"' : '') + '>' + label + '</button>').join('') + '</div>';
+  /* 지금 어느 자리를 보는지는 색이 아니라 aria-selected로 선다. 색만 칠하면 그 상태가 화면에만
+     있고, 누른 탭과 안 누른 탭이 계기에게 같은 모양이라 탭이 도는지를 아무도 못 잰다. */
+  const tabs = '<div class="kinds" role="tablist">' + ['gk'].concat(ROLES)
+    .map((id) => '<button class="kind" role="tab" data-pos="' + id + '" aria-selected="'
+      + (squadTab === id) + '">' + POS_ICON[id] + '<span>' + POS_ABBR[id] + '</span></button>').join('') + '</div>';
   const pane = squadTab === 'gk'
     ? '<div class="row mine">' + mine + '</div>'
       + '<h5>명단에서 데려오기</h5>'
@@ -835,14 +857,15 @@ function kickerPane(role) {
     if (!k) return "";
     return '<button data-kick="' + n + '"' + (on ? ' class="here"' : '') + '>'
       + '<img alt="' + n + '" src="' + thumbURL("face", k, lookOf({}, n)) + '">'
-      + n + '<em>결정력 ' + k.finishing + ', ' + (on ? "해제" : "선발") + '</em></button>';
+      + '<span class="nm">' + n + '</span><em>결정력 ' + k.finishing + '</em>'
+      + '<i class="tag">' + (on ? "해제" : "선발") + '</i></button>';
   };
   const hire = KICKERS.filter((k) => k.role === role && state.kickers.indexOf(k.name) < 0).map((k) => {
     const cost = kickerCost(k);
     const off = state.wallet.coin < cost;
     return '<button data-buy="' + k.name + '"' + (off ? ' disabled' : '') + '>'
       + '<img alt="' + k.name + '" src="' + thumbURL("face", k, lookOf({}, k.name)) + '">'
-      + k.name + '<em>' + SW(cost) + '</em></button>';
+      + '<span class="nm">' + k.name + '</span><em>' + SW(cost) + '</em></button>';
   }).join("");
   return '<h5>주전 ' + starting.length + ' / ' + slots + '</h5>'
     + '<div class="row mine">' + (starting.map((n) => card(n, true)).join("")
@@ -1076,19 +1099,35 @@ function hiddenBand(key, v) {
 // 내 정보. 오른쪽 기둥이 찼으므로 좌상단 레벨 칩이 진입이다.
 // 상대 전적. 만나본 키커만 올린다. 명단 77명을 다 깔면 읽을 것이 사라진다.
 // 먹힌 수를 먼저 세워 누구한테 약한지가 맨 위에 오게 한다.
+  /* 최근 열 판. 내가 선 판만 센다. 남이 찍어 올린 사진과 셀카는 판이 아니라 글이라,
+     같이 세면 막지도 먹히지도 않은 줄이 전적에 섞인다. 최근이 위로 오게 뒤집는다. */
+  const played = state.posts.filter((p) => !p.ph && !p.sf).slice(-10);
+  const recent = played.length
+    ? '<div class="log">' + played.map((p) => '<span>' + p.n
+      + '<b class="' + (p.c ? 'gone' : 'save') + '"></b></span>').reverse().join('') + '</div>'
+    : '<div class="note dim"><span></span></div>';
 function recordRows() {
   const names = Object.keys(state.record);
-  if (!names.length) return '<div class="note dim"><span>아직 상대 전적이 없다. 한 슛을 막거나 먹히면 여기 쌓인다</span></div>';
   names.sort((a, b) => {
     const x = state.record[a];
     const y = state.record[b];
     return (y.conceded - x.conceded) || (y.saved + y.conceded - x.saved - x.conceded) || a.localeCompare(b);
+  /* 상대 전적은 표다. 줄로 깔면 이름 길이에 따라 수가 줄마다 다른 자리에 서서, 어느 칸이
+     막은 수인지를 줄마다 다시 읽어야 한다. 얼굴이 첫 칸이라 누구한테 약한지가 글자 앞에 온다. */
   });
   const rows = names.map((n) => {
     const r = state.record[n];
-    return '<span>' + n + '<b><em>' + r.saved + '</em><i>-</i>' + r.conceded + '</b></span>';
+    const k = kickerByName(n);
+    const face = k ? '<img alt="' + n + '" src="' + thumbURL('face', k, lookOf({}, n)) + '">' : '';
+    return '<tr><td>' + face + '</td><td>' + n + '</td><td><em>' + r.saved
+      + '</em></td><td><i>' + r.conceded + '</i></td></tr>';
   }).join('');
-  return '<div class="note"><b>상대 전적</b><i>막은 수 - 먹힌 수</i></div><div class="log">' + rows + '</div>';
+  const table = names.length
+    ? '<table><thead><tr><th></th><th>이름</th><th>막은</th><th>먹힌</th></tr></thead><tbody>'
+      + rows + '</tbody></table>'
+    : '<div class="note dim"><span></span></div>';
+  return '<div class="note"><b>최근</b></div>' + recent
+    + '<div class="note"><b>상대 전적</b><i>막은 수 - 먹힌 수</i></div>' + table;
 }
 
 // 만남 버튼 글자. 문은 판정이 열고, 값을 어떻게 보여 줄지는 화면이 정한다.
@@ -1107,6 +1146,10 @@ function recruit(entry) {
   for (const f of WORN_FIELDS) k.worn[f] = 0;
   return k;
 }
+
+/* 단계 바의 칸 수. 판정이 가진 문턱 수를 되물어 만든다. 여기 3을 적으면 문턱이 늘어난 날
+   바가 조용히 짧아지고, 화면은 다 찼다고 말하는데 판정은 아직 한 칸 남았다고 센다. */
+const TIER_TOP = rapportTier({ '0:0': 999 }, 0, 0);
 
 // 아는 얼굴. 라포는 이미 판정과 팔로워에 붙는데 화면 어디에도 없어서 플레이어가 늘어난 줄을 몰랐다.
 function rapportRows() {
@@ -1129,7 +1172,12 @@ function rapportRows() {
     const face = tier > 0 ? tier + '단계' : '초면';
     // 만남은 이 사람에게 붙은 행동이라 그 줄 안에 둔다. 못 누르는 사유도 버튼이 직접 말한다.
     const g = dateGate(state.rapport, city, passer, state.wallet.coin);
-    return '<div class="note"><b>' + cityAt(city).name + '에서 마주친 ' + who + '</b><i>말 섞은 횟수 ' + n
+    /* 줄이 아니라 카드다. 실루엣과 동네와 단계 바와 만남 버튼이 한 장에 같이 서야 이 사람이
+       지금 어디까지 왔는지가 수를 읽기 전에 보인다. 생김새는 저장에 없으므로 실루엣이다. */
+    return '<div class="note met"><span class="ava anon">' + IC_FANS + '</span>'
+      + '<b>' + cityAt(city).name + '에서 마주친 ' + who + '</b><i>말 섞은 횟수 ' + n
+      + '<span class="bar">' + Array.from({ length: TIER_TOP }, (_, at) =>
+        '<u' + (at < tier ? ' class="on"' : '') + '></u>').join('') + '</span>'
       + '. ' + face + '. 한눈팔기 ' + aid + '% 감소, 팔로워 +' + fans + '%</i>'
       + '<button class="go' + (g.short > 0 ? ' bad-price' : '') + '" data-city="' + city + '" data-passer="' + passer + '"' + (g.open ? '' : ' disabled') + '>' + dateLabel(g) + '</button></div>';
   }).join('');
@@ -1173,8 +1221,25 @@ function renderMe() {
       : '<div class="grid">' + grid + '</div>' + traits + hidden;
   const tabs = '<div class="tabs">' + ME_TABS.map(([id, label]) =>
     '<button class="tab" data-tab="' + id + '"' + (meTab === id ? ' aria-current="true"' : '') + '>' + label + '</button>').join('') + '</div>';
-  box.innerHTML = '<h4>' + name + '<small><i>Lv ' + k.level + '</i><i>' + k.height + 'cm</i><i>' + k.weight + 'kg</i></small></h4>'
-    + '<div class="card">' + wear + tabs + '<div class="pane">' + pane + '</div></div>'
+  /* 첫 단. 누구를 보고 있는지다. 초상이 이름 앞에 서야 사람이 먼저 읽힌다. 컨디션은 상단 칩이
+     이미 판정한 값이라 칩이 낸 그림을 그대로 옮겨 온다. 여기서 다시 재면 문턱이 두 곳이 된다. */
+  const cond = el('form').innerHTML;
+  /* 둘째 단. 세이브율과 막은 수와 먹힌 수. 셋 다 장부를 그 자리에서 더해 만든다. 화면이 제 수를
+     따로 세면 장부가 움직인 날 둘이 갈린다. 창을 여는 이유가 이 셋이라 탭 위에 선다. */
+  const led = Object.keys(state.record).reduce((a, n) => {
+    a.s += state.record[n].saved;
+    a.c += state.record[n].conceded;
+    return a;
+  }, { s: 0, c: 0 });
+  const rate = led.s + led.c > 0 ? Math.round((led.s / (led.s + led.c)) * 100) : 0;
+  const big = '<div class="big"><span><b>' + rate + '%</b><i>세이브율</i></span>'
+    + '<span><b>' + led.s + '</b><i>막은 수</i></span>'
+    + '<span><b>' + led.c + '</b><i>먹힌 수</i></span></div>';
+  box.innerHTML = '<h4><img class="pfp" alt="' + name + '" src="'
+    + thumbURL('face', k, lookOf(state.gear, state.keeper.name)) + '">' + name
+    + '<small><i>Lv ' + k.level + '</i><i>' + k.height + 'cm</i><i>' + k.weight + 'kg</i>'
+    + '<i class="cond">' + cond + '</i></small></h4>'
+    + '<div class="card">' + wear + big + tabs + '<div class="pane">' + pane + '</div></div>'
     + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeMe;
   for (const b of box.querySelectorAll('.tab')) b.onclick = () => { meTab = b.dataset.tab; renderMe(); };
