@@ -4,6 +4,8 @@ import { pinClock } from "./clock.mjs";
 // 아웃문그램과 키커별 상대 전적은 화면에 선 지 오래인데 재는 자가 없었다.
 // 두 창 다 장부를 옮겨 그리는 창이라, 옮기는 도중에 어긋나면 화면만 조용히 거짓말을 한다.
 // 그래서 묻는 것은 창이 열리는가가 아니라 창이 말한 수가 장부의 수와 같은가이다.
+// 읽는 화면: 피드는 #gram의 .post 카드이고, 상대 전적은 #me의 .tab[data-tab="log"]을 눌러
+// 여는 #me .pane table이다. 줄은 tbody tr 하나, 칸은 넷(초상 td img | 이름 | em 막은 | i 먹힌)이다.
 
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 // 신규 키퍼로 돌리면 다섯 판이 전부 실점이라 먹힌 글의 표시가 갈리는지를 못 묻는다.
@@ -101,24 +103,40 @@ try {
   // 그 0은 화면이 장부를 안 옮겼다는 뜻이 아니라 이 자가 다른 칸을 보고 있다는 뜻이다.
   await p.click('#me .tab[data-tab="log"]', { force: true });
   await p.waitForTimeout(320);
-  const rows = await p.evaluate(() => {
-    const box = document.getElementById("me");
-    const out = [];
-    for (const s of box.querySelectorAll("span")) {
-      const b = s.querySelector("b");
-      if (!b) continue;
-      const em = b.querySelector("em");
-      if (!em) continue;
-      const name = s.childNodes[0] ? String(s.childNodes[0].textContent).trim() : "";
-      const nums = b.textContent.trim();
-      out.push({ name, nums });
-    }
-    return out;
+  /* 상대 전적은 이제 표다. 줄은 tbody tr 하나이고 칸은 넷이라, span 안의 b를 훑던 옛 읽기는
+     표 앞에서 빈손으로 돌아온다. 칸을 그대로 읽는다. 초상은 구운 크기와 그려진 상자를 둘 다
+     재는데, naturalWidth만 보면 규칙이 통째로 안 걸려 0px으로 선 그림도 제 크기를 내고 통과한다. */
+  const readRows = () => p.evaluate(() => {
+    const tb = document.querySelector("#me .pane table");
+    if (!tb) return [];
+    return [...tb.querySelectorAll("tbody tr")].map((tr) => {
+      const td = [...tr.querySelectorAll("td")];
+      const txt = (i, sel) => { const e = td[i] ? td[i].querySelector(sel) : null; return e ? e.textContent.trim() : ""; };
+      const im = td[0] ? td[0].querySelector("img") : null;
+      const box = im ? im.getBoundingClientRect() : null;
+      return {
+        name: td[1] ? td[1].textContent.trim() : "",
+        nums: txt(2, "em") + "-" + txt(3, "i"),
+        nat: im ? im.naturalWidth : 0,
+        w: box ? Math.round(box.width) : 0
+      };
+    });
   });
+  const rows = await readRows();
+  /* 대조군. 같은 읽기를 능력치 칸에서 하면 한 줄도 안 나와야 한다. 거기서도 줄이 나오면 이 자는
+     전적 칸을 연 것을 증명하지 못하고, 그 칸이 사라진 날에도 초록을 낸다. */
+  await p.click('#me .tab[data-tab="stat"]', { force: true });
+  await p.waitForTimeout(320);
+  const elsewhere = await readRows();
   await p.evaluate(() => window.__me(false));
-  for (const r of rows.slice(0, 4)) console.log("  row " + r.name + " " + r.nums);
+  for (const r of rows.slice(0, 4)) console.log("  row " + r.name + " " + r.nums + " face " + r.w + "px");
 
-  check("record:every-faced-kicker-has-a-row", rows.length === names.length, rows.length + " rows vs " + names.length + " kickers");
+  check("instrument:the-record-reader-finds-nothing-in-the-other-tab", elsewhere.length === 0,
+    elsewhere.length + " rows in the stat pane");
+  // 얼굴이 첫 칸이라 누구한테 약한지가 이름보다 먼저 읽힌다. 안 그려진 초상은 그 순서를 못 만든다.
+  const drawn = rows.filter((r) => r.nat > 0 && r.w > 0).length;
+  check("record:every-faced-kicker-has-a-row", rows.length === names.length && drawn === rows.length,
+    rows.length + " rows vs " + names.length + " kickers, " + drawn + " portraits drawn");
   const wrong = rows.filter((r) => {
     const led = ledger[r.name];
     if (!led) return true;
