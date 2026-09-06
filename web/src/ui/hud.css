@@ -780,14 +780,26 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #shop .card .held{display:flex;align-items:center;gap:5px;flex:none;color:#ffd83d}
 #shop .card .held svg{width:15px;height:15px;display:block}
 #shop .card .held b{font-family:var(--body);font-size:var(--fs-num);font-weight:400}
-/* 확률은 접힌 채로 선다. 펼치기 전에는 한 줄만 먹고, 살 것을 고르는 눈을 안 붙잡는다. */
-#shop .odds{margin-top:10px;text-align:left}
-#shop .odds summary{cursor:pointer;list-style:none;display:inline-block;
-  padding:4px 10px 6px;border:2px solid var(--edge);background:var(--panel);
-  color:var(--dim);font-size:var(--fs-body);font-weight:700;box-shadow:3px 3px 0 var(--edge)}
+/* 확률은 표시 하나 아래에 접혀 있다. 펼치기 전에는 한 자리만 먹고 살 것을 고르는 눈을 안 붙잡는다.
+   펼친 표는 선반을 밀지 않고 그 위에 뜬다. 밀면 확인할 때마다 뽑기 버튼이 아래로 내려가 손이 헛나간다. */
+#shop .odds{position:relative;flex:none}
+#shop .odds summary{cursor:pointer;list-style:none;display:grid;place-items:center;
+  width:26px;height:26px;border:2px solid var(--edge);background:var(--panel);
+  color:var(--dim);box-shadow:2px 2px 0 var(--edge)}
 #shop .odds summary::-webkit-details-marker{display:none}
+#shop .odds summary i{font-style:normal;font-size:var(--fs-body);font-weight:700;line-height:1}
 #shop .odds[open] summary{background:#2b3a22;color:#ffd83d}
-#shop .odds em{margin-top:8px}
+/* 표. 등급과 확률과 남은 수 세 칸이고, 누른 표시에 매달려 선반 위로 뜬다. */
+#shop .odds em{position:absolute;right:0;top:calc(100% + var(--gap-1));z-index:7;
+  display:grid;gap:var(--gap-1);width:max-content;min-width:210px;
+  padding:var(--gap-2) var(--gap-3) var(--gap-3);text-align:left;font-style:normal;
+  border:2px solid var(--edge);background:var(--panel);box-shadow:5px 5px 0 var(--edge), var(--bevel)}
+#shop .odds em span{display:grid;grid-template-columns:1fr auto 62px;gap:var(--gap-2);align-items:baseline}
+#shop .odds em i{font-style:normal;font-size:var(--fs-body);color:var(--dim)}
+#shop .odds em b{font-family:var(--body);font-size:var(--fs-num);font-weight:400;color:var(--ink);text-align:right}
+#shop .odds em u{font-family:var(--body);font-size:var(--fs-num);font-weight:400;color:var(--dim);
+  text-decoration:none;text-align:right}
+#shop .odds em .head b,#shop .odds em .head u{font-size:var(--fs-body);color:var(--dim)}
 /* 뽑기 버튼. 큰 글씨가 회차, 아래가 값이다. 못 사는 이유는 버튼 위 배지가 한 마디로 받고
    버튼 글자는 언제나 같은 두 줄이라, 살 수 있을 때와 없을 때 버튼이 다른 물건으로 안 읽힌다. */
 #shop .buy.pull{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;
@@ -826,61 +838,108 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#earn,#date):not([hidden])) :is
 #shop .card .tray i.rare{background:#3a3312;color:#ffd83d;border-color:#ffd83d}
 
 /* 개봉. 뽑은 카드는 상점 카드 안 58x34 칩으로 스쳐 지나갔다. 이 장르에서 뽑는 순간은
-   결과 통보가 아니라 파는 물건 자체라, 화면을 통째로 쓰고 한 장씩 선다.
+   결과 통보가 아니라 파는 물건 자체라, 화면을 통째로 쓰고 한 장씩 다섯 단으로 선다.
    덮개가 상점보다 진한 이유는 뒤에 남은 선반이 읽히면 눈이 그쪽으로 새기 때문이다. */
 #pull{position:absolute;inset:0;pointer-events:auto;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:16px;background:#060803ef}
+  align-items:center;justify-content:center;gap:var(--gap-3);background:#060803ef}
 #pull[hidden]{display:none}
-/* 몇 장째인지. 열 장을 여는 동안 남은 수가 없으면 언제 끝나는지를 모른 채 기다린다. */
+/* 몇 장째인지. 열한 장을 여는 동안 남은 수가 없으면 언제 끝나는지를 모른 채 기다린다. */
 #pull .count{font-family:var(--body);font-size:var(--fs-num);font-weight:400;color:var(--dim)}
-/* 지금 서는 한 장. 화면 높이의 절반을 쓴다. 이보다 작으면 상점 안 칩과 크기가 겹친다. */
-#pull .now{position:relative;width:min(46vh,300px);height:min(64vh,420px);
-  display:grid;place-items:center;gap:0;
-  border:var(--line) solid var(--edge);background:var(--panel);
+/* 지금 서는 한 장. 화면 높이의 절반을 쓴다. 이보다 작으면 상점 안 칩과 크기가 겹친다.
+   누름은 카드가 아니라 판 전체를 덮는 버튼이 받는다. 카드가 그 위에 뜨면 건너뛰기가 안 눌린다. */
+#pull .now{position:relative;width:min(46vh,300px);height:min(64vh,420px);overflow:hidden;
+  pointer-events:none;border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:10px 12px 0 var(--edge), var(--bevel);transform:rotate(-1.2deg)}
-/* 뒤집기. 카드가 세로축으로 한 번 돌아 앞면이 온다. 뒤집는 동안 폭이 0을 지나므로
-   앞뒤가 겹쳐 보이지 않고, 0.34초는 열 장을 여는 데 3.4초라 참을 수 있는 길이다. */
-@keyframes pullFlip{
-  0%{transform:rotate(-1.2deg) scaleX(1)}
-  38%{transform:rotate(-1.2deg) scaleX(.04)}
-  60%{transform:rotate(1.4deg) scaleX(.04)}
-  82%{transform:rotate(-.6deg) scaleX(1.06)}
-  100%{transform:rotate(-1.2deg) scaleX(1)}
+/* 카드가 놓이는 동작. 0.16초라 봉인 단 0.3초 안에서 끝나고, 뒷면은 흔들리는 도중이 아니라
+   멈춘 뒤에 한 박자 서 있다. 뒤집어 얼굴을 까던 자리는 이제 다섯 단이 맡는다. */
+@keyframes pullDeal{
+  from{opacity:.15;transform:rotate(-4deg) translateY(-18px) scale(.94)}
+  to{opacity:1;transform:rotate(-1.2deg)}
 }
-#pull .now.turn{animation:pullFlip .34s ease-in-out}
-/* 그림이 카드를 채우고 이름은 그 위에 앉는다. 둘을 위아래로 나누면 정사각 그림이 폭에 맞춰
-   줄어들어 사람이 카드 한가운데 작게 뜬다. 같은 칸에 겹쳐 놓고 그림을 잘라 키운다. */
-#pull .now{grid-template-areas:"card";overflow:hidden}
-#pull .now img,#pull .now b{grid-area:card}
-#pull .now img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated}
-/* 이름은 그림 위라 배경이 필요하다. 아래에서 올라오는 그늘 한 겹이면 어떤 그림 위에서도 읽힌다. */
-#pull .now b{align-self:end;font-family:var(--body);font-size:var(--fs-num);font-weight:400;
-  color:var(--ink);text-align:center;width:100%;padding:26px 12px 14px;line-height:1.25;
-  background:linear-gradient(#0000,#060803e0 46%)}
+#pull .now.turn{animation:pullDeal .16s ease-out}
+/* 그림이 카드를 채운다. 위아래로 나누면 정사각 그림이 폭에 맞춰 줄어 사람이 한가운데 작게 뜬다. */
+#pull .now img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  image-rendering:pixelated;transition:filter .22s ease-out}
+/* 0 봉인. 뒷면 무늬가 카드를 통째로 덮는다. 무엇이 나왔는지는 아직 화면에 없다. */
+#pull .now .seal{position:absolute;inset:0;z-index:3;
+  background:repeating-linear-gradient(-45deg,#1b2417 0 12px,#232e1d 12px 24px);
+  transition:opacity .18s ease-out}
+/* 봉인은 등급 단까지 남는다. 뒷면이 먼저 걷히면 빛이 뜨기도 전에 사람 모양이 이미 서서,
+   등급 신호와 실루엣이 한 단에서 같이 온다. */
+#pull .now[data-stage="2"] .seal,#pull .now[data-stage="3"] .seal,
+#pull .now[data-stage="4"] .seal{opacity:0}
+/* 1 등급 신호. 테두리 안쪽을 한 번 채우고 빠지는 빛이다. 서 있는 길이는 카드가 --beam-ms로
+   들고 오고 색은 등급이 정하므로, 빛만 보고도 어느 쪽이 왔는지가 갈린다. */
+#pull .now .beam{position:absolute;inset:0;z-index:4;opacity:0;
+  box-shadow:inset 0 0 0 5px var(--beam-c,#9aa495), inset 0 0 26px 6px var(--beam-c,#9aa495)}
+#pull .now.rare .beam{--beam-c:#ffd83d}
+#pull .now[data-stage="1"] .beam{animation:pullBeam var(--beam-ms,400ms) ease-out}
+@keyframes pullBeam{
+  0%{opacity:0}
+  16%{opacity:1}
+  100%{opacity:0}
+}
+/* 2 실루엣. 초상이 서되 색이 빠지고 어두워, 누구인지가 아니라 사람의 모양만 읽힌다.
+   봉인 단에서는 뒷면이 덮으므로 그림을 아예 죽여 두고, 실루엣 단에서 한 단 밝힌다. */
+#pull .now[data-stage="0"] img,#pull .now[data-stage="1"] img{filter:grayscale(1) brightness(0)}
+#pull .now[data-stage="2"] img{filter:grayscale(1) brightness(.24)}
+/* 3 이름과 초상. 색이 돌아오고 이름과 명성이 같이 선다. */
+#pull .now .foot > b,#pull .now u{opacity:0;transition:opacity .18s ease-out}
+#pull .now[data-stage="3"] .foot > b,#pull .now[data-stage="4"] .foot > b,
+#pull .now[data-stage="3"] u,#pull .now[data-stage="4"] u{opacity:1}
+/* 이름과 능력치는 그림 위라 배경이 필요하다. 아래에서 올라오는 그늘 한 겹이면 어떤 그림 위에서도
+   읽히고, 아래에 붙여 두었으므로 능력치가 서면 그만큼 위로 자란다. */
+#pull .now .foot{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:28px 12px 12px;
+  background:linear-gradient(#0000,#060803e8 34%)}
+#pull .now .foot > b{display:block;font-family:var(--body);font-size:var(--fs-num);font-weight:400;
+  color:var(--ink);text-align:center;line-height:1.25}
 /* 명성. 별 대신 숫자를 크게 세우면 다섯과 아홉이 한눈에 갈린다. */
-#pull .now u{position:absolute;top:12px;left:14px;text-decoration:none;
+#pull .now u{position:absolute;top:12px;left:14px;z-index:2;text-decoration:none;
   font-family:var(--body);font-size:var(--fs-body);font-weight:400;color:var(--dim)}
+/* 4 능력치 다섯 줄. 마지막 단에만 선다. 앞 단부터 자리를 차지하면 카드가 처음부터 명세서다. */
+#pull .now .stats{display:none;gap:var(--gap-1);margin-top:var(--gap-2)}
+#pull .now[data-stage="4"] .stats{display:grid}
+#pull .now .stats span{display:flex;align-items:baseline;justify-content:space-between;
+  gap:var(--gap-2);line-height:1.15}
+#pull .now .stats i{font-style:normal;font-size:var(--fs-body);color:var(--dim)}
+#pull .now .stats b{font-family:var(--body);font-size:var(--fs-num);font-weight:400;color:var(--ink)}
 /* 명성 9 이상. 마흔여섯 중 여덟이라 자주 안 오므로, 올 때는 판 전체가 달라야 한다. */
 #pull .now.rare{border-color:#ffd83d;background:#3a3312;box-shadow:10px 12px 0 var(--edge), 0 0 0 6px #ffd83d3d}
-#pull .now.rare b,#pull .now.rare u{color:#ffd83d}
-/* 아직 안 뒤집힌 뒷면. 앞면과 같은 자리에 서고 무늬만 다르다. */
-#pull .now.back b{opacity:0}
-#pull .now.back{background:repeating-linear-gradient(-45deg,#1b2417 0 12px,#232e1d 12px 24px)}
+#pull .now.rare .foot > b,#pull .now.rare u,#pull .now.rare .stats b{color:#ffd83d}
 /* 이미 나온 카드가 쌓이는 줄. 아래에 눕혀 두면 몇 장을 열었는지가 세지 않아도 보인다. */
-#pull .done{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;
+#pull .done{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--gap-1);
   width:min(92vw,720px);min-height:34px}
 #pull .done i{display:grid;place-items:center;min-width:64px;height:32px;padding:0 8px;
   font-style:normal;font-size:var(--fs-body);font-weight:700;color:var(--ink);
   border:2px solid var(--edge);background:#2b3a22}
 #pull .done i.rare{background:#3a3312;color:#ffd83d;border-color:#ffd83d}
-/* 넘기는 법. 연출 중에는 건너뛰기, 다 열리면 닫기라고 같은 자리에서 말이 바뀐다. */
-/* 누름을 받는 자리. 판 전체를 덮되 보이는 것은 아래쪽 안내 한 줄뿐이다.
+/* 확정. 방금 끝난 장이 제자리로 축소되며 줄에 앉는다. 그냥 나타나면 카드가 어디로 갔는지가 없다. */
+@keyframes pullSettle{
+  from{transform:scale(2.6) translateY(-46px);opacity:.2}
+  to{transform:none;opacity:1}
+}
+#pull .done i.just{animation:pullSettle .24s ease-out}
+/* 누름을 받는 자리. 판 전체를 덮되 보이는 것은 아래쪽 한 마디뿐이다.
    div에 핸들러를 걸면 화면에는 눌러도 된다는 신호가 안 남고 키보드로는 아예 못 닿는다.
    카드 위에 놓이므로 배경은 없고, 버튼은 글꼴을 물려받지 않으니 여기서 다시 준다. */
 #pull .tap{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;
   padding-bottom:22px;background:none;border:0;cursor:pointer;font:inherit;
   font-size:var(--fs-body);font-weight:700;color:var(--dim)}
 #pull .tap:focus-visible{outline:2px solid var(--dim);outline-offset:-6px}
+/* 세로가 짧은 가로 모바일. 카드와 이미 나온 줄과 넘기는 한 마디가 한 화면에 다 서야 한다.
+   측정: 740x360에서 줄이기 전 넘기는 한 마디가 두 줄로 접힌 칩 줄에 깔렸고, 능력치 다섯 줄이
+   카드의 3분의 2를 먹어 얼굴이 손가락 두 마디로 남았다. 칩과 여백을 줄여 카드에 돌려준다. */
+@media (max-height:480px){
+  #pull{gap:var(--gap-1)}
+  #pull .now{height:min(70vh,420px)}
+  #pull .now .foot{padding:12px 10px 8px}
+  #pull .now .stats{margin-top:var(--gap-1)}
+  #pull .done i{min-width:52px;height:24px;padding:0 6px}
+  /* 넘기는 한 마디는 위 오른쪽으로 간다. 아래는 칩 줄이 두 줄로 접히는 자리라 글자가 깔린다. */
+  #pull .tap{align-items:flex-start;justify-content:flex-end;padding:6px 12px 0 0}
+  /* 확률 표는 위로 편다. 아래로 펴면 마지막 등급 줄이 화면 밖으로 나간다. */
+  #shop .odds em{top:auto;bottom:calc(100% + var(--gap-1))}
+}
 @keyframes flip{from{transform:translateY(6px) scaleY(.4)}to{transform:none}}
 #shop .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);
   background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);
