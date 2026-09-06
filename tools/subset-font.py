@@ -24,9 +24,11 @@ WEIGHTS = [("Regular", 400), ("Bold", 700)]
 def corpus():
     seen = set()
     for base, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in SKIP]
+        dirs[:] = [d for d in dirs if d not in SKIP and ".local" not in d]
         for name in files:
-            if not re.search(r"\.(mjs|js|html)$", name):
+            # 스크래치는 코퍼스가 아니다. 굽는 쪽과 재는 쪽이 같은 목록을 봐야 하므로
+            # tools/font-gate.mjs의 walk과 같은 규칙으로 같이 뺀다.
+            if ".local" in name or not re.search(r"\.(mjs|js|html)$", name):
                 continue
             with open(os.path.join(base, name), encoding="utf-8", errors="ignore") as fh:
                 seen.update(fh.read())

@@ -58,7 +58,9 @@ function coverage(path) {
 
 function walk(dir, out) {
   for (const name of readdirSync(dir)) {
-    if (SKIP.includes(name)) continue;
+    // 스크래치는 코퍼스가 아니다. 옆 세션이 .omo에 떨군 *.local.* 한 장이 글자 집합을 밀면
+    // 이 게이트가 빨간불을 내고, 그 말대로 다시 깎으면 남의 임시 파일 글자가 서체에 박힌다.
+    if (SKIP.includes(name) || name.includes(".local")) continue;
     const p = join(dir, name);
     if (statSync(p).isDirectory()) walk(p, out);
     else if (/\.(mjs|js|html)$/.test(name)) out.push(p);
