@@ -206,7 +206,8 @@ function partPoint(k, part) {
 }
 
 // 한 장을 굽는다. 같은 자세와 같은 각도로 구워야 등급끼리의 차이가 색과 모양에서만 나온다.
-function frame(kind, keeper, look, yaw) {
+// over는 겨냥 한 칸만 덮어쓰는 자리다. 계기가 반사실을 구울 때만 쓰고, 화면은 안 쓴다.
+function frame(kind, keeper, look, yaw, over) {
   boot();
   /* 프레임 비율은 칸마다 다르다. 세로로 긴 피사체를 가로 칸에 구우면 담기는 것은 사람이 아니라 여백이다.
      크기가 그대로면 아무것도 안 한다. 매번 다시 잡으면 굽는 한 장마다 그리기 버퍼를 새로 만든다. */
@@ -240,7 +241,7 @@ function frame(kind, keeper, look, yaw) {
   rig = buildKeeper(keeper.height, keeper.weight, look);
   rig.updateMatrixWorld(true);
   scene.add(rig);
-  const aim = AIM[kind] || { part: "torso", dist: 1.3, lift: 0 };
+  const aim = Object.assign({}, AIM[kind] || { part: "torso", dist: 1.3, lift: 0 }, over || {});
   const at = partPoint(rig, aim.part);
   at.y += aim.lift;
   const a = yaw === undefined ? (aim.yaw === undefined ? -0.7 : aim.yaw) : yaw;
@@ -288,9 +289,9 @@ export function stopSpin() {
    좌표는 그림 몫이다. 왼쪽 위가 0,0이고 오른쪽 아래가 1,1이라 프레임 크기가 바뀌어도 축이 안 흔들린다.
    반지름이 둘인 이유는 프레임이 정사각이 아니기 때문이다. 같은 크기가 가로로 넓은 칸에서는
    x 몫으로 더 작게 선다. url을 같이 돌려주어, 잰 그림과 화면에 걸린 그림이 같은 장인지 대조할 수 있다. */
-export function headBox(kind, keeper, look) {
+export function headBox(kind, keeper, look, over) {
   if (!AIM[kind]) return null;
-  frame(kind, keeper, look);
+  frame(kind, keeper, look, undefined, over);
   const head = rig && rig.userData.head;
   if (!head) return null;
   const at = new THREE.Vector3();
@@ -302,5 +303,7 @@ export function headBox(kind, keeper, look) {
   const mid = to(at.clone().project(cam));
   const top = to(crown.clone().project(cam));
   const ry = Math.abs(mid.y - top.y);
-  return { x: mid.x, y: mid.y, ry, rx: ry * (R.domElement.height / R.domElement.width), url: R.domElement.toDataURL("image/png") };
+  // 쓴 거리를 같이 돌려준다. 계기가 반사실을 구울 때 겨냥 상수를 옮겨 적지 않아도 된다.
+  return { x: mid.x, y: mid.y, ry, rx: ry * (R.domElement.height / R.domElement.width),
+    dist: Object.assign({}, AIM[kind], over || {}).dist, url: R.domElement.toDataURL("image/png") };
 }
