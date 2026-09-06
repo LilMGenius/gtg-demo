@@ -222,6 +222,9 @@ const IC_SPON = G('스폰', R(10.5, 3, 3, 3) + R(9, 6, 6, 3) + R(0, 9, 24, 3) + 
 // 기복. 화살표 하나면 오늘 컨디션이 어느 쪽인지가 문장 없이 선다.
 const IC_UP = G('컨디션 좋음', R(10.5, 3, 3, 3) + R(7.5, 6, 9, 3) + R(4.5, 9, 15, 3) + R(9, 12, 6, 12));
 const IC_DOWN = G('컨디션 나쁨', R(9, 0, 6, 12) + R(4.5, 12, 15, 3) + R(7.5, 15, 9, 3) + R(10.5, 18, 3, 3));
+// 보통. 위도 아래도 아닌 날에 칸을 비우면 오늘 값이 없다는 뜻으로 안 읽히고 화면이 안 그렸다는
+// 뜻으로 읽힌다. 나란한 두 줄은 화살촉이 없어 어느 쪽으로도 안 기운다.
+const IC_MID = G('컨디션 보통', R(4.5, 9, 15, 3) + R(4.5, 15, 15, 3));
 // 버프. 목이 좁고 배가 넓은 병 하나면 마시는 물건인 것이 문장 없이 선다.
 const IC_BUFF = G('버프', R(9, 0, 6, 3) + R(9, 3, 6, 3) + R(6, 6, 12, 3) + R(4.5, 9, 15, 12)
   + R(6, 21, 12, 3));
@@ -375,11 +378,14 @@ function formChip() {
   const up = state.form > 0.4;
   const dn = state.form < -0.4;
   box.innerHTML = up ? '<span class="up">' + IC_UP + '</span>'
-    : dn ? '<span class="dn">' + IC_DOWN + '</span>' : '';
-  // 아이콘만 서는 자리라 이름은 라벨이 맡는다. 화살표가 없는 날은 빈 칸이고,
-  // 빈 칸에 이름을 붙이면 읽는 자에게 없는 것이 있다고 말한다.
-  if (up || dn) box.setAttribute('aria-label', '컨디션 ' + (up ? '좋음' : '나쁨'));
-  else box.removeAttribute('aria-label');
+    : dn ? '<span class="dn">' + IC_DOWN + '</span>'
+    : '<span class="mid">' + IC_MID + '</span>';
+  /* 아이콘만 서는 자리라 이름은 라벨이 맡는다. role은 마크업이 들고 있다. 이름 없는 덩어리에
+     라벨만 붙이면 계산은 되어도 읽어 주는 자에게 간다는 보장이 없고, 실측으로 이 판이
+     role=generic에 이름을 얹어 돌려줬다. title은 같은 이름을 마우스에 준다. */
+  const name = '컨디션 ' + (up ? '좋음' : dn ? '나쁨' : '보통');
+  box.setAttribute('aria-label', name);
+  box.setAttribute('title', name);
 }
 
 function setPad(on) {

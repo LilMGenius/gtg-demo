@@ -253,6 +253,41 @@ try {
   check("instrument:a-planted-tight-chip-is-caught", planted.gaps.some((g) => g < planted.unit),
     planted.gaps.join("/") + " against " + planted.unit + "px");
 
+  /* 자막과 상태 칩. 상자끼리 안 닿는 것으로는 부족하다. 칩은 --lift만큼 오른아래로 그림자를
+     던지므로, 상자가 3px 떨어져 있어도 그림자는 자막 상자 안으로 1px 들어가 앉는다.
+     닿고 나서 빨개지는 자는 옮길 시간을 안 준다. 그래서 재는 것은 그림자까지 실은 칩이다.
+     문턱은 지어내지 않고 --lift를 그대로 읽는다. 두 상자가 가로로 안 겹치는 폭에서는
+     세로 거리를 물을 일이 없으므로 판정은 겹친 넓이 하나로 낸다. */
+  const capGuard = async (w, h) => {
+    await p.setViewportSize({ width: w, height: h });
+    await p.waitForTimeout(400);
+    return p.evaluate(() => {
+      const lift = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--lift")) || 0;
+      const a = document.getElementById("top").getBoundingClientRect();
+      const c = document.getElementById("caption").getBoundingClientRect();
+      const dx = Math.min(a.right + lift, c.right) - Math.max(a.left, c.left);
+      const dy = Math.min(a.bottom + lift, c.bottom) - Math.max(a.top, c.top);
+      const r1 = (v) => Math.round(v * 10) / 10;
+      return { lift, over: dx > 0 && dy > 0, bite: r1(Math.min(dx, dy)),
+        side: r1(-dx), clear: r1(c.top - a.bottom) };
+    });
+  };
+  const bitten = [], guards = [];
+  for (const size of [[1280, 720], [740, 360]]) {
+    const g = await capGuard(size[0], size[1]);
+    const tag = size[0] + "x" + size[1];
+    /* 가로로 안 겹치는 폭에서 세로 거리를 적으면 음수가 나와 읽는 사람이 물린 줄로 읽는다.
+       두 상자가 좌우로 갈라선 폭에서는 갈라선 거리를 적는 것이 그 폭에서 참인 문장이다. */
+    guards.push(g.side > 0
+      ? tag + " apart " + g.side + "px sideways"
+      : tag + " clear " + g.clear + "px against lift " + g.lift + "px");
+    if (g.over) bitten.push(tag + " bites " + g.bite + "px into the caption");
+  }
+  await p.setViewportSize({ width: 1280, height: 720 });
+  await p.waitForTimeout(300);
+  check("layout:the-chip-shadow-clears-the-caption", bitten.length === 0,
+    bitten.join(", ") || guards.join(", "));
+
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
 
   console.log(notes.map((s) => "  ok   " + s).join("\n"));
