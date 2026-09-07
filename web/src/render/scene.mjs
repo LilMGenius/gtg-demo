@@ -832,9 +832,17 @@ const TOUCHED = new Set(['contact']);
   /* 복귀 동안의 포즈 추종 속도. 0.12로 끌면 시정수가 0.14초라 2.1Hz 보행의 진폭이 39% 깎여
      다리를 덜 흔든 것으로 보인다. 0.5는 시정수 0.033초라 5%만 깎인다. */
   const WALK_RATE = 0.5;
-  /* 다음 구가 걷기 도중 시작하면 남은 걸음을 이 안에 끝낸다. restartDelay의 하한이 1.6초라
-     (src/chain.mjs restartDelay) 그보다 짧으면 공이 다시 설 때 키퍼는 이미 선에 서 있다. */
-  const CARRY_FOR = 1.0;
+  /* 다음 구가 서면 남은 복귀를 이 안에 끝낸다. 기준은 재시작 대기가 아니라 손가락이 눌러야 하는
+     순간이다. 실측으로 리셋에서 그 순간까지 0.46초에서 0.52초이고(비행 0.68~0.72초의 72퍼센트,
+     web/src/main.mjs pressAt), 공이 발을 떠나는 것은 1.65초 뒤다. 1.0초로 두었을 때 실측 복귀가
+     리셋 0.62초 뒤에 끝나 그 순간을 0.16초 넘겼고, 누른 손가락은 걷는 몸에서 다이빙을 시작했다. */
+  const CARRY_FOR = 0.42;
+  /* 가속 상한. 위상이 지나온 거리로 도는 탓에 배속이 그대로 걸음 수가 되고, 예산만 보고 조이면
+     한 프레임에 0.15미터를 지나 걸음이 아니라 미끄러짐으로 읽힌다. 정상 보폭이 프레임당 0.0292미터라
+     네 배는 0.117미터이고, walkback 게이트가 순간이동으로 세는 0.18미터 아래에 그대로 든다. */
+  const GAIN_MAX = 4;
+  // 복귀로 칠 최소 이탈. 골문 반폭 3.66의 1.4퍼센트라 이 안쪽은 화면에서 제자리로 읽힌다.
+  const OFF_LINE = 0.05;
   // 걷는 속도의 임자. 키퍼를 다시 지을 때 그 사람의 민첩을 받아 둔다.
   let walkStat = 5;
   let back = null;
@@ -2654,8 +2662,16 @@ const TOUCHED = new Set(['contact']);
     /* 다음 구가 걷기 도중 시작해도 그 자리에서 순간이동시키지 않는다. 남은 걸음을 상한 안에
        끝내도록 속도만 올린다. 진행률은 프레임마다 더한 값이라 상한을 줄여도 지금 자리가 안 튄다. */
     if (back && back.hb > 0 && back.span > 0) {
-      back.gain = Math.max(1, ((1 - back.r) * RISE_FOR + (1 - back.w) * back.span) / CARRY_FOR);
+      back.gain = Math.min(GAIN_MAX, Math.max(1, ((1 - back.r) * RISE_FOR + (1 - back.w) * back.span) / CARRY_FOR));
       back.owner = null;
+    } else if (WALK_GAIN > 0 && !back && Math.abs(keeper.position.x) > OFF_LINE) {
+      /* 복귀가 아직 안 열렸는데 다음 구가 선다. 여기서 열지 않으면 착지점에서 골문 한가운데까지를
+         한 프레임에 옮겨 놓게 되고, 그 순간이동이 이 절이 없애려던 그림이다. 실측으로 만렙 키퍼가
+         공을 손에 쥔 판에서 꼬리 나이 3.54초에 다시 서는데 복귀는 3.6초에 열려 0.06초를 놓쳤고,
+         그 한 프레임이 1.650미터였다. z가 아니라 x로 묻는 이유는 판이 서기 전 첫 배치가 z만
+         0.9미터 옮기기 때문이다. 그 배치는 복귀가 아니라 시작 자리다. */
+      back = openBack(null);
+      back.gain = Math.min(GAIN_MAX, Math.max(1, (RISE_FOR + back.span) / CARRY_FOR));
     } else {
       back = null;
       keeper.position.set(0, 0, KEEPER_Z);
