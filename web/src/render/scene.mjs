@@ -536,6 +536,8 @@ const TOUCHED = new Set(['contact']);
   }
 
   function setKeeper(k, look) {
+    // 걷는 속도는 이 사람의 민첩을 탄다. 판정은 안 읽고 복귀 걸음만 읽는다.
+    if (Number.isFinite(k.agility)) walkStat = k.agility;
     // 벗겨진 장갑은 장면에 붙어 있다. 키퍼를 다시 짓기 전에 치워야
     // 새 키퍼의 장갑 목록과 짝이 안 맞는 유령이 남지 않는다.
     if (loose) { scene.remove(loose); loose = null; }
@@ -797,6 +799,92 @@ const TOUCHED = new Set(['contact']);
     // 감쇠를 dt로 환산하면 dt가 0일 때 0이 되고, 프레임률이 흔들려도 같은 속도로 도착한다.
     poseNow[key] = lerpPose(poseNow[key], target, 1 - Math.pow(1 - rate, stepDt * 60));
     setPose(actor[key], poseNow[key], swayPin >= 0 ? swayPin : vnow - swayT0);
+  }
+
+
+  /* 복귀는 두 단이다. 막은 자리에서 일어서고, 그다음 걸어서 골문 한가운데로 돌아온다.
+     예전에는 한 계수로 좌표를 집 쪽에 섞기만 해서, 사건 포즈 그대로 굳은 몸이 옆으로 미끄러졌다.
+     3.6초는 homing 게이트가 대조군으로 요구하는 구간(나이 0.8~4.0초에 집을 비운 표본)을 그대로 남기고,
+     일어서기 0.5초와 걷기 상한 2.0초를 더해도 그 게이트의 도착 마감 6.2초 안에 0.1초 여유로 든다.
+     실측 복귀 거리는 다이빙 착지 1.29미터에서 한눈판 자리 3.29미터까지다. */
+  const HOME_AT = 3.6;
+  const RISE_FOR = 0.5;
+  const HOME_FOR = 2.0;
+  /* 걷는 속도. 스탯 표에서 이동을 맡은 칸은 민첩이다(src/chain.mjs keeperAt).
+     민첩 3이 1.30, 만렙 10이 1.75미터/초라 실측 복귀 1.29미터를 각각 1.00초와 0.74초에 걷는다. */
+  const WALK_MPS0 = 1.10;
+  const WALK_MPS_AGI = 0.065;
+  /* 걷기를 통째로 끄는 스위치. 이 계수가 0이면 걷는 속도가 0이 되어 키퍼는 막은 자리에 그대로 선다.
+     대조군이 없으면 걷기 축이 무엇을 갈랐는지 말할 수 없다. ?walk=0으로만 켜진다. */
+  const WALK_GAIN = new URLSearchParams(location.search).get('walk') === '0' ? 0 : 1;
+  /* 보폭 상수. 위상은 흐른 시간이 아니라 지나온 거리가 정한다. 시간이 정하면 같은 거리를
+     빨리 걸을 때 걸음 수가 늘어나 발이 땅 위를 미끄러진다.
+     2파이를 이 값으로 나누면 한 주기가 0.60미터, 한 걸음이 0.30미터다. 실측 복귀 1.29미터에서
+     반주기가 네 번 지나므로 다리 교대가 네 번 잡힌다(walkback 게이트의 바는 셋).
+     걸음이 짧고 빠른 것은 공이 restartDelay 하한 1.6초 안에 다시 서기 때문이다. */
+  const STRIDE = 10.4;
+  // 고관절 앞뒤 진폭. 허벅지에 걸면 무릎이 앞뒤로 0.31미터를 지나 한 걸음 0.30미터와 맞는다.
+  const HIP_SWING = 0.40;
+  // 뜬 다리의 무릎 접힘. 0이면 두 다리가 같은 길이로 스쳐 지나가 뜬 발이 땅에 끌린다.
+  const KNEE_LIFT = 0.34;
+  // 몸통 좌우 기울기. 0.10라디안은 5.7도이고 목을 0.075미터 옮긴다.
+  const TORSO_BOB = 0.10;
+  /* 복귀 동안의 포즈 추종 속도. 0.12로 끌면 시정수가 0.14초라 2.1Hz 보행의 진폭이 39% 깎여
+     다리를 덜 흔든 것으로 보인다. 0.5는 시정수 0.033초라 5%만 깎인다. */
+  const WALK_RATE = 0.5;
+  /* 다음 구가 걷기 도중 시작하면 남은 걸음을 이 안에 끝낸다. restartDelay의 하한이 1.6초라
+     (src/chain.mjs restartDelay) 그보다 짧으면 공이 다시 설 때 키퍼는 이미 선에 서 있다. */
+  const CARRY_FOR = 1.0;
+  // 걷는 속도의 임자. 키퍼를 다시 지을 때 그 사람의 민첩을 받아 둔다.
+  let walkStat = 5;
+  let back = null;
+
+  // 복귀를 연다. 착지점과 거리와 걸을 시간을 이 프레임에 한 번만 굳힌다.
+  function openBack(owner) {
+    const from = { x: keeper.position.x, z: keeper.position.z, ry: keeper.rotation.y, rz: keeper.rotation.z };
+    const gone = Math.hypot(from.x, from.z - KEEPER_Z);
+    const mps = WALK_GAIN * (WALK_MPS0 + WALK_MPS_AGI * walkStat);
+    return { owner, from, gone, base: null, hb: 1, phase: 0, r: 0, w: 0, gain: 1,
+      span: mps > 0 ? Math.min(HOME_FOR, gone / mps) : 0 };
+  }
+
+  /* 복귀 한 프레임. 진행률을 시간으로 나누지 않고 프레임마다 더한다. 나누면 다음 구가 걷기를
+     재촉해 상한을 줄이는 순간 진행률이 점프해서, 스냅하지 않으려던 자리가 그대로 스냅이 된다. */
+  function stepBack(b) {
+    if (b.r < 1) b.r = Math.min(1, b.r + stepDt * b.gain / RISE_FOR);
+    else if (b.span > 0) b.w = Math.min(1, b.w + stepDt * b.gain / b.span);
+    b.hb = b.r < 1 ? 1 : 1 - b.w;
+  }
+
+  /* 복귀한 몸을 그 프레임의 자리에 놓는다. 예전에는 매 프레임 현재 좌표에 계수를 곱해 섞었는데,
+     좌표를 매 프레임 다시 쓰는 갈래(한눈팔기, 빈 골대)에서만 그것이 보간이고 나머지 갈래에서는
+     같은 곱이 프레임마다 쌓였다. 실측으로 1.4초를 쓰라고 적어 둔 복귀가 0.43초에 끝났다.
+     그래서 섞지 않고 착지점과 집 사이의 절대 좌표를 쓴다. */
+  function applyBack(b) {
+    keeper.position.x = b.from.x * b.hb;
+    keeper.position.z = KEEPER_Z + (b.from.z - KEEPER_Z) * b.hb;
+    keeper.rotation.y = b.from.ry * b.hb;
+    // 기운 몸으로 걸으면 걷는 것이 아니라 기울어진 채 미끄러지는 것이다. 일어서는 동안 세운다.
+    keeper.rotation.z = b.from.rz * (1 - ease(b.r));
+    if (b.hb < 0.5) for (const heart of hearts) heart.visible = false;
+  }
+
+  /* 보행 한 주기의 관절 각. 준비 자세에서 다리만 앞뒤로 흔들고, 뜬 다리의 무릎을 접고,
+     몸통을 디딘 다리 쪽으로 기울인다. 포즈 표는 안 늘린다. 표에 넣으면 걷기가 사건 포즈와
+     같은 자격으로 서서, 사건 사이 거리를 재는 자가 걷기를 사건 하나로 센다. */
+  function walkPose(ph) {
+    const r = POSES.ready;
+    const s = Math.sin(ph);
+    const o = Math.sin(ph + Math.PI);
+    const p = { ...r };
+    p.hipL = [r.hipL[0] + HIP_SWING * s, r.hipL[1], r.hipL[2]];
+    p.hipR = [r.hipR[0] + HIP_SWING * o, r.hipR[1], r.hipR[2]];
+    p.knL = [r.knL[0] + KNEE_LIFT * Math.max(0, o), r.knL[1], r.knL[2]];
+    p.knR = [r.knR[0] + KNEE_LIFT * Math.max(0, s), r.knR[1], r.knR[2]];
+    // 몸통은 다리 한 쪽과 반대 위상이다. hipR가 sin(ph+파이)이므로 그 반대인 sin(ph)로 기울고,
+    // 그 쪽이 그 순간 땅을 딛고 있는 다리다. 무게가 실린 쪽으로 기우는 것이 걸음으로 읽힌다.
+    p.spine = [r.spine[0], r.spine[1], r.spine[2] + TORSO_BOB * s];
+    return p;
   }
 
   let cue = null;
@@ -1314,12 +1402,12 @@ const TOUCHED = new Set(['contact']);
       /* 꼬리는 키퍼를 골문 밖으로 데려간다. 한눈판 갈래는 골대 반폭 너머로 걸어 나가고
          돌진 갈래는 5미터를 달려 나간다. 그를 제자리로 되돌리는 것이 그동안 리셋이었고,
          리셋은 한 프레임에 좌표를 바꾸므로 화면에서는 순간이동으로 보였다. 실측 2.51미터다.
-         4.6초는 꼬리가 사는 8초대의 절반을 넘긴 시점이라 사건을 다 보여 준 뒤이고,
-         1.4초는 나가는 데 쓴 0.8초보다 길어 돌아오는 걸음이 도망처럼 안 보인다.
-         둘을 더해도 다음 킥까지의 대기보다 짧아서 다음 구는 제자리에 선 키퍼로 시작한다. */
-      const HOME_AT = 4.6;
-      const HOME_FOR = 1.4;
-      const homeBack = 1 - ease(Math.min(1, Math.max(0, (vnow - tail.t0 - HOME_AT) / HOME_FOR)));
+         복귀 자체는 이제 두 단이고 그 상수와 계산은 walkPose 옆에 산다.
+         행인과 하트는 여기서 나오는 계수 하나만 읽으므로 그 형태는 그대로 둔다. */
+      if (back && back.owner !== tail) back = null;
+      if (!back && vnow - tail.t0 >= HOME_AT) back = openBack(tail);
+      if (back) stepBack(back);
+      const homeBack = back ? back.hb : 1;
       // 잡는 사건은 접촉이 순간이다. 정지 프레임은 충돌 직후 22ms에서 잡히는데
       // 0.32초 램프로는 그때 포즈가 아직 대기 자세라 손이 아니라 얼굴에 공이 붙어 보인다.
       tailRamp = ease(Math.min(1, u * (INSTANT.has(tail.kind) ? 40 : 2.5)));
@@ -1813,12 +1901,7 @@ const TOUCHED = new Set(['contact']);
          뒤에서 섞으므로 앞의 계산을 안 건드리고, 매 프레임 새 값에 섞으니 쌓이지도 않는다. */
       /* 집은 골문 한가운데다. 꼬리가 시작된 자리로 되돌리면 그 자리가 다이빙으로 벌어져 있던
          회차에서는 리셋이 그 폭만큼 다시 순간이동한다. 실측 1.23미터다. */
-      if (homeBack < 1) {
-        keeper.position.x = lerp(0, keeper.position.x, homeBack);
-        keeper.position.z = lerp(KEEPER_Z, keeper.position.z, homeBack);
-        keeper.rotation.y = lerp(0, keeper.rotation.y, homeBack);
-        if (homeBack < 0.5) for (const heart of hearts) heart.visible = false;
-      }
+      if (back) applyBack(back);
       // 공과 장갑이 실제로 만난 프레임에서 한 번만 터진다. 좌표는 둘의 중점이다.
       // u 상한은 접촉이 끝내 안 나는 사건의 안전판이다. 없으면 폭발이 아예 사라진다.
       if (pendingBurst) {
@@ -1883,9 +1966,28 @@ const TOUCHED = new Set(['contact']);
       const lift2 = Math.max(0, ball.position.y - BALL_R);
       shadow.scale.setScalar(1 + lift2 * 0.55);
       shadow.material.opacity = Math.max(0.06, 0.42 - lift2 * 0.14);
+    } else if (back) {
+      // 꼬리가 끝났는데 걸음이 남았다. 여기가 없으면 다음 구의 리셋이 걷던 몸을 한 프레임에 옮긴다.
+      stepBack(back);
+      applyBack(back);
+      if (back.hb <= 0) back = null;
     }
     // 잡히는 속도는 사건마다 다르다. 자빠짐은 빠르고 회복은 느리다.
-    drive('keeper', kp, WRECK_POSES.has(kpId) ? 0.22 : (SCRAMBLE_POSES.has(kpId) ? 0.26 : 0.12));
+    let kRate = WRECK_POSES.has(kpId) ? 0.22 : (SCRAMBLE_POSES.has(kpId) ? 0.26 : 0.12);
+    if (back) {
+      if (back.r < 1) {
+        /* 1단. 착지 순간의 몸에서 준비 자세로 한 방향으로만 간다. 꼬리가 얹던 잔여 진동은
+           여기서 끝난다. 진동을 남긴 채 일어서면 다 끝난 사건이 계속 떨고 있는 것으로 읽힌다. */
+        if (!back.base) back.base = poseNow.keeper;
+        kp = pushPose(back.base, POSES.ready, ease(back.r));
+      } else {
+        // 2단. 지나온 거리가 위상을 정한다.
+        back.phase = back.gone * back.w * STRIDE;
+        kp = walkPose(back.phase);
+      }
+      kRate = WALK_RATE;
+    }
+    drive('keeper', kp, kRate);
     // 예비는 느리게 잡혀야 버틴 것으로 보이고, 임팩트는 한 프레임에 가까워야 터진 것으로 보인다.
     drive('kicker', kk, kk === POSES.strike ? 0.62 : (kk === POSES.follow ? 0.24 : (kk === POSES.plant ? 0.16 : (kk === POSES.cheer ? 0.30 : 0.10))));
     // 닿는 순간에만 몸이 부풀어야 힘이 들어간 것으로 읽힌다. 길게 주면 몸집이 변한 것으로 보인다.
@@ -2549,9 +2651,17 @@ const TOUCHED = new Set(['contact']);
     head.quaternion.identity();
     // 입 배율까지 되돌리지 않으면 다음 구가 벌어진 입으로 시작한다.
     setMood(head, 'rest');
-    keeper.position.set(0, 0, KEEPER_Z);
-    keeper.rotation.z = 0;
-    keeper.rotation.y = 0;
+    /* 다음 구가 걷기 도중 시작해도 그 자리에서 순간이동시키지 않는다. 남은 걸음을 상한 안에
+       끝내도록 속도만 올린다. 진행률은 프레임마다 더한 값이라 상한을 줄여도 지금 자리가 안 튄다. */
+    if (back && back.hb > 0 && back.span > 0) {
+      back.gain = Math.max(1, ((1 - back.r) * RISE_FOR + (1 - back.w) * back.span) / CARRY_FOR);
+      back.owner = null;
+    } else {
+      back = null;
+      keeper.position.set(0, 0, KEEPER_Z);
+      keeper.rotation.z = 0;
+      keeper.rotation.y = 0;
+    }
     ball.position.set(0, BALL_R, 11);
     ball.scale.set(1, 1, 1);
     ballGain = 1;
@@ -2576,10 +2686,10 @@ const TOUCHED = new Set(['contact']);
     shadow.material.opacity = 0.42;
     kicker.position.set(KICKER_OFF, 0, 11.2);
     kicker.rotation.z = 0;
-    poseNow.keeper = POSES.ready;
+    // 걸음이 남아 있으면 포즈도 안 되돌린다. 되돌리면 걷던 다리가 한 프레임에 준비 자세로 스냅한다.
+    if (!back) { poseNow.keeper = POSES.ready; setPose(keeper, POSES.ready, 0); }
     poseNow.kicker = POSES.windup;
     swayT0 = vnow;
-    setPose(keeper, POSES.ready, 0);
     setPose(kicker, POSES.windup, 0);
   }
   reset();

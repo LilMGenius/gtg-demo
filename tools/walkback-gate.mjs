@@ -1,0 +1,289 @@
+import { chromium } from "playwright";
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { pinClock } from "./clock.mjs";
+
+// 막은 뒤 골문 한가운데로 돌아오는 몸을 재는 자. 좌표만 보면 미끄러진 것과 걸어온 것이 같은 곡선이라,
+// 위치와 관절을 한 궤적에서 같이 읽는다. 다리가 교대로 오르내리지 않으면 그 이동은 걸음이 아니다.
+//
+// 진행은 벽시계가 아니라 프레임이다. 시계를 1/60로 못 박고(clock.mjs pinClock) 사건을 건 프레임을
+// 닻으로 삼으면 표본 k번째의 세계시각이 회차와 무관하게 k/60이 된다. 잠으로 채취하면 그 사이에 몇
+// 프레임이 지났는지를 그날의 부하가 정해, 안 바꾼 코드가 다른 궤적을 낸다. 판 안의 편차는 ?vary=0으로,
+// 대기 흔들림의 위상은 __swayPin(0)으로 같이 못 박는다.
+//
+// 대조군은 셋이다. 걷기 계수를 0으로 둔 정지 폴백(?walk=0)에서 키퍼가 막은 자리에 남는가, 멈춘
+// 프레임 두 장이 같은 세계를 내는가, --was로 부모 판을 라우팅하면 걷기 축이 빨개지는가.
+// 마지막은 --was=<rev>로 켠다. 부모 판이 살아 있는 판과 같으면 대조군이 no-op이라 그 자리에서 끊는다.
+//
+// 표본 범위: 사건 셋(save, catch, spill) x 좌우 두 방향 + 정지 폴백 하나, 1280x720, seed 20.
+const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&vary=0";
+const LINE = String.fromCharCode(10);
+const W = 1280;
+const H = 720;
+const STEP = 1 / 60;
+// 개봉 카드 한 장을 넘기고 다음 마디가 설 때까지. 0.7초를 프레임으로 옮긴 값이다.
+const CARD_STEPS = 42;
+// 사건을 건 프레임에서 이만큼 뒤에 세계를 멈춘다. 6.67초이고 복귀 예산(3.6+0.5+2.0=6.1초)보다 길어서
+// 멈춘 프레임은 이미 도착한 뒤의 한 컷이다.
+const STOP_FRAMES = 400;
+const EVENTS = ["save", "catch", "spill"];
+const SIDES = [-1, 1];
+// 골문 앞 키퍼의 제자리. scene.mjs KEEPER_Z와 같은 값이고 여기서 다시 정하지 않고 받아 적는다.
+const KEEPER_Z = 0.9;
+// 다리 교대 횟수의 바. 계획이 정한 수다.
+const FLIP_BAR = 3;
+// 도착으로 치는 폭. 0.05m는 골문 반폭 3.66의 1.4퍼센트라 화면에서 제자리로 읽힌다.
+const HOME_TOL = 0.05;
+// 도착한 몸이 서 있는가. 계획이 정한 수다. 0.02라디안은 1.1도다.
+const RZ_BAR = 0.02;
+// 발을 떼기 전에 몸이 준비 자세로 얼마나 다가와야 하는가. 사건 순간 거리의 이 비율 아래여야 한다.
+// 절대값을 쓰면 실루엣 자의 단위를 여기서 다시 정하는 셈이라 같은 표본 안의 비로 묻는다.
+const RISE_CLOSE = 0.35;
+// 발을 뗀 것으로 치는 폭. 0.01m는 정지한 몸의 프레임 간 이동량 위다.
+const STEP_OFF = 0.01;
+// 뒷걸음 허용 폭. 이보다 되돌아가면 단조가 아니다.
+const BACK_TOL = 0.02;
+// 이만큼도 안 움직인 표본은 복귀를 아예 안 잰 것이다. 실측 다이빙 착지가 1.2m대다.
+const MIN_TRAVEL = 0.6;
+/* 걸음마다 몸통이 무게를 실은 다리 쪽으로 옮겨 가는가. 두 다리는 서로 반대 위상이라 어느 다리를
+   기준으로 잡느냐로 부호가 뒤집힌다. 그래서 이름이 아니라 더 펴진 다리, 곧 무릎이 낮은 쪽을 기준으로
+   묻는다. 그 쪽과 목의 좌우 오프셋이 같은 부호로 붙어야 하고 상관계수가 이 이상이어야 한다.
+   상관계수 하나로는 못 묻는다. 두 신호가 각각 한 방향으로만 가도 계수는 1이 나온다(실측: 안 걷는
+   판에서 여섯 표본 중 넷이 -1.00으로 이 축을 통과했다). 그래서 몸통이 실제로 진동했는지를 같이 센다. */
+const CORR_BAR = 0.5;
+// 몸통 진동의 죽은 띠 바닥. 목 좌우 오프셋의 보행 진폭이 0.0951이라 이 값은 그 열아홉 분의 일이다.
+const TORSO_DEAD = 0.005;
+// 걷기 전에 몸이 준비 자세에 얼마나 붙어야 하는가의 절대 바. 0.35는 pose 게이트가 서로 다른 사건을
+// 가르는 거리다(tools/pose-gate.mjs). 그보다 멀면 그 몸은 준비 자세가 아니라 다른 사건 하나만큼 떨어져 있다.
+const READY_NEAR = 0.35;
+// 되돌릴 판. HEAD로 걸면 이 게이트를 담은 커밋이 들어오는 순간 대조군이 자기를 자기와 맞대고 초록이 된다.
+// 기본값은 이 게이트를 담은 커밋의 부모다. RED 기록을 낸 scene.mjs가 그 판에 그대로 있다.
+const WAS_REV = (process.argv.find((a) => a.startsWith("--was=")) || "--was=40352dd").slice(6);
+const WAS = process.argv.some((a) => a === "--was" || a.startsWith("--was="));
+const LAYER = ["web/src/render/scene.mjs"];
+const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+
+const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 420000);
+t.unref();
+
+const rows = [];
+const say = (name, pass, detail) => rows.push([pass, name, detail]);
+
+// JOINTS = [spine, neck, shL, elL, shR, elR, hipL, knL, hipR, knR]. 관절 하나가 세 수를 차지한다.
+const KNL_Y = 7 * 3 + 1;
+const KNR_Y = 9 * 3 + 1;
+const KNL_X = 7 * 3;
+const KNR_X = 9 * 3;
+/* 몸통이 어느 쪽으로 옮겨 갔는지는 목의 좌우 오프셋에 있다. 척추를 z축으로 굴리는 각이라 목은 x로 간다.
+   앞뒤인 z를 읽으면 진폭 0.0012의 잡음을 읽고, 그 잡음이 상관계수 -0.67을 낸다. 같은 표본에서 x는
+   진폭 0.0951에 부호가 네 번 갈린다. 위아래인 y도 0.0042라 아래 죽은 띠 0.005 안에 들어간다. */
+const NECK_X = 1 * 3;
+
+const mean = (a) => a.reduce((s, v) => s + v, 0) / Math.max(1, a.length);
+const amp = (a) => { const m = mean(a); return Math.max(0, ...a.map((v) => Math.abs(v - m))); };
+const dist = (a, b) => { let s = 0; for (let i = 0; i < a.length; i += 1) { const d = a[i] - b[i]; s += d * d; } return Math.sqrt(s); };
+
+// 부호 교대. 죽은 띠 안의 값은 안 센다. 띠는 도착 뒤 선 몸에서 잰 잡음 바닥의 두 배다.
+function flips(sig, dead) {
+  let last = 0;
+  let n = 0;
+  for (const s of sig) {
+    if (Math.abs(s) < dead) continue;
+    const sgn = s > 0 ? 1 : -1;
+    if (last && sgn !== last) n += 1;
+    last = sgn;
+  }
+  return n;
+}
+
+function corr(a, b) {
+  const ma = mean(a);
+  const mb = mean(b);
+  let sab = 0;
+  let sa = 0;
+  let sb = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    const da = a[i] - ma;
+    const db = b[i] - mb;
+    sab += da * db; sa += da * da; sb += db * db;
+  }
+  return sa > 0 && sb > 0 ? sab / Math.sqrt(sa * sb) : 0;
+}
+
+// 한 표본의 궤적을 수로 옮긴다. 프레임 번호가 아니라 사건에서 흐른 프레임 수로 읽는다.
+function analyse(rec, ref) {
+  const x0 = rec[0].x;
+  const z0 = rec[0].z;
+  const travel = Math.hypot(x0, z0 - KEEPER_Z);
+  let off = -1;
+  let home = -1;
+  for (let i = 1; i < rec.length; i += 1) {
+    if (off < 0 && (Math.abs(rec[i].x - x0) > STEP_OFF || Math.abs(rec[i].z - z0) > STEP_OFF)) off = i;
+    if (home < 0 && off > 0 && Math.hypot(rec[i].x, rec[i].z - KEEPER_Z) <= HOME_TOL) home = i;
+  }
+  if (off < 0) off = rec.length - 1;
+  if (home < 0) home = rec.length - 1;
+  const win = rec.slice(off, home + 1);
+  const rest = rec.slice(Math.min(rec.length - 1, home + 6));
+  const leg = win.map((r) => r.v[KNL_Y] - r.v[KNR_Y]);
+  const legRest = rest.map((r) => r.v[KNL_Y] - r.v[KNR_Y]);
+  const torso = win.map((r) => r.v[NECK_X]);
+  const torsoRest = rest.map((r) => r.v[NECK_X]);
+  /* 어느 다리가 +x 쪽에 서는지를 표본에서 받아 적는다. 왼오 이름을 뒤집으면 무릎 차의 부호와 이 곱이
+     같이 뒤집히므로 판정이 이름 짓기에 안 걸린다. 곱한 신호는 낮은 무릎이 +x 쪽일 때 양수다. */
+  const side = mean(win.map((r) => r.v[KNR_X])) >= mean(win.map((r) => r.v[KNL_X])) ? 1 : -1;
+  const low = leg.map((v) => v * side);
+  const m = mean(leg);
+  let back = 0;
+  for (let i = off + 1; i <= home; i += 1) back = Math.max(back, Math.abs(rec[i].x) - Math.abs(rec[i - 1].x));
+  return {
+    travel, off, home, x0, xEnd: rec[home].x, ageOff: rec[off].a, ageHome: rec[home].a, age0: rec[0].a, zEnd: rec[home].z,
+    rzEnd: rec[home].rz, rzOff: rec[off].rz,
+    flips: flips(leg.map((v) => v - m), Math.max(0.01, 2 * amp(legRest))),
+    legAmp: amp(leg), legFloor: amp(legRest), lean: corr(low, torso), side, back,
+    tflips: flips(torso.map((v) => v - mean(torso)), Math.max(TORSO_DEAD, 2 * amp(torsoRest))),
+    d0: dist(rec[0].v, ref), dOff: dist(rec[off].v, ref)
+  };
+}
+
+// 한 표본을 뽑는다. 실제 슛으로 키퍼를 다이빙시킨 뒤 그 착지점에서 원하는 사건을 건다.
+async function sample(browser, routed, kind, side, walkOff) {
+  const ctx = await browser.newContext({ viewport: { width: W, height: H } });
+  await pinClock(ctx, STEP);
+  const page = await ctx.newPage();
+  const errs = [];
+  page.on("pageerror", (e) => errs.push(String(e)));
+  page.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+  for (const [f, body] of routed) {
+    await page.route("**/" + f, (r) => r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body }));
+  }
+  await page.goto(BASE + (walkOff ? "&walk=0" : ""), { waitUntil: "load" });
+  await page.waitForSelector("#go", { timeout: 15000 });
+  await page.click("#go", { force: true });
+  for (let i = 0; i < 6; i += 1) {
+    const open = await page.evaluate(() => { const e = document.getElementById("pull"); return Boolean(e) && !e.hidden; });
+    if (!open) break;
+    await page.click("#pull", { force: true });
+    await page.waitForFunction((n) => window.__frames() >= n, (await page.evaluate(() => window.__frames())) + CARD_STEPS, { timeout: 20000 });
+  }
+  // 흔들림 위상을 못 박는다. 안 박으면 같은 프레임의 몸이 회차마다 조금 다른 자리에 선다.
+  const pinned = await page.evaluate(() => (window.__swayPin ? window.__swayPin(0) : -1));
+  // 준비 자세의 기준 실루엣. 일어서기가 끝났는지는 이 벡터와의 거리로만 물을 수 있다.
+  const ref = await page.evaluate(() => window.__poseVis().v);
+  /* 방향키는 대기 마디에서만 먹고 그 자리에서 구를 날린다. 정해진 횟수만 누르면 누르는 동안 판이
+     비행이나 자막이던 회차에서 아무 구도 안 뛰고, 그 표본은 x가 0인 채로 복귀를 잰다(실측 travel 0.00).
+     그래서 횟수가 아니라 판정에 들어간 입력을 보고 멈춘다. */
+  let dove = false;
+  for (let i = 0; i < 40 && !dove; i += 1) {
+    await page.keyboard.press(side < 0 ? "ArrowLeft" : "ArrowRight");
+    await page.waitForTimeout(200);
+    dove = await page.evaluate((s) => Boolean(window.__lastInput) && window.__lastInput.dive === s, side);
+  }
+  // 그 구의 사건이 열리는 프레임을 기다린다. 그 프레임의 키퍼는 다이빙을 마치고 착지해 있다.
+  await page.waitForFunction(() => window.__tailKind() !== null, null, { timeout: 40000, polling: "raf" });
+  const open = await page.evaluate(([k, stop]) => {
+    const age = window.__tailAge();
+    const seen = window.__tailKind();
+    // 판을 잠가 뒤따르는 자막이 내 사건을 덮지 않게 한다. 그다음에 원하는 사건을 같은 프레임에 건다.
+    window.__lockRound();
+    window.__act(k);
+    const f = window.__frames();
+    window.__plan(0, null, f + stop);
+    window.__w14 = [];
+    const tick = () => {
+      const p = window.__poseVis();
+      window.__w14.push({ f: window.__frames(), a: window.__tailAge(), x: p.pos[0], z: p.pos[2], rz: p.rz, v: p.v });
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    return { f, age, seen, dive: window.__lastInput ? window.__lastInput.dive : 0 };
+  }, [kind, STOP_FRAMES]);
+  await page.waitForFunction((n) => window.__frames() >= n, open.f + STOP_FRAMES + 20, { timeout: 40000 });
+  // 멈춘 프레임 대조군. 세계시각은 그대로이고 프레임만 늘어야 멈춘 것이다.
+  const t0 = await page.evaluate(() => ({ v: window.__camDbg().vnow, f: window.__frames() }));
+  await page.waitForTimeout(250);
+  const t1 = await page.evaluate(() => ({ v: window.__camDbg().vnow, f: window.__frames(), k: window.__keeperPos() }));
+  const rec = await page.evaluate(() => window.__w14);
+  await ctx.close();
+  return { rec, ref, open, errs, pinned, dove, frozen: { t0, t1 } };
+}
+
+const routed = new Map();
+if (WAS) {
+  for (const f of LAYER) {
+    const was = execFileSync("git", ["show", WAS_REV + ":" + f], { encoding: "utf8", maxBuffer: 32000000, cwd: ROOT });
+    const live = readFileSync(ROOT + f, "utf8");
+    if (was.replace(/\r/g, "") === live.replace(/\r/g, "")) {
+      console.log("판정 중단. " + f + "이 " + WAS_REV + "와 같아 대조군이 no-op이다. INSTRUMENT DEAD");
+      process.exit(2);
+    }
+    routed.set(f, was);
+  }
+}
+
+let browser;
+const errAll = [];
+try {
+  browser = await chromium.launch({ executablePath: EXE });
+  const cells = [];
+  for (const kind of EVENTS) for (const side of SIDES) cells.push([kind, side, false]);
+  cells.push(["save", -1, true]);
+  for (const [kind, side, walkOff] of cells) {
+    const tag = kind + (side < 0 ? " L" : " R") + (walkOff ? " walk0" : "");
+    const s = await sample(browser, routed, kind, side, walkOff);
+    for (const e of s.errs) errAll.push(e);
+    const a = analyse(s.rec, s.ref);
+    console.log("  " + tag + " land " + a.x0.toFixed(2) + " travel " + a.travel.toFixed(2)
+      + "m off@" + a.off + "f/" + a.ageOff.toFixed(2) + "s home@" + a.home + "f/" + a.ageHome.toFixed(2) + "s age0 " + a.age0.toFixed(2) + " flips " + a.flips + " legAmp " + a.legAmp.toFixed(3)
+      + " floor " + a.legFloor.toFixed(3) + " lean " + a.lean.toFixed(2) + "/" + a.tflips + "/" + a.side + " rz " + a.rzOff.toFixed(3)
+      + "->" + a.rzEnd.toFixed(3) + " ready " + a.d0.toFixed(2) + "->" + a.dOff.toFixed(2));
+    if (walkOff) {
+      say("control:the-stop-fallback-keeps-him-where-he-landed",
+        Math.abs(a.xEnd - a.x0) <= HOME_TOL && a.travel >= MIN_TRAVEL,
+        "landed " + a.x0.toFixed(2) + ", last " + a.xEnd.toFixed(2) + " after " + s.rec.length + " frames");
+      continue;
+    }
+    say("instrument:the-shot-took-him-off-his-line " + tag, a.travel >= MIN_TRAVEL && s.pinned >= 0 && s.dove,
+      "dive " + s.open.dive + " opened on " + s.open.seen + " at age " + s.open.age.toFixed(2)
+      + ", travel " + a.travel.toFixed(2) + "m, sway phase " + s.pinned);
+    say("rise:he-stands-up-on-the-spot-before-the-first-step " + tag,
+      a.off > 0 && a.dOff <= a.d0 * RISE_CLOSE && a.dOff <= READY_NEAR && Math.abs(a.rzOff) <= HOME_TOL,
+      "ready distance " + a.d0.toFixed(2) + " -> " + a.dOff.toFixed(2) + " (bar "
+      + (a.d0 * RISE_CLOSE).toFixed(2) + "), tilt " + a.rzOff.toFixed(3) + " at the step off frame " + a.off);
+    say("walk:the-legs-alternate-on-the-way-home " + tag, a.flips >= FLIP_BAR,
+      a.flips + " sign changes of the knee height gap, amplitude " + a.legAmp.toFixed(3)
+      + " over a standing floor of " + a.legFloor.toFixed(3));
+    say("walk:the-torso-leans-over-the-planted-leg " + tag, a.lean >= CORR_BAR && a.tflips >= FLIP_BAR,
+      "lean " + a.lean.toFixed(2) + " between the lower knee side and the neck offset over " + a.tflips
+      + " torso sign changes, +x leg " + (a.side > 0 ? "R" : "L"));
+    say("walk:the-return-is-monotone " + tag, a.back <= BACK_TOL, "worst back step " + a.back.toFixed(3) + "m");
+    say("walk:he-arrives-home-standing " + tag,
+      Math.hypot(a.xEnd, a.zEnd - KEEPER_Z) <= HOME_TOL && Math.abs(a.rzEnd) < RZ_BAR,
+      "ended at " + a.xEnd.toFixed(3) + "," + a.zEnd.toFixed(3) + " tilt " + a.rzEnd.toFixed(4) + " on frame " + a.home);
+    say("control:the-frozen-frame-holds-the-world " + tag,
+      s.frozen.t0.v === s.frozen.t1.v && s.frozen.t1.f > s.frozen.t0.f,
+      "vnow " + s.frozen.t1.v.toFixed(4) + " held while frames ran " + s.frozen.t0.f + "->" + s.frozen.t1.f
+      + ", keeper x " + s.frozen.t1.k.x.toFixed(4));
+  }
+  say("console:no-errors", errAll.length === 0, errAll.slice(0, 2).join(" | ") || "clean");
+} finally {
+  clearTimeout(t);
+  if (browser) await browser.close();
+}
+
+const fails = rows.filter((r) => !r[0]);
+const oks = rows.filter((r) => r[0]);
+if (oks.length) console.log(oks.map((r) => "  ok   " + r[1] + " " + r[2]).join(LINE));
+if (fails.length) console.log(fails.map((r) => "  FAIL " + r[1] + " " + r[2]).join(LINE));
+console.log("표본 범위: 사건 " + EVENTS.length + " x 좌우 " + SIDES.length + " + 정지 폴백 1, 프레임 폭 " + STEP.toFixed(4) + "초");
+if (WAS) {
+  // 부모 판 대조군. 걷기와 일어서기 축이 그 판에서 빨개져야 이 자가 무언가를 가른 것이다.
+  const red = fails.filter((r) => r[1].startsWith("walk:") || r[1].startsWith("rise:")).length;
+  console.log(red > 0 ? "walkback CONTROL PASS " + red + " walk axes red on " + WAS_REV
+    : "walkback CONTROL FAIL 0 walk axes red on " + WAS_REV);
+  process.exitCode = red > 0 ? 0 : 1;
+} else {
+  console.log(fails.length ? "walkback FAIL " + fails.length : "walkback PASS " + oks.length);
+  if (fails.length) process.exitCode = 1;
+}
