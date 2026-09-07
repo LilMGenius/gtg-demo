@@ -9,7 +9,7 @@ import {
   flat, flatVertex, BALL_R, VIEW_X, KICKER_OFF, BALL_PAST, REST_Z, REST_Y,
   R_HALF_W, R_H, SX, SY, MOUTH_X, lerp, ease
 } from './units.mjs';
-import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, pushPose, setPose } from './objects/actors.mjs';
+import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, pushPose, setPose, KICK_WIND, beatOf } from './objects/actors.mjs';
 import { buildPitch, buildPassers, BOX_Z } from './objects/pitch.mjs';
 import { skinAt, placeAt } from '../state/gear.mjs';
 import { gazeMood } from '../ui/lines.mjs';
@@ -204,6 +204,27 @@ export function createScene(canvas) {
   let kickPop = 0;
   // 키퍼가 사건에 닿는 순간의 눌림. 키커의 kickPop과 같은 장치이고 대상만 다르다.
   let keeperPop = 0;
+  /* 착지 눌림. 몸이 자세에 도착하는 순간 몸통만 세로로 눌렸다가 펴진다. keeperPop은 그룹 전체를
+     부풀리는 접촉 반응이고 이것은 무게가 바닥에 실리는 순간이라, 대상도 방향도 다르다.
+     0.85와 1.08은 부피 보존 쌍이다(0.85 x 1.08 x 1.08 = 0.991, 1퍼센트 안).
+     60밀리초는 1/60 프레임으로 3.6프레임이고 그중 0.9 아래인 구간이 앞의 2프레임이라,
+     프레임마다 적는 자가 사건마다 반드시 하나 이상 잡는다. */
+  const LAND_FOR = 0.06;
+  const LAND_Y = 0.85;
+  const LAND_XZ = 1.08;
+  let landSq = 0;
+  // 예비를 버티는 시간. 이 폭은 사건이 아니라 눈이 반동을 읽는 데 드는 시간이라 포즈를 안 탄다.
+  const ANT_FOR = 0.075;
+  // 예비 깊이의 회차 편차. 표의 폭 0.30의 40퍼센트라 깊이 순서는 회차가 흔들려도 안 뒤집힌다.
+  const ANT_VARY = 0.12;
+  /* 잔여 주기의 회차 편차. 비율이라 표의 어느 줄에서도 같은 몫이 흔들린다. 0.84초 줄에서는
+     각속도 7.48에서 위아래로 1.50이고, 그것이 표를 넣기 전에 쓰던 폭과 같은 수라 repeat 게이트가 재는
+     회차 편차가 이 랩에서 줄지 않는다. */
+  const PER_VARY = 0.40;
+  /* 발등과 발 안쪽을 가르는 파워. 로스터 일흔일곱 명의 파워 중앙값이 7이다(4에서 10, 히스토그램
+     4:2 5:3 6:15 7:22 8:17 9:8 10:10). 이 선에서 74퍼센트가 발등, 26퍼센트가 발 안쪽인데,
+     판정이 레벨로 -2에서 +1.2를 얹으므로 낮은 레벨에서는 그 비가 뒤집힌다. */
+  const KICK_POWER_AT = 7;
   // 0.30은 슬로모션으로 읽혔고 0.02는 프레임이 멈춘 것으로 읽혔다. 0.08이 걸리는 느낌이다.
   const HIT_SCALE = 0.08;
 
@@ -1168,6 +1189,15 @@ const TOUCHED = new Set(['contact']);
    // deflect는 철봉 접촉이 정한 밀림 벡터다. 접촉 전에는 null이라 비행 코드가 통째로 건너뛴다.
     // settle은 비행이 끝난 자리다. 정착이 시작될 때 한 번만 채운다.
     cue = { shot, input, result, t0: vnow, ended: false, onEnd, steps: 0, struck: false, framed: false, deflect: null, settle: null };
+    /* 어떻게 차는 공인가. 판정 칸에는 종류가 없고(src/chain.mjs에 shot.kind 없음) chip과 strong과
+       kicker.power만 있어서 화면이 그 셋으로 고른다. 칩은 세게 차는 공이 아니고(그 칸이 chip이면
+       strong을 끈다) 강슛은 그 칸이 직접 세운 깃발이라 둘이 먼저 갈린다. 남는 둘은 세기로 갈리고,
+       경계 7은 로스터 일흔일곱 명의 파워 중앙값이다(4에서 10, 8 이상이 45퍼센트). 판정이 레벨로
+       -2에서 +1.2를 얹으므로 낮은 레벨에서는 발 안쪽이, 만렙에서는 발등이 흔하다. */
+    cue.kickKind = shot.chip ? 'chip'
+      : (shot.strong ? 'power'
+        : (shot.kicker && shot.kicker.power >= KICK_POWER_AT ? 'instep' : 'inside'));
+    cue.wind = KICK_WIND[cue.kickKind];
     trail.length = 0;
     ribbon.visible = false;
     ribCap.visible = false;
@@ -1238,6 +1268,9 @@ const TOUCHED = new Set(['contact']);
     // 섞기 전의 표준 포즈를 따로 들고 다닌다. 여기서 신원을 묻고, 몸에는 섞인 각도를 준다.
     let kpId = POSES.ready;
     let kk = POSES.windup;
+    /* 키커도 이제 섞인 포즈를 받는다. 잡히는 속도를 고르는 자리가 kk의 신원을 묻는데, 섞인 객체는
+       어느 이름과도 안 같아 예비와 임팩트가 한 속도로 잡힌다. 신원은 여기가 따로 들고 다닌다. */
+    let kkId = POSES.windup;
     // 발밑 높이는 상수로 못 낸다. 관절이 돌면 몸의 최저점이 매 프레임 바뀐다.
     // 원하는 높이를 여기 적고, 실제 접지는 프레임 끝에서 실측해서 맞춘다.
     let hover = 0;
@@ -1256,6 +1289,9 @@ const TOUCHED = new Set(['contact']);
       const swing = t - runup;
       kk = swing < -0.13 ? POSES.windup
         : (swing < 0 ? POSES.plant : (swing < 0.1 ? POSES.strike : POSES.follow));
+      kkId = kk;
+      // 예비는 킥 종류가 소유한다. 한 장으로 두면 칩과 강슛이 같은 몸에서 감기 시작한다.
+      if (kkId === POSES.windup && cue.wind) kk = cue.wind;
       if (t < runup) {
         const p = t / runup;
         kicker.position.z = lerp(11.2, 10.55, ease(p));
@@ -1476,24 +1512,29 @@ const TOUCHED = new Set(['contact']);
       // 거리만 재므로 이 결함을 못 잡는다. 포즈 표를 사건 수만큼 늘리지 않고,
       // 사건 직전 포즈와 최종 포즈를 잇는 선을 양쪽으로 늘려 세 키를 유도한다.
       if (!tail.base) tail.base = poseNow.keeper;
+      /* 예비의 깊이와 잔여의 주기는 포즈가 소유한다(actors.mjs POSE_BEAT). 상수 한 쌍으로 두면
+         열두 세이브가 같은 깊이로 되감겼다가 같은 주기로 떨어서, 몸은 열둘인데 박자는 하나다. */
+      const beat = beatOf(kpId);
       // 손으로 잡는 사건은 접촉이 이미 지나 있어 예비를 넣을 자리가 없다. 넣으면 공이 늦게 붙는다.
-      const ANT = INSTANT.has(tail.kind) ? 0 : 0.075;
+      const ANT = INSTANT.has(tail.kind) ? 0 : ANT_FOR;
       const tt = vnow - tail.t0;
       if (tt < ANT) {
         // 예비. 최종의 반대쪽으로 밀면 몸이 반동을 먹고 나서 넘어간 것으로 읽힌다.
-        kp = pushPose(kp, tail.base, 1.22);
+        // 깊이도 회차마다 흔든다. 매번 같은 깊이로 되감기면 예비가 반동이 아니라 자세의 일부가 된다.
+        kp = pushPose(kp, tail.base, beat.ant + (tail.vary.a - 0.5) * ANT_VARY);
       } else {
         // 잔여. 최종을 넘겼다가 감쇠 진동으로 되돌아온다. 진동이 빨리 죽으면
-        // 크리틱이 보는 520ms 프레임이 다시 마네킹이라 주기를 0.84초로 늘려 잡았다.
+        // 크리틱이 보는 520ms 프레임이 다시 마네킹이라, 표의 주기는 0.50초에서 1.18초 사이에 있다.
         const ft = tt - ANT;
         // 진동의 세기와 주기를 회차마다 흔든다. 종점은 그대로라 사건은 같은 사건으로 읽히고,
         // 관객이 실제로 보는 0.5초 부근의 몸만 매번 다른 자리를 지난다.
         // 종점을 흔들면 사건이 달라 보이고, 진동을 흔들면 같은 사건이 다르게 지나간다.
         const vy = tail.vary;
-        const w = Math.cos(ft * (7.5 + (vy.a - 0.5) * 3.0)) * Math.exp(-ft * 1.3);
+        const w = Math.cos(ft * (Math.PI * 2 / beat.per) * (1 + (vy.a - 0.5) * PER_VARY)) * Math.exp(-ft * 1.3);
         kp = pushPose(tail.base, kp, 1 + (0.34 + (vy.b - 0.5) * 0.30) * w);
         // 닿는 순간 몸이 눌린다. 없으면 충돌이 포즈 교체로만 나타난다.
-        if (!tail.squashed) { tail.squashed = true; keeperPop = 0.09; }
+        // 착지도 같은 순간이다. 몸이 자세에 도착하면서 무게가 바닥에 실리고 몸통이 한 번 눌린다.
+        if (!tail.squashed) { tail.squashed = true; keeperPop = 0.09; landSq = LAND_FOR; }
       }
       // 몸이 바닥에 닿는 순간 한 번만 흙을 판다. 매 프레임 칠하면 자국이 아니라 진흙탕이 된다.
       // 자국은 몸통이 아니라 뻗은 팔이 닿는 자리에 남는다. 장갑의 실제 좌표로 찍어야
@@ -1516,6 +1557,8 @@ const TOUCHED = new Set(['contact']);
         talked: POSES.cheer, distracted: POSES.cheer, openGoalScored: POSES.cheer
       };
       kk = KICKER_TAIL[tail.kind] ?? kk;
+      // 신원은 몸을 따라간다. 결과 포즈로 갈아탄 뒤에는 잡히는 속도도 그 포즈의 것이어야 한다.
+      if (KICKER_TAIL[tail.kind]) kkId = KICKER_TAIL[tail.kind];
       switch (tail.kind) {
         case 'catch':
         case 'save':
@@ -1727,6 +1770,8 @@ const TOUCHED = new Set(['contact']);
           kicker.rotation.z = ru < RUN ? Math.sin(ru * 42) * 0.12 : lerp(kicker.rotation.z, 0, damp(0.3));
           kk = ru < RUN ? POSES.dribble
             : (ru < HIT ? POSES.plant : (ru < HIT + 0.1 ? POSES.strike : (KICKER_TAIL[tail.kind] ?? POSES.follow)));
+          // 다시 차러 달려가는 몸도 같은 신원 규약을 쓴다. 여기서 안 세우면 두 번째 임팩트만 느리게 잡힌다.
+          kkId = kk;
           // 두 번째 임팩트는 한 번만 터진다. 매 프레임 부르면 소리가 톱니처럼 이어진다.
           if (!tail.restruck && ru >= HIT) {
             tail.restruck = true;
@@ -2015,7 +2060,7 @@ const TOUCHED = new Set(['contact']);
     }
     drive('keeper', kp, kRate);
     // 예비는 느리게 잡혀야 버틴 것으로 보이고, 임팩트는 한 프레임에 가까워야 터진 것으로 보인다.
-    drive('kicker', kk, kk === POSES.strike ? 0.62 : (kk === POSES.follow ? 0.24 : (kk === POSES.plant ? 0.16 : (kk === POSES.cheer ? 0.30 : 0.10))));
+    drive('kicker', kk, kkId === POSES.strike ? 0.62 : (kkId === POSES.follow ? 0.24 : (kkId === POSES.plant ? 0.16 : (kkId === POSES.cheer ? 0.30 : 0.10))));
     // 닿는 순간에만 몸이 부풀어야 힘이 들어간 것으로 읽힌다. 길게 주면 몸집이 변한 것으로 보인다.
     kickPop = Math.max(0, kickPop - dt);
     const kpop = 1 + (kickPop > 0 ? Math.sin((kickPop / 0.07) * Math.PI) * 0.15 : 0);
@@ -2024,6 +2069,17 @@ const TOUCHED = new Set(['contact']);
     keeperPop = Math.max(0, keeperPop - dt);
     const kep = keeperPop > 0 ? Math.sin((keeperPop / 0.09) * Math.PI) : 0;
     keeper.scale.set(1 + kep * 0.22, 1 - kep * 0.16, 1 + kep * 0.22);
+    /* 착지 눌림은 몸통 하나에만 건다. 그룹을 누르면 발도 같이 줄어 접지 보정이 몸을 도로 들어 올리고,
+       눌림이 높이가 아니라 몸집으로 읽힌다. 눌린 만큼 옆으로 퍼져야 부피가 남는다. */
+    /* 남은 시간을 먼저 읽고 그 다음에 줄인다. 순서를 뒤집으면 눌림이 걸린 그 프레임이 이미 한 칸
+       지나 있어 화면에 0.85가 한 번도 안 나온다(실측: 걸린 프레임이 0.892로 그려졌고, 프레임이
+       33밀리초로 늘어지는 기계에서는 0.933이라 눌림 자체가 사라진다). */
+    const lu = landSq > 0 ? landSq / LAND_FOR : 0;
+    landSq = Math.max(0, landSq - dt);
+    if (keeper.userData.torso) {
+      const wide = 1 + (LAND_XZ - 1) * lu;
+      keeper.userData.torso.scale.set(wide, 1 - (1 - LAND_Y) * lu, wide);
+    }
     // 접지는 선언이 아니라 측정이다. 몸의 실제 최저점을 재서 원하는 높이에 맞춘다.
     keeper.position.y += hover - footY(keeper);
     // drive()가 목을 덮어쓰고, 위치 보정 전 월드행렬은 낡았다. 둘이 끝난 뒤에 고개를 돌린다.
@@ -2372,10 +2428,11 @@ const TOUCHED = new Set(['contact']);
   // 사건이 다른데 실루엣이 같으면 관객은 같은 장면을 두 번 본다.
   // 선언된 오일러각이 아니라 캡처 순간의 관절 월드 좌표를 뽑는다.
   // 기울기와 위치까지 합쳐진 최종 몸이 화면에서 갈리는 것이고, 딕셔너리 비교로는 그게 안 잡힌다.
-  window.__poseVis = () => {
-    const j = keeper.userData.joints;
-    keeper.updateMatrixWorld(true);
-    const root = keeper.position;
+  // 한 배우의 관절을 루트 기준 무차원 벡터로 옮긴다. 두 배우가 같은 규약을 써야 두 수를 같은 자로 읽는다.
+  const poseVec = (g) => {
+    const j = g.userData.joints;
+    g.updateMatrixWorld(true);
+    const root = g.position;
     const w = new THREE.Vector3();
     j.spine.getWorldPosition(w);
     const scale = Math.max(0.2, w.distanceTo(root));
@@ -2384,7 +2441,23 @@ const TOUCHED = new Set(['contact']);
       j[n].getWorldPosition(w);
       v.push((w.x - root.x) / scale, (w.y - root.y) / scale, (w.z - root.z) / scale);
     }
+    return { v, root };
+  };
+  window.__poseVis = () => {
+    const { v, root } = poseVec(keeper);
     return { v, rz: keeper.rotation.z, pos: [root.x, root.y, root.z] };
+  };
+  /* 키커의 자세. 키퍼는 __poseVis가 들고 있었는데 차는 몸은 아무도 안 재고 있었다.
+     kind는 화면이 이 구의 shot에서 고른 킥 종류라, 고르는 길과 그려지는 몸을 한 번에 물을 수 있다. */
+  window.__kickVis = () => {
+    const { v } = poseVec(kicker);
+    return { v, rz: kicker.rotation.z, kind: cue ? cue.kickKind : null };
+  };
+  /* 착지 눌림은 60밀리초만 산다. 밖에서 잠으로 기다리면 그 창을 통째로 지나치므로
+     게이트가 프레임마다 이 수를 적어 두고 사건이 끝난 뒤에 센다. left는 남은 시간이다. */
+  window.__squashVis = () => {
+    const s = keeper.userData.torso ? keeper.userData.torso.scale : { x: 1, y: 1, z: 1 };
+    return { x: s.x, y: s.y, z: s.z, left: landSq };
   };
 
   // 포즈 게이트는 실루엣 분리도만 잰다. 사지가 화면을 차지하는지는 아무도 재지 않았다.
@@ -2565,13 +2638,14 @@ const TOUCHED = new Set(['contact']);
   // 확률로만 나오는 분기는 아무도 눈으로 못 본다. 그래서 그 코스를 직접 재생한다.
   // power와 strong은 선택이다. 생략하면 철봉 접촉용 기본값이 그대로 서고,
   // 넣으면 세기가 침투 깊이와 그물 진폭을 얼마나 벌리는지 두 극단으로 비교할 수 있다.
-  window.__frameShot = (aimX, aimY, conceded, power, strong) => {
+  // chip은 뒤에 붙은 선택이다. 안 넘기면 예전처럼 거짓이라 이 손잡이를 쓰던 자들이 그대로 돈다.
+  window.__frameShot = (aimX, aimY, conceded, power, strong, chip) => {
     const pw = power === undefined ? 14 : power;
     const st = strong === undefined ? true : !!strong;
     const shot = {
       aimX, aimY,
       // 철봉 접촉은 세게 찬 공에서 가장 잘 읽힌다. 약한 공은 튕김이 화면에 거의 안 남는다.
-      strong: st, chip: false, gaze: false, bend: 0,
+      strong: st, chip: !!chip, gaze: false, bend: 0,
       // flight가 없으면 835행 비행 보간이 통째로 NaN이 된다.
       // chain.mjs 143행과 같은 식이라야 세기를 바꿨을 때 비행 시간도 같이 따라온다.
       flight: Math.min(1.1, Math.max(0.55, 1.05 - pw * 0.05 - (st ? 0.1 : 0))),
@@ -2720,6 +2794,8 @@ const TOUCHED = new Set(['contact']);
     kicker.scale.setScalar(1);
     keeperPop = 0;
     keeper.scale.setScalar(1);
+    landSq = 0;
+    if (keeper.userData.torso) keeper.userData.torso.scale.setScalar(1);
     shakeLeft = 0;
     shakeAmp = 0;
     dutchLeft = 0;

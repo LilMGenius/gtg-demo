@@ -267,6 +267,42 @@ export const POSES = {
     shR: [1.30, 0, 0.54], elR: [-0.14, 0, -0.22],
     hipL: [-0.22, 0, -0.14], knL: [0.32, 0, 0],
     hipR: [-1.74, 0, 0.06], knR: [-0.10, 0, 0]
+  },
+  /* 킥 종류별 예비. 키커 포즈는 여섯이고(windup plant strike follow cheer despair) 그중 감는 자세만
+     종류를 탄다. 발이 공에 닿은 뒤의 셋은 접촉이 이미 정해 놓은 몸이라 종류가 아니라 결과가 소유한다.
+     넷은 windup에서 갈라져 나왔고 관절 각 L2로 서로 1.23에서 2.61 떨어져 있다(실측, 가장 닮은 쌍은
+     인스텝과 강슛의 1.23). 화면에 잡히는 것은 그중 92퍼센트라 그 거리가 실루엣 거리의 상한이다. */
+  // 인사이드. 골반을 열고 차는 다리를 옆으로 돌린다. 감아 차는 발은 몸을 가로질러 들어온다.
+  windInside: {
+    spine: [-0.10, 0, 0.34], neck: [-0.10, 0, 0.22],
+    shL: [-0.30, 0, -0.90], elL: [-0.60, 0, 0.60],
+    shR: [0.20, 0, 0.86], elR: [-1.10, 0, -0.30],
+    hipL: [-0.10, 0, -0.34], knL: [0.20, 0, 0],
+    hipR: [0.46, 0, 0.72], knR: [0.80, 0, 0]
+  },
+  // 인스텝. 발등으로 곧게 민다. 무릎을 뒤로 접고 상체를 조금 눕혀 축을 세운다.
+  windInstep: {
+    spine: [-0.30, 0, -0.16], neck: [-0.02, 0, 0.04],
+    shL: [-0.80, 0, -0.62], elL: [-1.10, 0, 0.30],
+    shR: [0.72, 0, 0.44], elR: [-0.60, 0, -0.24],
+    hipL: [-0.22, 0, -0.12], knL: [0.30, 0, 0],
+    hipR: [0.92, 0, 0.10], knR: [1.30, 0, 0]
+  },
+  // 칩. 백스윙이 짧고 상체가 선다. 크게 감으면 퍼올리는 공이 아니라 그냥 강슛이 된다.
+  windChip: {
+    spine: [-0.06, 0, -0.04], neck: [0.10, 0, 0],
+    shL: [-0.20, 0, -0.18], elL: [-0.50, 0, 0.10],
+    shR: [0.14, 0, 0.14], elR: [-0.36, 0, -0.08],
+    hipL: [-0.08, 0, -0.08], knL: [0.14, 0, 0],
+    hipR: [0.26, 0, 0.08], knR: [0.44, 0, 0]
+  },
+  // 강슛. 무릎을 가장 깊게 접고 두 팔을 크게 벌려 균형을 잡는다.
+  windPower: {
+    spine: [-0.46, 0, -0.24], neck: [-0.24, 0, 0.06],
+    shL: [-1.30, 0, -1.10], elL: [-0.70, 0, 0.50],
+    shR: [1.20, 0, 0.80], elR: [-0.30, 0, -0.40],
+    hipL: [-0.34, 0, -0.16], knL: [0.52, 0, 0],
+    hipR: [1.24, 0, 0.14], knR: [1.62, 0, 0]
   }
 };
 
@@ -286,6 +322,60 @@ POSES.reachL = mirrorPose(POSES.reachR);
 POSES.swatL = mirrorPose(POSES.swatR);
 POSES.shoveL = mirrorPose(POSES.shoveR);
 POSES.sprawlL = mirrorPose(POSES.sprawlR);
+
+// 킥 종류에서 예비 자세로 가는 표. 종류 이름은 판정 칸이 아니라 화면이 shot에서 고른 이름이다.
+export const KICK_WIND = {
+  inside: POSES.windInside, instep: POSES.windInstep,
+  chip: POSES.windChip, power: POSES.windPower
+};
+
+/* 세이브 포즈의 예비와 잔여. 사건마다 몸이 다르게 무너지는데 되감는 깊이와 떠는 주기는 상수 한 쌍이라,
+   열두 세이브가 같은 박자로 지나갔다. ant는 최종 자세에서 사건 직전 몸 쪽으로 되미는 깊이이고
+   (1이면 예비 없음), per는 그 뒤 감쇠 진동의 주기(초)다.
+   두 수의 순서는 손대중이 아니라 각 포즈가 대기 자세에서 떨어진 관절 각 거리다(실측 L2, 라디안):
+   swatR 1.69, clutch 1.85, dribble 1.94, snatch 2.26, reachR 2.72, stumble 2.87, hugfall 2.96,
+   skyward 2.96, shoveR 3.25, despair 3.43, faceplant 3.63, sprawlR 4.17.
+   멀리 무너진 몸일수록 깊게 되감고 길게 떤다. 고치기 전의 한 쌍은 1.22와 0.84초였고 표는 그 값을
+   가운데 두고 벌린다. 열두 줄은 세이브 열두 사건이 닿는 포즈다(자빠짐은 downed와 lost가 나눠 쓰고,
+   빈 골대의 despair까지 포함한다). 좌우 거울은 같은 몸이라 같은 줄을 쓰고, 눈맞음 갈래의 자세는
+   gaze 게이트가 소유하므로 기본값으로 남는다. */
+export const POSE_BEAT = {
+  // 손바닥으로 쳐낸 팔만 튕겨 접힌다. 몸이 거의 안 무너져 예비도 잔여도 가장 짧다.
+  swatR: { ant: 1.26, per: 0.58 },
+  // 공을 가슴에 안으면 진동을 공이 먹는다. 되감을 자리도 팔 안쪽뿐이다.
+  clutch: { ant: 1.14, per: 0.62 },
+  // 이미 일어나 달려 나가는 몸이다. 뒤로 되감으면 나가는 걸음이 끊긴다.
+  dribble: { ant: 1.10, per: 0.50 },
+  // 한 손으로 걷어 올린다. 되감김은 깊고 진동은 팔 하나만 남아 짧다.
+  snatch: { ant: 1.30, per: 0.72 },
+  // 손끝까지 뻗는다. 표의 가운데 줄이고 고치기 전의 한 쌍이 여기 서 있다.
+  reachR: { ant: 1.22, per: 0.84 },
+  // 제껴져 휘청인다. 다리가 살아 있어 진동이 오래 남는다.
+  stumble: { ant: 1.22, per: 0.94 },
+  // 공을 안은 채 끌려 들어간다. 팔이 묶여 못 짚으니 몸통이 길게 떤다.
+  hugfall: { ant: 1.18, per: 1.02 },
+  // 넘어간 공을 올려다본다. 접촉이 없어 되감김은 얕고 몸은 천천히 흔들린다.
+  skyward: { ant: 1.16, per: 1.06 },
+  // 몸을 가로질러 세게 민다. 어깨가 따라 돌아 되감김이 깊다.
+  shoveR: { ant: 1.32, per: 0.86 },
+  // 두 손이 머리로 올라간다. 골대를 못 쳐다보는 몸이라 예비가 얕고 주기는 중간이다.
+  despair: { ant: 1.20, per: 0.78 },
+  // 무릎이 반대로 꺾이며 엎어진다. 깊게 되감고 길게 떤다.
+  faceplant: { ant: 1.38, per: 1.12 },
+  // 바닥에 눌린 채로 남는다. 가장 멀리 무너지므로 표의 양 끝을 가진다.
+  sprawlR: { ant: 1.40, per: 1.18 }
+};
+// 표에 없는 포즈의 박자. 고치기 전에 열다섯 사건이 다 같이 쓰던 한 쌍이다.
+export const BEAT_DEFAULT = { ant: 1.22, per: 0.84 };
+
+// 포즈에서 그 몸의 박자로 가는 길. 거울까지 같은 줄에 걸어야 왼쪽으로 뛴 몸이 오른쪽과 다르게 떨지 않는다.
+const BEAT_BY_POSE = new Map();
+for (const name of Object.keys(POSE_BEAT)) {
+  if (POSES[name]) BEAT_BY_POSE.set(POSES[name], POSE_BEAT[name]);
+  const twin = name.endsWith('R') ? POSES[name.slice(0, -1) + 'L'] : null;
+  if (twin) BEAT_BY_POSE.set(twin, POSE_BEAT[name]);
+}
+export const beatOf = (pose) => BEAT_BY_POSE.get(pose) || BEAT_DEFAULT;
 
 export function lerpPose(a, b, t) {
   const k = Math.min(1, Math.max(0, t));
