@@ -807,7 +807,11 @@ const TOUCHED = new Set(['contact']);
      3.6초는 homing 게이트가 대조군으로 요구하는 구간(나이 0.8~4.0초에 집을 비운 표본)을 그대로 남기고,
      일어서기 0.5초와 걷기 상한 2.0초를 더해도 그 게이트의 도착 마감 6.2초 안에 0.1초 여유로 든다.
      실측 복귀 거리는 다이빙 착지 1.29미터에서 한눈판 자리 3.29미터까지다. */
-  const HOME_AT = 3.6;
+  /* 복귀가 열리는 나이. 게이트가 주소로 뒤로 밀 수 있다. 실측으로 공을 손에 쥔 재시작이 꼬리 나이
+     3.63초에 오는데 기본값 3.6초와의 사이가 0.03초뿐이라, 다음 구가 복귀보다 먼저 서는 갈래를
+     판 시각에 맡기면 60밀리초만 밀려도 다른 갈래가 뽑힌다. 값을 밀면 그 갈래가 확실히 열린다.
+     ?walk=0과 같은 자리의 계측 손잡이이고, 안 주면 화면은 3.6초 그대로다. */
+  const HOME_AT = Number(new URLSearchParams(location.search).get('home')) || 3.6;
   const RISE_FOR = 0.5;
   const HOME_FOR = 2.0;
   /* 걷는 속도. 스탯 표에서 이동을 맡은 칸은 민첩이다(src/chain.mjs keeperAt).
@@ -833,26 +837,40 @@ const TOUCHED = new Set(['contact']);
      다리를 덜 흔든 것으로 보인다. 0.5는 시정수 0.033초라 5%만 깎인다. */
   const WALK_RATE = 0.5;
   /* 다음 구가 서면 남은 복귀를 이 안에 끝낸다. 기준은 재시작 대기가 아니라 손가락이 눌러야 하는
-     순간이다. 실측으로 리셋에서 그 순간까지 0.46초에서 0.52초이고(비행 0.68~0.72초의 72퍼센트,
-     web/src/main.mjs pressAt), 공이 발을 떠나는 것은 1.65초 뒤다. 1.0초로 두었을 때 실측 복귀가
-     리셋 0.62초 뒤에 끝나 그 순간을 0.16초 넘겼고, 누른 손가락은 걷는 몸에서 다이빙을 시작했다. */
-  const CARRY_FOR = 0.42;
-  /* 가속 상한. 위상이 지나온 거리로 도는 탓에 배속이 그대로 걸음 수가 되고, 예산만 보고 조이면
-     한 프레임에 0.15미터를 지나 걸음이 아니라 미끄러짐으로 읽힌다. 정상 보폭이 프레임당 0.0292미터라
-     네 배는 0.117미터이고, walkback 게이트가 순간이동으로 세는 0.18미터 아래에 그대로 든다. */
-  const GAIN_MAX = 4;
+     순간이다. 그 순간은 비행의 72퍼센트이고(web/src/main.mjs pressAt, src/chain.mjs markerAt),
+     비행은 clamp(1.05 - 파워 x 0.05 - 강슛 0.1, 0.55, 1.1)이라 가장 짧은 비행 0.55초가 그 순간의
+     하한 0.396초를 정한다. 실측으로 뽑힌 비행 둘은 0.68초와 0.72초라 0.49초와 0.52초를 냈는데,
+     그 둘에만 맞추면 강한 저공 슛에서 손가락이 누를 때 키퍼가 아직 걷고 있다. 0.39초는 하한 아래다. */
+  const CARRY_FOR = 0.39;
+  /* 복귀 속도의 상한. 가속은 남은 시간을 나누는 배수라, 먼 복귀에서는 그 배수가 그대로 속도가 된다.
+     실측으로 돌진 꼬리가 8.5미터 밖에 세워 둔 판에서 배수 넷이 초속 17미터, 프레임당 0.283미터를
+     냈고 그것은 걸음이 아니라 미끄러짐이다. 정상 보폭이 프레임당 0.0292미터이므로 그 네 배인
+     초속 7미터에서 끊는다. 프레임당 0.117미터이고 walkback 게이트가 순간이동으로 세는 0.18 아래다. */
+  const CARRY_MPS_MAX = 7.0;
   // 복귀로 칠 최소 이탈. 골문 반폭 3.66의 1.4퍼센트라 이 안쪽은 화면에서 제자리로 읽힌다.
   const OFF_LINE = 0.05;
+  // 판이 서기 전 첫 배치. 그 한 번은 복귀가 아니라 시작 자리이므로 걷게 두지 않는다.
+  let placed = false;
+
+  /* 남은 복귀를 예산 안에 끝내는 배수. 속도 상한에 먼저 걸리면 예산보다 상한이 이긴다.
+     그래야 먼 복귀가 시간을 맞추려고 화면을 가로지르지 않는다. */
+  function carryGain(b, whole) {
+    const left = whole ? RISE_FOR + b.span : (1 - b.r) * RISE_FOR + (1 - b.w) * b.span;
+    const base = b.span > 0 ? b.gone / b.span : 0;
+    const cap = base > 0 ? CARRY_MPS_MAX / base : 1;
+    return Math.max(1, Math.min(left / CARRY_FOR, cap));
+  }
   // 걷는 속도의 임자. 키퍼를 다시 지을 때 그 사람의 민첩을 받아 둔다.
   let walkStat = 5;
   let back = null;
 
   // 복귀를 연다. 착지점과 거리와 걸을 시간을 이 프레임에 한 번만 굳힌다.
-  function openBack(owner) {
+  // why는 누가 열었는지다. 꼬리가 제 나이에 열면 tail, 다음 구가 먼저 서서 열면 reset이다.
+  function openBack(owner, why) {
     const from = { x: keeper.position.x, z: keeper.position.z, ry: keeper.rotation.y, rz: keeper.rotation.z };
     const gone = Math.hypot(from.x, from.z - KEEPER_Z);
     const mps = WALK_GAIN * (WALK_MPS0 + WALK_MPS_AGI * walkStat);
-    return { owner, from, gone, base: null, hb: 1, phase: 0, r: 0, w: 0, gain: 1,
+    return { owner, why: why || "tail", from, gone, base: null, hb: 1, phase: 0, r: 0, w: 0, gain: 1,
       span: mps > 0 ? Math.min(HOME_FOR, gone / mps) : 0 };
   }
 
@@ -2337,6 +2355,10 @@ const TOUCHED = new Set(['contact']);
      실측으로 같은 사건의 그림자 차분이 1435와 1443 화소로 갈렸다. 음수면 평소대로 세계시각을 읽는다. */
   window.__swayPin = (t) => { swayPin = Number.isFinite(Number(t)) ? Number(t) : -1; return swayPin; };
 
+  /* 복귀가 살아 있는지와 누가 열었는지. 갈래 이름을 게이트가 상수에서 다시 계산하면 그 계산과
+     화면이 따로 낡는다. 화면이 자기가 지난 갈래를 직접 말한다. */
+  window.__backVis = () => (back ? { why: back.why, gain: back.gain, r: back.r, w: back.w, hb: back.hb } : null);
+
   // 게이트가 사건을 걸 프레임과 세계를 멈출 프레임을 미리 맡긴다.
   // kind가 비면 사건은 안 걸고 멈춤만 맞는다. 장부를 읽는 동안 판이 더 돌면
   // 앞에 읽은 수와 뒤에 읽은 수가 한 판씩 어깼다.
@@ -2641,6 +2663,9 @@ const TOUCHED = new Set(['contact']);
   renderer.setAnimationLoop(frame);
 
   function reset() {
+    // 첫 호출은 장면을 세우는 배치다. 그 한 번만 복귀를 안 연다.
+    const boot = !placed;
+    placed = true;
     cue = null;
     tail = null;
     pendingBurst = null;
@@ -2662,16 +2687,19 @@ const TOUCHED = new Set(['contact']);
     /* 다음 구가 걷기 도중 시작해도 그 자리에서 순간이동시키지 않는다. 남은 걸음을 상한 안에
        끝내도록 속도만 올린다. 진행률은 프레임마다 더한 값이라 상한을 줄여도 지금 자리가 안 튄다. */
     if (back && back.hb > 0 && back.span > 0) {
-      back.gain = Math.min(GAIN_MAX, Math.max(1, ((1 - back.r) * RISE_FOR + (1 - back.w) * back.span) / CARRY_FOR));
+      back.gain = carryGain(back, false);
       back.owner = null;
-    } else if (WALK_GAIN > 0 && !back && Math.abs(keeper.position.x) > OFF_LINE) {
+    } else if (WALK_GAIN > 0 && !back && !boot && Math.hypot(keeper.position.x, keeper.position.z - KEEPER_Z) > OFF_LINE) {
       /* 복귀가 아직 안 열렸는데 다음 구가 선다. 여기서 열지 않으면 착지점에서 골문 한가운데까지를
          한 프레임에 옮겨 놓게 되고, 그 순간이동이 이 절이 없애려던 그림이다. 실측으로 만렙 키퍼가
          공을 손에 쥔 판에서 꼬리 나이 3.54초에 다시 서는데 복귀는 3.6초에 열려 0.06초를 놓쳤고,
-         그 한 프레임이 1.650미터였다. z가 아니라 x로 묻는 이유는 판이 서기 전 첫 배치가 z만
-         0.9미터 옮기기 때문이다. 그 배치는 복귀가 아니라 시작 자리다. */
-      back = openBack(null);
-      back.gain = Math.min(GAIN_MAX, Math.max(1, (RISE_FOR + back.span) / CARRY_FOR));
+         그 한 프레임이 1.650미터였다.
+         거리는 x가 아니라 x와 z를 함께 묻는다. 방향을 한 번도 안 누른 사람은 선호 기본값 0으로
+         가운데 판정을 받아 x가 정확히 0이고, 전진 토글만 켜면 몸은 z로만 0.9미터 나간다.
+         x만 보면 그 몸이 제자리로 읽혀 깊이축 복귀가 통째로 이 갈래를 빠져나간다.
+         판이 서기 전 첫 배치도 z만 0.9미터 옮기는데, 그것은 boot 한 번으로 따로 가른다. */
+      back = openBack(null, "reset");
+      back.gain = carryGain(back, true);
     } else {
       back = null;
       keeper.position.set(0, 0, KEEPER_Z);
