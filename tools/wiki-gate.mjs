@@ -22,6 +22,9 @@ const LINE = String.fromCharCode(10);
 const KEYS = ["hand", "coin", "drill", "pull", "gram", "bot", "buff", "risk"];
 /* 수를 싣는 여섯. hand와 risk는 자리와 이름만 싣는 표라 수가 0인 것이 정상이고,
    그래서 아래 계기 축이 요구하는 "수가 한 칸 이상"의 대상에서 빠진다. */
+/* 신호가 옮겨야 하는 최소 화소 몫. 그늘이 DOM에만 있고 화면을 안 건드리면 위의 축은 빈 초록이다.
+   실측 뒤에 정한다. */
+const CUE_FLOOR = 0.12;
 const GATED = ["coin", "drill", "pull", "gram", "bot", "buff"];
 /* 화면에 찍힌 글자와 맞대므로 상수도 글자로 세운다. 수로 맞대면 0.03 같은 값이
    부동소수 비교가 되고, 천 단위 쉼표가 붙은 날 조용히 지나간다. 글자로 맞대면 서식이 바뀐 것도 잡힌다. */
@@ -332,6 +335,133 @@ try {
   const afterProbe = await p.evaluate(WRAP);
   check("control:the-planted-break-was-put-back", afterProbe.bad.length === 0,
     afterProbe.bad.slice(0, 2).join(" ") || "probe removed, scan clean again");
+
+  /* 넘친다고 화면이 말하는가. 본문은 굴러가지만 굴러간다는 자국이 화면에 하나도 없었다.
+     실측으로 740x360에서 여덟 칸이 전부 넘쳤고, 조작 칸은 187px 창에 317px을 담아 세 줄짜리
+     자리/키 표에서 왼쪽 한 줄만 보였다. 옛 타이틀 조작법 패널이 세 줄을 다 보여 주던 자리다.
+     신호는 문장이 아니라 본문 아래끝의 그늘이다. 문장은 여덟 칸에 여덟 번 서서 본문을 또 밀어낸다. */
+  const CUE = () => {
+    const body = document.querySelector("#wiki .body");
+    if (!body) return null;
+    const wrap = body.parentElement;
+    const r = body.getBoundingClientRect();
+    const seat = (sel) => {
+      const e = wrap ? wrap.querySelector(sel) : null;
+      if (!e) return null;
+      const q = e.getBoundingClientRect();
+      return { h: Math.round(q.height), w: Math.round(q.width), top: Math.round(q.top),
+        bottom: Math.round(q.bottom), left: Math.round(q.left), op: Number(getComputedStyle(e).opacity) };
+    };
+    return { over: Math.round(body.scrollHeight - body.clientHeight), at: Math.round(body.scrollTop),
+      top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left), w: Math.round(r.width),
+      down: seat(".cue.down"), up: seat(".cue.up") };
+  };
+  // 끝까지 굴린다. scrollTop을 코드로 밀면 scroll 이벤트가 안 오는 판이 있어 여기서 같이 친다.
+  const SCROLL = (to) => {
+    const body = document.querySelector("#wiki .body");
+    if (!body) return -1;
+    body.scrollTop = to < 0 ? body.scrollHeight : to;
+    body.dispatchEvent(new Event("scroll"));
+    return Math.round(body.scrollTop);
+  };
+  /* 화소로 묻는다. 신호가 DOM에만 있고 화소를 하나도 안 옮기면 위의 축들은 빈 초록이다.
+     같은 자리를 두 번 찍는다. 한 번은 그대로, 한 번은 신호를 걷고. 세 채널 중 가장 큰 차가
+     8을 넘은 화소를 센다. 8은 글자 가장자리가 배경과 섞이며 흔들리는 폭보다 크다
+     (price 게이트가 같은 이유로 24를 쓰는데, 거기는 글자 심을 세고 여기는 면을 센다). */
+  const PIX_TOL = 8;
+  const shot = async (c) => (await p.screenshot({ clip: { x: c.left, y: c.bottom - c.down.h, width: c.w, height: c.down.h } })).toString("base64");
+  const moved = async (a, z) => p.evaluate(([s1, s2, tol]) => new Promise((res) => {
+    const load = (s) => new Promise((r2) => { const im = new Image(); im.onload = () => r2(im); im.src = "data:image/png;base64," + s; });
+    Promise.all([load(s1), load(s2)]).then(([ia, ib]) => {
+      const cv = document.createElement("canvas");
+      cv.width = ia.width; cv.height = ia.height;
+      const g = cv.getContext("2d");
+      g.drawImage(ia, 0, 0);
+      const da = g.getImageData(0, 0, ia.width, ia.height).data;
+      g.clearRect(0, 0, cv.width, cv.height);
+      g.drawImage(ib, 0, 0);
+      const db = g.getImageData(0, 0, ia.width, ia.height).data;
+      let n = 0;
+      for (let i = 0; i < da.length; i += 4) {
+        if (Math.max(Math.abs(da[i] - db[i]), Math.abs(da[i + 1] - db[i + 1]), Math.abs(da[i + 2] - db[i + 2])) > tol) n += 1;
+      }
+      res({ moved: n, all: da.length / 4 });
+    });
+  }), [a, z, PIX_TOL]);
+
+  const cueless = [], offSeat = [], noFlip = [], flat = [];
+  const overTally = [];
+  let overflowing = 0, seated = 0, pixels = 0, flips = 0, worst = 1;
+  for (const k of KEYS) {
+    if (!(await p.evaluate(OPEN_CAT, k))) continue;
+    await p.waitForTimeout(160);
+    await p.evaluate(SCROLL, 0);
+    await p.waitForTimeout(90);
+    const c = await p.evaluate(CUE);
+    if (!c) { cueless.push(k + " no body"); continue; }
+    overTally.push(k + " " + c.over);
+    if (c.over <= 1) continue;
+    overflowing += 1;
+    if (!c.down || c.down.h < 1 || c.down.op < 1) {
+      cueless.push(k + " " + (c.down ? c.down.h + "px opacity " + c.down.op : "no .cue.down"));
+      continue;
+    }
+    seated += 1;
+    if (Math.abs(c.down.bottom - c.bottom) > 1 || Math.abs(c.down.w - c.w) > 2) {
+      offSeat.push(k + " cue bottom " + c.down.bottom + " width " + c.down.w + ", body bottom " + c.bottom + " width " + c.w);
+    }
+    const on = await shot(c);
+    await p.evaluate(() => { const e = document.querySelector("#wiki .cue.down"); if (e) e.style.display = "none"; });
+    await p.waitForTimeout(70);
+    const off = await shot(c);
+    await p.evaluate(() => { const e = document.querySelector("#wiki .cue.down"); if (e) e.style.display = ""; });
+    await p.waitForTimeout(70);
+    const m = await moved(on, off);
+    pixels += 1;
+    const share = m.moved / m.all;
+    if (share < worst) worst = share;
+    if (share < CUE_FLOOR) flat.push(k + " " + (share * 100).toFixed(1) + "% of " + m.all + "px");
+    await p.evaluate(SCROLL, -1);
+    await p.waitForTimeout(120);
+    const e2 = await p.evaluate(CUE);
+    flips += 1;
+    const turned = e2 && e2.down && e2.up && e2.down.op === 0 && e2.up.op === 1;
+    if (!turned) noFlip.push(k + " " + (e2 && e2.down ? "down " + e2.down.op + " up " + (e2.up ? e2.up.op : "none") : "no cue"));
+  }
+  /* 셋 다 센 것을 같이 찍는다. 신호가 통째로 없으면 실패 목록이 비어서, 앞 축에서 걸러진 칸을
+     뒤 축은 잰 적도 없이 초록으로 넘겼다(실측: 신호 0개인 판에서 자리 축과 뒤집기 축이 8을 찍었다). */
+  check("wiki:an-overflowing-body-paints-a-bottom-cue", overflowing > 0 && cueless.length === 0,
+    cueless.slice(0, 3).join(", ") || overflowing + " overflowing bodies at 740x360, every one cued");
+  check("wiki:the-cue-sits-on-the-body-bottom-edge", overflowing > 0 && seated === overflowing && offSeat.length === 0,
+    offSeat.slice(0, 2).join(", ") || seated + " of " + overflowing + " cues flush with the body box");
+  check("wiki:the-cue-flips-when-the-body-hits-the-bottom", overflowing > 0 && flips === overflowing && noFlip.length === 0,
+    noFlip.slice(0, 3).join(", ") || flips + " of " + overflowing + " bodies flip the cue to the top edge at max scroll");
+  check("wiki:the-cue-moves-real-pixels", overflowing > 0 && pixels === overflowing && flat.length === 0,
+    flat.slice(0, 3).join(", ") || pixels + " of " + overflowing + " strips compared, weakest "
+      + (pixels ? (worst * 100).toFixed(1) + "%" : "nothing") + " of pixels moved, floor " + (CUE_FLOOR * 100).toFixed(0) + "%");
+  check("instrument:every-narrow-body-was-measured-for-overflow", overTally.length === KEYS.length,
+    overTally.length + " of " + KEYS.length + " bodies read, hidden px " + overTally.join(" "));
+
+  /* 대조군. 넘치지 않는 본문은 신호를 안 켠다. 늘 켜 두는 그늘은 마지막 줄을 영원히 흐리게 두고,
+     그때 이 신호는 더 있다는 뜻을 잃는다. 1280x720에서는 훈련만 넘치므로 나머지 일곱이 대조군이다. */
+  await p.setViewportSize({ width: 1280, height: 720 });
+  await p.waitForTimeout(400);
+  const stuck = [], dimmed = [];
+  let fitted = 0, wideOver = 0;
+  for (const k of KEYS) {
+    if (!(await p.evaluate(OPEN_CAT, k))) continue;
+    await p.waitForTimeout(160);
+    await p.evaluate(SCROLL, 0);
+    await p.waitForTimeout(90);
+    const c = await p.evaluate(CUE);
+    if (!c) continue;
+    if (c.over > 1) { wideOver += 1; if (!c.down || c.down.op < 1) dimmed.push(k + " " + (c.down ? "opacity " + c.down.op : "no cue")); }
+    else { fitted += 1; if (!c.down) stuck.push(k + " no cue element"); else if (c.down.op > 0) stuck.push(k + " opacity " + c.down.op); }
+  }
+  check("control:a-body-that-fits-paints-no-cue", fitted > 0 && stuck.length === 0,
+    stuck.slice(0, 3).join(", ") || fitted + " bodies fit at 1280x720 and none paints a cue");
+  check("control:the-wide-viewport-still-cues-what-overflows", wideOver > 0 && dimmed.length === 0,
+    dimmed.slice(0, 2).join(", ") || wideOver + " overflowing at 1280x720, every one cued");
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();

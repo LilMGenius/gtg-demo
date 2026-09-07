@@ -1077,6 +1077,19 @@ function openGram() {
 // 위키. 물음표 하나가 여는 카테고리 가이드다. 재화 칩이 열던 버는 법도 이 안의 한 칸이다.
 // 표의 수는 wiki.mjs가 상수에서 읽으므로 이 자리는 화면에 붙이는 일만 한다.
 let wikiAt = 'hand';
+/* 굴릴 것이 남았다는 자국. 본문은 굴러가지만 화면에는 그 사실이 하나도 안 적혀 있었다.
+   실측으로 740x360에서 여덟 칸이 전부 넘쳤고, 조작 칸은 187px 창에 317px을 담아 자리와 키
+   세 줄 중 왼쪽 한 줄만 보였다. 아래끝 그늘이 남은 것이 있다는 말이고, 끝까지 굴리면 그 그늘이
+   꺼지고 위끝으로 옮겨 간다. 1px은 굴림값이 소수로 남는 자리를 넘기는 폭이다. */
+function wikiCue(box) {
+  const body = box.querySelector('.body');
+  const wrap = body.parentElement;
+  const over = body.scrollHeight - body.clientHeight;
+  const at = body.scrollTop;
+  wrap.querySelector('.cue.down').style.opacity = over > 1 && at < over - 1 ? '1' : '0';
+  wrap.querySelector('.cue.up').style.opacity = over > 1 && at > 1 ? '1' : '0';
+}
+
 function paintWiki() {
   const box = el('wiki');
   box.innerHTML = wikiHTML(wikiAt);
@@ -1084,6 +1097,9 @@ function paintWiki() {
     { notices: SHOP_NOTICES_FOR_WIKI, shelves: SHELF_NOTES_FOR_WIKI, mishaps: MISHAP_SHELF });
   for (const b of box.querySelectorAll('.cats [data-cat]')) b.onclick = () => { wikiAt = b.dataset.cat; paintWiki(); };
   box.querySelector('.close').onclick = closeWiki;
+  const body = box.querySelector('.body');
+  body.onscroll = () => wikiCue(box);
+  wikiCue(box);
 }
 
 function openWiki(cat) {

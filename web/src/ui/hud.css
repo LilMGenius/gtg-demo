@@ -361,8 +361,21 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #wiki .cats button{padding:7px 12px 9px;border:var(--line) solid var(--edge);background:#1b2318;
   color:var(--dim);font-family:var(--body);font-size:var(--fs-body);white-space:nowrap;text-align:left}
 #wiki .cats button[aria-current="true"]{background:#ffd83d;color:#12160e}
-#wiki .body{grid-column:2;grid-row:1 / span 2;min-width:0;min-height:0;overflow-y:auto;
+/* 본문 상자. 격자 칸은 이 상자가 받고 구르는 것은 그 안의 본문이다. 신호를 본문 안에 두면
+   본문과 같이 굴러가 아래끝에 못 선다. */
+#wiki .bodybox{grid-column:2;grid-row:1 / span 2;position:relative;min-width:0;min-height:0;display:grid}
+#wiki .body{min-width:0;min-height:0;overflow-y:auto;
   display:grid;gap:var(--gap-2);align-content:start}
+/* 더 있다는 자국. 본문 아래끝 26px에 그늘 한 겹을 깐다. 740x360에서 본문 창은 187px인데 여덟 칸이
+   전부 넘쳤고(가린 높이 61~1525px), 조작 칸은 자리와 키 세 줄 중 왼쪽 한 줄만 보인 채 아무 자국도
+   안 남겼다. 26px인 이유는 본문 한 줄이 15px에 줄간 1.45라 22px이고, 그 한 줄을 덮어야 마지막 줄이
+   잘려 있다고 읽히기 때문이다. 문장으로 적으면 여덟 칸에 여덟 번 서서 본문을 그만큼 또 줄인다.
+   끝까지 구르면 이 겹이 꺼지고 위끝 겹이 켜진다. 늘 켜 두면 마지막 줄이 영원히 흐려지고,
+   그때 이 겹은 더 있다는 뜻을 잃는다. 전환을 안 거는 이유는 이 겹의 상태가 계기가 읽는 값이고,
+   흐르는 중간값은 잰 값이 아니기 때문이다. */
+#wiki .cue{position:absolute;left:0;right:0;height:26px;pointer-events:none;opacity:0}
+#wiki .cue.down{bottom:0;background:linear-gradient(to top,#080b07f2,#080b0700)}
+#wiki .cue.up{top:0;background:linear-gradient(to bottom,#080b07f2,#080b0700)}
 #wiki h4{font-family:var(--disp);font-weight:400;font-size:var(--fs-title);color:#ffd83d}
 #wiki h5{font-family:var(--body);font-weight:700;font-size:var(--fs-body);color:var(--ink)}
 #wiki p{font-family:var(--body);font-size:var(--fs-body);color:var(--dim);line-height:1.45}
@@ -383,7 +396,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 @media (max-width:900px),(max-height:520px){
   #wiki .sheet{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;gap:var(--gap-2)}
   #wiki .cats{grid-row:1;flex-direction:row}
-  #wiki .body{grid-column:1;grid-row:2}
+  #wiki .bodybox{grid-column:1;grid-row:2}
   #wiki .close{grid-column:1;grid-row:3;justify-self:start;align-self:auto}
 }
 /* 자동. 손가락만 대신하는 토글이라 소리 아래 왼쪽 기둥에 선다.
