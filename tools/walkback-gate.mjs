@@ -57,8 +57,30 @@ const TORSO_DEAD = 0.005;
 // 걷기 전에 몸이 준비 자세에 얼마나 붙어야 하는가의 절대 바. 0.35는 pose 게이트가 서로 다른 사건을
 // 가르는 거리다(tools/pose-gate.mjs). 그보다 멀면 그 몸은 준비 자세가 아니라 다른 사건 하나만큼 떨어져 있다.
 const READY_NEAR = 0.35;
+/* 잠그지 않은 판. 위의 칸들은 판을 잠그고 세계를 멈춰 리셋이 복귀 도중에 오는 길을 한 번도 안 지난다.
+   여기서는 아무것도 잠그지 않고 다음 구가 스스로 서게 둔다.
+   손 모드는 누른 구를 그 자리에서 판정하고 누른 시각의 오차를 같이 싣는다. 안 누르고 넘긴 구는
+   저장된 선호 방향이 오차 0으로 판정에 들어간다(web/src/main.mjs commit). 그래서 한 번만 눌러
+   선호를 놓고 그 뒤 구는 손을 뗀다. 그래야 공을 손에 쥐는 판이 나오고, 그 판만 재시작이
+   1.6초 하한으로 짧아져 리셋이 복귀보다 먼저 오거나 복귀 도중에 온다.
+   만렙 프리셋인 이유도 그것이다. 신인 키퍼는 골킥 재시작이라 실측 리셋이 꼬리 나이 8.7초에 오고,
+   그때 키퍼는 이미 3.7초 전에 집에 서 있어서 이 절을 아예 안 지난다. */
+const CARRY_PRESET = "maxed";
+// 리셋이 왔을 때 이만큼 밖에 서 있어야 그 표본이 이 절을 실제로 지난 것이다.
+// 0.25미터는 homing 게이트가 제자리로 읽는 폭과 같은 수다(tools/homing-gate.mjs NEAR).
+const AWAY_BAR = 0.25;
+/* 한 프레임에 몸이 지날 수 있는 폭. 실측 정상 보폭은 만렙이 프레임당 0.0292미터이고,
+   구현이 스스로 거는 가속 상한은 그 4배(0.117미터)다. 이 바는 6배로, 구현의 상한 위에 있고
+   순간이동 아래에 있다. 고친 적 없는 판의 실측 순간이동은 한 프레임에 1.650미터, 곧 56배였다. */
+const STEP_CAP = 0.18;
+// 선호 방향을 놓는 누름. 오른쪽이어야 실측 seed 20에서 공을 손에 쥔 판이 나온다.
+const CARRY_DIR = 1;
+// 잠그지 않은 판을 이만큼 지켜본다. 실측으로 한 판이 12초에서 18초라 판 둘은 들어온다.
+const CARRY_MS = 32000;
+
 // 되돌릴 판. HEAD로 걸면 이 게이트를 담은 커밋이 들어오는 순간 대조군이 자기를 자기와 맞대고 초록이 된다.
-// 기본값은 이 게이트를 담은 커밋의 부모다. RED 기록을 낸 scene.mjs가 그 판에 그대로 있다.
+// 기본값은 복귀 동작이 들어오기 직전 판이다. 바로 앞 커밋으로 걸면 걷기 축은 이미 초록이라
+// 이 자가 무엇을 갈랐는지 한 줄로 못 읽는다. 이 판에서는 일어서기와 걷기와 복귀 가속이 다 빨갛다.
 const WAS_REV = (process.argv.find((a) => a.startsWith("--was=")) || "--was=40352dd").slice(6);
 const WAS = process.argv.some((a) => a === "--was" || a.startsWith("--was="));
 const LAYER = ["web/src/render/scene.mjs"];
@@ -209,6 +231,87 @@ async function sample(browser, routed, kind, side, walkOff) {
   return { rec, ref, open, errs, pinned, dove, frozen: { t0, t1 } };
 }
 
+/* 잠그지 않은 한 판. 선호를 놓고 손을 뗀 뒤, 리셋이 복귀 도중이나 그 전에 오는 판 하나를 고른다.
+   세계를 안 멈추므로 프레임이 아니라 공과 꼬리가 시각을 알려 준다. */
+async function carrySample(browser, routed, seed) {
+  const ctx = await browser.newContext({ viewport: { width: W, height: H } });
+  await pinClock(ctx, STEP);
+  const page = await ctx.newPage();
+  const errs = [];
+  page.on("pageerror", (e) => errs.push(String(e)));
+  page.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+  for (const [f, body] of routed) {
+    await page.route("**/" + f, (r) => r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body }));
+  }
+  await page.goto("http://127.0.0.1:10310/web/index.html?seed=" + seed + "&vary=0&preset=" + CARRY_PRESET, { waitUntil: "load" });
+  await page.waitForSelector("#go", { timeout: 15000 });
+  await page.click("#go", { force: true });
+  for (let i = 0; i < 6; i += 1) {
+    const open = await page.evaluate(() => { const e = document.getElementById("pull"); return Boolean(e) && !e.hidden; });
+    if (!open) break;
+    await page.click("#pull", { force: true });
+    await page.waitForFunction((n) => window.__frames() >= n, (await page.evaluate(() => window.__frames())) + CARD_STEPS, { timeout: 20000 });
+  }
+  await page.evaluate(() => (window.__swayPin ? window.__swayPin(0) : -1));
+  let pref = false;
+  for (let i = 0; i < 40 && !pref; i += 1) {
+    await page.keyboard.press(CARRY_DIR < 0 ? "ArrowLeft" : "ArrowRight");
+    await page.waitForTimeout(200);
+    pref = await page.evaluate((d) => Boolean(window.__lastInput) && window.__lastInput.dive === d, CARRY_DIR);
+  }
+  await page.evaluate(() => {
+    window.__w14c = [];
+    const tick = () => {
+      const k = window.__keeperPos();
+      const b = window.__ballPos();
+      window.__w14c.push({ f: window.__frames(), k: window.__tailKind(), a: window.__tailAge(), x: k.x, z: k.z, bz: b.z, t: window.__camDbg().vnow });
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  await page.waitForTimeout(CARRY_MS);
+  const rec = await page.evaluate(() => window.__w14c);
+  await ctx.close();
+  return { rec, errs, pref };
+}
+
+// 한 판의 궤적을 수로 옮긴다. 리셋 프레임과 다음 구의 발 떠나는 프레임이 이 표본의 두 경계다.
+function analyseCarry(rec) {
+  const off = (r) => Math.hypot(r.x, r.z - KEEPER_Z);
+  const rounds = [];
+  let open = -1;
+  for (let i = 1; i < rec.length; i += 1) {
+    if (!rec[i - 1].k && rec[i].k) open = i;
+    if (rec[i - 1].k && !rec[i].k && open > 0) { rounds.push([open, i]); open = -1; }
+  }
+  // 리셋 순간에 집을 비운 판만 이 절을 지난다. 그런 판이 없으면 마지막 판을 그대로 낸다.
+  let pick = rounds.find(([, r0]) => off(rec[r0 - 1]) >= AWAY_BAR) || rounds[rounds.length - 1];
+  if (!pick) return null;
+  const [o, r0] = pick;
+  let strike = -1, arrive = -1, home = -1, worst = 0, worstAt = -1;
+  for (let i = r0; i < rec.length; i += 1) if (rec[i].bz < 10.6) { strike = i; break; }
+  if (strike > 0) for (let i = strike; i < rec.length; i += 1) if (rec[i].bz <= KEEPER_Z) { arrive = i; break; }
+  for (let i = r0; i < rec.length; i += 1) if (off(rec[i]) <= HOME_TOL) { home = i; break; }
+  const last = strike > 0 ? strike : rec.length - 1;
+  const steps = [];
+  for (let i = o + 1; i <= last; i += 1) {
+    const d = off(rec[i - 1]) - off(rec[i]);
+    if (d > worst) { worst = d; worstAt = i; }
+    if (d > 0.002) steps.push(d);
+  }
+  steps.sort((a, b) => a - b);
+  // 다음 구를 손가락이 눌러야 하는 순간. main.mjs가 비행의 72퍼센트에 둔다.
+  const flight = arrive > 0 && strike > 0 ? rec[arrive].t - rec[strike].t : -1;
+  return {
+    kind: rec[o].k, landed: off(rec[o]), resetAge: rec[r0 - 1].a, awayAtReset: off(rec[r0 - 1]),
+    afterReset: off(rec[r0]), worst, worstAt: worstAt > 0 ? rec[worstAt].f : -1,
+    median: steps.length ? steps[Math.floor(steps.length / 2)] : 0, n: steps.length,
+    homeIn: home > 0 ? rec[home].t - rec[r0].t : -1,
+    strikeIn: strike > 0 ? rec[strike].t - rec[r0].t : -1,
+    pressIn: flight > 0 ? 0.72 * flight : -1
+  };
+}
+
 const routed = new Map();
 if (WAS) {
   for (const f of LAYER) {
@@ -266,6 +369,26 @@ try {
       "vnow " + s.frozen.t1.v.toFixed(4) + " held while frames ran " + s.frozen.t0.f + "->" + s.frozen.t1.f
       + ", keeper x " + s.frozen.t1.k.x.toFixed(4));
   }
+  /* 잠그지 않은 칸 둘. 하나는 리셋이 복귀가 열리기 전에 오고(실측 꼬리 나이 3.54초, 복귀는 3.6초),
+     하나는 걷는 도중에 온다(실측 5.33초에 1.13미터 남음). 두 자리가 이 절의 두 갈래다. */
+  for (const [tag, seed] of [["carry-before-the-walk", 20], ["carry-mid-walk", 7]]) {
+    const s = await carrySample(browser, routed, seed);
+    for (const e of s.errs) errAll.push(e);
+    const a = analyseCarry(s.rec);
+    if (!a) { say("instrument:the-next-ball-arrived-while-he-was-off-his-line " + tag, false, "no round closed in " + s.rec.length + " frames"); continue; }
+    console.log("  " + tag + " seed " + seed + " tail " + a.kind + " landed " + a.landed.toFixed(2)
+      + "m reset@" + a.resetAge.toFixed(2) + "s away " + a.awayAtReset.toFixed(3) + "->" + a.afterReset.toFixed(3)
+      + " worst " + a.worst.toFixed(4) + "m/f at " + a.worstAt + " median " + a.median.toFixed(4) + " n " + a.n
+      + " home +" + a.homeIn.toFixed(2) + "s press +" + a.pressIn.toFixed(2) + "s strike +" + a.strikeIn.toFixed(2) + "s");
+    say("instrument:the-next-ball-arrived-while-he-was-off-his-line " + tag, a.awayAtReset >= AWAY_BAR && s.pref,
+      a.kind + " restarted at tail age " + a.resetAge.toFixed(2) + "s with him " + a.awayAtReset.toFixed(2) + "m off his line");
+    say("carry:no-frame-crosses-more-than-the-walk-can-step " + tag, a.worst <= STEP_CAP,
+      "worst homeward frame " + a.worst.toFixed(3) + "m against a " + STEP_CAP + "m cap, walking median "
+      + a.median.toFixed(4) + "m over " + a.n + " frames");
+    say("carry:he-is-home-before-the-next-ball-needs-a-press " + tag, a.homeIn >= 0 && a.pressIn > 0 && a.homeIn <= a.pressIn,
+      "home " + a.homeIn.toFixed(2) + "s after the restart, press window at " + a.pressIn.toFixed(2)
+      + "s, ball struck at " + a.strikeIn.toFixed(2) + "s");
+  }
   say("console:no-errors", errAll.length === 0, errAll.slice(0, 2).join(" | ") || "clean");
 } finally {
   clearTimeout(t);
@@ -279,7 +402,7 @@ if (fails.length) console.log(fails.map((r) => "  FAIL " + r[1] + " " + r[2]).jo
 console.log("표본 범위: 사건 " + EVENTS.length + " x 좌우 " + SIDES.length + " + 정지 폴백 1, 프레임 폭 " + STEP.toFixed(4) + "초");
 if (WAS) {
   // 부모 판 대조군. 걷기와 일어서기 축이 그 판에서 빨개져야 이 자가 무언가를 가른 것이다.
-  const red = fails.filter((r) => r[1].startsWith("walk:") || r[1].startsWith("rise:")).length;
+  const red = fails.filter((r) => r[1].startsWith("walk:") || r[1].startsWith("rise:") || r[1].startsWith("carry:")).length;
   console.log(red > 0 ? "walkback CONTROL PASS " + red + " walk axes red on " + WAS_REV
     : "walkback CONTROL FAIL 0 walk axes red on " + WAS_REV);
   process.exitCode = red > 0 ? 0 : 1;
