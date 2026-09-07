@@ -116,6 +116,7 @@ const DURATION = () => {
       const name = (card.querySelector("b") || {}).textContent || "";
       const dur = card.querySelector(".duration");
       const em = card.querySelector("em");
+      const eff = card.querySelector(".eff");
       if (!dur) { out.push({ tab: kind, name: name.trim(), has: false }); continue; }
       /* 화면 밖의 점은 elementFromPoint가 null을 낸다. 좁은 폭에서는 카드가 접힌 자리 아래에 서므로
          먼저 화면 가운데로 끌어오고, 끌어온 뒤의 좌표로 다시 잰다.
@@ -134,6 +135,11 @@ const DURATION = () => {
         // 세로 폭에서는 가로로 돌리라는 판이 화면을 통째로 덮는다. 그 판 아래의 점은 카드가
         // 가린 것이 아니라 상점 자체가 사람에게 안 보이는 것이라, 누름 축이 잴 자리가 아니다.
         shop: Boolean(mid) && Boolean(document.getElementById("shop")) && document.getElementById("shop").contains(mid),
+        /* 자르는 상자는 .eff다. em은 flex에 overflow:visible이라 굴림값이 0에 못 박혀 있고,
+           거기만 물으면 이 대조군은 못 빨개진다(실측: .eff를 99로 밀면 1280에서 27, 740에서 22로 서는데
+           같은 순간 em은 둘 다 0이었다). 둘 다 읽어, 접기가 나중에 어느 쪽으로 옮겨 가도 빨개진다.
+           .eff가 없으면 -1이라 이 축이 또 0에 못 박히는 그 순간에 빨개진다. */
+        effTop: eff ? Math.round(eff.scrollTop) : -1,
         emTop: em ? Math.round(em.scrollTop) : -1,
         who: mid ? mid.tagName.toLowerCase() + (mid.className ? "." + String(mid.className).trim().split(/ +/).join(".") : "") : "null",
         card: [Math.round(c.left), Math.round(c.right), Math.round(c.top), Math.round(c.bottom)],
@@ -267,7 +273,7 @@ try {
       if (!d.has) { durMissing.push(at); continue; }
       if (!/[0-9]/.test(d.txt) || !/[분슛]/.test(d.txt)) durEmpty.push(at + " reads " + JSON.stringify(d.txt));
       if (!d.inside) durOut.push(at + " token x[" + d.rect[0] + "," + d.rect[1] + "] y[" + d.rect[2] + "," + d.rect[3] + "] against card x[" + d.card[0] + "," + d.card[1] + "] y[" + d.card[2] + "," + d.card[3] + "]");
-      if (d.emTop !== 0) durRolled.push(at + " effect box scrolled to " + d.emTop);
+      if (d.effTop !== 0 || d.emTop !== 0) durRolled.push(at + " clamp box at " + d.effTop + ", effect row at " + d.emTop);
       if (!d.shop) { durBlocked.push(at + " " + d.who); continue; }
       durTapped += 1;
       if (!d.own) durHidden.push(at + " centre returns " + d.who);
@@ -286,9 +292,9 @@ try {
     durHidden.slice(0, 3).join(", ") || durTapped + " of " + durSeen + " tokens answer a tap at their centre, "
       + durBlocked.length + " behind the portrait lock");
   /* 계기. 잘린 상자가 굴러 있으면 위 축이 잰 것은 화면에 선 자리가 아니다. 굴림값 0을 같이 물어야
-     이 자가 잘림을 보고 있다고 말할 수 있다. */
+     이 자가 잘림을 보고 있다고 말할 수 있다. 묻는 상자는 자르는 상자여야 한다. */
   check("instrument:no-clamped-box-was-rolled-while-measuring", durRolled.length === 0,
-    durRolled.slice(0, 2).join(", ") || durSeen + " readings taken with every effect box at scrollTop 0");
+    durRolled.slice(0, 2).join(", ") || durSeen + " readings taken with every clamp box and effect row at scrollTop 0");
   check("instrument:every-bot-and-buff-card-was-read-for-duration", durCards === durSeen && durSeen > 0,
     durSeen + " readings, " + full.dur.length + " at " + WIDE + "px, " + thin.dur.length + " at " + NARROW + "px, " + hand.dur.length + " at " + HAND_W + "px, "
       + durTapped + " tap-tested, texts " + full.dur.map((d) => d.txt).join(" "));

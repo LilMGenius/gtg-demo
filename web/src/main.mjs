@@ -1077,6 +1077,7 @@ function openGram() {
 // 위키. 물음표 하나가 여는 카테고리 가이드다. 재화 칩이 열던 버는 법도 이 안의 한 칸이다.
 // 표의 수는 wiki.mjs가 상수에서 읽으므로 이 자리는 화면에 붙이는 일만 한다.
 let wikiAt = 'hand';
+let wikiWatch = null;
 /* 굴릴 것이 남았다는 자국. 본문은 굴러가지만 화면에는 그 사실이 하나도 안 적혀 있었다.
    실측으로 740x360에서 여덟 칸이 전부 넘쳤고, 조작 칸은 187px 창에 317px을 담아 자리와 키
    세 줄 중 왼쪽 한 줄만 보였다. 아래끝 그늘이 남은 것이 있다는 말이고, 끝까지 굴리면 그 그늘이
@@ -1099,6 +1100,15 @@ function paintWiki() {
   box.querySelector('.close').onclick = closeWiki;
   const body = box.querySelector('.body');
   body.onscroll = () => wikiCue(box);
+  /* 창 크기가 바뀌면 넘침이 다시 계산된다. 그릴 때와 굴릴 때만 세면 창만 바뀐 화면에 옛 답이 남는다.
+     실측으로 조작 칸을 740x360에서 그린 뒤 1280x720으로 늘리면 넘침이 0인데 그늘은 켜진 채였고,
+     줄이면 넘침이 130인데 그늘은 꺼진 채라 가린 줄이 다시 조용해졌다. 이 함수는 살아 있는 값만 읽어
+     몇 번 불러도 같은 답이라 창이 움직일 때마다 그냥 다시 부르면 된다.
+     관찰자는 하나만 두고 그릴 때마다 새 본문으로 옮겨 붙인다. 그릴 때마다 새로 만들면
+     떨어져 나간 옛 본문을 붙든 관찰자가 그 수만큼 쌓인다. */
+  if (!wikiWatch) wikiWatch = new ResizeObserver(() => wikiCue(el('wiki')));
+  wikiWatch.disconnect();
+  wikiWatch.observe(body);
   wikiCue(box);
 }
 
