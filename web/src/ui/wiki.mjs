@@ -128,7 +128,10 @@ export function wikiHTML(cur) {
   const tabs = WIKI_CATS.map((c) => '<button type="button" data-cat="' + c.key + '"'
     + (c.key === cur ? ' aria-current="true"' : '') + '>' + esc(c.label) + '</button>').join('');
   return '<div class="sheet"><nav class="cats">' + tabs + '</nav>'
-    + '<div class="body"></div><button class="close">닫기</button></div>';
+    // 본문을 감싸는 칸. 신호는 본문 밖에 서야 본문과 같이 안 굴러간다.
+    + '<div class="bodybox"><div class="body"></div>'
+    + '<div class="cue up" aria-hidden="true"></div><div class="cue down" aria-hidden="true"></div></div>'
+    + '<button class="close">닫기</button></div>';
 }
 
 export function wikiBody(key, ctx) {
