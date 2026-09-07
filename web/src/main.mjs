@@ -2053,7 +2053,8 @@ function botShelf() {
     return '<div class="card gear" data-spec="bot" data-at="' + b.tier + '" data-rare="' + b.tier + '">'
       + '<div class="pic"><div class="shot" data-kind="bot" data-rank="' + b.tier + '"></div></div>'
       + '<b>' + b.name + '</b>'
-      + '<em>' + cardLine('bot', b.tier) + '<small class="duration">' + duration + '</small></em>'
+      // 효과 문장만 접는다. 기간과 횟수는 그 접기 밖에 서야 안 잘린다.
+      + '<em><span class="eff">' + cardLine('bot', b.tier) + '</span><small class="duration">' + duration + '</small></em>'
       + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-bot="' + b.tier + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
   return '<h4>봇</h4><div class="rack">' + rows.join('') + '</div>';
@@ -2117,7 +2118,8 @@ function buffShelf() {
     return '<div class="card gear" data-spec="buff" data-at="' + b.kind + '" data-rare="' + BUFF_RARE + '">'
       + '<div class="pic"><div class="shot" data-kind="buff" data-rank="' + at + '"></div></div>'
       + '<b>' + b.name + '</b>'
-      + '<em>' + cardLine('buff', b.kind) + '<small class="duration">' + duration + '</small></em>'
+      // 효과 문장만 접는다. 기간과 횟수는 그 접기 밖에 서야 안 잘린다.
+      + '<em><span class="eff">' + cardLine('buff', b.kind) + '</span><small class="duration">' + duration + '</small></em>'
       + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-buff="' + b.kind + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
   return '<h4>버프</h4><div class="rack">' + rows.join('') + '</div>';

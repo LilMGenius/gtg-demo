@@ -1005,11 +1005,22 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
    같은 격자 줄 안에서 갈리기 때문이다. 잘린 나머지는 효과 칸이 표로 받는다. */
 #shop .card.gear em{margin:0;font-weight:400;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* 접기는 문장에만 건다. 접기가 <em> 통째에 걸려 있어서 줄 끝에 붙은 기간 칸이 말줄임표 뒤로 같이
+   잘렸다(실측: 송진 스프레이가 문장 81px을 창 54px에 담아 10슛이 1280과 740 양쪽에서 화면에 안 뜨고,
+   그 자리를 찍으면 값 배지가 돌아왔다. 형제 둘은 12슛과 8슛을 그대로 들고 있어 셋 중 하나만
+   조용히 기간을 감췄다). 파는 물건의 크기가 기간인 선반에서 그 수가 없으면 값만 남는다.
+   문장과 칸을 가로로 세워 문장만 접고 칸은 제 폭을 지킨다. 칸을 아랫줄로 내리지 않는 이유는
+   740x360에서 카드 아래끝이 354px이라 한 줄을 더하면 360px 화면 밖으로 나가기 때문이다.
+   윗선을 맞추는 이유는 문장이 한 줄인 카드와 두 줄인 카드에서 칸이 같은 높이에 서야 넷을 훑는 눈이
+   같은 자리에서 기간만 맞대 보기 때문이다. */
+#shop .card.gear em:has(.eff){display:flex;align-items:baseline;overflow:visible}
+#shop .card.gear em .eff{min-width:0;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 /* 값은 오른쪽 아래 구석에 못 박힌다. 넉 장을 훑는 눈이 같은 자리에서 값만 맞대 본다.
    auto 여백이 배지를 카드 바닥으로 밀어, 이름이 두 줄인 카드에서도 배지가 같은 높이에 선다. */
 #shop .card.gear .foot{display:flex;justify-content:flex-end;margin-top:auto}
 /* 봇과 버프의 기간·횟수는 가격 배지 밖의 보조 칸이다. 효과 한 줄 끝에 붙어 한 줄로 읽힌다. */
-#shop .card.gear .duration{margin-left:var(--gap-2);color:var(--dim);font-size:var(--fs-body);
+#shop .card.gear .duration{flex:0 0 auto;margin-left:var(--gap-2);color:var(--dim);font-size:var(--fs-body);
   font-style:normal;font-weight:700;white-space:nowrap}
 /* 변형 조각. 한 등급이 여러 모양을 들고 있다는 것을 썸네일 위에서 알린다.
    18px는 손가락으로 누르기엔 작지만 카드 높이를 안 밀고, 눌리는 것은 조각이 아니라 그 줄 전체다.
@@ -1041,6 +1052,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
   #shop .rack{max-height:none;overflow-y:visible}
   #shop .card.gear .shot{aspect-ratio:12 / 5}
   #shop .card.gear em{-webkit-line-clamp:1}
+  #shop .card.gear em .eff{-webkit-line-clamp:1}
 }
 #shop .buy{width:100%;margin-top:13px;padding:10px 0 12px;
   border:var(--line) solid var(--edge);background:#2b3a22;color:var(--ink);

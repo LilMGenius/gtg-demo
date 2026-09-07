@@ -100,6 +100,48 @@ const lumOf = (css) => {
   return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
 };
 
+/* 기간 토큰이 카드 안에 통째로 서는가. 봇은 분이고 버프는 슛이라 파는 물건의 크기 그 자체인데,
+   효과 문장이 두 줄에서 잘리면 그 뒤에 붙은 이 칸이 말줄임표 뒤로 통째로 사라졌다.
+   실측으로 송진 스프레이가 1280에서 잘려(문장 81px, 창 54px) 10슛이 선반 어디에도 안 떴고,
+   형제 둘은 12슛과 8슛을 그대로 들고 있어 셋 중 하나만 조용히 기간을 감췄다.
+   묻는 것이 셋이다. 글자가 있는가, 그 상자가 카드 안에 들어 있는가, 그 한가운데를 찍으면
+   그 칸이 돌아오는가. 앞의 둘만 물으면 다른 조각이 위에 덮인 자리를 통과시킨다. */
+const DURATION = () => {
+  const out = [];
+  for (const tab of [...document.querySelectorAll("#shop .tab")]) {
+    const kind = tab.dataset.tab;
+    if (kind !== "bot" && kind !== "buff") continue;
+    tab.click();
+    for (const card of document.querySelectorAll("#shop .rack .card.gear")) {
+      const name = (card.querySelector("b") || {}).textContent || "";
+      const dur = card.querySelector(".duration");
+      const em = card.querySelector("em");
+      if (!dur) { out.push({ tab: kind, name: name.trim(), has: false }); continue; }
+      /* 화면 밖의 점은 elementFromPoint가 null을 낸다. 좁은 폭에서는 카드가 접힌 자리 아래에 서므로
+         먼저 화면 가운데로 끌어오고, 끌어온 뒤의 좌표로 다시 잰다.
+         끌어오는 것은 이 칸이 아니라 카드다. overflow:hidden 상자도 코드로는 굴러가므로,
+         잘린 칸을 직접 끌어오면 그 상자가 27px 굴러 이 자가 재려던 잘림 자체가 사라진다
+         (실측: 송진 스프레이가 이 실수 하나로 잘린 채 초록을 냈다). 카드를 끌면 상자는 안 구른다. */
+      card.scrollIntoView({ block: "center" });
+      const c = card.getBoundingClientRect();
+      const d = dur.getBoundingClientRect();
+      const mid = document.elementFromPoint(d.left + d.width / 2, d.top + d.height / 2);
+      out.push({ tab: kind, name: name.trim(), has: true, txt: (dur.textContent || "").trim(),
+        w: Math.round(d.width), h: Math.round(d.height),
+        inside: d.width > 0 && d.height > 0 && d.left >= c.left - 1 && d.right <= c.right + 1
+          && d.top >= c.top - 1 && d.bottom <= c.bottom + 1,
+        own: Boolean(mid) && (mid === dur || dur.contains(mid) || mid.contains(dur)),
+        // 세로 폭에서는 가로로 돌리라는 판이 화면을 통째로 덮는다. 그 판 아래의 점은 카드가
+        // 가린 것이 아니라 상점 자체가 사람에게 안 보이는 것이라, 누름 축이 잴 자리가 아니다.
+        shop: Boolean(mid) && Boolean(document.getElementById("shop")) && document.getElementById("shop").contains(mid),
+        emTop: em ? Math.round(em.scrollTop) : -1,
+        who: mid ? mid.tagName.toLowerCase() + (mid.className ? "." + String(mid.className).trim().split(/ +/).join(".") : "") : "null",
+        card: [Math.round(c.left), Math.round(c.right), Math.round(c.top), Math.round(c.bottom)],
+        rect: [Math.round(d.left), Math.round(d.right), Math.round(d.top), Math.round(d.bottom)] });
+    }
+  }
+  return out;
+};
 let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
@@ -117,6 +159,7 @@ try {
     const count = await p.evaluate(COUNT);
     const rare = await p.evaluate(RARE);
     const fit = await p.evaluate(FIT);
+    const dur = await p.evaluate(DURATION);
     /* 내려온 설명 문장이 어디에 서 있는가. 페이지가 이미 불러 둔 판을 다시 부르는 것이라
        모듈이 두 번 돌지 않고, 화면에 안 그려지는 값을 화면 쪽에서 읽는 유일한 길이다. */
     const parked = await p.evaluate(async () => {
@@ -127,7 +170,7 @@ try {
       return out;
     }).catch(() => null);
     await ctx.close();
-    return { count, rare, fit, parked };
+    return { count, rare, fit, parked, dur };
   };
   const full = await at(WIDE, 720);
   const thin = await at(NARROW, 720);
@@ -213,6 +256,42 @@ try {
     parked === null ? "SHELF_NOTES_FOR_WIKI missing from main.mjs, " + NOTES.length + " notes unread"
       : unread.length ? unread.length + " of " + NOTES.length + " unread, first " + JSON.stringify(unread[0])
         : NOTES.length + " notes parked for the wiki screen");
+  /* 기간 토큰. 세 폭에서 봇과 버프 카드 전부를 훑는다. 1280만 재면 좁은 폭에서 한 줄로 접히는
+     자리를 놓치고, 그 폭이 F3에서 열 장까지 잘린 폭이다. */
+  const durMissing = [], durOut = [], durHidden = [], durEmpty = [], durBlocked = [], durRolled = [];
+  let durSeen = 0, durTapped = 0;
+  for (const [w, h, rows] of [[WIDE, 720, full.dur], [NARROW, 720, thin.dur], [HAND_W, HAND_H, hand.dur]]) {
+    for (const d of rows) {
+      durSeen += 1;
+      const at = d.name + " " + w + "x" + h;
+      if (!d.has) { durMissing.push(at); continue; }
+      if (!/[0-9]/.test(d.txt) || !/[분슛]/.test(d.txt)) durEmpty.push(at + " reads " + JSON.stringify(d.txt));
+      if (!d.inside) durOut.push(at + " token x[" + d.rect[0] + "," + d.rect[1] + "] y[" + d.rect[2] + "," + d.rect[3] + "] against card x[" + d.card[0] + "," + d.card[1] + "] y[" + d.card[2] + "," + d.card[3] + "]");
+      if (d.emTop !== 0) durRolled.push(at + " effect box scrolled to " + d.emTop);
+      if (!d.shop) { durBlocked.push(at + " " + d.who); continue; }
+      durTapped += 1;
+      if (!d.own) durHidden.push(at + " centre returns " + d.who);
+    }
+  }
+  const durCards = full.dur.length + thin.dur.length + hand.dur.length;
+  check("rack:every-bot-and-buff-card-carries-its-duration", durSeen > 0 && durMissing.length === 0,
+    durMissing.slice(0, 3).join(", ") || durSeen + " card readings over three widths, every one carries a duration span");
+  check("rack:the-duration-token-reads-a-number-and-a-unit", durSeen > 0 && durEmpty.length === 0,
+    durEmpty.slice(0, 3).join(", ") || durSeen + " tokens carry a number and 분 or 슛");
+  check("rack:the-duration-token-sits-inside-its-card", durSeen > 0 && durOut.length === 0,
+    durOut.slice(0, 2).join(", ") || durSeen + " tokens inside their card box");
+  /* 잘림은 여기서 잡힌다. 말줄임표 뒤로 넘어간 칸은 폭도 높이도 남아 있지만 그 한가운데를 찍으면
+     제 칸이 아니라 그것을 자른 부모가 돌아온다. */
+  check("rack:the-duration-token-answers-its-own-centre", durTapped > 0 && durHidden.length === 0,
+    durHidden.slice(0, 3).join(", ") || durTapped + " of " + durSeen + " tokens answer a tap at their centre, "
+      + durBlocked.length + " behind the portrait lock");
+  /* 계기. 잘린 상자가 굴러 있으면 위 축이 잰 것은 화면에 선 자리가 아니다. 굴림값 0을 같이 물어야
+     이 자가 잘림을 보고 있다고 말할 수 있다. */
+  check("instrument:no-clamped-box-was-rolled-while-measuring", durRolled.length === 0,
+    durRolled.slice(0, 2).join(", ") || durSeen + " readings taken with every effect box at scrollTop 0");
+  check("instrument:every-bot-and-buff-card-was-read-for-duration", durCards === durSeen && durSeen > 0,
+    durSeen + " readings, " + full.dur.length + " at " + WIDE + "px, " + thin.dur.length + " at " + NARROW + "px, " + hand.dur.length + " at " + HAND_W + "px, "
+      + durTapped + " tap-tested, texts " + full.dur.map((d) => d.txt).join(" "));
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
 
   for (const k of racks) console.log("  " + k.padEnd(7) + " cards " + wide[k].cards + "  columns " + wide[k].cols + " at " + WIDE + "px, " + narrow[k].cols + " at " + NARROW + "px");
