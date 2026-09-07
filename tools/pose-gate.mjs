@@ -40,6 +40,13 @@ const KICK_BAR = 0.2;
 const SQUASH_BAR = 0.9;
 // 눌린 만큼 옆으로 퍼졌는가. 0.85 x 1.08 x 1.08 = 0.991이라 부피가 1퍼센트 안에서 보존된다.
 const WIDE_BAR = 1.05;
+/* 무게가 실리는 사건을 가르는 두 문턱. 하나만 쓰면 둘 다 샌다는 것을 실측이 보여 준다.
+   낙하만 보면 두 발로 버틴 제껴짐이 0.709로 통과하고, 누움만 보면 허리를 접고 선 빈 골대가
+   0.870으로 통과한다. 실제로 바닥에 닿는 넷은 낙하 0.590 이상이고 누움 0.941 이상이다.
+   낙하 문턱은 charge 0.392와 reboundMiss 0.590 사이, 누움 문턱은 빈 골대 0.870과 그 0.941 사이다.
+   두 수는 이 자가 제 좌표에서 잰 값이고, 화면이 쓰는 미터 단위 문턱과는 다른 공간의 수다. */
+const FALL_BAR = 0.50;
+const LIE_BAR = 0.90;
 /* 눌림이 착지에 맞았다고 볼 프레임 차이. 화면은 미래를 못 보므로 지난 프레임의 속도로 판단하고,
    그래서 구조적으로 한 프레임 늦는다. 실측 편차는 착지 다섯 사건에서 0, 1, 1, 1, 1프레임이라
    그 위에 한 프레임만 얹는다. 셋으로 두면 예비 경계에 걸던 옛 판이 빠른 사건에서 통과한다
@@ -123,13 +130,17 @@ function beatOrder() {
   const B = [];
   const bre = /(\w+):\s*\{\s*ant:\s*([0-9.]+),\s*per:\s*([0-9.]+)\s*\}/g;
   while ((m = bre.exec(beatSrc.slice(0, beatSrc.indexOf("};") + 2)))) B.push([m[1], Number(m[2]), Number(m[3])]);
+  // 예외로 선언된 줄. 표가 스스로 이름을 적어 두므로 이 자는 그 이름만 읽는다.
+  const ex = src.match(/export const BEAT_EXCEPT = \[([^\]]*)\]/);
+  // 선언이 아예 없으면 예외 칸이 빈 것이 아니라 규칙이 없는 것이다. 둘을 같은 것으로 읽으면 안 된다.
+  const EX = ex ? ex[1].split(",").map((s) => s.trim().replace(/['"]/g, "")).filter(Boolean) : null;
   if (!P.ready || B.length === 0) return null;
   const d = (a, b) => {
     let s = 0;
     for (const k of J) for (let i = 0; i < 3; i += 1) { const x = a[k][i] - b[k][i]; s += x * x; }
     return Math.sqrt(s);
   };
-  return B.map(([n, ant, per]) => ({ n, ant, per, d: P[n] ? d(P[n], P.ready) : -1 }));
+  return { rows: B.map(([n, ant, per]) => ({ n, ant, per, d: P[n] ? d(P[n], P.ready) : -1 })), ex: EX };
 }
 
 // 판 하나를 여는 자리. 되돌린 판도 여기서만 물려야 사건 채취와 킥 채취가 같은 판을 본다.
@@ -181,7 +192,8 @@ try {
         const p = window.__poseVis();
         // 머리 월드 높이. 어느 판에도 있는 손잡이라, 되돌린 판에서도 이 자가 착지를 직접 셀 수 있다.
         window.__w15.push([window.__frames(), window.__tailKind(), s ? s.y : -1, s ? s.x : -1,
-          s ? s.z : -1, window.__camDbg().vnow, p.v, p.rz, window.__headAt().y]);
+          s ? s.z : -1, window.__camDbg().vnow, p.v, p.rz, window.__headAt().y,
+          s && s.landFall !== undefined ? s.landFall : -1]);
         requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
@@ -214,6 +226,10 @@ try {
     const fall = Math.max(...head) - Math.min(...head);
     let arrive = -1;
     for (let i = spd.indexOf(peak); i < spd.length; i += 1) if (spd[i] <= peak * 0.10) { arrive = i; break; }
+    /* 깊이가 없으면 착지도 없다. 감속만 보면 제자리에서 고개를 숙인 몸도 도착한 것이 되고,
+       그러면 얕은 낙하에 걸린 눌림이 위상만 맞아 통과한다(실측: 화면의 낙하 문턱을 0.20에서
+       0.05로 낮춰도 이 축이 초록이었다). 이 자가 잰 낙하가 문턱 아래면 착지 프레임을 안 준다. */
+    if (fall < FALL_BAR) arrive = -1;
     const press = mine.findIndex((r) => r[2] >= 0 && r[2] < 1);
     let back = -1;
     if (press >= 0) for (let i = press; i < mine.length; i += 1) if (mine[i][2] >= 1) { back = i; break; }
@@ -222,11 +238,15 @@ try {
     land[k] = {
       hook: mine.some((r) => r[2] >= 0),
       fall,
-      // 누움은 착지 프레임에서 잰다. 창 끝에서 재면 이미 다음 연출로 넘어간 몸을 재게 된다.
-      lie: lieOf(mine[arrive > 0 ? arrive : mine.length - 1][6]),
+      /* 누움은 머리가 가장 낮은 프레임에서 잰다. 착지 프레임에서 재면 착지가 없는 사건에는 잴 자리가
+         없어 창 끝의 몸, 곧 이미 다음 연출로 넘어간 몸을 재게 된다. 가장 낮은 프레임은 열다섯 사건
+         모두에 있고, 무게가 실렸는지를 묻기에도 그 자리가 맞다. */
+      lie: lieOf(mine[head.indexOf(Math.min(...head))][6]),
       arrive, press, delta: press >= 0 && arrive > 0 ? press - arrive : null,
       under: under.length,
       dur: press >= 0 && back > 0 ? (mine[back][5] - mine[press][5]) * 1000 : -1,
+      // 화면이 착지 프레임에서 잰 낙하. 이 자의 창 전체 낙하와는 다른 수라 나란히 적어 둔다.
+      engFall: (mine.find((r) => r[9] > 0) || [])[9] ?? -1,
       deepY: deep[2], deepX: deep[3], deepZ: deep[4]
     };
     for (const e of errs) errAll.push(e);
@@ -277,19 +297,34 @@ const stood = KINDS.filter((k) => land[k].hook && land[k].press < 0);
 for (const k of KINDS) {
   const L = land[k];
   notes.push("land " + k.padEnd(15) + " lie " + L.lie.toFixed(3) + " fall " + L.fall.toFixed(3)
+    + " engFall " + (L.engFall >= 0 ? L.engFall.toFixed(3) : "-")
     + " arrive " + (L.arrive > 0 ? L.arrive : -1)
     + " press " + L.press + " delta " + (L.delta === null ? "-" : L.delta)
     + " under " + L.under + " dur " + (L.dur >= 0 ? L.dur.toFixed(1) + "ms" : "-")
     + " y " + (L.deepY >= 0 ? L.deepY.toFixed(3) : "-"));
 }
+/* 눌려야 하는 사건은 이 자가 제 좌표에서 직접 고른다. 깊게 내려왔고 그 끝이 누운 몸이어야 한다.
+   예전 축은 두 무리가 누움 순서에서 갈라졌는지만 물었고, 그것은 화면이 누움으로 가르는 한 어느
+   자리에 금을 그어도 참이라 문턱을 하나도 못 잡았다(실측: save를 눌린 쪽에 넣어도 초록이었다). */
+const lands = (k) => land[k].fall >= FALL_BAR && land[k].lie >= LIE_BAR;
+const want = KINDS.filter(lands);
+const sameSet = (a, c) => a.length === c.length && a.every((k) => c.includes(k));
 const loPress = pressed.length ? Math.min(...pressed.map((k) => land[k].lie)) : -1;
 const hiStand = stood.length ? Math.max(...stood.map((k) => land[k].lie)) : -1;
-say("squash:only-the-body-that-lies-down-gets-pressed",
-  hooked.length === KINDS.length && pressed.length >= 1 && stood.length >= 1 && loPress > hiStand,
+say("squash:only-a-deep-fall-onto-a-lying-body-gets-pressed",
+  hooked.length === KINDS.length && pressed.length >= 1 && sameSet(pressed, want),
   hooked.length < KINDS.length ? "window.__squashVis missing on this layer"
-    : pressed.length + " pressed (lowest lie " + loPress.toFixed(3) + "), " + stood.length
-    + " stood (highest lie " + hiStand.toFixed(3) + "), gap " + (loPress - hiStand).toFixed(3)
-    + "; pressed " + pressed.join(" "));
+    : "pressed " + (pressed.join(" ") || "none") + "; deep and lying " + (want.join(" ") || "none")
+    + " (fall >= " + FALL_BAR + " and lie >= " + LIE_BAR + "), lowest pressed lie "
+    + loPress.toFixed(3) + " against the highest standing " + hiStand.toFixed(3));
+/* 대조군. 두 발로 끝나는 save를 눌린 쪽에 억지로 넣으면 위 축이 빨개져야 한다.
+   안 빨개지면 그 축은 문턱이 아니라 두 무리가 갈라졌다는 사실만 보고 있는 것이다. */
+const planted = pressed.concat(["save"]);
+say("control:planting-a-standing-save-in-the-pressed-set-reds-it",
+  hooked.length === KINDS.length && !sameSet(planted, want),
+  "save falls " + land.save.fall.toFixed(3) + " and lies " + land.save.lie.toFixed(3)
+  + ", so planting it makes the pressed set " + planted.length + " against the measured "
+  + want.length + (sameSet(planted, want) ? " and the axis stays green" : " and the axis reds"));
 const deepest = hooked.length ? hooked.reduce((m, k) => (land[k].lie > land[m].lie ? k : m), hooked[0]) : null;
 say("squash:the-deepest-fall-is-one-of-them", Boolean(deepest) && land[deepest].press >= 0,
   deepest ? "deepest lie is " + deepest + " at " + land[deepest].lie.toFixed(3)
@@ -319,21 +354,49 @@ say("squash:the-landing-presses-the-torso", pressed.length >= 1 && deepBad.lengt
   pressed.length ? (pressed.length - deepBad.length) + "/" + pressed.length
     + " reach under " + SQUASH_BAR : "nothing pressed");
 
-// 박자 표. 표가 스스로 적어 둔 순서가 소스에서 다시 나오는가.
+/* 박자 표. 주기는 대기 자세에서 떨어진 거리를 따라 오르되, 표가 이름을 적어 둔 줄만 예외다.
+   예외로 안 적힌 줄이 순서를 깨면 빨개지고, 예외로 적혔는데 실제로는 순서를 안 깨는 줄이 있어도
+   빨개진다. 뒤쪽이 없으면 낡은 이름표가 남아 규칙이 조용히 넓어진다.
+   ant에는 순서를 안 건다. 되감을 깊이는 관절이 남아 있는지가 정하고 그것은 한 축의 거리로 안 나온다.
+   대신 두 열이 표가 쓰는 폭 안에 있는지만 본다.
+   거리 차가 TIE 아래인 쌍은 견주지 않는다. 실측으로 skyward 2.958과 hugfall 2.962는 0.004 떨어져
+   있어, 그 둘의 순서를 강제하면 자세를 손톱만큼 고친 날 아무 동기 없이 빨간불이 난다. */
+const TIE = 0.05;
+const ANT_LO = 1.10;
+const ANT_HI = 1.40;
+const PER_LO = 0.50;
+const PER_HI = 1.18;
 const beats = beatOrder();
-if (!beats) say("beat:the-period-rises-with-the-distance-from-ready", false, "POSE_BEAT not on this layer");
+if (!beats) say("beat:the-period-rises-with-the-distance-outside-the-declared-rows", false, "POSE_BEAT not on this layer");
 else {
-  const sorted = beats.slice().sort((a, c) => a.d - c.d);
+  const sorted = beats.rows.slice().sort((a, c) => a.d - c.d);
+  const EX = beats.ex || [];
+  const breaks = (j) => {
+    const under = [];
+    for (let i = 0; i < sorted.length; i += 1) {
+      if (i === j || sorted[j].d - sorted[i].d <= TIE) continue;
+      if (sorted[j].per < sorted[i].per) under.push(sorted[i].n);
+    }
+    return under;
+  };
   const bad = [];
-  for (let i = 1; i < sorted.length; i += 1) {
-    if (sorted[i].per < sorted[i - 1].per) bad.push(sorted[i - 1].n + ">" + sorted[i].n + " per");
-    if (sorted[i].ant < sorted[i - 1].ant) bad.push(sorted[i - 1].n + ">" + sorted[i].n + " ant");
+  const stale = [];
+  for (let j = 0; j < sorted.length; j += 1) {
+    const under = breaks(j);
+    if (EX.includes(sorted[j].n)) { if (under.length === 0) stale.push(sorted[j].n); }
+    else if (under.length) bad.push(sorted[j].n + " under " + under.join("/"));
   }
-  notes.push("beat " + sorted.map((r) => r.n + " " + r.d.toFixed(2) + "/" + r.per.toFixed(2)).join("  "));
-  say("beat:the-period-rises-with-the-distance-from-ready", bad.length === 0 && sorted.length === 12,
-    sorted.length + " rows from " + sorted[0].n + " " + sorted[0].d.toFixed(2) + " to "
-    + sorted[sorted.length - 1].n + " " + sorted[sorted.length - 1].d.toFixed(2)
-    + (bad.length ? ", out of order: " + bad.join(" ") : ", ant and per both rise with it"));
+  const band = sorted.filter((r) => r.ant < ANT_LO || r.ant > ANT_HI || r.per < PER_LO || r.per > PER_HI);
+  notes.push("beat " + sorted.map((r) => r.n + " " + r.d.toFixed(2) + "/" + r.per.toFixed(2)
+    + (EX.includes(r.n) ? "*" : "")).join("  "));
+  say("beat:the-period-rises-with-the-distance-outside-the-declared-rows",
+    Boolean(beats.ex) && bad.length === 0 && stale.length === 0 && band.length === 0 && sorted.length === 12,
+    (beats.ex ? sorted.length + " rows, " + EX.length + " declared (" + EX.join(" ") + ")"
+      : sorted.length + " rows but BEAT_EXCEPT is not declared on this layer")
+    + (bad.length ? ", undeclared inversions: " + bad.join(", ") : "")
+    + (stale.length ? ", declared but in order: " + stale.join(" ") : "")
+    + (band.length ? ", outside the band: " + band.map((r) => r.n).join(" ") : "")
+    + (bad.length + stale.length + band.length === 0 ? ", every other row rises and both columns stay in band" : ""));
 }
 
 // 킥 예비. 종류 넷이 서로 다른 몸에서 출발해야 칩과 강슛이 같은 그림에서 시작하지 않는다.
