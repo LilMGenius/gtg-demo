@@ -303,8 +303,11 @@ async function carrySample(browser, routed, seed, dir, home) {
         armed = true;
       }
       if (!open) armed = false;
+      const bv = window.__backVis ? window.__backVis() : null;
       window.__w14c.push({ f: window.__frames(), k: window.__tailKind(), a: window.__tailAge(), x: k.x, z: k.z, bz: b.z,
-        t: window.__camDbg().vnow, w: window.__backVis ? (window.__backVis() || {}).why || null : "no-hook" });
+        t: window.__camDbg().vnow, w: window.__backVis ? (bv || {}).why || null : "no-hook",
+        // 일어서기 진행률. 복귀는 두 단이고 걷기는 이 값이 1에 닿은 뒤에 시작한다.
+        r: bv ? bv.r : null });
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
@@ -337,6 +340,10 @@ function analyseCarry(rec, branch) {
   for (let i = r0; i < rec.length; i += 1) if (rec[i].bz < 10.6) { strike = i; break; }
   if (strike > 0) for (let i = strike; i < rec.length; i += 1) if (rec[i].bz <= KEEPER_Z) { arrive = i; break; }
   for (let i = r0; i < rec.length; i += 1) if (off(rec[i]) <= HOME_TOL) { home = i; break; }
+  /* 일어서기가 끝난 프레임. 리셋이 연 복귀는 일어서기부터 시작하고, 꼬리가 이미 열어 둔 복귀는
+     그 단을 지나 있어 0이 나온다. 두 갈래의 남은 일을 같은 자로 재려면 이 단을 따로 알아야 한다. */
+  let rose = -1;
+  for (let i = r0; i < rec.length; i += 1) { if (rec[i].r === null || rec[i].r === undefined || rec[i].r >= 1) { rose = i; break; } }
   const last = strike > 0 ? strike : rec.length - 1;
   const steps = [];
   for (let i = o + 1; i <= last; i += 1) {
@@ -361,6 +368,7 @@ function analyseCarry(rec, branch) {
     median: steps.length ? steps[Math.floor(steps.length / 2)] : 0, n: steps.length,
     why: rec[Math.min(rec.length - 1, r0 + 1)].w,
     homeIn: home > 0 ? rec[home].t - rec[r0].t : -1,
+    riseIn: rose >= 0 ? rec[rose].t - rec[r0].t : -1,
     strikeIn: strike > 0 ? rec[strike].t - rec[r0].t : -1,
     pressIn: flight > 0 ? 0.72 * flight : -1
   };
@@ -423,13 +431,14 @@ try {
       "vnow " + s.frozen.t1.v.toFixed(4) + " held while frames ran " + s.frozen.t0.f + "->" + s.frozen.t1.f
       + ", keeper x " + s.frozen.t1.k.x.toFixed(4));
   }
-  /* 잠그지 않은 칸 둘. 하나는 리셋이 복귀가 열리기 전에 오고(실측 꼬리 나이 3.54초, 복귀는 3.6초),
+  /* 잠그지 않은 칸 셋. 하나는 리셋이 복귀가 열리기 전에 오고(실측 꼬리 나이 3.54초, 복귀는 3.6초),
      하나는 걷는 도중에 온다(실측 5.33초에 1.13미터 남음). 두 자리가 이 절의 두 갈래다. */
   /* 앞 칸은 복귀를 8초로 밀어 다음 구가 반드시 먼저 서게 한다. 실측 재시작이 5.38초라 여유가
      2.6초이고, 밀지 않으면 3.63초와 3.6초 사이 0.03초에 갈래가 걸린다.
-     가운데 칸은 방향을 한 번도 안 눌러 x가 정확히 0인 몸으로 깊이축 복귀만 뽑는다. */
+     마지막 칸도 복귀를 8초로 밀되 방향을 한 번도 안 눌러 x가 정확히 0인 몸을 리셋 갈래로 보낸다.
+     변위 가드가 x와 z를 함께 묻는 자리는 그 갈래뿐이라, 꼬리 갈래로 두면 깊이축 복귀를 아무도 안 지난다. */
   for (const [tag, seed, dir, branch, home] of [["carry-before-the-walk", 20, CARRY_DIR, "reset", 8],
-    ["carry-mid-walk", 7, CARRY_DIR, "tail", 0], ["carry-centre-depth", 20, CARRY_CENTRE, "tail", 0]]) {
+    ["carry-mid-walk", 7, CARRY_DIR, "tail", 0], ["carry-centre-depth", 20, CARRY_CENTRE, "reset", 8]]) {
     const s = await carrySample(browser, routed, seed, dir, home);
     for (const e of s.errs) errAll.push(e);
     const a = analyseCarry(s.rec, branch);
@@ -437,7 +446,8 @@ try {
     console.log("  " + tag + " seed " + seed + " tail " + a.kind + " landed " + a.landed.toFixed(2)
       + "m reset@" + a.resetAge.toFixed(2) + "s away " + a.awayAtReset.toFixed(3) + "->" + a.afterReset.toFixed(3)
       + " worst " + a.worst.toFixed(4) + "m/f at " + a.worstAt + " median " + a.median.toFixed(4) + " n " + a.n + " branch " + a.why
-      + " home +" + a.homeIn.toFixed(2) + "s press +" + a.pressIn.toFixed(2) + "s strike +" + a.strikeIn.toFixed(2) + "s");
+      + " home +" + a.homeIn.toFixed(2) + "s rise +" + a.riseIn.toFixed(2)
+      + "s press +" + a.pressIn.toFixed(2) + "s strike +" + a.strikeIn.toFixed(2) + "s");
     say("instrument:the-next-ball-arrived-while-he-was-off-his-line " + tag, a.awayAtReset >= AWAY_BAR && s.pref,
       a.kind + " restarted at tail age " + a.resetAge.toFixed(2) + "s with him " + a.awayAtReset.toFixed(2) + "m off his line");
     say("carry:no-frame-crosses-more-than-the-walk-can-step " + tag, a.worst <= STEP_CAP,
@@ -446,10 +456,15 @@ try {
     /* 손가락이 누르는 순간까지 걸어올 수 있는 거리인가부터 묻는다. 상한 속도로도 못 닿는 거리면
        그 판은 공이 발을 떠나는 순간을 기준으로 묻는다. 한눈판 복귀 3.29미터는 0.46초에 초속 7미터로도
        못 오고, 그 거리를 그 안에 오게 만들면 그것이 다시 미끄러짐이다. */
-    const reach = a.pressIn * CARRY_MPS_BAR >= a.awayAtReset;
+    /* 누름까지 닿을 수 있는 거리인가. 복귀는 일어서기와 걷기 두 단이고 가속 상한은 둘을 같이 나눈다.
+       걷는 거리만 상한으로 나누면 일어서는 동안 쓴 시간이 공짜가 되어, 실측 3.29미터 판이 걷기만으로
+       0.470초를 쓰는데 0.48초 창을 통과했다고 읽혔다. 그 판의 일어서기는 0.10초였고 집에 든 것은
+       0.58초다. 일어서기를 같이 세면 그 판은 창 밖으로 나가고 판정 기준이 공이 발을 떠나는 순간이 된다. */
+    const reach = a.pressIn >= a.riseIn + a.awayAtReset / CARRY_MPS_BAR;
     say("carry:he-is-home-before-the-next-ball-needs-a-press " + tag,
       a.homeIn >= 0 && a.pressIn > 0 && a.homeIn <= (reach ? a.pressIn : a.strikeIn),
-      "home " + a.homeIn.toFixed(2) + "s after the restart, press window at " + a.pressIn.toFixed(2)
+      "home " + a.homeIn.toFixed(2) + "s after the restart (stand-up " + a.riseIn.toFixed(2)
+      + "s), press window at " + a.pressIn.toFixed(2)
       + "s, ball struck at " + a.strikeIn.toFixed(2) + "s, " + a.awayAtReset.toFixed(2) + "m "
       + (reach ? "is" : "is not") + " reachable inside the press window");
     /* 어느 갈래를 지났는지를 못 박는다. 이것이 없으면 판 시각이 60밀리초만 밀려도 앞 칸이
