@@ -463,6 +463,31 @@ try {
   check("control:the-wide-viewport-still-cues-what-overflows", wideOver > 0 && dimmed.length === 0,
     dimmed.slice(0, 2).join(", ") || wideOver + " overflowing at 1280x720, every one cued");
 
+  /* 살아 있는 창 크기 변화. 신호는 그릴 때와 굴릴 때만 다시 셌으므로, 창만 바뀌고 아무도 안 누르면
+     옛 답이 화면에 남았다. 실측으로 조작 칸을 740x360에서 그린 뒤 1280x720으로 늘리면 넘침이 130에서
+     0으로 주는데 그늘은 켜진 채였고, 줄이면 넘침이 다시 130인데 그늘은 꺼진 채였다. 뒤엣것이
+     이 자가 막으려던 결함 그대로다. 그래서 다시 그리지 않고 폭만 바꿔서 묻는다.
+     조작 칸을 쓰는 이유는 740에서 넘치고 1280에서 안 넘치는 칸이라 한 칸으로 양쪽을 다 묻기 때문이다. */
+  await p.setViewportSize({ width: 740, height: 360 });
+  await p.waitForTimeout(420);
+  await p.evaluate(OPEN_CAT, "hand");
+  await p.waitForTimeout(240);
+  const drew = await p.evaluate(CUE);
+  await p.setViewportSize({ width: 1280, height: 720 });
+  await p.waitForTimeout(440);
+  const grew = await p.evaluate(CUE);
+  await p.setViewportSize({ width: 740, height: 360 });
+  await p.waitForTimeout(440);
+  const shrank = await p.evaluate(CUE);
+  const say = (c) => (c && c.down ? "over " + c.over + " cue " + c.down.op : "no cue");
+  const liveOk = Boolean(drew && grew && shrank && drew.down && grew.down && shrank.down)
+    && drew.over > 1 && drew.down.op === 1
+    && grew.over === 0 && grew.down.op === 0
+    && shrank.over > 1 && shrank.down.op === 1;
+  check("wiki:a-live-resize-recomputes-the-cue", liveOk,
+    "painted at 740x360 " + say(drew) + ", grown to 1280x720 without a click " + say(grew)
+      + ", back to 740x360 " + say(shrank));
+
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 
