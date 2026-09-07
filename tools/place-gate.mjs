@@ -263,8 +263,21 @@ async function arenaPassers() {
   return out;
 }
 
-// 부모 판을 라우트에 실어 둔다. 되돌린 파일이 살아 있는 파일과 같으면 대조군이 no-op이다.
+/* 부모 판을 라우트에 실어 둔다. 되돌린 파일이 살아 있는 파일과 같으면 대조군이 no-op이다.
+   그 판정은 아래에서 빌림 줄을 붙이기 전의 바이트로 한다. 붙인 뒤로 재면 어떤 파일이든 항상
+   달라 보여서 이 끊는 자리가 조용히 무너진다.
+
+   빌림 줄이 필요한 이유. 라우트는 아래 세 파일만 되돌리고 나머지는 살아 있는 판이 그대로 선다.
+   그래서 살아 있는 scene.mjs가 부모 판에 없는 이름을 가져오면 링크가 깨지고 모듈 그래프가
+   통째로 안 선다. 실측: 이 자가 얹힌 뒤에 들어온 커밋이 actors.mjs에 이름 여섯을 더했고
+   scene.mjs가 그중 셋을 가져오면서, 그날부터 대조군 판이 한 번도 안 섰다.
+   그래서 부모 판에 없는 이름만 골라 살아 있는 파일에서 빌려 온다.
+   빌린 이름은 대조군이 아니다. 다만 부모 파일은 제 안에 없던 이름을 부를 수 없으므로 부모 쪽
+   코드 길은 이 줄을 안 쓴다. 팔에 걸리는 고리와 places 없는 pitch가 그대로 서는 것이 그 증거다. */
 const routed = new Map();
+// 빌려 줄 살아 있는 바이트. 주소는 디스크에 없고 아래 lap이 그 자리에 세운다.
+const lent = new Map();
+const exportsOf = (src) => new Set([...src.matchAll(/^export\s+(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]));
 if (!LIVE_ONLY) {
   for (const f of LAYER) {
     const was = execFileSync("git", ["show", WAS_REV + ":" + f], { encoding: "utf8", maxBuffer: 16000000, cwd: ROOT });
@@ -273,7 +286,22 @@ if (!LIVE_ONLY) {
       console.log("판정 중단. " + f + "이 " + WAS_REV + "와 같아 대조군이 no-op이다. INSTRUMENT DEAD");
       process.exit(2);
     }
-    routed.set(f, was);
+    /* 위 한 줄만 읽는 자라 export {a, b}와 export default는 못 센다. 하나라도 있으면 빠진 이름을
+       덜 세고 빌림이 반쪽이 된다. 반쪽은 링크가 깨진 뒤에야 드러나므로 여기서 끊는다. */
+    if (/^export\s*[{*]/m.test(live) || /^export\s+default/m.test(live)) {
+      console.log("판정 중단. " + f + "의 수출 형태를 이 자가 못 읽는다. INSTRUMENT DEAD");
+      process.exit(2);
+    }
+    const had = exportsOf(was);
+    const lack = [...exportsOf(live)].filter((n) => !had.has(n));
+    const url = f.replace(/\.mjs$/, ".live.mjs");
+    routed.set(f, lack.length === 0 ? was
+      : was + "\n// 빌림. 부모 판에 없는 이름만 살아 있는 파일에서 가져다 다시 내보낸다.\n"
+        + "export { " + lack.join(", ") + " } from \"./" + url.split("/").pop() + "\";\n");
+    if (lack.length) {
+      lent.set(url, live);
+      notes.push("shim " + f + " borrows " + lack.join(",") + " from live, parent code paths untouched");
+    }
   }
 }
 
@@ -289,10 +317,30 @@ async function lap(browser, lane, errs) {
     for (const [f, body] of routed) {
       await page.route("**/" + f, (route) => route.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body }));
     }
+    // 빌림 줄이 가리키는 주소. 디스크에 없는 파일이라 여기서만 산다.
+    for (const [f, body] of lent) {
+      await page.route("**/" + f, (route) => route.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body }));
+    }
   }
   await page.goto(BASE, { waitUntil: "load" });
   await page.waitForSelector("#go", { timeout: 15000 });
   await page.click("#go", { force: true });
+  /* 그래프가 실제로 섰는지 먼저 묻는다. 라우트로 되돌린 판이 살아 있는 판의 가져오기를 못 채우면
+     모듈이 통째로 안 서고 main.mjs가 손잡이를 하나도 안 건다. 그때 아래 첫 손잡이 호출이
+     "is not a function"으로 터지는데, 그것은 판정이 아니라 죽음이라 빨간 줄로도 안 남는다.
+     그래서 손잡이 유무를 축으로 세우고, 없으면 그 자리에서 빠진 이름을 들고 끊는다. */
+  const cold = await page.evaluate(() => ["__lockRound", "__plan", "__frames", "__crowd", "__sceneRoot", "__camDbg"]
+    .filter((k) => typeof window[k] !== "function"));
+  // 링크가 깨진 자리는 브라우저가 빠진 이름을 대고 말해 준다. 그 줄을 먼저 집는다.
+  const mine = errs.filter((e) => e.startsWith(lane + ":"));
+  say("control:the-module-graph-evaluated " + lane, cold.length === 0,
+    cold.length === 0 ? "six page hooks installed, __lockRound among them"
+      : "window." + cold.join(", window.") + " never installed. "
+        + (mine.find((e) => /export named/.test(e)) || mine[0] || "no page error captured").slice(0, 200));
+  if (cold.length) {
+    await ctx.close();
+    return null;
+  }
   const at = (n) => page.waitForFunction((m) => window.__frames() >= m, n, { timeout: 20000 });
   // 첫 진입은 개봉 카드 두 마디를 지난다. 안 닫으면 화면 가운데를 카드가 덮는다.
   for (let i = 0; i < 6; i += 1) {
@@ -360,8 +408,10 @@ try {
   const live = await lap(browser, "live", errs);
   const was = LIVE_ONLY ? null : await lap(browser, "was", errs);
 
+  /* 한 판이라도 안 섰으면 그 판이 낸 수는 없다. 위에서 빨간 줄이 이미 섰으므로 여기서는 잴 수
+     있는 축만 재고 판정 줄까지 간다. 예외로 죽으면 줄이 한 개도 안 찍혀 랩 전체가 안 읽힌다. */
   // 동네. 여섯 쌍이 전부 바를 넘어야 넷이 서로 다른 자리다. 한 쌍만 넘으면 셋이 같은 자리다.
-  for (const p of live.band) {
+  for (const p of (live ? live.band : [])) {
     const old = was ? was.band.find((q) => q.a === p.a && q.b === p.b) : null;
     say("place:town-" + p.a + "-and-town-" + p.b + "-stand-on-different-ground", p.pct >= BAND_MIN,
       pc(p.pct) + " of the band (" + p.n + " of " + p.total + "px, rows " + p.rows.join("-") + ")"
@@ -375,7 +425,7 @@ try {
   }
 
   // 행인. 자를 먼저 세운다. 답을 아는 상자 둘이 4.0과 1.0을 내야 아래 수가 뜻을 갖는다.
-  if (live.rig) {
+  if (live && live.rig) {
     const c = live.rig.control;
     say("control:the-silhouette-rule-reads-a-known-pair",
       c.length === 2 && Math.abs(c[0].ratio - 4) < 0.25 && Math.abs(c[1].ratio - 1) < 0.15,
@@ -399,7 +449,7 @@ try {
   /* 격리해서 잰 몸이 화면에 선 몸인지 되묻는다. 경기장 행인을 월드 상자로 재서 순서를 맞댄다.
      상자는 원근을 안 타므로 비의 절대값은 다르지만, 넷을 세운 순서는 같아야 한다.
      여기서 어긋나면 위의 수는 화면에 없는 몸을 잰 것이다. */
-  if (live.arena) {
+  if (live && live.arena) {
     const seen = new Set(live.arena.map((p) => p.persona));
     const want = new Set(REPR.map((i) => personaKindAt(i)));
     say("arena:the-pitch-stands-all-four-personas", want.size === 4 && [...want].every((k) => seen.has(k)),
@@ -416,14 +466,14 @@ try {
   // 문신. 0등급이 아래에 있어야 하고 고리 방식보다 위에 있어야 한다.
   /* 부모 판에는 armBox가 없어 같은 상자로 못 잰다. 그러면 고리와 무늬를 맞대는 축이 서지 않으므로
      조용히 넘기는 대신 여기서 끊는다. 계기가 반쪽인 채로 낸 초록은 초록이 아니다. */
-  if (!live.ink || (was && !was.ink)) {
+  if (live && (!live.ink || (was && !was.ink))) {
     console.log("판정 중단. armBox 손잡이가 " + (live.ink ? WAS_REV : "살아 있는 판") + "에 없다. INSTRUMENT DEAD");
     process.exit(2);
   }
-  const bare = live.ink.find((x) => x.grade === 0);
+  const bare = live && live.ink ? live.ink.find((x) => x.grade === 0) : null;
   say("control:the-ink-sample-is-an-arm-not-a-speck", bare && bare.n >= INK_MIN,
     bare ? bare.n + "px opaque inside the upper-arm box " + bare.box.join(",") + " over " + bare.parts + " meshes" : "no bake");
-  for (const x of live.ink) {
+  for (const x of (live && live.ink ? live.ink : [])) {
     if (x.grade === 0) continue;
     say("ink:grade-" + x.grade + "-has-more-texture-than-bare-skin", x.v > bare.v,
       "variance " + x.v.toFixed(1) + " vs bare " + bare.v.toFixed(1));
