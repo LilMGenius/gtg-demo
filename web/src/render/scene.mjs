@@ -9,7 +9,7 @@ import {
   flat, flatVertex, BALL_R, VIEW_X, KICKER_OFF, BALL_PAST, REST_Z, REST_Y,
   R_HALF_W, R_H, SX, SY, MOUTH_X, lerp, ease
 } from './units.mjs';
-import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, pushPose, setPose, KICK_WIND, beatOf } from './objects/actors.mjs';
+import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, pushPose, setPose, poseDist, KICK_WIND, beatOf } from './objects/actors.mjs';
 import { buildPitch, buildPassers, BOX_Z } from './objects/pitch.mjs';
 import { skinAt, placeAt } from '../state/gear.mjs';
 import { gazeMood } from '../ui/lines.mjs';
@@ -225,6 +225,25 @@ export function createScene(canvas) {
      4:2 5:3 6:15 7:22 8:17 9:8 10:10). 이 선에서 74퍼센트가 발등, 26퍼센트가 발 안쪽인데,
      판정이 레벨로 -2에서 +1.2를 얹으므로 낮은 레벨에서는 그 비가 뒤집힌다. */
   const KICK_POWER_AT = 7;
+  /* 착지는 목이 내려오기를 멈춘 프레임이다. 자세가 목표 각도에 도착하는 것과는 다른 순간이다.
+     관절 각도는 실측으로 사건 뒤 8에서 17프레임에 도착하는데, 그 뒤로도 꼬리가 0.8초에 걸쳐 몸통을
+     눕히므로 목은 44에서 50프레임까지 계속 내려간다. 각도로 걸면 아직 떨어지는 중인 몸을 누르게 된다.
+     이만큼은 내려와야 착지라고 부른다. 서서 끝나는 사건의 목은 실측으로 0.03에서 0.09미터 내려가고,
+     바닥에 눕는 사건은 0.35미터 넘게 내려간다. 0.20은 그 사이다. */
+  const LAND_FALL = 0.20;
+  /* 떨어지던 속도가 가장 빨랐던 값의 이 비율 아래로 꺾이면 닿은 것이다. 절대 속도로 걸면 사건마다
+     낙하 속도가 달라 같은 뜻이 안 된다. 실측한 목 속도는 사건에 따라 초속 3에서 11미터로 떨어지고,
+     닿는 프레임에서 한두 프레임 만에 최고값의 10퍼센트대로 꺾인다. 끌려 들어가는 사건만 낙하가 두 번
+     오고, 0.10에서는 두 번째 낙하 끝까지 밀렸다(실측 25프레임, 첫 낙하가 끝나는 자리는 16).
+     0.15는 그 사건까지 첫 접지에서 걸린다. */
+  const LAND_SLOW = 0.15;
+  /* 착지가 있는 사건과 두 발로 끝나는 사건을 가르는 누움. 목과 두 무릎의 수평 거리이고 그늘이
+     이미 쓰던 수다. 도착 프레임에서 잰 열다섯 사건이 두 무리로 갈린다. 서서 끝나는 열은
+     0.118에서 0.507(skied 0.118, catch 0.290, rebound 0.302, distracted 0.325, gloveGone 0.393,
+     talked 0.401, spill 0.419, save 0.483, beat 0.504, charge 0.507)이고, 바닥에 눕는 다섯은
+     0.625에서 1.002(openGoalScored 0.625, reboundMiss 0.693, lost 0.814, downed 0.867,
+     carriedIn 1.002)다. 0.56은 그 사이 빈 구간의 가운데이고 양쪽으로 0.05와 0.07이 남는다. */
+  const LAND_LIE = 0.56;
   // 0.30은 슬로모션으로 읽혔고 0.02는 프레임이 멈춘 것으로 읽혔다. 0.08이 걸리는 느낌이다.
   const HIT_SCALE = 0.08;
 
@@ -516,6 +535,8 @@ const TOUCHED = new Set(['contact']);
   const kickerShadow = blob(0.36);
   // 골반 높이의 기준선. 서 있을 때 값을 그대로 쓰므로 키를 바꿔 끼워도 따라온다.
   let pelvisRest = 0;
+  // 이 프레임의 누움. 목과 두 무릎의 수평 거리이고, 서 있으면 0에 가깝고 누우면 몸길이만큼이다.
+  let lieNow = 0;
   const hipA = new THREE.Vector3();
   const hipB = new THREE.Vector3();
   // 그림자의 방향과 길이를 정하는 축. 목과 두 무릎이 리그의 실재 점 중 가장 먼 양 끝이다.
@@ -1515,6 +1536,9 @@ const TOUCHED = new Set(['contact']);
       /* 예비의 깊이와 잔여의 주기는 포즈가 소유한다(actors.mjs POSE_BEAT). 상수 한 쌍으로 두면
          열두 세이브가 같은 깊이로 되감겼다가 같은 주기로 떨어서, 몸은 열둘인데 박자는 하나다. */
       const beat = beatOf(kpId);
+      /* 자세가 목표에 얼마나 왔는지. 착지를 고르는 것은 이 수가 아니라 목 높이지만, 둘이 언제
+         갈라지는지를 밖에서 볼 수 있어야 이 랩의 판단이 다음 랩에서도 검사된다. */
+      if (tail.aim !== kpId) { tail.aim = kpId; tail.d0 = poseDist(tail.base, kpId); }
       // 손으로 잡는 사건은 접촉이 이미 지나 있어 예비를 넣을 자리가 없다. 넣으면 공이 늦게 붙는다.
       const ANT = INSTANT.has(tail.kind) ? 0 : ANT_FOR;
       const tt = vnow - tail.t0;
@@ -1533,8 +1557,9 @@ const TOUCHED = new Set(['contact']);
         const w = Math.cos(ft * (Math.PI * 2 / beat.per) * (1 + (vy.a - 0.5) * PER_VARY)) * Math.exp(-ft * 1.3);
         kp = pushPose(tail.base, kp, 1 + (0.34 + (vy.b - 0.5) * 0.30) * w);
         // 닿는 순간 몸이 눌린다. 없으면 충돌이 포즈 교체로만 나타난다.
-        // 착지도 같은 순간이다. 몸이 자세에 도착하면서 무게가 바닥에 실리고 몸통이 한 번 눌린다.
-        if (!tail.squashed) { tail.squashed = true; keeperPop = 0.09; landSq = LAND_FOR; }
+        // 착지는 여기가 아니다. 이것은 공이 몸에 닿는 반응이고 착지는 몸이 바닥에 닿는 것이라,
+        // 깊게 무너지는 자세에서는 두 순간이 반 초 가까이 떨어져 있다.
+        if (!tail.squashed) { tail.squashed = true; keeperPop = 0.09; }
       }
       // 몸이 바닥에 닿는 순간 한 번만 흙을 판다. 매 프레임 칠하면 자국이 아니라 진흙탕이 된다.
       // 자국은 몸통이 아니라 뻗은 팔이 닿는 자리에 남는다. 장갑의 실제 좌표로 찍어야
@@ -2107,6 +2132,29 @@ const TOUCHED = new Set(['contact']);
     const axZ = headW.z - footZ;
     // 서 있으면 이 값이 0에 가깝고 완전히 누우면 몸길이만큼 나온다. 1.1m를 완전히 누운 것으로 본다.
     const span = Math.hypot(axX, axZ);
+    // 몸이 얼마나 누웠는가. 그늘이 이미 쓰던 수이고, 착지가 있는 사건과 두 발로 끝나는 사건을 가른다.
+    lieNow = span;
+    /* 착지. 예비가 끝나는 순간이 아니라 떨어지던 몸이 멈춘 순간이다. 둘을 같은 것으로 두면
+       깊게 무너지는 자세일수록 눌림이 일찍 끝나, 바닥에 닿기도 전에 무게가 다 지나가 있다
+       (실측: 자빠짐이 4프레임에 눌리고 몸은 15프레임에 닿았다).
+       무게가 실렸는지는 몸이 누웠는지로 가른다. 두 발로 서서 끝나는 사건에는 실릴 무게가 없다. */
+    if (tail) {
+      /* 목이 얼마나 내려왔고 지금 얼마나 빠르게 내려오는가. 프레임당 변위가 아니라 초속으로 잰다.
+         히트스톱이 걸린 프레임은 세계시간이 8퍼센트로 흐르므로 변위만 보면 떨어지는 중인 몸이
+         멈춘 것으로 읽힌다(실측: 그렇게 걸었더니 자빠짐이 16프레임에, 놓친 공이 8프레임에 눌렸다). */
+      if (tail.neckTop === undefined) tail.neckTop = headW.y;
+      const fell = tail.neckWas === undefined ? 0 : tail.neckWas - headW.y;
+      tail.neckWas = headW.y;
+      tail.mps = stepDt > 0 ? fell / stepDt : 0;
+      tail.peak = Math.max(tail.peak ?? 0, tail.mps);
+      tail.conv = tail.aim && tail.d0 > 0 ? 1 - poseDist(poseNow.keeper, tail.aim) / tail.d0 : 1;
+      if (!tail.landed && tail.neckTop - headW.y >= LAND_FALL && tail.mps <= tail.peak * LAND_SLOW) {
+        tail.landed = true;
+        tail.landLie = span;
+        // 내려온 몸만 무게를 받는다. 두 발로 서서 끝나는 사건에는 실릴 무게가 없다.
+        if (span >= LAND_LIE) landSq = LAND_FOR;
+      }
+    }
     keeperShadow.position.set((headW.x + footX) * 0.5, 0.03, (headW.z + footZ) * 0.5);
     // 로컬 x는 rotation.x=-PI/2를 거쳐 월드 x로, 로컬 y는 월드 -z로 간다. 각도는 그 평면에서 잰다.
     // 5cm 미만은 서 있는 것이다. 그 각을 믿으면 잡음이 원판을 제자리에서 돌린다.
@@ -2457,7 +2505,12 @@ const TOUCHED = new Set(['contact']);
      게이트가 프레임마다 이 수를 적어 두고 사건이 끝난 뒤에 센다. left는 남은 시간이다. */
   window.__squashVis = () => {
     const s = keeper.userData.torso ? keeper.userData.torso.scale : { x: 1, y: 1, z: 1 };
-    return { x: s.x, y: s.y, z: s.z, left: landSq };
+    /* 배율만으로는 눌림이 착지에 맞았는지 못 묻는다. 누움과 내려온 깊이, 그리고 자세가 목표에
+       얼마나 왔는지를 같이 내놓는다. 착지 프레임 자체는 게이트가 __headAt으로 따로 세므로
+       여기서 내놓는 landed는 판정이 아니라 그 두 수를 맞댈 때 쓰는 표식이다. */
+    return { x: s.x, y: s.y, z: s.z, left: landSq, lie: lieNow,
+      fall: tail && tail.neckTop !== undefined ? tail.neckTop - (tail.neckWas ?? tail.neckTop) : 0,
+      conv: tail ? (tail.conv ?? 0) : 0, landed: Boolean(tail && tail.landed) };
   };
 
   // 포즈 게이트는 실루엣 분리도만 잰다. 사지가 화면을 차지하는지는 아무도 재지 않았다.
