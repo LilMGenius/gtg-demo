@@ -73,10 +73,18 @@ const AWAY_BAR = 0.25;
    구현이 스스로 거는 가속 상한은 그 4배(0.117미터)다. 이 바는 6배로, 구현의 상한 위에 있고
    순간이동 아래에 있다. 고친 적 없는 판의 실측 순간이동은 한 프레임에 1.650미터, 곧 56배였다. */
 const STEP_CAP = 0.18;
+// 화면이 거는 복귀 속도 상한과 같은 수(scene.mjs CARRY_MPS_MAX). 어느 거리가 누름 전에 닿을 수
+// 있는지를 이 속도로 가른다. 게이트가 여기서 다른 수를 쓰면 두 자가 서로 다른 몸을 이야기한다.
+const CARRY_MPS_BAR = 7.0;
 // 선호 방향을 놓는 누름. 오른쪽이어야 실측 seed 20에서 공을 손에 쥔 판이 나온다.
 const CARRY_DIR = 1;
-// 잠그지 않은 판을 이만큼 지켜본다. 실측으로 한 판이 12초에서 18초라 판 둘은 들어온다.
-const CARRY_MS = 32000;
+/* 방향을 한 번도 안 누르는 칸. 선호 기본값이 0이라 아무것도 안 누른 사람은 매 구 가운데로 판정되고,
+   그 몸은 x가 정확히 0이고 전진 토글만큼 z로 나간다(main.mjs advance 0.9, scene.mjs 다이빙 절).
+   방향을 누르는 칸 둘은 x가 1.65라 이 깊이축 복귀를 한 번도 안 뽑는다. */
+const CARRY_CENTRE = 0;
+// 잠그지 않은 판을 이만큼 지켜본다. 실측으로 한 판이 12초에서 18초라 판 셋에서 넷이 들어오고,
+// 공을 손에 쥐어 재시작이 짧은 판이 그 안에 하나는 있어야 리셋 갈래를 뽑을 수 있다.
+const CARRY_MS = 52000;
 
 // 되돌릴 판. HEAD로 걸면 이 게이트를 담은 커밋이 들어오는 순간 대조군이 자기를 자기와 맞대고 초록이 된다.
 // 기본값은 복귀 동작이 들어오기 직전 판이다. 바로 앞 커밋으로 걸면 걷기 축은 이미 초록이라
@@ -198,8 +206,9 @@ async function sample(browser, routed, kind, side, walkOff) {
      그래서 횟수가 아니라 판정에 들어간 입력을 보고 멈춘다. */
   let dove = false;
   for (let i = 0; i < 40 && !dove; i += 1) {
+    await padOpen(page);
     await page.keyboard.press(side < 0 ? "ArrowLeft" : "ArrowRight");
-    await page.waitForTimeout(200);
+    await waitFrames(page, 12);
     dove = await page.evaluate((s) => Boolean(window.__lastInput) && window.__lastInput.dive === s, side);
   }
   // 그 구의 사건이 열리는 프레임을 기다린다. 그 프레임의 키퍼는 다이빙을 마치고 착지해 있다.
@@ -231,9 +240,26 @@ async function sample(browser, routed, kind, side, walkOff) {
   return { rec, ref, open, errs, pinned, dove, frozen: { t0, t1 } };
 }
 
+/* 프레임으로 기다린다. 벽시계로 기다리면 부하가 걸린 기계에서 대기 마디를 통째로 지나친다.
+   실측으로 노드 프로세스 122개에 CPU 72퍼센트인 기계에서 여섯 칸 중 셋이 다이빙을 못 걸었고,
+   그 셋은 travel 0.00으로 빨개졌다. pinClock이 세계를 프레임으로 돌리므로 기다림도 프레임이어야
+   같은 판이 같은 수를 낸다. */
+const waitFrames = (page, n) => page.evaluate((k) => new Promise((done) => {
+  const f0 = window.__frames();
+  const tick = () => (window.__frames() >= f0 + k ? done(window.__frames()) : requestAnimationFrame(tick));
+  requestAnimationFrame(tick);
+}), n);
+
+/* 방향키는 대기 마디에서만 먹는다. 그 마디가 열렸는지는 다이브 패드의 zone 단추가 살아 있는지로
+   읽는다(main.mjs setPad). 패드가 열린 프레임에 눌러야 그 누름이 판정에 들어간다. */
+const padOpen = (page) => page.waitForFunction(() => {
+  const z = document.querySelector(".zone");
+  return Boolean(z) && !z.disabled;
+}, null, { timeout: 60000, polling: "raf" });
+
 /* 잠그지 않은 한 판. 선호를 놓고 손을 뗀 뒤, 리셋이 복귀 도중이나 그 전에 오는 판 하나를 고른다.
    세계를 안 멈추므로 프레임이 아니라 공과 꼬리가 시각을 알려 준다. */
-async function carrySample(browser, routed, seed) {
+async function carrySample(browser, routed, seed, dir, home) {
   const ctx = await browser.newContext({ viewport: { width: W, height: H } });
   await pinClock(ctx, STEP);
   const page = await ctx.newPage();
@@ -243,7 +269,8 @@ async function carrySample(browser, routed, seed) {
   for (const [f, body] of routed) {
     await page.route("**/" + f, (r) => r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body }));
   }
-  await page.goto("http://127.0.0.1:10310/web/index.html?seed=" + seed + "&vary=0&preset=" + CARRY_PRESET, { waitUntil: "load" });
+  await page.goto("http://127.0.0.1:10310/web/index.html?seed=" + seed + "&vary=0&preset=" + CARRY_PRESET
+    + (home ? "&home=" + home : ""), { waitUntil: "load" });
   await page.waitForSelector("#go", { timeout: 15000 });
   await page.click("#go", { force: true });
   for (let i = 0; i < 6; i += 1) {
@@ -253,22 +280,35 @@ async function carrySample(browser, routed, seed) {
     await page.waitForFunction((n) => window.__frames() >= n, (await page.evaluate(() => window.__frames())) + CARD_STEPS, { timeout: 20000 });
   }
   await page.evaluate(() => (window.__swayPin ? window.__swayPin(0) : -1));
-  let pref = false;
+  let pref = dir === 0;
   for (let i = 0; i < 40 && !pref; i += 1) {
-    await page.keyboard.press(CARRY_DIR < 0 ? "ArrowLeft" : "ArrowRight");
-    await page.waitForTimeout(200);
-    pref = await page.evaluate((d) => Boolean(window.__lastInput) && window.__lastInput.dive === d, CARRY_DIR);
+    await padOpen(page);
+    await page.keyboard.press(dir < 0 ? "ArrowLeft" : "ArrowRight");
+    await waitFrames(page, 12);
+    pref = await page.evaluate((d) => Boolean(window.__lastInput) && window.__lastInput.dive === d, dir);
   }
-  await page.evaluate(() => {
+  await page.evaluate((centre) => {
     window.__w14c = [];
+    /* 전진 토글은 nextShot이 매 구 0으로 되돌린다(main.mjs advance = 0). 가운데 칸은 판마다 대기
+       마디가 열린 뒤에 다시 켜야 몸이 깊이로 나간다. 방향은 한 번도 안 누른다. */
+    let armed = false;
     const tick = () => {
       const k = window.__keeperPos();
       const b = window.__ballPos();
-      window.__w14c.push({ f: window.__frames(), k: window.__tailKind(), a: window.__tailAge(), x: k.x, z: k.z, bz: b.z, t: window.__camDbg().vnow });
+      const zone = document.querySelector(".zone");
+      const open = Boolean(zone) && !zone.disabled;
+      if (centre && open && !armed) {
+        const out = document.getElementById("out");
+        if (out && !out.classList.contains("on")) out.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+        armed = true;
+      }
+      if (!open) armed = false;
+      window.__w14c.push({ f: window.__frames(), k: window.__tailKind(), a: window.__tailAge(), x: k.x, z: k.z, bz: b.z,
+        t: window.__camDbg().vnow, w: window.__backVis ? (window.__backVis() || {}).why || null : "no-hook" });
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
-  });
+  }, dir === 0);
   await page.waitForTimeout(CARRY_MS);
   const rec = await page.evaluate(() => window.__w14c);
   await ctx.close();
@@ -276,7 +316,7 @@ async function carrySample(browser, routed, seed) {
 }
 
 // 한 판의 궤적을 수로 옮긴다. 리셋 프레임과 다음 구의 발 떠나는 프레임이 이 표본의 두 경계다.
-function analyseCarry(rec) {
+function analyseCarry(rec, branch) {
   const off = (r) => Math.hypot(r.x, r.z - KEEPER_Z);
   const rounds = [];
   let open = -1;
@@ -284,8 +324,13 @@ function analyseCarry(rec) {
     if (!rec[i - 1].k && rec[i].k) open = i;
     if (rec[i - 1].k && !rec[i].k && open > 0) { rounds.push([open, i]); open = -1; }
   }
-  // 리셋 순간에 집을 비운 판만 이 절을 지난다. 그런 판이 없으면 마지막 판을 그대로 낸다.
-  let pick = rounds.find(([, r0]) => off(rec[r0 - 1]) >= AWAY_BAR) || rounds[rounds.length - 1];
+  /* 리셋 순간에 집을 비웠고 그때 원하는 갈래로 복귀가 열린 판을 고른다. 거리만 보고 고르면
+     판 시각이 조금 밀렸을 때 다른 갈래의 판이 뽑히고, 이 랩이 낸 갈래는 아무도 안 지나는데
+     게이트는 초록이 된다(실측: 채취를 프레임으로 바꾸자 앞 칸이 3.54초 판에서 5.38초 판으로 옮겨 갔다).
+     그런 판이 없으면 거리로만 고른 판을 내고, 갈래 축이 그 사실을 빨갛게 말한다. */
+  const okAway = ([, r0]) => off(rec[r0 - 1]) >= AWAY_BAR;
+  const okBranch = ([, r0]) => rec[Math.min(rec.length - 1, r0 + 1)].w === branch;
+  let pick = rounds.find((r) => okAway(r) && okBranch(r)) || rounds.find(okAway) || rounds[rounds.length - 1];
   if (!pick) return null;
   const [o, r0] = pick;
   let strike = -1, arrive = -1, home = -1, worst = 0, worstAt = -1;
@@ -296,16 +341,25 @@ function analyseCarry(rec) {
   const steps = [];
   for (let i = o + 1; i <= last; i += 1) {
     const d = off(rec[i - 1]) - off(rec[i]);
-    if (d > worst) { worst = d; worstAt = i; }
     if (d > 0.002) steps.push(d);
   }
   steps.sort((a, b) => a - b);
+  /* 최악 프레임은 고른 판이 아니라 기록 전체에서 찾는다. 순간이동은 어느 판에서 나든 순간이동이다.
+     새 꼬리가 열리는 프레임만 뺀다. 그 프레임은 이동이 아니라 컷이고, 새 꼬리의 연출이 몸을
+     자기 시작 자세로 다시 세운다(실측: 잡기에서 돌진으로 넘어가며 z가 한 프레임에 0.9미터 줄었다).
+     그 컷은 이 절이 아니라 꼬리 연출의 문제이고 이 랩에서 안 건드린다. */
+  for (let i = 1; i < rec.length; i += 1) {
+    if (rec[i].k && rec[i].k !== rec[i - 1].k) continue;
+    const d = off(rec[i - 1]) - off(rec[i]);
+    if (d > worst) { worst = d; worstAt = i; }
+  }
   // 다음 구를 손가락이 눌러야 하는 순간. main.mjs가 비행의 72퍼센트에 둔다.
   const flight = arrive > 0 && strike > 0 ? rec[arrive].t - rec[strike].t : -1;
   return {
-    kind: rec[o].k, landed: off(rec[o]), resetAge: rec[r0 - 1].a, awayAtReset: off(rec[r0 - 1]),
+    rounds: rounds.length, kind: rec[o].k, landed: off(rec[o]), resetAge: rec[r0 - 1].a, awayAtReset: off(rec[r0 - 1]),
     afterReset: off(rec[r0]), worst, worstAt: worstAt > 0 ? rec[worstAt].f : -1,
     median: steps.length ? steps[Math.floor(steps.length / 2)] : 0, n: steps.length,
+    why: rec[Math.min(rec.length - 1, r0 + 1)].w,
     homeIn: home > 0 ? rec[home].t - rec[r0].t : -1,
     strikeIn: strike > 0 ? rec[strike].t - rec[r0].t : -1,
     pressIn: flight > 0 ? 0.72 * flight : -1
@@ -371,23 +425,39 @@ try {
   }
   /* 잠그지 않은 칸 둘. 하나는 리셋이 복귀가 열리기 전에 오고(실측 꼬리 나이 3.54초, 복귀는 3.6초),
      하나는 걷는 도중에 온다(실측 5.33초에 1.13미터 남음). 두 자리가 이 절의 두 갈래다. */
-  for (const [tag, seed] of [["carry-before-the-walk", 20], ["carry-mid-walk", 7]]) {
-    const s = await carrySample(browser, routed, seed);
+  /* 앞 칸은 복귀를 8초로 밀어 다음 구가 반드시 먼저 서게 한다. 실측 재시작이 5.38초라 여유가
+     2.6초이고, 밀지 않으면 3.63초와 3.6초 사이 0.03초에 갈래가 걸린다.
+     가운데 칸은 방향을 한 번도 안 눌러 x가 정확히 0인 몸으로 깊이축 복귀만 뽑는다. */
+  for (const [tag, seed, dir, branch, home] of [["carry-before-the-walk", 20, CARRY_DIR, "reset", 8],
+    ["carry-mid-walk", 7, CARRY_DIR, "tail", 0], ["carry-centre-depth", 20, CARRY_CENTRE, "tail", 0]]) {
+    const s = await carrySample(browser, routed, seed, dir, home);
     for (const e of s.errs) errAll.push(e);
-    const a = analyseCarry(s.rec);
+    const a = analyseCarry(s.rec, branch);
     if (!a) { say("instrument:the-next-ball-arrived-while-he-was-off-his-line " + tag, false, "no round closed in " + s.rec.length + " frames"); continue; }
     console.log("  " + tag + " seed " + seed + " tail " + a.kind + " landed " + a.landed.toFixed(2)
       + "m reset@" + a.resetAge.toFixed(2) + "s away " + a.awayAtReset.toFixed(3) + "->" + a.afterReset.toFixed(3)
-      + " worst " + a.worst.toFixed(4) + "m/f at " + a.worstAt + " median " + a.median.toFixed(4) + " n " + a.n
+      + " worst " + a.worst.toFixed(4) + "m/f at " + a.worstAt + " median " + a.median.toFixed(4) + " n " + a.n + " branch " + a.why
       + " home +" + a.homeIn.toFixed(2) + "s press +" + a.pressIn.toFixed(2) + "s strike +" + a.strikeIn.toFixed(2) + "s");
     say("instrument:the-next-ball-arrived-while-he-was-off-his-line " + tag, a.awayAtReset >= AWAY_BAR && s.pref,
       a.kind + " restarted at tail age " + a.resetAge.toFixed(2) + "s with him " + a.awayAtReset.toFixed(2) + "m off his line");
     say("carry:no-frame-crosses-more-than-the-walk-can-step " + tag, a.worst <= STEP_CAP,
       "worst homeward frame " + a.worst.toFixed(3) + "m against a " + STEP_CAP + "m cap, walking median "
       + a.median.toFixed(4) + "m over " + a.n + " frames");
-    say("carry:he-is-home-before-the-next-ball-needs-a-press " + tag, a.homeIn >= 0 && a.pressIn > 0 && a.homeIn <= a.pressIn,
+    /* 손가락이 누르는 순간까지 걸어올 수 있는 거리인가부터 묻는다. 상한 속도로도 못 닿는 거리면
+       그 판은 공이 발을 떠나는 순간을 기준으로 묻는다. 한눈판 복귀 3.29미터는 0.46초에 초속 7미터로도
+       못 오고, 그 거리를 그 안에 오게 만들면 그것이 다시 미끄러짐이다. */
+    const reach = a.pressIn * CARRY_MPS_BAR >= a.awayAtReset;
+    say("carry:he-is-home-before-the-next-ball-needs-a-press " + tag,
+      a.homeIn >= 0 && a.pressIn > 0 && a.homeIn <= (reach ? a.pressIn : a.strikeIn),
       "home " + a.homeIn.toFixed(2) + "s after the restart, press window at " + a.pressIn.toFixed(2)
-      + "s, ball struck at " + a.strikeIn.toFixed(2) + "s");
+      + "s, ball struck at " + a.strikeIn.toFixed(2) + "s, " + a.awayAtReset.toFixed(2) + "m "
+      + (reach ? "is" : "is not") + " reachable inside the press window");
+    /* 어느 갈래를 지났는지를 못 박는다. 이것이 없으면 판 시각이 60밀리초만 밀려도 앞 칸이
+       걷는 도중 갈래로 조용히 옮겨 가고, 이 랩이 새로 낸 갈래는 아무도 안 지나는데 게이트는 초록이다.
+       갈래 이름은 화면이 직접 낸다(scene.mjs __backVis). 게이트가 상수를 베껴 쓰면 그 베낌이 또 낡는다. */
+    say("branch:the-cell-ran-the-expected-return-branch " + tag, a.why === branch,
+      "opened by " + a.why + ", expected " + branch + ", restart at tail age " + a.resetAge.toFixed(2)
+      + "s over " + a.rounds + " rounds");
   }
   say("console:no-errors", errAll.length === 0, errAll.slice(0, 2).join(" | ") || "clean");
 } finally {
@@ -402,7 +472,8 @@ if (fails.length) console.log(fails.map((r) => "  FAIL " + r[1] + " " + r[2]).jo
 console.log("표본 범위: 사건 " + EVENTS.length + " x 좌우 " + SIDES.length + " + 정지 폴백 1, 프레임 폭 " + STEP.toFixed(4) + "초");
 if (WAS) {
   // 부모 판 대조군. 걷기와 일어서기 축이 그 판에서 빨개져야 이 자가 무언가를 가른 것이다.
-  const red = fails.filter((r) => r[1].startsWith("walk:") || r[1].startsWith("rise:") || r[1].startsWith("carry:")).length;
+  const red = fails.filter((r) => r[1].startsWith("walk:") || r[1].startsWith("rise:") || r[1].startsWith("carry:")
+    || r[1].startsWith("branch:")).length;
   console.log(red > 0 ? "walkback CONTROL PASS " + red + " walk axes red on " + WAS_REV
     : "walkback CONTROL FAIL 0 walk axes red on " + WAS_REV);
   process.exitCode = red > 0 ? 0 : 1;
