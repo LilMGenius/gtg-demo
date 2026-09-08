@@ -467,7 +467,24 @@ export function headBox(kind, keeper, look, over) {
   const mid = to(at.clone().project(cam));
   const top = to(crown.clone().project(cam));
   const ry = Math.abs(mid.y - top.y);
+  /* 눈과 입이 그 상자 안 어디에 섰는지. 머리 상자만으로는 볼을 못 자른다.
+     볼은 눈 아래에서 입 위까지의 띠인데 입은 렌즈에 가장 가까워서 같은 높이의 옆 얼굴보다
+     아래에 맺힌다. 그 두 자리를 화소에서 찾으면 눈동자와 외곽선이 거의 같은 색이라 서로 안 갈린다. */
+  const spot = new THREE.Vector3();
+  const eyes = (head.userData.eyes || []).map((e) => to(e.getWorldPosition(spot).project(cam)));
+  const mo = head.userData.mouth;
+  let mouth = null;
+  if (mo) {
+    mo.getWorldPosition(spot);
+    const half = mo.geometry.parameters.radius * mo.scale.y;
+    const lip = spot.clone();
+    lip.y += half;
+    const jaw = spot.clone();
+    jaw.y -= half;
+    const hit = to(spot.clone().project(cam));
+    mouth = { x: hit.x, y: hit.y, top: to(lip.project(cam)).y, bot: to(jaw.project(cam)).y };
+  }
   // 쓴 거리를 같이 돌려준다. 계기가 반사실을 구울 때 겨냥 상수를 옮겨 적지 않아도 된다.
-  return { x: mid.x, y: mid.y, ry, rx: ry * (R.domElement.height / R.domElement.width),
+  return { x: mid.x, y: mid.y, ry, rx: ry * (R.domElement.height / R.domElement.width), eyes, mouth,
     dist: Object.assign({}, AIM[kind], over || {}).dist, url: R.domElement.toDataURL("image/png") };
 }

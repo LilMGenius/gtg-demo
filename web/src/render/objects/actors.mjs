@@ -500,22 +500,26 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
   const shellColors = [hairTone || 0x2b1d14, 0x5a4030, 0x2a2018];
   /* 수염과 묶은 머리. 머리색과 피부색만으로는 백 명이 다섯 얼굴로 뭉친다.
      이 둘은 실루엣을 바꾸므로 카드 크기에서도, 경기장의 작은 머리에서도 갈린다.
-     수염은 턱을 감싸는 얇은 껍데기다. 1은 짧고 2는 덥수룩해서 볼까지 올라온다. */
+     수염은 턱과 인중에 붙는 껍데기다. 1은 짧고 2는 덥수룩해서 조금 더 서고 넓다. */
   const beard = face && face.beard ? face.beard : 0;
   if (beard) {
-    /* 수염은 눈 아래에서 시작한다. 덥수룩한 단계가 위도 0.41파이에서 시작해 정수리 쪽 y가 +0.18r였고,
-       흰자 바닥은 -0.10r이라 눈 바깥 절반과 볼 전체가 수염 색으로 덮여 초상에서 두건으로 읽혔다.
-       두 조각이다. 턱선 고리는 0.54파이(y -0.125r)에서 입 높이까지 내려오며 정면에 입 창을 남기고,
-       턱 덮개는 그 아래를 창 없이 감싼다. 창은 입 반폭 0.21r을 덮지 않는 0.28r이다.
-       한 조각으로 창을 끝까지 내면 턱 밑이 비어 수염이 아니라 구레나룻 띠로 읽힌다. */
-    const c = beard === 2 ? { rad: 1.06, len: 0.36, gap: 0.20 } : { rad: 1.02, len: 0.30, gap: 0.24 };
-    // 입 웨지의 아래 끝이 -0.49r이고 0.66파이가 -0.49r이다. 고리는 거기서 끝나고 덮개가 잇는다.
-    const jawEnd = 0.66;
-    const ring = new THREE.SphereGeometry(r * c.rad, 12, 6, Math.PI * (0.5 + c.gap * 0.5 + (dir > 0 ? 0 : 1)),
-      Math.PI * (2 - c.gap), Math.PI * 0.54, Math.PI * (jawEnd - 0.54));
+    /* 앞의 턱선 고리는 위도 0.54파이에서 시작해 입 창만 남기고 머리를 한 바퀴 감았고,
+       그 띠가 정면에서 양볼에 어두운 조각 둘로 맺혀 파운더가 볼에 김이 붙었다고 짚었다.
+       실측으로 조각의 위 끝이 머리 중심에서 반지름의 0.21 아래인데 입 윗선은 0.40 아래라
+       조각이 볼 한가운데 섰다. 귀에서 내려오는 구레나룻도 그 자리에서 시작하지 않는다.
+       짧은 수염은 입 아래 턱과 인중 두 덩이로 읽힌다. 그 둘만 남긴다.
+       턱 덮개는 입 아랫선 -0.49r 바로 아래인 -0.52r에서 시작해 머리 밑동까지 감싼다.
+       인중은 입 윗선 -0.31r 위 한 줄이고 폭은 입 반폭 0.21r보다 조금 넓다.
+       볼 높이에는 어느 등급도 아무것도 안 선다. */
+    const c = beard === 2 ? { rad: 1.06, mus: 0.16 } : { rad: 1.02, mus: 0.14 };
+    // 껍데기는 y를 0.06r 내려 쓰므로 높이를 위도로 바꿀 때 그만큼 되돌린다.
+    const lat = (y) => Math.acos((y + 0.06) / c.rad);
     const chin = new THREE.SphereGeometry(r * c.rad, 12, 6, 0, Math.PI * 2,
-      Math.PI * jawEnd, Math.PI * (0.54 + c.len - jawEnd));
-    for (const g of [ring, chin]) {
+      lat(-0.52), Math.PI - lat(-0.52));
+    const mus = new THREE.SphereGeometry(r * c.rad, 12, 3,
+      Math.PI * (0.5 - c.mus * 0.5 + (dir > 0 ? 0 : 1)), Math.PI * c.mus,
+      lat(-0.20), lat(-0.31) - lat(-0.20));
+    for (const g of [chin, mus]) {
       g.scale(1, 1, c.rad);
       g.translate(0, -r * 0.06, 0);
       shellGeos.push(g);
