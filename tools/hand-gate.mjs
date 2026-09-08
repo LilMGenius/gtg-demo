@@ -39,6 +39,18 @@ try {
     await page.waitForFunction((n) => document.querySelectorAll("#pips i.gone, #pips i.save").length > n, before, { timeout: ROUND_MS });
     await page.waitForFunction(() => document.querySelectorAll(".zone:not([disabled])").length === 3, null, { timeout: ROUND_MS });
   };
+  // 입력창이 닫힌 순간. 세 판이 모두 비활성이면 그 구는 이미 커밋됐고 판정은 굴러갔다.
+  const shut = (page) => page.waitForFunction(() => [...document.querySelectorAll(".zone")].every((b) => b.disabled), null, { timeout: ROUND_MS });
+  /* 창 밖의 판을 누르는 자리. 비활성 버튼은 click의 활성 검사에서 멈추므로 좌표로 직접 누른다. 실측으로
+     크롬은 비활성 버튼에도 pointerdown과 pointerup을 그대로 보내고 click과 mousedown만 죽이므로, 실제
+     손가락이 보내는 것과 같은 이벤트가 화면에 닿는다. dispatchEvent는 맞아도 히트테스트를 안 지난다. */
+  const tap = async (page, dive) => {
+    const box = await page.locator('.zone[data-dive="' + dive + '"]').boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.up();
+  };
+  const pressed = (page) => page.evaluate(() => [...document.querySelectorAll(".zone")].map((b) => ({ dive: Number(b.dataset.dive), pressed: b.getAttribute("aria-pressed") })));
   // 창이 닫히면 #auto와 #out은 -96px에서 제자리로 .24s 동안 미끄러져 돌아온다.
   // 그 사이 두 기둥은 화면 밖에 있고, force는 가려진 것을 건너뛸 뿐 누를 자리가 화면 안인지는 그대로 본다.
   // 한가한 기계에서는 닫자마자 눌러도 맞아 초록이 나왔고, 기계가 바쁘면 움직이는 중간에 자를 대서
@@ -89,6 +101,34 @@ try {
       }
       check("hand:a-clicked-left-preference-survives-three-untapped-rounds",
         dives.length === 3 && dives.every((d) => d === -1), dives.join(","));
+      await ctx.close();
+    }
+
+    /* 축 10. 선호는 킥과 킥 사이에도 바뀐다. 방향 선택이 킥 앞에만 열려 있으면 막는 중에 마음이 바뀐 사람은
+       다음 창이 열릴 때까지 기다려야 한다. 고정 선호는 이 구의 입력이 아니라 상태이므로 창 밖에서도 옮겨
+       가야 하고, 이미 굴린 이 구의 판정 입력은 그대로여야 한다. 창 안의 누름은 축 2가 대조군으로 잡는다. */
+    {
+      const { ctx, page } = await open();
+      // 첫 구는 손 대지 않고 흘린다. 그 구의 입력은 시작 선호인 가운데이고, 커밋된 뒤에 눌러야 창 밖이다.
+      await shut(page);
+      const flying = await page.evaluate(() => window.__lastInput);
+      await tap(page, 1);
+      const moved = await page.evaluate(() => ({
+        shut: [...document.querySelectorAll(".zone")].every((b) => b.disabled),
+        dive: window.__lastInput?.dive,
+      }));
+      const movedMarks = await pressed(page);
+      await waitRound(page);
+      const openedMarks = await pressed(page);
+      await waitRound(page);
+      const rolled = await page.evaluate(() => window.__lastInput);
+      const onRight = (marks) => marks.length === 3 && marks.every((v) => v.pressed === (v.dive === 1 ? "true" : "false"));
+      check("hand:the-preference-can-change-between-kicks",
+        flying?.dive === 0 && moved.shut && moved.dive === 0 && onRight(movedMarks)
+          && onRight(openedMarks) && rolled?.dive === 1 && rolled?.auto === false,
+        JSON.stringify({ flying: flying?.dive, held: moved.dive, shut: moved.shut,
+          pressed: movedMarks.map((v) => v.pressed).join("/"), opened: openedMarks.map((v) => v.pressed).join("/"),
+          next: rolled?.dive, auto: rolled?.auto }));
       await ctx.close();
     }
 
@@ -222,10 +262,10 @@ try {
       await ctx.close();
     }
     check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
-    console.log("표본 범위: veteran 손 모드 5구, 왼쪽 선호 뒤 무입력 3구, 크레딧 봇 2구, 저장 재적재와 두 옛 저장, 740x360·1280x720 패드");
+    console.log("표본 범위: veteran 손 모드 5구, 왼쪽 선호 뒤 무입력 3구, 창 밖 오른쪽 누름 뒤 두 구, 크레딧 봇 2구, 저장 재적재와 두 옛 저장, 740x360·1280x720 패드");
     if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
     if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
-    console.log(fails.length ? "hand FAIL " + fails.length : "hand PASS 9");
+    console.log(fails.length ? "hand FAIL " + fails.length : "hand PASS 10");
     if (fails.length) process.exitCode = 1;
   }
 } finally {

@@ -396,11 +396,19 @@ function setPad(on) {
 function markDive(dive, bot) {
   for (const b of document.querySelectorAll('.zone')) {
     const on = dive !== null && Number(b.dataset.dive) === dive;
+    b.classList.toggle('bot', on && bot);
+    b.querySelector('.bot').hidden = !(on && bot);
+  }
+  markPref();
+}
+
+/* 선호 표시는 이 구가 그린 배지와 따로 움직인다. 선호만 바뀔 때 배지까지 다시 그리면 봇이 고른 쪽
+   표시가 그 구 중간에 지워진다. */
+function markPref() {
+  for (const b of document.querySelectorAll('.zone')) {
     const pref = Number(b.dataset.dive) === state.pref;
     b.classList.toggle('pref', pref);
-    b.classList.toggle('bot', on && bot);
     b.setAttribute('aria-pressed', String(pref));
-    b.querySelector('.bot').hidden = !(on && bot);
   }
 }
 
@@ -566,9 +574,18 @@ function commit(dive) {
 // 패드를 누른 순간 다음 무입력 구에도 남을 선호를 저장한다.
 function chooseDive(dive) {
   if (state.phase !== 'wait') return;
+  setPref(dive);
+  commit(dive);
+}
+
+/* 방향 선택은 판이 사는 동안 언제든 바뀐다. 킥 앞에만 열어 두면 막는 중에 마음이 바뀐 사람이 다음 창까지
+   기다려야 하는데, 고정 선호는 이 구의 입력이 아니라 상태다. 이미 굴린 이 구의 판정은 안 건드리고 표시만
+   옮긴다. 실측으로 창 밖 누름은 aria-pressed를 false/true/false에 그대로 남긴다. 지금은 false/false/true로
+   옮겨 가고 그 다음 구가 새 선호로 굴러간다. */
+function setPref(dive) {
   state.pref = dive;
   persist();
-  commit(dive);
+  markPref();
 }
 
 // 자막은 체인 순서대로 한 줄씩 나온다. 반전이 반전을 덮으려면 한꺼번에 오면 안 된다.
@@ -2318,6 +2335,12 @@ for (const b of document.querySelectorAll('.zone')) {
     if (state.phase === 'caption') return state.skip && state.skip();
     chooseDive(Number(b.dataset.dive));
   };
+  /* 누름이 끝난 자리가 다음 구의 선호다. 창 안에서는 chooseDive가 같은 값을 이미 세워 두므로 이 줄이
+     실제로 움직이는 것은 창이 닫혀 있을 때뿐이고, 그때 흐린 화살표를 눌러도 표시가 바로 옮겨 간다. 누른
+     순간이 아니라 손가락이 올라오는 순간을 읽는 이유는, 창 안에서는 누른 시각이 곧 입력이라 pointerdown이
+     판정을 굴려야 하지만 창 밖에는 잴 시각이 없어서다. 비활성 버튼에도 pointerdown과 pointerup은 그대로
+     오고 click과 mousedown만 안 온다(실측). 봇 모드는 봇이 대신 고르므로 그대로 둔다. */
+  b.onpointerup = () => { if (!state.auto) setPref(Number(b.dataset.dive)); };
 }
 const autoBtn = el('auto');
 autoBtn.classList.toggle('on', state.auto);
