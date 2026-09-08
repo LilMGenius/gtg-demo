@@ -261,6 +261,143 @@ try {
   check("hover:the-live-view-moves-into-the-card", spin.moved, String(spin.moved));
   check("hover:the-item-turns-while-hovered", spin.turned, String(spin.turned));
   check("hover:the-live-view-leaves-when-the-pointer-does", spin.left === true, String(spin.left));
+
+  /* 위의 세 축은 캔버스가 카드 안으로 들어왔는지만 묻는다. 그래서 캔버스가 정지 그림 아래
+     칸에 서서 상자 밖으로 잘려도 초록이 났다. 실측: 호버 한 프레임 뒤 .shot 격자가 94.8px
+     두 줄로 갈려 정지 그림이 124.9px에서 97.0px로 줄고, 캔버스는 y=318.7에 서서 상자
+     아래변 348.8 밖으로 밀렸다. 눈에 닿은 것은 회전이 아니라 살짝 올라간 정지 그림이었다.
+     그래서 여기는 누가 칸을 차지했는지를 묻는다. 정지 그림이 비켰는가, 캔버스가 칸을 채웠는가. */
+  /* 캔버스가 정지 그림이 섰던 자리를 그대로 받는가를 잰다. 견주는 상대가 상자 안쪽이 아니라
+     정지 그림인 이유는, 정지 그림 자체가 안쪽 상자와 안 맞기 때문이다. 실측: 장비 선반은
+     208.46x124.87로 안쪽 상자 208.50x124.91보다 0.04px 작고, 봇과 버프 선반은
+     208.48x126.55로 1.64px 크다. 굽는 판이 448x205와 448x269로 달라 격자 줄 높이가
+     122.70px과 124.39px로 갈리기 때문이다. 안쪽 상자를 1px 안으로 맞추라고 하면 겹침을
+     고친 뒤에도 봇 선반만 1.64px로 빨개지는데, 그것은 이 자가 잡으려는 겹침이 아니라
+     원래부터 있던 줄 높이 몫이다. 그래서 자리는 정지 그림과 견주고, 안쪽 상자는 2px 안에서
+     덮였는지만 본다. 캔버스가 반 칸에 머물거나 상자 밖으로 밀리면 두 수가 같이 크게 벌어진다. */
+  const CELL_SLACK = 1;
+  const CELL_SPILL = 2;
+  /* 도는 것을 증명하는 화소 문턱. 8초 한 바퀴에서 0.5초는 22.5도라 옆면이 크게 바뀐다.
+     채널 최대 차 8은 압축 잔파동과 안티에일리어싱 위다. 바닥은 둘로 잡는다. 안 도는 이웃 칸을
+     같은 간격으로 두 번 찍은 몫과, 그 몫이 0으로 나올 때를 받는 고정값 0.02다. */
+  const TURN_DELTA = 8;
+  const TURN_SHARE = 0.02;
+  const pngOf = (box) => box.screenshot({ timeout: 8000 }).then((x) => x.toString("base64"));
+  const moveOf = (one, two) => p.evaluate(([a, c, d]) => Promise.all([a, c].map((s) => new Promise((res) => {
+    const im = new Image();
+    im.onload = () => {
+      const cv = document.createElement("canvas");
+      cv.width = im.width; cv.height = im.height;
+      const g = cv.getContext("2d");
+      g.drawImage(im, 0, 0);
+      res(g.getImageData(0, 0, im.width, im.height));
+    };
+    im.src = "data:image/png;base64," + s;
+  }))).then(([u, v]) => {
+    if (u.width !== v.width || u.height !== v.height) return -1;
+    let n = 0;
+    for (let k = 0; k < u.data.length; k += 4) {
+      const m = Math.max(Math.abs(u.data[k] - v.data[k]), Math.abs(u.data[k + 1] - v.data[k + 1]), Math.abs(u.data[k + 2] - v.data[k + 2]));
+      if (m > d) n += 1;
+    }
+    return n / (u.width * u.height);
+  }), [one, two, TURN_DELTA]);
+
+  // 두 장이 필요하다. 하나는 호버해서 도는 칸, 하나는 안 도는 이웃 칸이라 바닥이 된다.
+  const pick = await p.evaluate(() => {
+    const cards = [...document.querySelectorAll("#shop .rack .card")];
+    const a = cards.findIndex((c) => c.querySelector(".shot img"));
+    return { a, b: cards.findIndex((c, n) => n !== a && c.querySelector(".shot img")), all: cards.length };
+  });
+  const swap = await p.evaluate((n) => {
+    const card = document.querySelectorAll("#shop .rack .card")[n];
+    const shot = card.querySelector(".shot");
+    const box = (e) => { const q = e.getBoundingClientRect(); return { x: +q.x.toFixed(2), y: +q.y.toFixed(2), w: +q.width.toFixed(2), h: +q.height.toFixed(2) }; };
+    const rest = box(shot.querySelector("img"));
+    card.dispatchEvent(new PointerEvent("pointerenter", { bubbles: false }));
+    return new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(() => {
+      /* 상자 자체가 아니라 상자 안쪽과 견준다. 테두리 2px은 칸의 몫이 아니라 상자의 몫이고,
+         자식은 그 안에만 설 수 있어 상자 밖변으로 재면 채운 칸도 2px씩 모자라게 읽힌다. */
+      const s = getComputedStyle(shot);
+      const q = shot.getBoundingClientRect();
+      const in4 = ["Top", "Right", "Bottom", "Left"].map((k) => parseFloat(s["border" + k + "Width"]) + parseFloat(s["padding" + k]));
+      const cell = { x: +(q.x + in4[3]).toFixed(2), y: +(q.y + in4[0]).toFixed(2), w: +(q.width - in4[1] - in4[3]).toFixed(2), h: +(q.height - in4[0] - in4[2]).toFixed(2) };
+      const img = shot.querySelector("img");
+      const cv = shot.querySelector("canvas");
+      const cs = img ? getComputedStyle(img) : null;
+      const ir = img ? box(img) : { w: 0, h: 0 };
+      const cr = cv ? box(cv) : null;
+      const gap = cr ? Math.max(Math.abs(cr.x - rest.x), Math.abs(cr.y - rest.y), Math.abs(cr.w - rest.w), Math.abs(cr.h - rest.h)) : -1;
+      const bare = cr ? +Math.max(cell.w - cr.w, cell.h - cr.h).toFixed(2) : 999;
+      res({ rest, ir, cr, cell, gap, bare, hidden: !img || cs.display === "none" || cs.visibility === "hidden" || ir.w * ir.h === 0,
+        vis: cs ? cs.display + "/" + cs.visibility : "no img" });
+    })));
+  }, pick.a);
+  check("thumb:the-spin-replaces-the-still", swap.hidden && swap.gap >= 0 && swap.gap <= CELL_SLACK && swap.bare <= CELL_SPILL,
+    "card " + pick.a + " of " + pick.all + ": still " + swap.vis + " " + swap.ir.w + "x" + swap.ir.h
+    + " (resting " + swap.rest.w + "x" + swap.rest.h + "), canvas "
+    + (swap.cr ? swap.cr.w + "x" + swap.cr.h + " off that slot by " + swap.gap.toFixed(2) + "px, short of the "
+      + swap.cell.w + "x" + swap.cell.h + " inner box by " + swap.bare + "px" : "not in the box"));
+
+  const liveOne = await pngOf(p.locator("#shop .rack .card").nth(pick.a).locator(".shot"));
+  const stillOne = await pngOf(p.locator("#shop .rack .card").nth(pick.b).locator(".shot"));
+  await p.waitForTimeout(500);
+  const liveTwo = await pngOf(p.locator("#shop .rack .card").nth(pick.a).locator(".shot"));
+  const stillTwo = await pngOf(p.locator("#shop .rack .card").nth(pick.b).locator(".shot"));
+  const live = await moveOf(liveOne, liveTwo);
+  const still = await moveOf(stillOne, stillTwo);
+  check("thumb:the-spin-actually-turns", live > still + TURN_SHARE,
+    (live * 100).toFixed(1) + "% of the box moved in 500ms, a resting neighbour " + (still * 100).toFixed(1)
+    + "%, floor " + ((still + TURN_SHARE) * 100).toFixed(1) + "%");
+
+  const back = await p.evaluate((n) => {
+    const card = document.querySelectorAll("#shop .rack .card")[n];
+    const shot = card.querySelector(".shot");
+    card.dispatchEvent(new PointerEvent("pointerleave", { bubbles: false }));
+    return new Promise((res) => setTimeout(() => {
+      const img = shot.querySelector("img");
+      const q = img ? img.getBoundingClientRect() : { width: 0, height: 0 };
+      const cs = img ? getComputedStyle(img) : null;
+      res({ w: +q.width.toFixed(2), h: +q.height.toFixed(2), canvas: Boolean(shot.querySelector("canvas")),
+        vis: cs ? cs.display + "/" + cs.visibility : "no img" });
+    }, 160));
+  }, pick.a);
+  check("thumb:the-still-returns-after-leave",
+    !back.canvas && back.vis === "block/visible" && Math.abs(back.w - swap.rest.w) <= CELL_SLACK && Math.abs(back.h - swap.rest.h) <= CELL_SLACK,
+    "still " + back.vis + " " + back.w + "x" + back.h + " (rested " + swap.rest.w + "x" + swap.rest.h + "), canvas "
+    + (back.canvas ? "still in the box" : "gone"));
+
+  /* 대조군. 굽는 자가 없는 종류는 호버해도 정지 그림이 그대로 서야 한다. startSpin은 그런
+     종류에서 먼저 돌아 나가는데, 숨기는 규칙이 그 앞에 서면 캔버스도 그림도 없는 빈 칸이 남는다.
+     그 칸은 호버해야만 비므로 위의 잉크 축이 영원히 못 본다. */
+  const dead = await p.evaluate(async () => {
+    const m = await import("/web/src/render/thumb.mjs");
+    const rack = document.querySelector("#shop .rack");
+    const card = document.createElement("div");
+    card.className = "card gear";
+    card.id = "spinProbe";
+    const pic = document.createElement("div");
+    pic.className = "pic";
+    const shot = document.createElement("div");
+    shot.className = "shot";
+    const im = document.createElement("img");
+    im.alt = "";
+    pic.appendChild(shot); card.appendChild(pic); rack.appendChild(card);
+    await new Promise((res) => { im.onload = res; im.onerror = res; im.src = document.querySelector("#shop .rack .card .shot img").getAttribute("src"); shot.appendChild(im); });
+    await new Promise((res) => requestAnimationFrame(res));
+    const rest = +im.getBoundingClientRect().height.toFixed(2);
+    m.startSpin(shot, "nosuchkind", { height: 188, weight: 84 }, {});
+    await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+    const cs = getComputedStyle(im);
+    const out = { rest, h: +im.getBoundingClientRect().height.toFixed(2), vis: cs.display + "/" + cs.visibility, canvas: Boolean(shot.querySelector("canvas")) };
+    m.stopSpin();
+    card.remove();
+    return out;
+  });
+  check("control:a-kind-with-no-render-keeps-its-still",
+    dead.vis === "block/visible" && dead.h > 0 && Math.abs(dead.h - dead.rest) <= 1 && !dead.canvas,
+    "still " + dead.vis + " " + dead.h + "px, rested " + dead.rest + "px, canvas " + (dead.canvas ? "moved in" : "stayed out"));
+
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 

@@ -373,15 +373,27 @@ export function thumbURL(kind, keeper, look) {
 }
 
 let spinning = null;
+/* 지금 도는 칸. stopSpin은 인자를 안 받으므로 표시를 걸어 둔 칸을 여기 들고 있어야
+   떠날 때 그 칸의 표시를 벗길 수 있다. 표시가 남으면 그 칸은 정지 그림 없이 빈 상자가 된다. */
+let spinHost = null;
 
 // 호버에서 천천히 돈다. 정지한 그림은 무엇을 샀는지 한 면만 보여 준다.
 export function startSpin(host, kind, keeper, look) {
+  // 굽는 자가 없는 종류는 여기서 돌아 나간다. 아래의 표시가 이 줄 뒤에 서야 그 칸이
+  // 대체할 그림도 없이 비지 않는다.
   if (!AIM[kind] && !SCENE[kind]) return;
   boot();
   stopSpin();
   const cv = R.domElement;
   cv.style.cssText = "width:100%;height:100%;display:block";
   host.appendChild(cv);
+  /* 도는 동안 정지 그림은 자리를 비운다는 표시. 칠은 hud.css가 가지고 여기는 표시만 건다.
+     캔버스만 넣었을 때 실측: 212.5x128.91 칸의 격자가 94.8px 두 줄로 갈려 정지 그림이
+     124.9px에서 97.0px로 줄고, 캔버스는 안쪽 상자에서 124.41px 벗어난 자리에 서서
+     overflow에 잘렸다. 0.5초 동안 칸의 화소가 0.0퍼센트 움직였으니, 사람이 본 것은
+     회전이 아니라 살짝 올라간 정지 그림이었다. */
+  spinHost = host;
+  host.classList.add("spinning");
   const t0 = performance.now();
   const tick = () => {
     if (!spinning) return;
@@ -395,6 +407,8 @@ export function startSpin(host, kind, keeper, look) {
 export function stopSpin() {
   if (spinning) cancelAnimationFrame(spinning);
   spinning = null;
+  if (spinHost) spinHost.classList.remove("spinning");
+  spinHost = null;
   if (R && R.domElement.parentNode) R.domElement.parentNode.removeChild(R.domElement);
 }
 
