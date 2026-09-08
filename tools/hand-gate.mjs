@@ -39,6 +39,25 @@ try {
     await page.waitForFunction((n) => document.querySelectorAll("#pips i.gone, #pips i.save").length > n, before, { timeout: ROUND_MS });
     await page.waitForFunction(() => document.querySelectorAll(".zone:not([disabled])").length === 3, null, { timeout: ROUND_MS });
   };
+  // 창이 닫히면 #auto와 #out은 -96px에서 제자리로 .24s 동안 미끄러져 돌아온다.
+  // 그 사이 두 기둥은 화면 밖에 있고, force는 가려진 것을 건너뛸 뿐 누를 자리가 화면 안인지는 그대로 본다.
+  // 한가한 기계에서는 닫자마자 눌러도 맞아 초록이 나왔고, 기계가 바쁘면 움직이는 중간에 자를 대서
+  // 느린 랩 세 번이 여기서 죽었다. d7cf608, 7daa663, 그리고 단독 재실행 한 번.
+  // 그래서 재우지 않고 실제로 그려진 사각형이 제자리에 설 때까지 기다린 뒤에 누른다.
+  const closePanel = async (page, panel, back = "#auto") => {
+    await page.click(panel + " .close", { force: true });
+    await page.waitForFunction((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) return false;
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      const inside = r.left >= 0 && x >= 0 && x <= innerWidth && y >= 0 && y <= innerHeight;
+      const slide = getComputedStyle(el).translate;
+      return inside && (slide === "none" || /^0px( 0px)?$/.test(slide));
+    }, back, { timeout: ROUND_MS });
+  };
 
   // 축 1. 사람이 아무 방향도 누르지 않아도 손 모드는 다섯 구를 고정 선호로 끝낸다.
   {
@@ -79,7 +98,7 @@ try {
       await page.click("#auto", { force: true });
       await page.waitForSelector('.buy[data-bot="1"]', { timeout: ROUND_MS });
       await page.click('.buy[data-bot="1"]', { force: true });
-      await page.click("#shop .close", { force: true });
+      await closePanel(page, "#shop");
       await page.click("#auto", { force: true });
       const armed = await page.evaluate(() => ({ bot: window.__bot(), auto: document.getElementById("auto").classList.contains("on") }));
       check("control:wallet-bought-a-live-bot-and-enabled-auto", armed.bot.ms > 0 && armed.auto, JSON.stringify(armed));
@@ -133,7 +152,7 @@ try {
       await page.click("#auto", { force: true });
       await page.waitForSelector('.buy[data-bot="1"]', { timeout: ROUND_MS });
       await page.click('.buy[data-bot="1"]', { force: true });
-      await page.click("#shop .close", { force: true });
+      await closePanel(page, "#shop");
       await page.click("#auto", { force: true });
       await page.waitForFunction(() => window.__botRan() === true, null, { timeout: ROUND_MS });
       const badge = await page.evaluate(() => ({
