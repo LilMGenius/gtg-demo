@@ -145,6 +145,62 @@ try {
   check("chrome:the-sound-toggle-clears-the-status-chip", scan.chipGap >= scan.lift,
     scan.chipGap + "px against " + scan.lift + "px");
 
+  /* 기둥의 리듬. 소리가 오른쪽 기둥으로 간 뒤 왼쪽 기둥에는 그 판때기가 서 있던 자리가 그대로 남았다.
+     실측 1280x720에서 상태 칩 아래끝 74px과 자동 140px 사이가 66px으로, 오른쪽 기둥이 네 번 지키는
+     12px의 다섯 배 반이었다. 판때기 하나가 빠진 자리는 사람 눈에 여백이 아니라 사라진 버튼으로 읽힌다.
+     간격은 CSS 상자로 잰다. 판때기마다 기울기가 달라 getBoundingClientRect는 회전된 상자를 돌려주고,
+     상태 칩은 폭이 실측 350px이라 -1.1도만으로 아래끝이 3.3px 내려앉아 같은 자리가 다른 수로 읽힌다.
+     두 뷰포트에서 잰다. 글자 크기가 폭을 따라 굽어 칩의 키가 실측 55px에서 66px까지 갈리므로,
+     한 폭에서만 맞춘 자리는 다른 폭에서 다시 벌어진다. */
+  const rhythmOf = (page) => page.evaluate(() => {
+    const box = (id) => { const e = document.getElementById(id); return { top: e.offsetTop, bottom: e.offsetTop + e.offsetHeight }; };
+    const gaps = (ids) => ids.slice(1).map((id, i) => ({ pair: ids[i] + " to " + id, gap: box(id).top - box(ids[i]).bottom }));
+    return { left: gaps(["top", "auto", "out"]), right: gaps(["mute", "gymBtn", "rosterBtn", "gramBtn", "shopBtn"]) };
+  });
+  /* 대역은 오른쪽 기둥이 그 판에서 실제로 쓴 값으로 매 판 다시 낸다. 숫자를 박아 두면 기둥이 움직인
+     날 자가 먼저 늙는다. 여유 2px은 offsetTop과 offsetHeight가 정수로 끊기며 생기는 오차고,
+     간격 하나는 위 판때기와 아래 판때기가 각각 한 번씩 끊긴 값이라 1px이 두 번 든다. */
+  const TOL = 2;
+  const judge = (r) => {
+    const lo = Math.min(...r.right.map((g) => g.gap));
+    const hi = Math.max(...r.right.map((g) => g.gap));
+    return {
+      band: lo + " to " + hi,
+      off: r.left.filter((g) => g.gap < lo - TOL || g.gap > hi + TOL),
+      over: r.left.filter((g) => g.gap > hi * 2)
+    };
+  };
+  const say = (tag, r, v) => tag + " left " + r.left.map((g) => g.pair + " " + g.gap).join(", ") + " against right " + v.band;
+
+  const wideRhythm = await rhythmOf(p);
+  const narrow = await b.newContext({ viewport: { width: 740, height: 360 } });
+  const np = await narrow.newPage();
+  await np.goto(BASE, { waitUntil: "load" });
+  await np.waitForSelector("#go", { timeout: 15000 });
+  await np.click("#go", { force: true });
+  await np.waitForTimeout(1300);
+  const tightRhythm = await rhythmOf(np);
+  await narrow.close();
+  const wide = judge(wideRhythm), tight = judge(tightRhythm);
+  check("chrome:the-left-column-keeps-the-right-column-rhythm",
+    wide.off.length === 0 && wide.over.length === 0 && tight.off.length === 0 && tight.over.length === 0,
+    say("1280x720", wideRhythm, wide) + " | " + say("740x360", tightRhythm, tight));
+
+  /* 대조군. 떠난 소리 판때기 46px을 자동 위에 도로 심는다. 이 자가 살아 있으면 그 한 칸이
+     들어온 순간 빨개져야 하고, 안 빨개지면 위의 초록은 리듬이 아니라 아무것도 안 잰 것이다. */
+  await p.evaluate(() => {
+    const t = document.getElementById("top");
+    const want = t.offsetTop + t.offsetHeight + 46;
+    const d = want - document.getElementById("auto").offsetTop;
+    for (const id of ["auto", "out"]) { const e = document.getElementById(id); e.dataset.was = e.style.top; e.style.top = (e.offsetTop + d) + "px"; }
+  });
+  const planted = await rhythmOf(p);
+  await p.evaluate(() => { for (const id of ["auto", "out"]) { const e = document.getElementById(id); e.style.top = e.dataset.was; delete e.dataset.was; } });
+  const plant = judge(planted);
+  check("control:planting-the-old-sound-plate-reddens-the-rhythm-axis",
+    plant.off.length > 0 || plant.over.length > 0,
+    say("planted 46px", planted, plant));
+
   // 덮임. 창을 연 프레임과 닫은 프레임의 밝기를 조작마다 잰다.
   const lum = async () => p.evaluate((ids) => ids.map((id) => {
     const e = document.getElementById(id);
