@@ -471,6 +471,152 @@ try {
   }, [on, off, win]);
   check("price:the-icon-is-drawn-over-8pct", cover >= 0.08, (cover * 100).toFixed(1) + "%");
 
+
+  /* 부족 표기의 문법. 값 자리에는 언제나 그 물건의 값이 서고, 못 사는 것은 붉은 값과 비활성 버튼이 말한다.
+     값을 든 자리는 여섯 갈래다. 장비 여덟 선반, 봇, 버프, 뽑기, 시착실 합계, 만남.
+     한 갈래라도 모자란 액수를 값 자리에 적으면 같은 물건이 지갑마다 다른 수로 읽힌다.
+     실측으로 장갑 하나가 116과 140으로 갈려 보였고, 그때 뽑기만 값을 적고 있어 그 자리가 기준이 됐다.
+
+     짧은 지갑은 0이 아니다. 잔고가 0이면 모자란 액수와 값이 같은 수라 두 문법이 같은 화면을 내고,
+     이 축은 아무것도 안 재면서 초록이 된다. 가장 싼 장비가 140이라 24로도 여전히 아무것도 못 사며,
+     116은 그 지갑에서 장갑이 갈려 보이던 수다. */
+  const SHORT_COIN = 24;
+  /* 지금 그려진 판에서 값 표기를 걷는다. 열쇠는 그 물건이고 창은 그 열쇠로 다시 찾는 선택자다.
+     선택자를 같이 들고 오는 이유는 화소를 재는 자가 두 지갑에서 같은 자리를 집어야 하기 때문이다. */
+  const pxHere = (mark) => {
+    const out = [];
+    for (const px of document.querySelectorAll("#shop .px, #me .met .px")) {
+      if (!px.getClientRects().length) continue;
+      const b = px.closest("button");
+      if (!b) continue;
+      const d = b.dataset;
+      let key = "", sel = "", shelf = mark;
+      if (d.kind !== undefined && d.rank !== undefined) {
+        key = "gear:" + d.kind + ":" + d.rank;
+        sel = '#shop .buy[data-kind="' + d.kind + '"][data-rank="' + d.rank + '"] .px b';
+      } else if (d.bot !== undefined) {
+        key = "bot:" + d.bot;
+        sel = '#shop .buy[data-bot="' + d.bot + '"] .px b';
+      } else if (d.buff !== undefined) {
+        key = "buff:" + d.buff;
+        sel = '#shop .buy[data-buff="' + d.buff + '"] .px b';
+      } else if (d.want !== undefined) {
+        key = "pull:" + d.want;
+        sel = '#shop .buy[data-want="' + d.want + '"] .px b';
+      } else if (d.city !== undefined && d.passer !== undefined) {
+        key = "date:" + d.city + ":" + d.passer;
+        sel = '#me .go[data-city="' + d.city + '"][data-passer="' + d.passer + '"] .px b';
+        shelf = "date";
+      } else if (b.classList.contains("all")) {
+        key = "fitting:all";
+        sel = "#shop .fitting .all .px b";
+        shelf = "fitting";
+      }
+      if (!key) continue;
+      out.push({ key: key, shelf: shelf, sel: sel, coin: Number(px.dataset.coin),
+        shown: (px.textContent.match(/[0-9,]+/) || [""])[0].replace(/,/g, ""),
+        bad: Boolean(px.closest(".bad-price")) });
+    }
+    return out;
+  };
+  /* 한 지갑에서 값을 든 자리를 전부 훑는다. 상점은 한 번에 한 선반만 그리고 만남은 다른 창에 있어,
+     이 순회를 안 돌면 열 선반과 만남이 안 잰 채로 초록이 난다.
+     화소는 판이 열려 있는 동안 같이 잰다. 창을 닫고 다시 찾으면 그 사이 판이 다시 그려진다. */
+  const sweepPrices = async () => {
+    const seen = new Map();
+    const keep = async (list) => {
+      for (const e of list) {
+        if (seen.has(e.key)) continue;
+        const g = await paintAt(p.locator(e.sel).first(), e.key, null);
+        e.red = g.bad;
+        e.top = g.top;
+        seen.set(e.key, e);
+      }
+    };
+    await p.evaluate((h) => { window[h](true); }, "__shop");
+    await p.waitForTimeout(320);
+    for (const tab of shopTabs) {
+      await p.click('#shop .tab[data-tab="' + tab + '"]', { force: true });
+      await p.waitForTimeout(180);
+      await keep(await p.evaluate(pxHere, tab));
+    }
+    // 만남은 내 정보의 아는 얼굴 칸에 있다. 칸을 안 열면 버튼이 없고, 그 없음은
+    // 만남이 없다는 뜻이 아니라 이 자가 다른 칸을 보고 있다는 뜻이다.
+    await p.evaluate((h) => { window[h](true); }, "__me");
+    await p.waitForTimeout(320);
+    await p.click('#me .tab[data-tab="face"]', { force: true });
+    await p.waitForTimeout(320);
+    await keep(await p.evaluate(pxHere, "me"));
+    await p.evaluate((h) => { window[h](false); }, "__me");
+    await p.waitForTimeout(120);
+    return seen;
+  };
+  /* 시착실 청구서는 걸친 것이 있어야 서고 만남 줄은 라포가 서야 그려진다. 둘 다 이 자가 세우고
+     잰 뒤에 도로 내린다. 라포는 date-gate가 쓰는 자리에 같은 수를 심는다. */
+  await p.evaluate((h) => { window[h](true); }, "__shop");
+  await p.waitForTimeout(320);
+  await p.click('#shop .tab[data-tab="glove"]', { force: true });
+  await p.waitForTimeout(180);
+  await p.click("#shop .card.gear:last-child .shot", { force: true });
+  await p.waitForTimeout(180);
+  const hadMet = await p.evaluate(() => {
+    const r = window.__rapport();
+    const was = r["0:2"];
+    r["0:2"] = 15;
+    return was === undefined ? null : was;
+  });
+  const rich = await sweepPrices();
+  await p.evaluate((c) => { window.__wallet().coin = c; }, SHORT_COIN);
+  const poor = await sweepPrices();
+  await p.evaluate((c) => { window.__wallet().coin = c; }, coinFull);
+  await p.evaluate((was) => {
+    const r = window.__rapport();
+    if (was === null) delete r["0:2"]; else r["0:2"] = was;
+  }, hadMet);
+  await p.evaluate((h) => { window[h](true); }, "__shop");
+  await p.waitForTimeout(320);
+  const undress = p.locator("#shop .fitting .strip");
+  if (await undress.count()) await undress.click({ force: true });
+  await p.waitForTimeout(180);
+
+  const poorList = [...poor.values()], richList = [...rich.values()];
+  // 값을 든 여섯 갈래가 다 잡혔는가. 한 갈래가 빠진 채로도 나머지가 초록이면 그 초록은 다섯 갈래의 것이다.
+  const KINDS = ["gear", "bot", "buff", "pull", "fitting", "date"];
+  const blind = KINDS.filter((k) => !poorList.some((e) => e.key.split(":")[0] === k));
+  const cheapest = richList.length ? Math.min.apply(null, richList.map((e) => e.coin)) : 0;
+  // 값은 부자 지갑의 산 버튼이 든 수다. gear-gate가 정가를 얻는 자리와 같다.
+  const wrong = [];
+  for (const e of poorList) {
+    const want = rich.has(e.key) ? rich.get(e.key).coin : null;
+    if (e.shown !== String(e.coin)) wrong.push(e.shelf + " " + e.key + " draws " + e.shown + " over data-coin " + e.coin);
+    else if (want !== null && e.coin !== want) wrong.push(e.shelf + " " + e.key + " " + e.coin + " want " + want);
+  }
+  check("price:a-short-wallet-still-reads-the-price",
+    wrong.length === 0 && blind.length === 0 && SHORT_COIN > 0 && SHORT_COIN < cheapest,
+    wrong.length ? wrong.length + "/" + poorList.length + " off; first " + wrong[0]
+      : blind.length ? "no price on " + blind.join(", ")
+        : poorList.length + " prices over " + KINDS.length + " kinds, wallet " + SHORT_COIN + " under the cheapest " + cheapest);
+  // 같은 물건이 두 지갑에서 같은 수로 읽히는가. 짝이 없는 자리는 못 맞댄 자리라 같이 적는다.
+  const split = [];
+  for (const e of poorList) {
+    const twin = rich.get(e.key);
+    if (!twin) { split.push(e.shelf + " " + e.key + " has no rich twin"); continue; }
+    if (twin.shown !== e.shown) split.push(e.shelf + " " + e.key + " reads " + e.shown + " short and " + twin.shown + " rich");
+  }
+  check("price:short-and-rich-show-the-same-number", split.length === 0 && poorList.length > 0,
+    split.length ? split.length + "/" + poorList.length + " differ; first " + split[0]
+      : poorList.length + " prices read the same on a " + SHORT_COIN + " wallet and a " + coinFull + " one");
+  /* 대조군. 두 지갑이 같은 수를 적기만 하고 못 사는 것을 아무 데서도 안 말하면 그것도 결함이다.
+     짧은 지갑에서는 숫자에 붉은 화소가 있어야 하고 부자 지갑에서는 하나도 없어야 한다. */
+  const pale = poorList.filter((e) => !(e.red > 0));
+  const flush = richList.filter((e) => e.red > 0);
+  check("price:shortage-is-red-in-rendered-pixels",
+    poorList.length > 0 && pale.length === 0 && flush.length === 0,
+    pale.length ? pale.length + " short digits with no red; first " + pale[0].shelf + " " + pale[0].key + " top " + pale[0].top
+      : flush.length ? flush.length + " rich digits carry red; first " + flush[0].shelf + " " + flush[0].key + " " + flush[0].red
+        : poorList.length + " short digits red, lowest " + Math.min.apply(null, poorList.map((e) => e.red))
+          + ", " + richList.length + " rich digits with none");
+
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 
