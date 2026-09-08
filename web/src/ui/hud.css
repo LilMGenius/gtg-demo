@@ -1015,6 +1015,11 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #shop .shot{aspect-ratio:5 / 3;background:#12180f;
   border:2px solid #ffffff14;display:grid;place-items:center;overflow:hidden}
 #shop .shot img,#shop .shot canvas{width:100%;height:100%;object-fit:contain;display:block}
+/* 도는 동안 정지 그림은 자리를 비운다. 남겨 두면 칸이 격자 두 줄로 갈리고, 캔버스가 둘째 줄에
+   서서 안쪽 상자 밖 124.41px 자리로 밀려 overflow에 잘린다. 실측: 그 상태로 0.5초 동안
+   칸의 화소가 0.0퍼센트 움직였다. visibility가 아니라 display인 이유는 숨긴 그림도 격자
+   한 줄을 계속 잡아서, 캔버스가 여전히 반 칸에 머물기 때문이다. */
+#shop .shot.spinning img{display:none}
 /* 이름은 제목 토큰을 쓴다. 카드에서 가장 큰 글자가 값이면 진열이 아니라 가격표가 된다. */
 #shop .card.gear b{font-size:var(--fs-title);line-height:1.25}
 /* 효과 한 줄은 카드 폭을 다 쓴다. 값 배지와 한 줄을 나눠 쓰면 남는 폭이 절반이라
