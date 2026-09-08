@@ -38,6 +38,99 @@ try {
   // 라포는 판을 여러 번 돌려야 쌓이므로 저장에 직접 심는다. 심는 값은 판정이 읽는 그 자리다.
   await p.evaluate(() => window.__act && window.__act("save"));
   await p.evaluate(() => { window.__rapport()["0:0"] = 4; });
+  /* 6.5 (a). 창 바탕 #080b07c4는 뒤가 비치는 것이 설계다. 그래서 살아 있는 자막이 첫 단 글자
+     아래로 그대로 올라온다. 실측 1280x720에서 자막 상자가 첫 단 상자 안으로 13.6px 들어왔고,
+     첫 단 상자 27390px 중 2323px이 자막의 잉크였다. 화면에서는 두 문장이 한 덩어리로 읽힌다.
+     자막이 살아 있는 화면과 자막만 걷은 화면을 같은 자리에서 찍어 달라진 화소를 센다. 창은 두
+     장에서 다 열려 있으므로 창의 어둠과 그 겹은 같고, 남는 차이는 자막의 잉크뿐이다.
+     찍기 전에 장면 캔버스를 세우고 뒤에 단색을 깐다. 움직이는 배경 위에서는 같은 화면을 두 번
+     찍어도 화소가 흔들려 잉크와 배경을 못 가른다. title-gate가 같은 이유로 쓰는 자세다.
+     자막 한 줄이 실제로 떠 있는 것을 프레임으로 기다린 뒤에 판을 잠근다. 카운트다운은 0.1초마다
+     숫자를 갈아서, 안 잠그면 정지 프레임 두 장이 그 숫자 하나로 갈린다. */
+  const INK_TOL = 8;
+  const inkMoved = (a, z) => p.evaluate(([s1, s2, tol]) => new Promise((res) => {
+    const load = (s) => new Promise((r2) => { const im = new Image(); im.onload = () => r2(im); im.src = "data:image/png;base64," + s; });
+    Promise.all([load(s1), load(s2)]).then(([ia, ib]) => {
+      const cv = document.createElement("canvas");
+      cv.width = ia.width; cv.height = ia.height;
+      const g = cv.getContext("2d");
+      g.drawImage(ia, 0, 0);
+      const da = g.getImageData(0, 0, ia.width, ia.height).data;
+      g.clearRect(0, 0, cv.width, cv.height);
+      g.drawImage(ib, 0, 0);
+      const db = g.getImageData(0, 0, ia.width, ia.height).data;
+      let n = 0;
+      for (let i = 0; i < da.length; i += 4) {
+        if (Math.max(Math.abs(da[i] - db[i]), Math.abs(da[i + 1] - db[i + 1]), Math.abs(da[i + 2] - db[i + 2])) > tol) n += 1;
+      }
+      res({ moved: n, all: da.length / 4 });
+    });
+  }), [a, z, INK_TOL]);
+  // 자르는 자리는 화면 안으로 물린다. 창 밖을 자르면 찍기가 통째로 죽어 축이 아니라 계기가 운다.
+  const inkClip = (r, vw, vh) => {
+    const x = Math.max(0, Math.floor(r.l));
+    const y = Math.max(0, Math.floor(r.t));
+    return { x, y, width: Math.max(1, Math.min(Math.ceil(r.r) - x, vw - x)),
+      height: Math.max(1, Math.min(Math.ceil(r.b) - y, vh - y)) };
+  };
+  const inkShot = async (c) => (await p.screenshot({ clip: c })).toString("base64");
+  const inkBox = (sel) => p.evaluate((s) => {
+    const e = document.querySelector(s);
+    if (!e) return null;
+    const q = e.getBoundingClientRect();
+    return { t: +q.top.toFixed(1), b: +q.bottom.toFixed(1), l: +q.left.toFixed(1), r: +q.right.toFixed(1) };
+  }, sel);
+  const standDown = (on) => p.evaluate((v) => {
+    document.getElementById("stage").style.visibility = v ? "hidden" : "";
+    document.body.style.background = v ? "#7f7f7f" : "";
+  }, on);
+
+  await p.waitForFunction(() => document.getElementById("caption").textContent.trim().length > 0, null, { timeout: 25000 });
+  await p.evaluate(() => window.__lockRound());
+  await p.evaluate(() => window.__me(true));
+  await p.waitForTimeout(420);
+  await standDown(true);
+  await p.waitForTimeout(200);
+  const capSeen = await p.evaluate(() => {
+    const cap = document.getElementById("caption").getBoundingClientRect();
+    const h4 = document.querySelector("#me h4").getBoundingClientRect();
+    return { text: document.getElementById("caption").textContent.trim(),
+      into: +(Math.min(cap.bottom, h4.bottom) - Math.max(cap.top, h4.top)).toFixed(1),
+      op: Number(getComputedStyle(document.getElementById("caption")).opacity) };
+  });
+  const capClip = inkClip(await inkBox("#me h4"), 1280, 720);
+  const capOn = await inkShot(capClip);
+  const capOn2 = await inkShot(capClip);
+  await p.evaluate(() => { document.getElementById("caption").style.visibility = "hidden"; });
+  await p.waitForTimeout(90);
+  const capOff = await inkShot(capClip);
+  await p.evaluate(() => { document.getElementById("caption").style.visibility = ""; });
+  await p.waitForTimeout(90);
+  /* 대조군. 비교자가 진짜 달라진 화소를 잡는지 먼저 묻는다. 같은 자리에 한 겹을 심어 두고 다시
+     잰다. 이게 없으면 찍기가 통째로 죽은 날에도 위의 축이 0으로 초록을 낸다. */
+  await p.evaluate((r) => {
+    const q = document.createElement("div");
+    q.id = "inkProbe";
+    q.style.cssText = "position:fixed;z-index:99;pointer-events:none;background:#ff00ff;left:"
+      + r.x + "px;top:" + r.y + "px;width:" + r.width + "px;height:" + r.height + "px";
+    document.body.append(q);
+  }, capClip);
+  await p.waitForTimeout(90);
+  const capPlanted = await inkShot(capClip);
+  await p.evaluate(() => { const q = document.getElementById("inkProbe"); if (q) q.remove(); });
+  await standDown(false);
+  await p.evaluate(() => window.__me(false));
+  await p.waitForTimeout(160);
+  const capStill = await inkMoved(capOn, capOn2);
+  const capInk = await inkMoved(capOn, capOff);
+  const capCaught = await inkMoved(capOn, capPlanted);
+  check("instrument:a-live-caption-stood-behind-the-header", capSeen.text.length > 0 && capSeen.into > 0,
+    JSON.stringify(capSeen.text) + " reaches " + capSeen.into + "px into the header box, caption opacity " + capSeen.op);
+  check("control:the-ink-comparator-catches-a-planted-layer", capCaught.moved >= capCaught.all * 0.98,
+    capCaught.moved + " of " + capCaught.all + "px caught under a planted layer");
+  check("mepane:the-header-carries-no-caption-ink-at-1280x720", capInk.moved === 0 && capStill.moved === 0,
+    capInk.moved + "px of " + capInk.all + " = " + (100 * capInk.moved / capInk.all).toFixed(2)
+    + "% of the header box moved when the caption was pulled, a still frame moves " + capStill.moved + "px");
   /* 큰 수 셋은 장부에서 나온다. 막은 것만 있는 장부로 재면 먹힌 수 칸이 0으로 서고,
      0은 자리가 비어 있는 것과 화면에서 안 갈린다. 두 이름을 심어 세 수가 전부 살아 있게 한다.
      판이 계속 돌면 그 사이에 장부가 또 움직이므로, 심기 전에 판을 멈춘다. */
@@ -615,6 +708,42 @@ try {
     + ", 1280x720 pane cue " + (wideSeen.pane && wideSeen.pane.down ? wideSeen.pane.down.op : "none")
     + " panel cue " + (wideSeen.panel && wideSeen.panel.down ? wideSeen.panel.down.op : "none")
     + " over " + (wideSeen.panel ? wideSeen.panel.over : "?"));
+
+  /* 6.5 (b). 창은 inset:0으로 화면을 덮고 첫 단은 그 창의 맨 위다. 세로 360px에서는 그 맨 위가
+     재화 띠와 같은 자리라, 실측으로 초상과 이름이 띠 아래끝 66.2px보다 61.8px 위에서 시작해
+     스폰 칩을 통째로 덮었다. 그 칸 한가운데에서 elementFromPoint가 첫 단을 냈으므로, 셋째 재화는
+     창이 열려 있는 동안 읽을 수 없다.
+     묻는 것은 둘이다. 자리로 물어 첫 단이 띠 아래에서 시작하는가, 화소로 물어 띠 위에 창의
+     잉크가 한 점도 없는가. 화소는 창을 연 화면과 창의 내용만 걷은 화면을 견준다. 창을 닫은
+     화면과 견주면 창 바탕의 어둠과 그 겹이 칩 글자의 가장자리를 통째로 흔들어, 첫 단이 띠를
+     완전히 비켜선 자리에서도 실측 21042px 중 1069px이 달라진다. 그 5%는 첫 단이 아니라 겹이다.
+     굴림값 0에서 잰다. 첫 단은 두루마리의 첫 줄이라 굴려 둔 창에서는 화면 밖에 있고, 그 자리를
+     재면 이 축이 가장 나쁜 자리를 안 보고 지나간다. */
+  const STRIP_FLOOR = 0.005;
+  await panelScrollTo(0);
+  await p.waitForTimeout(140);
+  await standDown(true);
+  await p.waitForTimeout(200);
+  const stripTop = await inkBox("#top");
+  const stripHead = await inkBox("#me h4");
+  const stripClip = inkClip(stripTop, 740, 360);
+  const stripOn = await inkShot(stripClip);
+  const stripOn2 = await inkShot(stripClip);
+  await p.evaluate(() => { for (const e of document.querySelectorAll("#me > *")) e.style.visibility = "hidden"; });
+  await p.waitForTimeout(90);
+  const stripBare = await inkShot(stripClip);
+  await p.evaluate(() => { for (const e of document.querySelectorAll("#me > *")) e.style.visibility = ""; });
+  await standDown(false);
+  await p.waitForTimeout(90);
+  const stripStill = await inkMoved(stripOn, stripOn2);
+  const stripInk = await inkMoved(stripOn, stripBare);
+  const stripShare = stripInk.moved / stripInk.all;
+  check("mepane:the-header-clears-the-resource-strip-at-740x360",
+    stripTop.b <= stripHead.t && stripShare <= STRIP_FLOOR && stripStill.moved === 0,
+    "the strip ends at " + stripTop.b + " and the header starts at " + stripHead.t + ", "
+    + stripInk.moved + "px of " + stripInk.all + " = " + (100 * stripShare).toFixed(2)
+    + "% of the strip carries panel ink, floor " + (100 * STRIP_FLOOR).toFixed(1)
+    + "%, a still frame moves " + stripStill.moved + "px");
   await p.evaluate(() => window.__me(false));
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");

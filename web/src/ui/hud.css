@@ -182,13 +182,16 @@ body.playing #hud{opacity:1}
   -webkit-text-stroke:clamp(4px,.6vw,8px) var(--edge);paint-order:stroke fill;
   text-shadow:5px 6px 0 var(--edge);letter-spacing:.04em;white-space:nowrap}
 #stamp.hit{animation:stampHit 1.15s ease-out}
-/* 창이 열려 있으면 사건 단어와 섬광을 감춘다. 둘 다 #hud 밖에 있어 창 덮개가 안 닿는데,
+/* 창이 열려 있으면 사건 단어와 섬광과 자막을 감춘다. 앞의 둘은 #hud 밖에 있어 창 덮개가 안 닿는데,
    글자가 화면 너비의 절반을 쓰므로 어두워져도 창 제목과 한 줄에서 겹쳐 읽힌다.
    실측으로 훈련장 제목 위에 '같이'와 '어감'이 겹쳐 세 낱말이 한 덩어리가 됐다.
    판은 계속 돌고 사건도 그대로 일어난다. 창을 닫으면 그 다음 구부터 다시 보인다. */
 /* 애니메이션은 일반 선언을 이긴다. opacity만 0으로 두면 돌고 있는 키프레임이 그대로 덮어써서
    실측으로 훈련장에서 둘 다 계속 보였다. 애니메이션을 끊어야 이 줄이 힘을 쓴다. */
-body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is(#stamp,#flash){animation:none;opacity:0}
+/* 자막도 같은 살아 있는 잉크다. 창 바탕이 #080b07c4라 뒤가 비치고, 실측 1280x720에서 자막 상자가
+   내 정보 첫 단 상자 안으로 13.6px 들어와 그 상자 27390px 중 2488px이 자막 글자였다.
+   '골킥 차주는 중'이 '동네형 Lv 2 174cm 88kg' 아래에서 같이 읽힌다. */
+body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is(#stamp,#flash,#caption){animation:none;opacity:0}
 @keyframes stampHit{
   0%{opacity:0;rotate:-13deg;scale:2.4}
   9%{opacity:1;rotate:-7deg;scale:.92}
@@ -759,6 +762,11 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
    창이 이미 구르므로 여기서는 카드와 칸의 상한을 걷고 넘치는 만큼 창이 받게 한다.
    구르는 상자가 창 하나면 손가락이 어디를 밀든 같은 것이 움직인다. */
 @media (max-height:520px){
+  /* 재화 띠 아래에서 첫 단을 세운다. 띠는 8px에서 시작해 칩 55px로 서고 --lift 4px 그림자를 아래로 던진다.
+     창은 inset:0이라 첫 단이 화면 맨 위, 곧 띠와 같은 자리에서 시작해서 실측 740x360에서 초상과 이름이
+     띠 아래끝 66.2px보다 61.8px 위에 서고 스폰 칩을 통째로 덮었다. 여기서 첫 단은 실측 71.4px에 서고,
+     길어진 만큼은 창이 제 스크롤로 받는다(숨은 높이 436px에서 503px). */
+  #me{padding-top:calc(8px + 55px + var(--lift) + var(--gap-2) + env(safe-area-inset-top))}
   #me .card{max-height:none}
   #me .pane{max-height:none}
   /* 걸친 것은 맨 아래로 간다. 창을 연 이유는 탭 안의 답이고 걸친 것은 그 답이 아닌데,
