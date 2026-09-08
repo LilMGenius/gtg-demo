@@ -1201,7 +1201,8 @@ function recordRows() {
 // 만남 버튼 글자. 문은 판정이 열고, 값을 어떻게 보여 줄지는 화면이 정한다.
 function dateLabel(g) {
   if (g.open) return SW(g.cost);
-  if (g.short > 0) return SW(g.short);
+  // 못 사는 것은 붉은 값과 비활성 버튼이 말한다. 모자란 액수를 적으면 같은 물건이 지갑마다 다른 수로 읽힌다.
+  if (g.short > 0) return SW(DATE_COST);
   return '만남';
 }
 
@@ -1666,8 +1667,8 @@ function fittingRoom() {
   const chips = tried.map((f) => '<i data-off="' + f + '">' + nameOfField(f, fitting[f]) + '<b>X</b></i>').join('');
   const canAll = tried.length > 0 && bill <= state.wallet.coin;
   /* 합계 배지는 사는 버튼이 든다. 시착 게이트가 청구서를 이 버튼 안의 .px[data-coin]에서 읽으므로
-     배지를 버튼 밖으로 빼면 값을 재는 자가 눈을 잃는다. 살 수 있으면 합계, 모자라면 모자란 만큼이다. */
-  const badge = tried.length ? SW(canAll ? bill : bill - state.wallet.coin) : '';
+     배지를 버튼 밖으로 빼면 값을 재는 자가 눈을 잃는다. 모자라도 합계는 같은 수다. */
+  const badge = tried.length ? SW(bill) : '';
   const allClass = tried.length > 0 && !canAll ? ' bad-price' : '';
   return '<div class="fitting">'
     + '<div class="who"><span class="face">' + (face ? '<img alt="" src="' + face + '">' : '') + '</span>'
@@ -1714,8 +1715,8 @@ function gearShelf(kind) {
       label = s.past;
       off = true;
     } else if (state.wallet.coin < g.cost) {
-      // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
-      label = SW(g.cost - state.wallet.coin);
+      // 못 사는 것은 붉은 값과 비활성 버튼이 말한다. 모자란 액수를 적으면 같은 물건이 지갑마다 다른 수로 읽힌다.
+      label = SW(g.cost);
       off = true;
       bad = true;
     }
@@ -2099,8 +2100,8 @@ function botShelf() {
     let off = false;
     let bad = false;
     if (state.wallet.coin < b.cost) {
-      // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
-      label = SW(b.cost - state.wallet.coin);
+      // 못 사는 것은 붉은 값과 비활성 버튼이 말한다. 모자란 액수를 적으면 같은 물건이 지갑마다 다른 수로 읽힌다.
+      label = SW(b.cost);
       off = true;
       bad = true;
     } else if (cur.ms > 0 && b.tier === cur.tier) {
@@ -2162,8 +2163,8 @@ function buffShelf() {
     let off = false;
     let bad = false;
     if (state.wallet.coin < b.cost) {
-      // 못 누르는 사유를 버튼 글자로 적는다. 회색으로만 죽이면 이유를 알 수 없다.
-      label = SW(b.cost - state.wallet.coin);
+      // 못 사는 것은 붉은 값과 비활성 버튼이 말한다. 모자란 액수를 적으면 같은 물건이 지갑마다 다른 수로 읽힌다.
+      label = SW(b.cost);
       off = true;
       bad = true;
     } else if (cur.shots > 0 && cur.kind === b.kind) {
