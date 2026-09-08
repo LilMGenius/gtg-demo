@@ -1856,6 +1856,11 @@ function paintStage() {
   const now = el('pull').querySelector('.now');
   if (!now) return;
   now.dataset.stage = String(pullStage);
+  // 마지막 단에 서면 버튼 글자도 같이 바뀐다. 여는 버튼이 닫기라고 적혀 있으면 그 말대로 눌러 카드를 못 본 채 닫는다.
+  if (shown >= lastPull.length && pullStage === STAGE_LAST) {
+    const tap = el('pull').querySelector('.tap');
+    if (tap) tap.textContent = '닫기';
+  }
 }
 
 // 남은 것을 한 번에 연다. 기다리는 것이 연출이지 벌은 아니다. 서 있던 장도 마지막 단까지 같이 열린다.
@@ -1902,8 +1907,8 @@ function paintPull() {
   const done = lastPull.slice(0, at)
     .map((c, i) => '<i class="' + (c.fame >= 9 ? 'rare' : '') + (i === at - 1 ? ' just' : '')
       + '">' + c.name + '</i>').join('');
-  // 마지막 장까지 열렸으면 넘길 것이 없다. 그때부터 이 화면은 닫는 화면이다.
-  const over = shown >= lastPull.length;
+  // 마지막 장이 마지막 단까지 서면 넘길 것이 없다. 그때부터 이 화면은 닫는 화면이다.
+  const over = shown >= lastPull.length && pullStage === STAGE_LAST;
   box.innerHTML = '<div class="count">' + shown + ' / ' + lastPull.length + '</div>'
     /* 카드 안에 사람이 없으면 이름을 적은 빈 판이다. 선수단과 상점이 이미 쓰는 전신 그림을
        그대로 굽는다. 걸친 것은 내 장비가 아니라 기본 차림이다. 아직 내 선수가 아니기 때문이다.
@@ -1927,7 +1932,8 @@ function paintPull() {
   void now.offsetWidth;
   now.classList.add('turn');
   box.querySelector('.tap').onclick = () => {
-    if (shown < lastPull.length) return revealAll();
+    // 안 연 장이 남았거나 이 장이 마지막 단 전이면 먼저 연다. 닫는 것은 그 뒤다.
+    if (shown < lastPull.length || pullStage < STAGE_LAST) return revealAll();
     stopReveal();
     // 첫 진입은 두 마디다. 키퍼를 닫으면 그 자리에서 키커가 이어 열린다.
     onboardStep();
@@ -2341,8 +2347,8 @@ window.__persist = () => { persist(); return true; };
 // 저장이 사는 자리. 계기가 이 자리를 손으로 적으면 계정이 갈린 날 조용히 빈 자리를 읽는다.
 window.__saveKey = () => saveKey();
 window.__kickers = () => state.kickers.slice();
-// 뒤집힌 카드 수와 뽑은 카드 수. 연출이 도는 동안 계기가 이 둘을 읽어 한 번에 안 열리는 것을 본다.
-window.__reveal = () => ({ shown, drawn: lastPull.length });
+// 뒤집힌 카드 수와 뽑은 카드 수와 지금 선 단. 연출이 도는 동안 계기가 이 셋을 읽어 한 번에 안 열리는 것을 본다.
+window.__reveal = () => ({ shown, drawn: lastPull.length, stage: pullStage });
 // 누가 무엇을 걸쳤는가. 계기가 교체 전후로 이 둘을 읽어 착용이 사람을 따라가는지 본다.
 window.__worn = () => ({ pick: state.pick, name: state.keeper.name,
   worn: Object.assign({}, state.keeper.worn), place: Object.assign({}, state.place),
