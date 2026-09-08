@@ -23,6 +23,7 @@ import { pinClock } from "./clock.mjs";
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&vary=0";
+// 페이지는 브라우저 게이트 전부와 F3이 함께 쓰는 데스크톱 기준에서 측정한다. 폭이 갈리면 관절 좌표를 게이트 간에 못 맞댄다.
 const W = 1280;
 const H = 720;
 const KINDS = ["save", "catch", "carriedIn", "downed", "lost", "openGoalScored", "gloveGone", "spill", "rebound", "reboundMiss", "charge", "beat", "talked", "distracted", "skied"];
