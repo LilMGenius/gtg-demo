@@ -1079,17 +1079,35 @@ function openGram() {
    243px 자리에 700px을 담아 상대 전적 표가 통째로 접힘 아래 있었다. 아래끝 그늘이 남은 것이
    있다는 말이고, 끝까지 굴리면 그 그늘이 꺼지고 위끝으로 옮겨 간다. 1px은 굴림값이 소수로
    남는 자리를 넘기는 폭이다. 두 창이 한 함수를 쓴다. 따로 적으면 한쪽만 고친 날 둘이 갈린다.
-   구르는 것은 감싼 상자가 아니라 그 안의 칸이라, 신호 둘이 아닌 첫 자식이 그 칸이다. */
-function scrollCue(wrap) {
+   구르는 것은 감싼 상자가 아니라 그 안의 칸이라, 신호 둘이 아닌 첫 자식이 그 칸이다.
+   다만 늘 그렇지는 않다. 세로가 짧으면 칸의 상한이 걷혀 칸이 안 구르고 창이 스스로 구른다.
+   그때는 구르는 것을 밖에서 받는다. 안 받으면 첫 자식인 제목 줄을 재게 되어 넘침이 늘 0이고
+   신호가 영영 안 켜진다. 신호는 감싼 상자의 자식에서만 찾는다. 창을 상자로 넘기면 그 안에
+   칸의 신호가 같이 들어 있어, 안 좁히면 창의 신호 대신 칸의 것을 두 번 켠다.
+   문턱은 그늘 자신의 높이다. 감춘 것이 그늘보다 얇으면 그 겹은 알리는 것보다 더 많이 가린다.
+   실측으로 1280x720의 창은 닫기 버튼 아래 16px만 감췄는데, 거기에 26px 그늘을 켜면 버튼만
+   흐려지고 아래에 더 있다는 뜻은 거짓이 된다. 높이를 여기 상수로 안 적고 그려진 값을 읽는 것은
+   그 수가 CSS 한 곳에만 있어야 하기 때문이다. */
+function scrollCue(wrap, roll) {
   if (!wrap) return;
-  const body = wrap.querySelector(':scope > :not(.cue)');
+  const body = roll || wrap.querySelector(':scope > :not(.cue)');
   if (!body) return;
   const over = body.scrollHeight - body.clientHeight;
   const at = body.scrollTop;
-  const down = wrap.querySelector('.cue.down');
-  const up = wrap.querySelector('.cue.up');
-  if (down) down.style.opacity = over > 1 && at < over - 1 ? '1' : '0';
-  if (up) up.style.opacity = over > 1 && at > 1 ? '1' : '0';
+  const down = wrap.querySelector(':scope > .cue.down');
+  const up = wrap.querySelector(':scope > .cue.up');
+  const lip = Math.max(down ? down.offsetHeight : 0, up ? up.offsetHeight : 0);
+  if (down) down.style.opacity = over > lip && at < over - 1 ? '1' : '0';
+  if (up) up.style.opacity = over > lip && at > 1 ? '1' : '0';
+}
+
+/* 내 정보 창의 신호 둘. 칸이 구르는 화면과 창이 구르는 화면이 갈리므로 둘을 같이 다시 센다.
+   scrollCue는 살아 있는 값만 읽어 몇 번 불러도 같은 답이라, 어느 쪽이 움직였는지는 안 물어도 된다. */
+function meCues() {
+  const box = el('me');
+  if (!box) return;
+  scrollCue(box.querySelector('.panebox'));
+  scrollCue(box, box);
 }
 
 // 위키. 물음표 하나가 여는 카테고리 가이드다. 재화 칩이 열던 버는 법도 이 안의 한 칸이다.
@@ -1293,7 +1311,10 @@ function renderMe() {
     + '<i class="cond">' + cond + '</i></small></h4>'
     + '<div class="card">' + wear + big + tabs + '<div class="panebox"><div class="pane">' + pane + '</div>'
     + '<div class="cue up" aria-hidden="true"></div><div class="cue down" aria-hidden="true"></div></div></div>'
-    + '<button class="close">닫기</button>';
+    + '<button class="close">닫기</button>'
+    /* 창이 구르는 화면에서 쓰는 신호. 칸의 것과 같은 클래스로 두어 그늘 규칙이 한 벌로 남는다.
+       마지막에 두는 것은 칠하는 차례 때문이다. 앞에 두면 자리를 잡은 칸 상자가 이 겹을 덮는다. */
+    + '<div class="cue up" aria-hidden="true"></div><div class="cue down" aria-hidden="true"></div>';
   box.querySelector('.close').onclick = closeMe;
   for (const b of box.querySelectorAll('.tab')) b.onclick = () => { meTab = b.dataset.tab; renderMe(); };
   for (const b of box.querySelectorAll('.note .go')) b.onclick = () => openDate(Number(b.dataset.city), Number(b.dataset.passer));
@@ -1301,11 +1322,17 @@ function renderMe() {
      관찰자는 하나만 두고 그릴 때마다 새 칸으로 옮겨 붙인다. 그릴 때마다 새로 만들면
      떨어져 나간 옛 칸을 붙든 관찰자가 그 수만큼 쌓인다. */
   const paneEl = box.querySelector('.pane');
-  paneEl.onscroll = () => scrollCue(box.querySelector('.panebox'));
-  if (!meWatch) meWatch = new ResizeObserver(() => scrollCue(el('me').querySelector('.panebox')));
+  paneEl.onscroll = meCues;
+  /* 창 자신이 구르는 화면에서는 손가락이 미는 것이 칸이 아니라 창이다. 여기를 안 이으면
+     그 화면에서 신호가 그릴 때 한 번 서고 그대로 굳어, 끝까지 굴려도 안 뒤집힌다. */
+  box.onscroll = meCues;
+  if (!meWatch) meWatch = new ResizeObserver(meCues);
   meWatch.disconnect();
   meWatch.observe(paneEl);
-  scrollCue(box.querySelector('.panebox'));
+  /* 창도 같이 본다. 화면이 바뀌면 상한이 걷히거나 붙어 구르는 상자가 칸에서 창으로 넘어가는데,
+     칸만 보면 그 순간 창의 넘침을 아무도 다시 안 센다. 관찰자는 그대로 하나다. */
+  meWatch.observe(box);
+  meCues();
 }
 
 function openMe() {
