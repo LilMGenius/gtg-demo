@@ -148,6 +148,51 @@ const DURATION = () => {
   }
   return out;
 };
+
+/* 접힌 효과 이름 옆에서 수치가 어디에 서는가. 이름이 두 줄이 되면 칸이 이름 블록 전체가 아니라
+   첫 줄에만 붙었다(실측: 1280에서 자양강장제 이름 블록의 세로 가운데가 417.3인데 12슛은 402.71,
+   한 줄 26.88의 절반인 13.44를 14.58이 넘었다). 아래 줄은 값 없이 남고 값은 위로 떠서,
+   넉 장을 훑는 눈이 그 수가 어느 이름의 것인지를 카드마다 다시 맞춘다.
+   줄 수는 그려진 상자로 센다. Range가 세는 줄은 접기 전의 줄이라 740에서 송진 스프레이가
+   세 줄로 잡히는데 화면에 선 상자는 한 줄이다(실측: range 3, 상자 24.28px에 한 줄 22.5px).
+   사람이 보는 이름 블록은 접힌 뒤의 상자이므로 그쪽으로 재고, Range 수는 같이 적어 접힘을 남긴다.
+   한 줄 카드와 두 줄 카드를 같은 식으로 잰다. 식이 하나여야 두 줄만 따로 봐 주는 예외가 안 생긴다. */
+const ALIGN = () => {
+  const out = [];
+  const num = (v) => Math.round(v * 100) / 100;
+  const read = (eff, dur) => {
+    const n = eff.getBoundingClientRect(), v = dur.getBoundingClientRect();
+    const lh = parseFloat(getComputedStyle(eff).lineHeight);
+    const rng = document.createRange();
+    rng.selectNodeContents(eff);
+    return { lh: num(lh), rows: Math.round(n.height / lh), range: rng.getClientRects().length,
+      nMid: num(n.top + n.height / 2), vMid: num(v.top + v.height / 2),
+      off: num(Math.abs((v.top + v.height / 2) - (n.top + n.height / 2))) };
+  };
+  for (const tab of [...document.querySelectorAll("#shop .tab")]) {
+    const kind = tab.dataset.tab;
+    if (kind !== "bot" && kind !== "buff") continue;
+    tab.click();
+    for (const card of document.querySelectorAll("#shop .rack .card.gear")) {
+      const name = (((card.querySelector("b") || {}).textContent) || "").trim();
+      const em = card.querySelector("em");
+      const eff = card.querySelector(".eff");
+      const dur = card.querySelector(".duration");
+      if (!em || !eff || !dur) { out.push({ tab: kind, name: name, split: false }); continue; }
+      const live = read(eff, dur);
+      /* 대조군은 같은 화면에서 만든다. 칸을 첫 줄에 못 박고 같은 자로 다시 재는 것이라,
+         묻는 것은 문턱이 맞는가가 아니라 이 자가 어긋남을 보기는 하는가다.
+         잰 뒤에 인라인 값을 도로 지운다. 남겨 두면 뒤에 오는 축이 이 자가 민 화면을 잰다. */
+      em.style.alignItems = "flex-start";
+      dur.style.alignSelf = "flex-start";
+      const pinned = read(eff, dur);
+      em.style.alignItems = "";
+      dur.style.alignSelf = "";
+      out.push({ tab: kind, name: name, split: true, live: live, pinned: pinned });
+    }
+  }
+  return out;
+};
 let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
@@ -166,6 +211,7 @@ try {
     const rare = await p.evaluate(RARE);
     const fit = await p.evaluate(FIT);
     const dur = await p.evaluate(DURATION);
+    const align = await p.evaluate(ALIGN);
     /* 내려온 설명 문장이 어디에 서 있는가. 페이지가 이미 불러 둔 판을 다시 부르는 것이라
        모듈이 두 번 돌지 않고, 화면에 안 그려지는 값을 화면 쪽에서 읽는 유일한 길이다. */
     const parked = await p.evaluate(async () => {
@@ -176,7 +222,7 @@ try {
       return out;
     }).catch(() => null);
     await ctx.close();
-    return { count, rare, fit, parked, dur };
+    return { count, rare, fit, parked, dur, align };
   };
   const full = await at(WIDE, 720);
   const thin = await at(NARROW, 720);
@@ -298,6 +344,33 @@ try {
   check("instrument:every-bot-and-buff-card-was-read-for-duration", durCards === durSeen && durSeen > 0,
     durSeen + " readings, " + full.dur.length + " at " + WIDE + "px, " + thin.dur.length + " at " + NARROW + "px, " + hand.dur.length + " at " + HAND_W + "px, "
       + durTapped + " tap-tested, texts " + full.dur.map((d) => d.txt).join(" "));
+  /* 접힌 이름 옆의 수치. 이름 블록의 세로 가운데와 수치 칸의 세로 가운데가 한 줄 높이의 절반 안에
+     같이 서는가를 묻는다. 문턱은 지어낸 수가 아니라 그 화면이 쓰는 줄 높이 그 자체다.
+     한 줄 카드도 같은 식으로 잰다. 두 줄만 따로 재면 규칙이 둘이 되고, 그때 어느 쪽이 옳은지는
+     카드마다 갈린다. */
+  const alignRows = [];
+  for (const [w, h, rows] of [[WIDE, 720, full.align], [NARROW, 720, thin.align], [HAND_W, HAND_H, hand.align]])
+    for (const a of rows) alignRows.push({ at: a.name + " " + w + "x" + h, a: a });
+  const paired = alignRows.filter((r) => r.a.split);
+  const hung = paired.filter((r) => r.a.live.off > r.a.live.lh / 2);
+  const wrapped = paired.filter((r) => r.a.live.rows >= 2);
+  check("rack:a-wrapped-name-keeps-its-value-beside-it", paired.length > 0 && hung.length === 0,
+    hung.slice(0, 3).map((r) => r.at + " value mid " + r.a.live.vMid + " against name mid " + r.a.live.nMid
+      + " over " + r.a.live.rows + " lines, off " + r.a.live.off + " past " + (r.a.live.lh / 2)).join(", ")
+      || paired.length + " readings, " + wrapped.length + " of them two-line, worst off "
+        + Math.max.apply(null, paired.map((r) => r.a.live.off)) + " inside half a line");
+  /* 두 줄 표본이 없으면 이 축은 아무것도 안 물은 것이다. 한 줄짜리만 모아 놓고 초록을 내면
+     그 초록은 정렬이 옳다는 뜻이 아니라 접힌 이름을 한 장도 못 만났다는 뜻이다. */
+  check("instrument:a-two-line-effect-name-stood-in-the-sample", wrapped.length > 0,
+    wrapped.length ? wrapped.length + " of " + paired.length + " readings draw two lines: "
+      + wrapped.map((r) => r.at + " range " + r.a.live.range).join(", ")
+      : "no card drew a two-line effect name over " + paired.length + " readings");
+  // 대조군. 같은 카드의 칸을 첫 줄에 못 박으면 위 축이 빨개져야 한다. 안 빨개지면 이 자가 눈이 먼 것이다.
+  const unseen = wrapped.filter((r) => r.a.pinned.off <= r.a.pinned.lh / 2);
+  check("control:a-value-pinned-to-the-first-line-is-caught", wrapped.length > 0 && unseen.length === 0,
+    unseen.slice(0, 2).map((r) => r.at + " stays inside " + (r.a.pinned.lh / 2) + " at off " + r.a.pinned.off).join(", ")
+      || wrapped.length + " two-line readings go red when pinned to the first line, off "
+        + wrapped.map((r) => r.a.pinned.off).join(" / "));
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
 
   for (const k of racks) console.log("  " + k.padEnd(7) + " cards " + wide[k].cards + "  columns " + wide[k].cols + " at " + WIDE + "px, " + narrow[k].cols + " at " + NARROW + "px");
