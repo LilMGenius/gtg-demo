@@ -1074,22 +1074,28 @@ function openGram() {
   renderGram();
 }
 
+/* 굴릴 것이 남았다는 자국. 칸은 굴러가지만 화면에는 그 사실이 하나도 안 적혀 있었다.
+   실측으로 위키 본문은 740x360에서 여덟 칸이 전부 넘쳤고, 내 정보의 전적 칸은 1280x720에서
+   243px 자리에 700px을 담아 상대 전적 표가 통째로 접힘 아래 있었다. 아래끝 그늘이 남은 것이
+   있다는 말이고, 끝까지 굴리면 그 그늘이 꺼지고 위끝으로 옮겨 간다. 1px은 굴림값이 소수로
+   남는 자리를 넘기는 폭이다. 두 창이 한 함수를 쓴다. 따로 적으면 한쪽만 고친 날 둘이 갈린다.
+   구르는 것은 감싼 상자가 아니라 그 안의 칸이라, 신호 둘이 아닌 첫 자식이 그 칸이다. */
+function scrollCue(wrap) {
+  if (!wrap) return;
+  const body = wrap.querySelector(':scope > :not(.cue)');
+  if (!body) return;
+  const over = body.scrollHeight - body.clientHeight;
+  const at = body.scrollTop;
+  const down = wrap.querySelector('.cue.down');
+  const up = wrap.querySelector('.cue.up');
+  if (down) down.style.opacity = over > 1 && at < over - 1 ? '1' : '0';
+  if (up) up.style.opacity = over > 1 && at > 1 ? '1' : '0';
+}
+
 // 위키. 물음표 하나가 여는 카테고리 가이드다. 재화 칩이 열던 버는 법도 이 안의 한 칸이다.
 // 표의 수는 wiki.mjs가 상수에서 읽으므로 이 자리는 화면에 붙이는 일만 한다.
 let wikiAt = 'hand';
 let wikiWatch = null;
-/* 굴릴 것이 남았다는 자국. 본문은 굴러가지만 화면에는 그 사실이 하나도 안 적혀 있었다.
-   실측으로 740x360에서 여덟 칸이 전부 넘쳤고, 조작 칸은 187px 창에 317px을 담아 자리와 키
-   세 줄 중 왼쪽 한 줄만 보였다. 아래끝 그늘이 남은 것이 있다는 말이고, 끝까지 굴리면 그 그늘이
-   꺼지고 위끝으로 옮겨 간다. 1px은 굴림값이 소수로 남는 자리를 넘기는 폭이다. */
-function wikiCue(box) {
-  const body = box.querySelector('.body');
-  const wrap = body.parentElement;
-  const over = body.scrollHeight - body.clientHeight;
-  const at = body.scrollTop;
-  wrap.querySelector('.cue.down').style.opacity = over > 1 && at < over - 1 ? '1' : '0';
-  wrap.querySelector('.cue.up').style.opacity = over > 1 && at > 1 ? '1' : '0';
-}
 
 function paintWiki() {
   const box = el('wiki');
@@ -1099,17 +1105,17 @@ function paintWiki() {
   for (const b of box.querySelectorAll('.cats [data-cat]')) b.onclick = () => { wikiAt = b.dataset.cat; paintWiki(); };
   box.querySelector('.close').onclick = closeWiki;
   const body = box.querySelector('.body');
-  body.onscroll = () => wikiCue(box);
+  body.onscroll = () => scrollCue(box.querySelector('.bodybox'));
   /* 창 크기가 바뀌면 넘침이 다시 계산된다. 그릴 때와 굴릴 때만 세면 창만 바뀐 화면에 옛 답이 남는다.
      실측으로 조작 칸을 740x360에서 그린 뒤 1280x720으로 늘리면 넘침이 0인데 그늘은 켜진 채였고,
      줄이면 넘침이 130인데 그늘은 꺼진 채라 가린 줄이 다시 조용해졌다. 이 함수는 살아 있는 값만 읽어
      몇 번 불러도 같은 답이라 창이 움직일 때마다 그냥 다시 부르면 된다.
      관찰자는 하나만 두고 그릴 때마다 새 본문으로 옮겨 붙인다. 그릴 때마다 새로 만들면
      떨어져 나간 옛 본문을 붙든 관찰자가 그 수만큼 쌓인다. */
-  if (!wikiWatch) wikiWatch = new ResizeObserver(() => wikiCue(el('wiki')));
+  if (!wikiWatch) wikiWatch = new ResizeObserver(() => scrollCue(el('wiki').querySelector('.bodybox')));
   wikiWatch.disconnect();
   wikiWatch.observe(body);
-  wikiCue(box);
+  scrollCue(box.querySelector('.bodybox'));
 }
 
 function openWiki(cat) {
@@ -1234,6 +1240,8 @@ function rapportRows() {
    지금 누구를 보고 있는지이기 때문이다. */
 const ME_TABS = [['stat', '능력치'], ['face', '아는 얼굴'], ['log', '전적']];
 let meTab = 'stat';
+// 관찰자 하나. 창 크기가 바뀌면 넘침이 다시 계산되므로, 그릴 때와 굴릴 때만 세면 옛 답이 남는다.
+let meWatch = null;
 
 function renderMe() {
   const box = el('me');
@@ -1283,11 +1291,21 @@ function renderMe() {
     + thumbURL('face', k, lookOf(state.gear, state.keeper.name)) + '">' + name
     + '<small><i>Lv ' + k.level + '</i><i>' + k.height + 'cm</i><i>' + k.weight + 'kg</i>'
     + '<i class="cond">' + cond + '</i></small></h4>'
-    + '<div class="card">' + wear + big + tabs + '<div class="pane">' + pane + '</div></div>'
+    + '<div class="card">' + wear + big + tabs + '<div class="panebox"><div class="pane">' + pane + '</div>'
+    + '<div class="cue up" aria-hidden="true"></div><div class="cue down" aria-hidden="true"></div></div></div>'
     + '<button class="close">닫기</button>';
   box.querySelector('.close').onclick = closeMe;
   for (const b of box.querySelectorAll('.tab')) b.onclick = () => { meTab = b.dataset.tab; renderMe(); };
   for (const b of box.querySelectorAll('.note .go')) b.onclick = () => openDate(Number(b.dataset.city), Number(b.dataset.passer));
+  /* 칸이 넘치면 아래끝에 그늘 한 겹이 선다. 위키가 쓰던 그 함수를 그대로 부른다.
+     관찰자는 하나만 두고 그릴 때마다 새 칸으로 옮겨 붙인다. 그릴 때마다 새로 만들면
+     떨어져 나간 옛 칸을 붙든 관찰자가 그 수만큼 쌓인다. */
+  const paneEl = box.querySelector('.pane');
+  paneEl.onscroll = () => scrollCue(box.querySelector('.panebox'));
+  if (!meWatch) meWatch = new ResizeObserver(() => scrollCue(el('me').querySelector('.panebox')));
+  meWatch.disconnect();
+  meWatch.observe(paneEl);
+  scrollCue(box.querySelector('.panebox'));
 }
 
 function openMe() {

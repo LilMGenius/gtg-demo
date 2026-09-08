@@ -276,6 +276,127 @@ try {
   await p.waitForTimeout(350);
   const again = await read();
   check("control:reopening-lands-on-the-stat-pane", again.current.join("") === "stat", again.current.join("/") || "none");
+
+  /* 접힘 아래. 상대 전적 표는 진짜 표로 서 있었는데 1280x720에서 243px 자리에 700px을 담아
+     최근 목록만 보이고 표는 통째로 화면 밖이었다. 능력치도 416을 같은 자리에 담아 기복과
+     프로의식이 같이 잘렸다. 아래에 더 있다는 말이 화면 어디에도 없었다. 위키가 이미 같은
+     결함을 아래끝 그늘 한 겹으로 닫았으므로, 여기서 재는 것도 그 그늘이다. */
+  const CUE_TOL = 8;
+  const CUE_FLOOR = 0.12;
+  const paneCue = () => p.evaluate(() => {
+    const pane = document.querySelector("#me .pane");
+    if (!pane) return null;
+    /* 신호는 구르는 칸의 형제다. 안에 두면 내용과 같이 굴러가 아래끝에 못 선다.
+       그래서 칸이 아니라 칸을 감싼 상자에서 찾는다. 상자가 없으면 여기서 null이 난다. */
+    const wrap = pane.parentElement;
+    const r = pane.getBoundingClientRect();
+    const seat = (sel) => {
+      const e = wrap ? wrap.querySelector(sel) : null;
+      if (!e) return null;
+      const q = e.getBoundingClientRect();
+      return { h: Math.round(q.height), w: Math.round(q.width), bottom: Math.round(q.bottom),
+        left: Math.round(q.left), op: Number(getComputedStyle(e).opacity) };
+    };
+    return { over: Math.round(pane.scrollHeight - pane.clientHeight), at: Math.round(pane.scrollTop),
+      bottom: Math.round(r.bottom), left: Math.round(r.left), w: Math.round(r.width),
+      down: seat(".cue.down"), up: seat(".cue.up") };
+  });
+  // 끝까지 굴린다. scrollTop을 코드로 밀면 scroll 이벤트가 안 오는 판이 있어 여기서 같이 친다.
+  const paneScrollTo = (to) => p.evaluate((v) => {
+    const pane = document.querySelector("#me .pane");
+    if (!pane) return -1;
+    pane.scrollTop = v < 0 ? pane.scrollHeight : v;
+    pane.dispatchEvent(new Event("scroll"));
+    return Math.round(pane.scrollTop);
+  }, to);
+  /* 화소로 묻는다. 신호가 DOM에만 있고 화소를 하나도 안 옮기면 위의 축들은 빈 초록이다.
+     같은 자리를 두 번 찍는다. 한 번은 그대로, 한 번은 신호를 걷고. 세 채널 중 가장 큰 차가
+     8을 넘은 화소를 센다. 8은 글자 가장자리가 배경과 섞이며 흔들리는 폭보다 크다.
+     자르는 자리를 화면 안으로 물린다. 창 밖을 자르면 찍기가 통째로 죽어 축이 아니라 계기가 운다. */
+  const paneShot = async (c) => {
+    const y = Math.max(0, c.bottom - c.down.h);
+    const h = Math.max(1, Math.min(c.down.h, 720 - y));
+    return (await p.screenshot({ clip: { x: Math.max(0, c.left), y, width: c.w, height: h } })).toString("base64");
+  };
+  const paneMoved = async (a, z) => p.evaluate(([s1, s2, tol]) => new Promise((res) => {
+    const load = (s) => new Promise((r2) => { const im = new Image(); im.onload = () => r2(im); im.src = "data:image/png;base64," + s; });
+    Promise.all([load(s1), load(s2)]).then(([ia, ib]) => {
+      const cv = document.createElement("canvas");
+      cv.width = ia.width; cv.height = ia.height;
+      const g = cv.getContext("2d");
+      g.drawImage(ia, 0, 0);
+      const da = g.getImageData(0, 0, ia.width, ia.height).data;
+      g.clearRect(0, 0, cv.width, cv.height);
+      g.drawImage(ib, 0, 0);
+      const db = g.getImageData(0, 0, ia.width, ia.height).data;
+      let n = 0;
+      for (let i = 0; i < da.length; i += 4) {
+        if (Math.max(Math.abs(da[i] - db[i]), Math.abs(da[i + 1] - db[i + 1]), Math.abs(da[i + 2] - db[i + 2])) > tol) n += 1;
+      }
+      res({ moved: n, all: da.length / 4 });
+    });
+  }), [a, z, CUE_TOL]);
+
+  /* 셋 다 센 것을 같이 찍는다. 신호가 통째로 없으면 실패 목록이 비어서, 앞 축에서 걸러진 칸을
+     뒤 축은 잰 적도 없이 초록으로 넘긴다. 그래서 넘친 수와 잰 수를 나란히 적는다. */
+  const cueless = [], offSeat = [], noFlip = [], dull = [], stuck = [], overTally = [];
+  let overflowing = 0, seated = 0, pixels = 0, flips = 0, fitted = 0, worst = 1;
+  for (const id of TABS) {
+    await p.click('#me .tab[data-tab="' + id + '"]', { force: true });
+    await p.waitForTimeout(240);
+    await paneScrollTo(0);
+    await p.waitForTimeout(90);
+    const c = await paneCue();
+    if (!c) { cueless.push(id + " no pane"); continue; }
+    overTally.push(id + " " + c.over);
+    /* 대조군. 안 넘치는 칸은 신호를 안 켠다. 늘 켜 두는 그늘은 마지막 줄을 영원히 흐리게 두고,
+       그때 이 신호는 더 있다는 뜻을 잃는다. */
+    if (c.over <= 1) {
+      fitted += 1;
+      if (!c.down) stuck.push(id + " no cue element");
+      else if (c.down.op > 0) stuck.push(id + " opacity " + c.down.op);
+      continue;
+    }
+    overflowing += 1;
+    if (!c.down || c.down.h < 1 || c.down.op < 1) {
+      cueless.push(id + " " + (c.down ? c.down.h + "px opacity " + c.down.op : "no .cue.down"));
+      continue;
+    }
+    seated += 1;
+    if (Math.abs(c.down.bottom - c.bottom) > 1 || Math.abs(c.down.w - c.w) > 2) {
+      offSeat.push(id + " cue bottom " + c.down.bottom + " width " + c.down.w + ", pane bottom " + c.bottom + " width " + c.w);
+    }
+    const on = await paneShot(c);
+    await p.evaluate(() => { const e = document.querySelector("#me .cue.down"); if (e) e.style.display = "none"; });
+    await p.waitForTimeout(70);
+    const off = await paneShot(c);
+    await p.evaluate(() => { const e = document.querySelector("#me .cue.down"); if (e) e.style.display = ""; });
+    await p.waitForTimeout(70);
+    const m = await paneMoved(on, off);
+    pixels += 1;
+    const share = m.moved / m.all;
+    if (share < worst) worst = share;
+    if (share < CUE_FLOOR) dull.push(id + " " + (share * 100).toFixed(1) + "% of " + m.all + "px");
+    await paneScrollTo(-1);
+    await p.waitForTimeout(120);
+    const e2 = await paneCue();
+    flips += 1;
+    const turned = e2 && e2.down && e2.up && e2.down.op === 0 && e2.up.op === 1;
+    if (!turned) noFlip.push(id + " " + (e2 && e2.down ? "down " + e2.down.op + " up " + (e2.up ? e2.up.op : "none") : "no cue"));
+  }
+  check("mepane:an-overflowing-pane-paints-a-bottom-cue", overflowing > 0 && cueless.length === 0,
+    cueless.slice(0, 3).join(", ") || overflowing + " overflowing panes at 1280x720, every one cued, hidden px " + overTally.join(" "));
+  check("mepane:the-cue-sits-on-the-pane-bottom-edge", overflowing > 0 && seated === overflowing && offSeat.length === 0,
+    offSeat.slice(0, 2).join(", ") || seated + " of " + overflowing + " cues flush with the pane box");
+  check("mepane:the-cue-flips-when-the-pane-hits-the-bottom", overflowing > 0 && flips === overflowing && noFlip.length === 0,
+    noFlip.slice(0, 3).join(", ") || flips + " of " + overflowing + " panes flip the cue to the top edge at max scroll");
+  check("mepane:the-cue-moves-real-pixels", overflowing > 0 && pixels === overflowing && dull.length === 0,
+    dull.slice(0, 3).join(", ") || pixels + " of " + overflowing + " strips compared, weakest "
+      + (pixels ? (worst * 100).toFixed(1) + "%" : "nothing") + " of pixels moved, floor " + (CUE_FLOOR * 100).toFixed(0) + "%");
+  check("control:a-pane-that-fits-paints-no-cue", fitted > 0 && stuck.length === 0,
+    stuck.slice(0, 3).join(", ") || (fitted
+      ? fitted + " of three panes fit at 1280x720 and none paints a cue"
+      : "no pane fits at 1280x720 for this account, hidden px " + overTally.join(" ")));
   await p.evaluate(() => window.__me(false));
 
   /* 선수단. 골키퍼 하나와 필드 셋은 다른 질문이라 한 목록에 못 섞는다. 탭이 갈렸다는 주장은
