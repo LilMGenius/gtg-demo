@@ -1029,9 +1029,13 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
    조용히 기간을 감췄다). 파는 물건의 크기가 기간인 선반에서 그 수가 없으면 값만 남는다.
    문장과 칸을 가로로 세워 문장만 접고 칸은 제 폭을 지킨다. 칸을 아랫줄로 내리지 않는 이유는
    740x360에서 카드 아래끝이 354px이라 한 줄을 더하면 360px 화면 밖으로 나가기 때문이다.
-   윗선을 맞추는 이유는 문장이 한 줄인 카드와 두 줄인 카드에서 칸이 같은 높이에 서야 넷을 훑는 눈이
-   같은 자리에서 기간만 맞대 보기 때문이다. */
-#shop .card.gear em:has(.eff){display:flex;align-items:baseline;overflow:visible}
+   칸은 문장 블록 전체에 세로 가운데로 선다. 첫 줄에 맞추면 문장이 두 줄인 카드에서 아랫줄이 값 없이
+   남고 수는 위로 떠서, 그 수가 어느 줄에 딸린 것인지를 카드마다 다시 맞춘다(실측: 1280에서
+   자양강장제의 문장 블록 세로 가운데가 417.3인데 12슛은 402.71로, 한 줄 26.88의 절반인 13.44를
+   14.58이 넘었다). 기성작이 쓰는 문법도 이것이다. 클래시 오브 클랜의 자원 행과 FC 모바일의 효과 행은
+   여러 줄로 접힌 이름 옆의 수 칸을 이름 블록 전체에 세로 가운데로 세운다. 마지막 줄 끝에 붙이는
+   형태는 안 쓴다. */
+#shop .card.gear em:has(.eff){display:flex;align-items:center;overflow:visible}
 #shop .card.gear em .eff{min-width:0;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 /* 값은 오른쪽 아래 구석에 못 박힌다. 넉 장을 훑는 눈이 같은 자리에서 값만 맞대 본다.
