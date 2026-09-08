@@ -23,7 +23,7 @@ const SHELVES = [
   { tab: 'sock', head: '양말', field: 'socks' },
   { tab: 'frame', head: '골대', field: 'frame' },
   { tab: 'city', head: '동네', field: 'city' },
-  { tab: 'hair', head: '머리', field: 'hair' },
+  { tab: 'hair', head: '헤어', field: 'hair' },
   { tab: 'ink', head: '타투', field: 'ink' }
 ];
 // 지금 낀 등급과 지나온 등급의 이름표. 선반마다 달랐던 여덟 쌍이 이 두 낱말로 모였으므로
