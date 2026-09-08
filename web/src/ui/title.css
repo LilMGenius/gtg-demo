@@ -14,10 +14,17 @@
   font-size:var(--fs-body);letter-spacing:.09em;
   padding:5px 13px 6px;transform:rotate(1.4deg);
   box-shadow:4px 4px 0 #0009}
-#word{margin-top:clamp(8px,1.2vw,16px);line-height:.85;
+#word{margin-top:clamp(8px,1.2vw,16px);
+  /* 이 서체는 글자 상자가 1em이라 .85는 둘째 줄을 첫 줄 안으로 3.91px 끌어올렸다.
+     골키퍼의 아래가 키우기의 줄상자에 들어와 퍼와 키가 겹쳤다. 1.12면 3.11px 떨어진다. */
+  line-height:1.12;
   font-size:var(--fs-title);color:#ffd83d;font-weight:400;
   -webkit-text-stroke:clamp(3px,.62vw,8px) #12160e;paint-order:stroke fill;
-  text-shadow:clamp(5px,.9vw,12px) clamp(6px,1.05vw,14px) 0 #12160e}
+  /* 그림자를 vw로 잡아 1280에서 13.44px, 글자 높이의 절반이었다. 첫 줄의 그림자가
+     유령 사본으로 읽히고 그 위에 둘째 줄이 얹혔다. em은 --fs-title을 따라가므로
+     어느 폭에서나 같은 비율이고, 둘째 줄 줄상자에 들어오는 첫 줄의 잉크가
+     1280에서 4.98%, 844에서 9.45%였던 것이 양쪽 다 0%가 된다. */
+  text-shadow:.16em .2em 0 #12160e}
 #word span{display:block}
 #word span:last-child{margin-left:clamp(22px,5.4vw,78px);color:#8ff0a6}
 /* 한 줄 카피가 흙바닥 위에 얹힌다. 반투명 회색 글자는 밝은 흙과 붙어 안 읽혔다.
