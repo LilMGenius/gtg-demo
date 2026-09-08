@@ -707,6 +707,13 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 /* 세로 flex의 자식은 기본으로 줄어든다. 칸이 화면보다 길어지면 초상과 큰 수가 같이 눌린다. */
 #me > *{flex:none}
 #me[hidden]{display:none}
+/* 창이 스스로 구르는 화면에서 쓰는 신호. 칸의 신호는 감싼 상자에 붙어 그 상자와 같이 서지만,
+   구르는 것이 창이면 그 상자가 곧 굴러가는 내용이라 붙박이로는 내용과 같이 밀려 내려간다.
+   실측으로 sticky는 창 안쪽 상자에 걸려 아래 여백만큼인 8px 위에 섰고, 화면에 고정인 #hud 안이라
+   fixed는 굴림값 0과 중간과 끝에서 모두 창의 보이는 아래끝 360px에 그대로 섰다.
+   흐름 밖이라 flex 한 줄과 gap을 하나도 안 먹어 위의 flex:none과도 안 부딪힌다.
+   자식 선택자인 이유는 칸의 신호까지 같이 걸면 그 겹이 제 상자를 떠나 화면 끝으로 날아가기 때문이다. */
+#me > .cue{position:fixed}
 /* 첫 단. 초상과 이름이 한 줄, 그 아래가 레벨과 체격과 컨디션이다. 초상을 제목 안에 두는 것은
    계정 머리가 이미 쓰는 규칙이라 두 창의 첫 줄이 같은 문법으로 선다. */
 #me h4{display:grid;grid-template-columns:auto 1fr;column-gap:var(--gap-3);

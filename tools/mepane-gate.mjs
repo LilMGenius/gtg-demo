@@ -282,6 +282,10 @@ try {
      프로의식이 같이 잘렸다. 아래에 더 있다는 말이 화면 어디에도 없었다. 위키가 이미 같은
      결함을 아래끝 그늘 한 겹으로 닫았으므로, 여기서 재는 것도 그 그늘이다. */
   const CUE_TOL = 8;
+  /* 신호가 옮겨야 하는 최소 화소 몫. 그늘이 DOM에만 있고 화면을 안 건드리면 위의 축은 빈 초록이다.
+     26px 띠는 위로 갈수록 투명해져 몫이 1에 닿지 못한다. 실측으로 가장 약한 칸이 22.4%,
+     위키 여덟 칸에서 가장 약한 것이 51.4%였다. 12%는 그 절반 아래라 신호를 그렸다면 넘고
+     안 그렸다면 못 넘는 자리다. */
   const CUE_FLOOR = 0.12;
   const paneCue = () => p.evaluate(() => {
     const pane = document.querySelector("#me .pane");
@@ -312,10 +316,12 @@ try {
   /* 화소로 묻는다. 신호가 DOM에만 있고 화소를 하나도 안 옮기면 위의 축들은 빈 초록이다.
      같은 자리를 두 번 찍는다. 한 번은 그대로, 한 번은 신호를 걷고. 세 채널 중 가장 큰 차가
      8을 넘은 화소를 센다. 8은 글자 가장자리가 배경과 섞이며 흔들리는 폭보다 크다.
-     자르는 자리를 화면 안으로 물린다. 창 밖을 자르면 찍기가 통째로 죽어 축이 아니라 계기가 운다. */
-  const paneShot = async (c) => {
+     자르는 자리를 화면 안으로 물린다. 창 밖을 자르면 찍기가 통째로 죽어 축이 아니라 계기가 운다.
+     화면 높이는 부르는 쪽이 넘긴다. 이 자는 1280x720과 740x360 둘에서 도는데, 한 곳에 박아 두면
+     좁은 화면에서 창 밖을 자르게 된다. */
+  const paneShot = async (c, vh) => {
     const y = Math.max(0, c.bottom - c.down.h);
-    const h = Math.max(1, Math.min(c.down.h, 720 - y));
+    const h = Math.max(1, Math.min(c.down.h, vh - y));
     return (await p.screenshot({ clip: { x: Math.max(0, c.left), y, width: c.w, height: h } })).toString("base64");
   };
   const paneMoved = async (a, z) => p.evaluate(([s1, s2, tol]) => new Promise((res) => {
@@ -336,6 +342,38 @@ try {
       res({ moved: n, all: da.length / 4 });
     });
   }), [a, z, CUE_TOL]);
+
+  /* 같은 물음을 창에 대고 다시 묻는 자. 세로가 짧은 화면에서는 구르는 것이 칸이 아니라 창이라,
+     신호도 칸이 아니라 창에 붙는다. 신호를 자식으로 좁히는 이유는 창 안에 칸의 신호가 같이
+     들어 있어, 안 좁히면 창의 신호 대신 칸의 것을 읽기 때문이다. 아래끝은 창 상자와 화면 중
+     위엣것을 쓴다. 화면 밖으로 내려간 상자 끝을 그대로 자르면 찍기가 죽는다. */
+  const panelCue = () => p.evaluate(() => {
+    const box = document.getElementById("me");
+    if (!box) return null;
+    const r = box.getBoundingClientRect();
+    const seat = (sel) => {
+      const e = box.querySelector(":scope > " + sel);
+      if (!e) return null;
+      const q = e.getBoundingClientRect();
+      return { h: Math.round(q.height), w: Math.round(q.width), bottom: Math.round(q.bottom),
+        left: Math.round(q.left), op: Number(getComputedStyle(e).opacity) };
+    };
+    return { over: Math.round(box.scrollHeight - box.clientHeight), at: Math.round(box.scrollTop),
+      bottom: Math.min(Math.round(r.bottom), window.innerHeight), left: Math.max(0, Math.round(r.left)),
+      w: Math.round(r.width), down: seat(".cue.down"), up: seat(".cue.up") };
+  });
+  const panelShot = async (c) => {
+    const y = Math.max(0, c.bottom - c.down.h);
+    const h = Math.max(1, Math.min(c.down.h, 360 - y));
+    return (await p.screenshot({ clip: { x: c.left, y, width: c.w, height: h } })).toString("base64");
+  };
+  const panelScrollTo = (to) => p.evaluate((v) => {
+    const box = document.getElementById("me");
+    if (!box) return -1;
+    box.scrollTop = v < 0 ? box.scrollHeight : v;
+    box.dispatchEvent(new Event("scroll"));
+    return Math.round(box.scrollTop);
+  }, to);
 
   /* 셋 다 센 것을 같이 찍는다. 신호가 통째로 없으면 실패 목록이 비어서, 앞 축에서 걸러진 칸을
      뒤 축은 잰 적도 없이 초록으로 넘긴다. 그래서 넘친 수와 잰 수를 나란히 적는다. */
@@ -366,11 +404,13 @@ try {
     if (Math.abs(c.down.bottom - c.bottom) > 1 || Math.abs(c.down.w - c.w) > 2) {
       offSeat.push(id + " cue bottom " + c.down.bottom + " width " + c.down.w + ", pane bottom " + c.bottom + " width " + c.w);
     }
-    const on = await paneShot(c);
-    await p.evaluate(() => { const e = document.querySelector("#me .cue.down"); if (e) e.style.display = "none"; });
+    const on = await paneShot(c, 720);
+    /* 칸의 신호만 걷는다. 창에도 같은 클래스가 붙으므로 좁히지 않으면 화면에 걸린 신호가 같이 걷히고,
+       그러면 이 축이 무엇을 재고 있는지가 흐려진다. */
+    await p.evaluate(() => { const e = document.querySelector("#me .panebox .cue.down"); if (e) e.style.display = "none"; });
     await p.waitForTimeout(70);
-    const off = await paneShot(c);
-    await p.evaluate(() => { const e = document.querySelector("#me .cue.down"); if (e) e.style.display = ""; });
+    const off = await paneShot(c, 720);
+    await p.evaluate(() => { const e = document.querySelector("#me .panebox .cue.down"); if (e) e.style.display = ""; });
     await p.waitForTimeout(70);
     const m = await paneMoved(on, off);
     pixels += 1;
@@ -397,6 +437,11 @@ try {
     stuck.slice(0, 3).join(", ") || (fitted
       ? fitted + " of three panes fit at 1280x720 and none paints a cue"
       : "no pane fits at 1280x720 for this account, hidden px " + overTally.join(" ")));
+  /* 넓은 화면에서 창이 든 신호. 여기서는 칸이 구르므로 창의 신호는 꺼져 있어야 한다.
+     아래 좁은 화면 대조군이 이 값을 그대로 읽는다. */
+  await p.click('#me .tab[data-tab="log"]', { force: true });
+  await p.waitForTimeout(240);
+  const wideSeen = { panel: await panelCue(), pane: await paneCue() };
   await p.evaluate(() => window.__me(false));
 
   /* 선수단. 골키퍼 하나와 필드 셋은 다른 질문이라 한 목록에 못 섞는다. 탭이 갈렸다는 주장은
@@ -508,10 +553,74 @@ try {
     floor.length === 7 && floor.every((v) => v >= TOUCH),
     "position tabs " + kindH.join("/") + ", profile tabs " + tabH.join("/") + " against " + TOUCH + "px");
 
+  /* 좁고 낮은 화면. 여기서 구르는 것은 칸이 아니라 창이다. 상한을 걷은 자리라 칸은 제 높이를 다 쓰고,
+     넘치는 만큼을 창이 받는다. 그래서 칸에 붙은 신호는 꺼진 채가 맞고, 그 상태로 두면 화면에는
+     아래에 더 있다는 말이 한 군데도 안 남는다. 실측으로 전적 칸에서 최근 목록이 화면 밖으로 흐르고
+     상대 전적 표는 그보다 400px 아래에 있었다. 그래서 같은 물음을 창에 대고 다시 묻는다. */
+  await p.evaluate(() => window.__me(true));
+  await p.click('#me .tab[data-tab="log"]', { force: true });
+  await p.waitForTimeout(320);
+  await panelScrollTo(0);
+  await p.waitForTimeout(120);
+  const narrow = await panelCue();
+  const narrowPane = await paneCue();
+  const panelSeated = Boolean(narrow) && narrow.over > 1 && Boolean(narrow.down)
+    && narrow.down.h >= 1 && narrow.down.op === 1;
+  const panelFlush = panelSeated && Math.abs(narrow.down.bottom - narrow.bottom) <= 1;
+  check("mepane:the-panel-cues-what-overflows-at-740x360", panelSeated && panelFlush,
+    narrow
+      ? "panel hides " + narrow.over + "px, cue "
+        + (narrow.down ? narrow.down.h + "px opacity " + narrow.down.op + " bottom " + narrow.down.bottom : "none")
+        + ", panel visible bottom " + narrow.bottom
+      : "no panel");
+
+  /* 화소. 창의 신호도 DOM에만 있으면 위의 축이 빈 초록이다. 칸에 쓴 그 자를 그대로 쓰되
+     화면 높이만 360으로 넘긴다. 걷는 것도 창의 신호 하나로 좁힌다. */
+  let panelShare = -1;
+  if (panelSeated) {
+    const on = await panelShot(narrow);
+    await p.evaluate(() => { const e = document.querySelector("#me > .cue.down"); if (e) e.style.display = "none"; });
+    await p.waitForTimeout(70);
+    const off = await panelShot(narrow);
+    await p.evaluate(() => { const e = document.querySelector("#me > .cue.down"); if (e) e.style.display = ""; });
+    await p.waitForTimeout(70);
+    const m = await paneMoved(on, off);
+    panelShare = m.moved / m.all;
+  }
+  check("mepane:the-panel-cue-moves-real-pixels-at-740x360", panelShare >= CUE_FLOOR,
+    panelShare < 0 ? "no panel cue to compare"
+      : (panelShare * 100).toFixed(1) + "% of the bottom strip moved, floor " + (CUE_FLOOR * 100).toFixed(0) + "%");
+
+  /* 끝까지 굴린다. 아래끝 신호가 꺼지고 위끝 신호가 켜져야 한다. 안 뒤집히면 이 겹은 상태가 아니라
+     늘 켜 둔 장식이고, 그때 마지막 줄만 영원히 흐려진다. */
+  await panelScrollTo(-1);
+  await p.waitForTimeout(150);
+  const narrowEnd = await panelCue();
+  const flipped = Boolean(narrowEnd) && Boolean(narrowEnd.down) && Boolean(narrowEnd.up)
+    && narrowEnd.down.op === 0 && narrowEnd.up.op === 1;
+  check("mepane:the-panel-cue-flips-at-the-bottom-at-740x360", flipped,
+    narrowEnd && narrowEnd.down
+      ? "at " + narrowEnd.at + " of " + narrowEnd.over + " down " + narrowEnd.down.op
+        + " up " + (narrowEnd.up ? narrowEnd.up.op : "none")
+      : "no panel cue at max scroll");
+
+  /* 대조군. 구르는 상자만 신호를 켠다. 좁은 화면에서는 창이 구르고 칸은 안 구르며,
+     넓은 화면에서는 그 반대다. 한쪽만 재면 늘 켜 둔 신호 둘로도 위의 축이 통과한다. */
+  const narrowSplit = Boolean(narrowPane) && Boolean(narrowPane.down) && narrowPane.down.op === 0 && panelSeated;
+  const wideSplit = Boolean(wideSeen.panel) && Boolean(wideSeen.pane) && Boolean(wideSeen.pane.down)
+    && wideSeen.pane.down.op === 1 && (!wideSeen.panel.down || wideSeen.panel.down.op === 0);
+  check("control:only-the-scrolling-box-cues-at-740x360", narrowSplit && wideSplit,
+    "740x360 pane cue " + (narrowPane && narrowPane.down ? narrowPane.down.op : "none")
+    + " panel cue " + (narrow && narrow.down ? narrow.down.op : "none")
+    + ", 1280x720 pane cue " + (wideSeen.pane && wideSeen.pane.down ? wideSeen.pane.down.op : "none")
+    + " panel cue " + (wideSeen.panel && wideSeen.panel.down ? wideSeen.panel.down.op : "none")
+    + " over " + (wideSeen.panel ? wideSeen.panel.over : "?"));
+  await p.evaluate(() => window.__me(false));
+
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 
-  console.log("표본 범위: 내 정보 칸 셋 + 선수단 포지션 넷, 한 화면 1280x720");
+  console.log("표본 범위: 내 정보 칸 셋 + 선수단 포지션 넷, 1280x720과 740x360 두 화면");
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
   console.log(fails.length ? "mepane FAIL " + fails.length : "mepane PASS " + notes.length);
