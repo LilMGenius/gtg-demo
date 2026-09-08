@@ -4,9 +4,9 @@ import { chromium } from "playwright";
 // 파운더가 연 상점에 게이트가 하나도 없었다. 선반은 그려졌지만 사고 나서 무엇이 변하는지 아무도 본 적이 없다.
 // 살 수 있는 상태는 주입 훅(?preset=rich)으로 앞당긴다. 판정식도 가격표도 건드리지 않는다.
 //
-// 라벨은 문장이 아니라 명사구다. 버튼은 모자란다고 안 적고 모자란 값을 숫자로만 적으며,
+// 라벨은 문장이 아니라 명사구다. 버튼은 모자란다고 안 적고 값 자리에 언제나 원값을 적으며,
 // 산 등급과 지난 등급은 두 낱말이 받는다. 그래서 이 자는 낱말이 아니라 수와 상태를 읽는다.
-// 정가는 부자 표본의 산 버튼에서 얻고, 모자란 값은 그 정가와 지갑의 차로 확인한다.
+// 정가는 부자 표본의 산 버튼에서 얻고, 가난한 지갑의 죽은 버튼이 그 정가를 그대로 적는지 본다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html";
 // 한 선반의 등급 수. gear.mjs의 각 배열 길이다.
@@ -96,7 +96,9 @@ try {
           // 데이터의 수와 사람이 읽는 숫자가 같은가. 천 단위 쉼표만 뺀다.
           shown: c ? c.textContent.replace(/[^0-9]/g, "") : "",
           lit: lit(x),
-          off: x.disabled
+          off: x.disabled,
+          // 붉은 값 표식. 부족은 이 표식과 죽은 버튼으로만 말한다.
+          bad: x.classList.contains('bad-price')
         };
       })
     };
@@ -144,18 +146,16 @@ try {
   await boot("?seed=20&preset=maxed,veteran");
   const emptyCoin = await p.evaluate(() => window.__wallet().coin);
   let poorTop = 0;
-  const fresh = {};
   for (const s of SHELVES) {
     const v = await shelf(s.tab);
     const top = v.rows.find((r) => r.rank === TOP);
     if (top && top.off) poorTop += 1;
-    fresh[s.tab] = top ? top.coin : null;
   }
   check("control:top-rank-is-dead-on-a-fresh-wallet", poorTop === SHELVES.length, poorTop + "/" + SHELVES.length);
   const deadPaint = await paintShot(SHELVES[0].tab);
 
   /* 지갑을 조금 채운다. 주입이 아니라 사람이 도는 경로다. 남은 훈련을 환전하면 값이 들어오고,
-     그 뒤 버튼이 적는 수가 정가에서 그만큼 내려가야 그 수가 값이 아니라 모자란 값이다. */
+     그 뒤에도 버튼이 적는 수가 안 내려가야 그 수가 모자란 값이 아니라 값이다. */
   await p.evaluate(() => window.__shop(false));
   await p.waitForTimeout(160);
   // 훈련장 문은 pointerdown으로 열린다. click()은 그 문을 안 건드리므로 창을 여는 훅으로 연다.
@@ -183,8 +183,8 @@ try {
   for (const s of SHELVES) {
     const v = await shelf(s.tab);
     const top = v.rows.find((r) => r.rank === TOP);
-    // 죽은 버튼이 수를 하나 들고 있고, 그 수가 화면에도 같은 숫자로 찍혀 있는가.
-    if (top && top.off && top.lit && top.coin > 0 && top.shown === String(top.coin)) poorSaid += 1;
+    // 죽은 버튼이 수를 하나 들고 있고, 그 수가 화면에도 같은 숫자로 찍혀 있으며, 붉은 값 표식을 달고 있는가.
+    if (top && top.off && top.bad && top.lit && top.coin > 0 && top.shown === String(top.coin)) poorSaid += 1;
     short[s.tab] = top ? top.coin : null;
   }
 
@@ -220,9 +220,8 @@ try {
   }
   const coin1 = await p.evaluate(() => window.__wallet().coin);
   const gear = await p.evaluate(() => window.__gear());
-  // 모자란 값은 정가에서 지갑을 뺀 수다. 정가는 아래 총액 축과 지갑 축이 붙들고 있다.
-  const owed = SHELVES.filter((s) => price[s.tab] !== null
-    && short[s.tab] === price[s.tab] - GYM_COIN && fresh[s.tab] === price[s.tab]).length;
+  // 값 자리에는 언제나 원값이 선다. 부족은 붉은 값과 죽은 버튼이 말한다. 파운더 결정이고 be0cb4c가 제품을 그리로 옮겼다.
+  const stated = SHELVES.filter((s) => price[s.tab] !== null && short[s.tab] === price[s.tab]).length;
   const drawn = await repaint(deadPaint, livePaint);
 
   check("shop:eight-shelves-render-four-ranks-under-their-own-head", shaped === SHELVES.length, shaped + "/" + SHELVES.length);
@@ -230,8 +229,8 @@ try {
   check("buy:price-on-the-button-matches-the-declared-total", paid === TOP_TOTAL, paid + " want " + TOP_TOTAL);
   check("buy:wallet-drops-by-exactly-what-the-buttons-asked", coin0 - coin1 === paid, coin0 + "-" + paid + " -> " + coin1);
   check("buy:every-gear-field-rose-to-the-top-rank", SHELVES.every((s) => gear[s.field] === TOP), JSON.stringify(gear));
-  check("control:dead-button-states-the-shortfall", poorSaid === SHELVES.length && owed === SHELVES.length,
-    poorSaid + "/" + SHELVES.length + " read on screen, " + owed + "/" + SHELVES.length + " equal price minus " + GYM_COIN);
+  check("control:a-dead-button-still-states-the-price", poorSaid === SHELVES.length && stated === SHELVES.length,
+    poorSaid + "/" + SHELVES.length + " read on screen at " + GYM_COIN + ", " + stated + "/" + SHELVES.length + " equal the rich-wallet price");
   check("control:the-dead-button-is-drawn-dead-not-just-disabled", drawn >= DEAD_REPAINT,
     (drawn * 100).toFixed(1) + "% of the button repainted, want " + (DEAD_REPAINT * 100) + "%");
   check("after:bought-row-says-it-is-being-worn", worn === SHELVES.length, worn + "/" + SHELVES.length);
