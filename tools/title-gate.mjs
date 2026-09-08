@@ -57,6 +57,38 @@ const WRAP = function () {
   return bad;
 };
 
+// 두 화면의 차이를 픽셀로 센다. png를 푸는 일은 브라우저에게 맡긴다.
+// 채널 하나라도 8을 넘게 벌어지면 그 자리에 다른 것이 칠해진 것이다.
+async function inkDiff([A, B, thr]) {
+  const read = async (b64) => {
+    const im = new Image();
+    im.src = "data:image/png;base64," + b64;
+    await im.decode();
+    const cv = document.createElement("canvas");
+    cv.width = im.width; cv.height = im.height;
+    cv.getContext("2d").drawImage(im, 0, 0);
+    return cv.getContext("2d").getImageData(0, 0, im.width, im.height);
+  };
+  const a = await read(A);
+  const b = await read(B);
+  let hits = 0;
+  for (let i = 0; i < a.data.length; i += 4) {
+    const d = Math.max(Math.abs(a.data[i] - b.data[i]), Math.abs(a.data[i + 1] - b.data[i + 1]), Math.abs(a.data[i + 2] - b.data[i + 2]));
+    if (d > thr) hits += 1;
+  }
+  return { hits, px: a.width * a.height };
+}
+
+// 픽셀 축이 쓰는 눈금. 8은 채널 하나가 눈에 띄게 벌어진 정도다.
+// 바닥 1퍼센트는 고치기 전과 고친 뒤 사이에서 잡았다. 줄간격 .85와 vw 그림자일 때 첫 줄은
+// 둘째 줄 줄상자를 1280에서 4.98퍼센트, 844에서 9.45퍼센트 칠했고, 1.12와 em 그림자로
+// 바꾼 뒤에는 양쪽 다 0.00퍼센트다. 1퍼센트는 1280에서 20픽셀, 844에서 12픽셀이라
+// 글자 가장자리 한 줄은 통과시키고 유령의 획 하나는 못 통과한다.
+// 0.3은 둘째 줄이 제 상자를 이만큼은 칠해야 상자를 제대로 물었다고 보는 하한이다. 실측은 0.90 언저리였다.
+const INK_THR = 8;
+const INK_FLOOR = 0.01;
+const OWN_MIN = 0.3;
+
 let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
@@ -82,6 +114,77 @@ try {
     check("title:" + tag + ":says-its-name-and-a-line", words.word.length >= 4 && words.tag.length >= 8 && words.go.length >= 1, words.word + " / " + words.tag.slice(0, 14) + " / " + words.go);
     const clipped = await p.evaluate(SCAN);
     check("title:" + tag + ":no-text-is-clipped", clipped.length === 0, clipped.join(", ") || "nothing overruns its box");
+
+    /* 워드마크는 두 줄이다. 첫 줄의 잉크와 그림자가 둘째 줄 줄상자에 들어오면
+       골키퍼의 그림자가 유령 사본으로 읽히고 그 위에 키우기가 얹힌다.
+       둘째 줄만 숨긴 화면과 둘 다 숨긴 화면의 차이가 그 자리에 들어온 첫 줄의 양이다.
+       재는 동안만 장면 캔버스를 세우고 타이틀에 단색을 깐다. 움직이는 배경 위에서는
+       같은 화면을 두 번 찍어도 8064픽셀 중 2460이 달라져 잉크와 배경을 못 가르고,
+       검정 그림자는 어두운 배경과 채널차가 7이라 회색을 깔지 않으면 아예 안 잡힌다. */
+    await p.evaluate(() => {
+      document.getElementById("stage").style.visibility = "hidden";
+      document.getElementById("title").style.background = "#7f7f7f";
+    });
+    await p.waitForTimeout(150);
+    // R은 둘째 줄의 줄상자다. 스팬의 상자는 블록이라 마크의 폭을 다 차지해서,
+    // 1280에서 252px 중 글자가 쓰는 자리는 65px뿐이고 겹침이 네 배로 묽어진다.
+    const R = await p.evaluate(() => {
+      const rng = document.createRange();
+      rng.selectNodeContents(document.querySelectorAll("#word span")[1]);
+      const r = rng.getBoundingClientRect();
+      const x = Math.max(0, Math.floor(r.x));
+      const y = Math.max(0, Math.floor(r.y));
+      return { x, y, width: Math.ceil(r.x + r.width) - x, height: Math.ceil(r.y + r.height) - y };
+    });
+    const clipAt = async (one, two) => {
+      await p.evaluate((v) => {
+        const s = document.querySelectorAll("#word span");
+        s[0].style.visibility = v[0] ? "visible" : "hidden";
+        s[1].style.visibility = v[1] ? "visible" : "hidden";
+      }, [one, two]);
+      return (await p.screenshot({ clip: R })).toString("base64");
+    };
+    const shotBoth = await clipAt(true, true);
+    const shotFirst = await clipAt(true, false);
+    const shotNone = await clipAt(false, false);
+    const shotNone2 = await clipAt(false, false);
+    await p.evaluate(() => {
+      for (const s of document.querySelectorAll("#word span")) s.style.visibility = "";
+      document.getElementById("stage").style.visibility = "";
+      document.getElementById("title").style.background = "";
+    });
+    const still = await p.evaluate(inkDiff, [shotNone, shotNone2, INK_THR]);
+    const wear = await p.evaluate(inkDiff, [shotFirst, shotNone, INK_THR]);
+    const own = await p.evaluate(inkDiff, [shotBoth, shotFirst, INK_THR]);
+    const area = R.width * R.height;
+    const share = wear.hits / area;
+    // 빈 자리를 찍고도 0은 나온다. 둘째 줄이 제 상자를 칠하는지와 화면이 멎었는지를
+    // 같이 물어야 이 0이 잘 잰 0이다.
+    check("title:" + tag + ":the-second-line-does-not-wear-the-first",
+      share <= INK_FLOOR && still.hits === 0 && own.hits >= area * OWN_MIN,
+      wear.hits + "px of " + area + " = " + (100 * share).toFixed(2) + "% against floor "
+      + (100 * INK_FLOOR).toFixed(2) + "%, second line fills " + (100 * own.hits / area).toFixed(2)
+      + "%, a still frame moves " + still.hits + "px");
+
+    /* 같은 주장의 DOM 쪽 반쪽이고 값이 싸다. 마크가 -2.2도 기울어 있어 화면 좌표의
+       AABB는 두 줄이 12.28px 겹친 것으로 읽히는데, 줄간격을 무엇으로 바꿔도 같은 수다.
+       기울기는 두 줄을 함께 돌리므로 서 있는지는 기울기를 뺀 자리에서 묻는다.
+       스팬의 상자끼리는 블록이라 언제나 맞닿아 아무것도 못 묻는다. 줄상자를 잰다. */
+    const apart = await p.evaluate(() => {
+      const s = document.querySelectorAll("#word span");
+      const mark = document.getElementById("mark");
+      const keep = mark.style.transform;
+      mark.style.transform = "none";
+      const rng = document.createRange();
+      rng.selectNodeContents(s[0]);
+      const one = rng.getBoundingClientRect();
+      rng.selectNodeContents(s[1]);
+      const two = rng.getBoundingClientRect();
+      mark.style.transform = keep;
+      return { bottom: +one.bottom.toFixed(2), top: +two.top.toFixed(2), gap: +(two.top - one.bottom).toFixed(2) };
+    });
+    check("title:" + tag + ":the-lines-stand-apart", apart.gap >= -1,
+      "line one ends at " + apart.bottom + ", line two starts at " + apart.top + ", gap " + apart.gap + "px");
 
     /* 조작법 패널은 이 화면을 떠나 판 안의 위키로 옮겼다. 접힘과 여닫이를 재던 다섯 축은
        그 표면을 따라가 wiki 게이트가 갖는다. 여기서는 타이틀이 이름과 문 하나만 세우는지를 본다. */
