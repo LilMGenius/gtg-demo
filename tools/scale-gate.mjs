@@ -115,7 +115,7 @@ try {
   }
   // 오류가 많아도 실패 진단 출력은 앞의 두 건으로 제한해 원인을 읽을 수 있게 한다.
   check("render:console-clean", errors.length === 0, errors.slice(0, 2).join(" | ") || "clean");
-  console.log("표본 범위: " + sampleCount + " 표면 × 제목/본문/수치 셋");
+  console.log("표본 범위: " + surfaces.length + " 표면 × 제목/본문/수치 셋 = " + sampleCount + " 표본");
   console.log("토큰 실측: " + JSON.stringify(tokenSet));
   await context.close();
 } catch (error) {
