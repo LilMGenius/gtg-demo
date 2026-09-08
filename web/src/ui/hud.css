@@ -28,6 +28,12 @@
   --gap-3:12px;
   --pad-l:calc(16px + env(safe-area-inset-left));
   --pad-r:calc(16px + env(safe-area-inset-right));
+  /* 재화 띠의 아래끝. 왼쪽 기둥이 여기서 시작한다. 띠의 키가 글자를 따라 굽어 실측으로
+     740x360에서 63px, 1280x720에서 74px이라, 상수로 박으면 한 폭에서만 리듬이 맞는다.
+     띠는 8px에서 서고 여백 2/3px과 테두리 3/3px로 11px을 쓴다. 안쪽은 초상화 44px과
+     글자 두 줄 중 큰 쪽이고, 두 줄은 컨디션 아이콘 .9em과 잔고 1.05em에 줄 사이 --gap-3이다.
+     --fs-num이 16.4px을 넘는 폭 912px부터 글자가 초상화를 넘어 띠가 자란다. */
+  --strip-b:calc(8px + max(44px, calc(.9 * var(--fs-num) + var(--gap-3) + 1.05 * var(--fs-num))) + 11px);
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;background:#0d110c;overflow:hidden;
@@ -308,8 +314,10 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
    쌓는 차례는 손이 가는 빈도다. 나가기가 맨 위에서 가장 컸을 때 화면에서 제일 굵은
    덩어리가 판을 뜨는 버튼이었다. */
 /* 돌진. 나가 있는 동안만 켜지는 토글이라 왼쪽 토글 무리에 선다.
-   자동 46px 판때기 아래 198px에서 시작해 244px에 끝난다. */
-#out{position:absolute;left:var(--pad-l);top:calc(198px + env(safe-area-inset-top));
+   자동 46px 판때기 아래 --gap-3만큼 내려와 오른쪽 기둥과 같은 칸을 쓴다. 실측으로 1280x720에서
+   144px에서 시작해 190px에, 740x360에서 133px에서 시작해 179px에 끝난다. 세로 360px 안이고,
+   왼쪽 100px에서 시작하는 자막 상자와 좌우로 안 겹친다. */
+#out{position:absolute;left:var(--pad-l);top:calc(var(--strip-b) + var(--gap-3) + 46px + var(--gap-3) + env(safe-area-inset-top));
   pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(2deg);
@@ -405,9 +413,12 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
   #wiki .bodybox{grid-column:1;grid-row:2}
   #wiki .close{grid-column:1;grid-row:3;justify-self:start;align-self:auto}
 }
-/* 자동. 손가락만 대신하는 토글이라 소리 아래 왼쪽 기둥에 선다.
-   소리 128px 판때기 아래 140px에서 시작해 186px에 끝난다. */
-#auto{position:absolute;left:var(--pad-l);top:calc(140px + env(safe-area-inset-top));
+/* 자동. 손가락만 대신하는 토글이라 왼쪽 기둥 맨 위, 재화 띠 바로 아래에 선다.
+   소리가 오른쪽 기둥으로 간 뒤 그 판때기가 서 있던 자리가 빈 칸으로 남아, 띠 아래끝과 이 판때기
+   사이가 실측 66px(1280x720)과 77px(740x360)으로 벌어졌다. 오른쪽 기둥이 네 번 지키는 12px의
+   다섯 배가 넘어, 눈에는 여백이 아니라 판때기 하나가 빠진 자리로 읽힌다.
+   띠 아래끝에서 --gap-3만큼 내려와 그 리듬에 붙는다. 실측 86px(1280x720)과 75px(740x360)이다. */
+#auto{position:absolute;left:var(--pad-l);top:calc(var(--strip-b) + var(--gap-3) + env(safe-area-inset-top));
   pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(-2.4deg);
