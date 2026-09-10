@@ -1033,6 +1033,17 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #shop .shot.spinning img{display:none}
 /* 이름은 제목 토큰을 쓴다. 카드에서 가장 큰 글자가 값이면 진열이 아니라 가격표가 된다. */
 #shop .card.gear b{font-size:var(--fs-title);line-height:1.25}
+/* 이름 칸은 두 줄을 미리 잡아 둔다. 한 줄 이름과 두 줄 이름이 같은 격자 줄에 서면 두 줄짜리 밑의
+   효과 한 줄만 형제보다 한 줄 아래로 내려가, 넉 장을 훑는 눈이 효과를 카드마다 다른 높이에서 다시 찾는다
+   (실측: 1280에서 봇 선반의 효과 줄이 387/387/420으로 어긋남 33px이고, 그 수가 이름 한 줄 32.5와 같다.
+   신발·유니폼·양말·타투도 같은 33px으로 열 선반 중 다섯이 이렇게 갈렸다).
+   값 배지는 아래 foot의 auto 여백이 이미 카드 바닥에 못 박아 두 줄 카드에서도 안 흔들리므로
+   (실측: 같은 줄에서 배지 아래끝 어긋남 1px 이하) 못 박을 것은 배지가 아니라 이름 칸이다.
+   2.5em은 바로 위 줄의 1.25 두 줄이라 줄 높이를 고치면 이 자리도 같이 움직인다. 자식 b에만 거는 이유는
+   값 배지 안의 수도 b이고 .px가 inline-flex라 그 b한테도 높이가 걸리기 때문이다.
+   기성작이 쓰는 문법도 이것이다. FC 모바일의 선수 카드와 클래시 오브 클랜의 상점 줄은 이름에 두 줄 자리를
+   내주고 값은 한 줄에 맞춰 세운다. */
+#shop .card.gear > b{min-height:2.5em}
 /* 효과 한 줄은 카드 폭을 다 쓴다. 값 배지와 한 줄을 나눠 쓰면 남는 폭이 절반이라
    두 낱말짜리 줄도 두 줄로 접히고, 접힌 자리가 낱말 가운데였다(실측: '한눈팔기 -50%, 수다...').
    두 줄에서 자르는 이유는 축이 둘인 선반의 한 줄이 세 줄까지 가고, 그때 카드 높이가
@@ -1091,6 +1102,11 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
   #shop .card.gear .shot{aspect-ratio:12 / 5}
   #shop .card.gear em{-webkit-line-clamp:1}
   #shop .card.gear em .eff{-webkit-line-clamp:1}
+  /* 짧은 화면에서는 이름 칸을 도로 거둔다. 카드 아래끝이 353px이라 360px 화면에 7px밖에 안 남는데,
+     두 줄 자리는 한 줄 22.2px을 더해 그 끝을 375px으로 밀어 값 배지를 화면 밖에 세운다.
+     이 폭에서는 어느 이름도 안 접히므로(실측: 740x360에서 열 선반 카드 38장이 전부 한 줄)
+     자리를 안 잡아도 효과 줄이 같은 높이에 선다. */
+  #shop .card.gear > b{min-height:0}
 }
 #shop .buy{width:100%;margin-top:13px;padding:10px 0 12px;
   border:var(--line) solid var(--edge);background:#2b3a22;color:var(--ink);
