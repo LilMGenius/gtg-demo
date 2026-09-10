@@ -746,10 +746,133 @@ try {
     + "%, a still frame moves " + stripStill.moved + "px");
   await p.evaluate(() => window.__me(false));
 
+  /* 일반 앱 UX 문법 둘. 위의 축들은 이 게임의 장부와 성장 칸을 알아야 읽히지만, 아래 둘은 어느 앱의
+     프로필이든 같은 것을 묻는다. 표면마다 도메인 축 옆에 같은 문법을 세운다는 래칫의 요구다.
+     하나. 같은 종류의 칸은 같은 표기다. 머리의 큰 수 셋은 한 줄에 나란히 선 같은 종류이고, 성장 칸
+     열다섯도 서로 같은 종류다. 무리 안에서 글꼴이 갈리면 한 수가 다른 층의 것으로 읽히고, 값 자리에
+     낱말이 서면 그 칸만 다른 문법이 된다. 세이브율의 %는 그 수의 단위라 값의 일부이고, 그것을 빼면
+     막은 수와 같은 모양이다. 성장 칸은 단위가 없으므로 숫자만 선다.
+     둘. 상태를 바꾸는 조작이 그 상태가 사는 동안 내내 열려 있다. 칸을 끝까지 굴린 자리에서도 탭 셋은
+     그대로 눌려야 한다. 묻는 것은 disabled 하나가 아니라 화면이 실제로 그 누름을 받는가이므로
+     elementFromPoint로 그 칸이 맨 앞인지까지 보고, 실제로 눌러 칸이 바뀌는 것까지 본다.
+     접힌 이름 문법은 이 표면에 안 선다. 성장 칸 이름은 1280x720에서도 740x360에서도 두 줄로 안 접히고,
+     수는 이름 옆이 아니라 이름 아래 칸에 서는 구조다. 접힌 이름이 표본에 없으므로 그 축을 세우지 않고,
+     대신 두 폭에서 센 줄 수를 아래 표본 줄이 적는다. */
+  const uxSlots = () => {
+    const font = (e) => { const s = getComputedStyle(e); return [s.fontFamily.split(",")[0], s.fontSize, s.fontWeight, s.fontStyle, s.letterSpacing].join("|"); };
+    const box = document.getElementById("me");
+    const big = [...box.querySelectorAll(".big span")].map((s) => {
+      const v = s.querySelector("b");
+      return { where: "big", text: v ? v.textContent.trim() : "", font: v ? font(v) : "none",
+        label: (s.querySelector("i") || {}).textContent || "" };
+    });
+    const grid = [...box.querySelectorAll(".grid > span")].map((s) => {
+      const v = s.querySelector("b");
+      const n = s.querySelector("span");
+      return { where: "grid", text: v ? v.textContent.trim() : "", font: v ? font(v) : "none",
+        label: n ? n.textContent.trim() : "" };
+    });
+    return { big: big, grid: grid };
+  };
+  const uxNames = () => [...document.querySelectorAll("#me .grid > span")].map((s) => {
+    const n = s.querySelector("span");
+    if (!n) return 0;
+    return Math.round(n.getBoundingClientRect().height / parseFloat(getComputedStyle(n).lineHeight));
+  });
+  const uxTabState = () => [...document.querySelectorAll("#me .tabs .tab")].map((t) => {
+    const q = t.getBoundingClientRect();
+    const mid = document.elementFromPoint(q.x + q.width / 2, q.y + q.height / 2);
+    return { k: t.dataset.tab, off: t.disabled, pe: getComputedStyle(t).pointerEvents,
+      cur: t.getAttribute("aria-current") === "true", hit: mid === t || (mid && t.contains(mid)),
+      w: Math.round(q.width), h: Math.round(q.height) };
+  });
+  // 값 자리의 모양 둘. 셈은 숫자만, 비율은 그 뒤에 단위 한 글자. 낱말이 서면 둘 다 안 맞는다.
+  const UX_TALLY = /^[0-9]{1,3}(,[0-9]{3})*$/;
+  const UX_RATE = /^[0-9]{1,3}(,[0-9]{3})*%$/;
+  const uxFormat = (slots) => {
+    const faces = (rs) => [...new Set(rs.map((r) => r.font))];
+    const bigOdd = slots.big.filter((r) => !(UX_TALLY.test(r.text) || UX_RATE.test(r.text)));
+    const gridOdd = slots.grid.filter((r) => !UX_TALLY.test(r.text));
+    return { bigFaces: faces(slots.big), gridFaces: faces(slots.grid), bigOdd: bigOdd, gridOdd: gridOdd,
+      ok: slots.big.length === 3 && slots.grid.length > 0 && faces(slots.big).length === 1
+        && faces(slots.grid).length === 1 && bigOdd.length === 0 && gridOdd.length === 0 };
+  };
+  const uxDeaf = (ts) => ts.filter((t) => t.off || t.pe === "none" || !t.hit || t.w < 1 || t.h < 1);
+
+  await p.evaluate(() => window.__me(true));
+  await p.waitForTimeout(460);
+  const uxNarrow = await p.evaluate(uxSlots);
+  const uxNarrowRows = await p.evaluate(uxNames);
+  await p.setViewportSize({ width: 1280, height: 720 });
+  await p.waitForTimeout(460);
+  const uxWide = await p.evaluate(uxSlots);
+  const uxWideRows = await p.evaluate(uxNames);
+  const uxFmt = uxFormat(uxWide);
+  const uxFmtNarrow = uxFormat(uxNarrow);
+  check("ux:the-numbers-of-one-kind-read-one-format", uxFmt.ok && uxFmtNarrow.ok,
+    uxFmt.bigOdd.length || uxFmt.gridOdd.length
+      ? uxFmt.bigOdd.concat(uxFmt.gridOdd).map((r) => r.where + " " + r.label + " draws " + JSON.stringify(r.text)).join(", ")
+      : uxFmt.bigFaces.length > 1 || uxFmt.gridFaces.length > 1
+        ? "the three big numbers carry " + uxFmt.bigFaces.length + " faces and the " + uxWide.grid.length
+          + " growth slots " + uxFmt.gridFaces.length
+        : uxWide.big.map((r) => r.text).join("/") + " on one face " + uxFmt.bigFaces[0] + ", "
+          + uxWide.grid.length + " growth values " + uxWide.grid.map((r) => r.text).join(" ")
+          + " on " + uxFmt.gridFaces[0] + ", both viewports");
+  /* 대조군 둘. 큰 수 하나의 글꼴을 줄이면 머리 셋이 두 표기로 갈리고, 성장 칸 하나에 낱말을 심으면
+     값 자리에 값이 아닌 것이 선다. 둘 다 위 축을 빨갛게 만들어야 한다. 심고 곧바로 도로 뺀다. */
+  await p.evaluate(() => { document.querySelector("#me .big span b").style.fontSize = "13px"; });
+  const uxSmall = uxFormat(await p.evaluate(uxSlots));
+  await p.evaluate(() => { document.querySelector("#me .big span b").style.fontSize = ""; });
+  await p.evaluate(() => { const e = document.querySelector("#me .grid > span b"); e.dataset.was = e.textContent; e.textContent = "MAX"; });
+  const uxWord = uxFormat(await p.evaluate(uxSlots));
+  await p.evaluate(() => { const e = document.querySelector("#me .grid > span b"); e.textContent = e.dataset.was; delete e.dataset.was; });
+  const uxBack = uxFormat(await p.evaluate(uxSlots));
+  check("control:a-shrunk-number-and-a-worded-slot-redden-the-format-axis",
+    uxSmall.ok === false && uxWord.ok === false && uxBack.ok === uxFmt.ok,
+    "13px on a big number caught " + (uxSmall.ok === false) + ", a word in a growth slot caught "
+    + (uxWord.ok === false) + ", restored to " + uxBack.ok);
+
+  /* 굴린 자리에서 탭이 살아 있는가. 칸을 끝까지 밀고 나서 묻는다. 굴린 뒤에 죽는 탭은 사람이 위로
+     되감아야 겨우 눌리는 탭이고, 그 되감기는 화면 어디에도 안 적혀 있다. */
+  const uxRolled = await p.evaluate(() => {
+    const e = document.querySelector("#me .pane");
+    if (!e) return -1;
+    e.scrollTop = e.scrollHeight;
+    e.dispatchEvent(new Event("scroll"));
+    return Math.round(e.scrollTop);
+  });
+  await p.waitForTimeout(240);
+  const uxTabs = await p.evaluate(uxTabState);
+  const uxNumb = uxDeaf(uxTabs);
+  const uxWas = await p.evaluate(() => (document.querySelector("#me .pane").textContent || "").slice(0, 40));
+  await p.locator('#me .tabs .tab[data-tab="log"]').click({ timeout: 4000 }).catch(() => {});
+  await p.waitForTimeout(320);
+  const uxMoved = await p.evaluate(() => ({
+    cur: [...document.querySelectorAll("#me .tabs .tab")].filter((t) => t.getAttribute("aria-current") === "true").map((t) => t.dataset.tab).join(","),
+    body: (document.querySelector("#me .pane").textContent || "").slice(0, 40) }));
+  check("ux:the-tabs-stay-live-while-the-pane-scrolls",
+    uxNumb.length === 0 && uxRolled > 0 && uxMoved.cur === "log" && uxMoved.body !== uxWas,
+    uxNumb.length ? uxNumb.map((t) => t.k + " off " + t.off + " pointer " + t.pe + " hit " + t.hit).join(", ")
+      : "the pane scrolled to " + uxRolled + " and all " + uxTabs.length
+        + " tabs stayed hit-testable, then the record tab swapped the pane");
+  // 대조군. 굴린 자리에서 탭 줄이 누름을 안 받게 심으면 위 축이 빨개져야 한다.
+  await p.evaluate(() => { document.querySelector("#me .tabs").style.pointerEvents = "none"; });
+  await p.waitForTimeout(160);
+  const uxDead = uxDeaf(await p.evaluate(uxTabState));
+  await p.evaluate(() => { document.querySelector("#me .tabs").style.pointerEvents = ""; });
+  await p.waitForTimeout(160);
+  const uxAlive = uxDeaf(await p.evaluate(uxTabState));
+  check("control:a-tab-row-that-takes-no-pointer-reddens-the-live-axis",
+    uxDead.length === uxTabs.length && uxAlive.length === 0,
+    "planting pointer-events none killed " + uxDead.length + " of " + uxTabs.length + " tabs, restored to "
+    + (uxTabs.length - uxAlive.length) + " live");
+  await p.evaluate(() => window.__me(false));
+
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 
-  console.log("표본 범위: 내 정보 칸 셋 + 선수단 포지션 넷, 1280x720과 740x360 두 화면");
+  console.log("표본 범위: 내 정보 칸 셋 + 선수단 포지션 넷, 1280x720과 740x360 두 화면. 접힌 이름 문법은 이 표면에 안 선다: 성장 칸 이름이 두 줄로 선 것이 740x360에서 "
+    + uxNarrowRows.filter((n) => n >= 2).length + "개, 1280x720에서 " + uxWideRows.filter((n) => n >= 2).length + "개다");
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
   console.log(fails.length ? "mepane FAIL " + fails.length : "mepane PASS " + notes.length);

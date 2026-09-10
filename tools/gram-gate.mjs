@@ -368,9 +368,116 @@ try {
     Boolean(fold) && fold.under >= 0 && fold.before === false && fold.after === true && fold.below >= 0,
     fold ? "inbox " + fold.under + "px under the feed, thread drawn " + fold.before + " then " + fold.after
       + ", body " + fold.below + "px under its handle" : "no fold under the feed");
+  /* 일반 앱 UX 문법 둘. 위의 축들은 장부와 화면이 같은 수를 말하는지를 묻고, 아래 둘은 이 피드가
+     어느 앱의 것이든 같은 것을 묻는다. 표면마다 도메인 축 옆에 같은 문법을 세운다는 래칫의 요구다.
+     하나. 같은 종류의 칸은 같은 표기다. 반응 줄의 수 칸들은 한 줄에 나란히 선 같은 종류이고, 계정
+     머리의 수 칸 둘도 서로 같은 종류다. 두 무리를 따로 묶는 이유는 하나가 글 한 장의 반응이고 하나가
+     계정의 총계라 크기가 다른 자리이기 때문이다. 무리 안에서 글꼴이 갈리거나 자릿점이 갈리면 같은
+     수가 두 단위로 읽힌다. 늘어난 팬 칸만 앞에 부호가 붙는데, 그것은 총계가 아니라 증감이라 다른 종류다.
+     둘. 아이콘 옆의 수가 아이콘 줄에 붙어 서는가. rack-gate가 접힌 효과 이름에 쓰는 자와 같은 식이고
+     문턱도 그 자의 것, 한 줄 높이의 절반이다. 글이 길어 본문이 여러 줄로 접히는 카드에서도 그 밑의
+     반응 줄은 아이콘과 수가 한 줄에 같이 서야 한다.
+     호버 문법은 이 표면에 안 선다. 글 카드에 닿는 :hover 규칙이 하나도 없고 카드에 포인터 진입 처리기도
+     없어서, 호버가 정지 그림을 갈아 끼우는지를 물을 자리 자체가 없다. 그 수를 아래 표본 줄이 적는다. */
+  const HALF = 2;
+  const COUNTS = () => {
+    const font = (e) => { const s = getComputedStyle(e); return [s.fontFamily.split(",")[0], s.fontSize, s.fontWeight, s.fontStyle, s.letterSpacing].join("|"); };
+    const read = (host, where, kind) => {
+      const em = host.querySelector("em");
+      const icon = host.querySelector("svg");
+      if (!em || !icon) return { where: where, kind: kind, text: em ? em.textContent.trim() : "", font: "none", iconFirst: false, off: -1, lh: 0 };
+      const a = icon.getBoundingClientRect(), b = em.getBoundingClientRect();
+      const kids = [...host.children];
+      return { where: where, kind: kind, text: em.textContent.trim(), font: font(em),
+        iconFirst: kids.indexOf(icon) < kids.indexOf(em),
+        off: +Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)).toFixed(2),
+        lh: +parseFloat(getComputedStyle(em).lineHeight).toFixed(2) };
+    };
+    const out = [];
+    for (const post of document.querySelectorAll("#gram .post"))
+      for (const c of post.querySelectorAll(".react i")) out.push(read(c, "post", c.className));
+    for (const s of document.querySelectorAll("#gram .stat")) out.push(read(s, "head", "stat"));
+    return out;
+  };
+  const wrapOf = () => [...document.querySelectorAll("#gram .post .txt")]
+    .filter((x) => Math.round(x.getBoundingClientRect().height / parseFloat(getComputedStyle(x).lineHeight)) >= 2).length;
+  // 총계는 쉼표로 끊긴 수, 증감은 그 앞에 부호 하나. 두 모양 다 값 자리에 값만 서는 모양이다.
+  const PLAIN = /^[0-9]{1,3}(,[0-9]{3})*$/;
+  const GAIN = /^[+-][0-9]{1,3}(,[0-9]{3})*$/;
+  const format = (rows) => {
+    const post = rows.filter((r) => r.where === "post");
+    const head = rows.filter((r) => r.where === "head");
+    const faces = (rs) => [...new Set(rs.map((r) => r.font))];
+    const shape = (r) => (r.kind.indexOf("fans") >= 0 && r.where === "post" ? GAIN : PLAIN).test(r.text);
+    const odd = rows.filter((r) => !shape(r) || !r.iconFirst);
+    return { post: post, head: head, postFaces: faces(post), headFaces: faces(head), odd: odd,
+      ok: post.length > 0 && head.length > 0 && faces(post).length === 1 && faces(head).length === 1 && odd.length === 0 };
+  };
+  const beside = (rows) => {
+    const hung = rows.filter((r) => r.off < 0 || r.off > r.lh / HALF);
+    return { hung: hung, worst: rows.length ? Math.max.apply(null, rows.map((r) => r.off)) : -1,
+      ok: rows.length > 0 && hung.length === 0 };
+  };
+  const counters = await p.evaluate(COUNTS);
+  const wrapped = await p.evaluate(wrapOf);
+  const fmt = format(counters);
+  const side = beside(counters);
+  check("ux:the-feed-counters-read-one-number-format", fmt.ok,
+    fmt.odd.length ? fmt.odd.map((r) => r.where + " " + r.kind + " draws " + JSON.stringify(r.text) + " icon-first " + r.iconFirst).join(", ")
+      : fmt.postFaces.length > 1 || fmt.headFaces.length > 1
+        ? "post counters carry " + fmt.postFaces.length + " faces and the header " + fmt.headFaces.length
+          + ": " + fmt.postFaces.concat(fmt.headFaces).join(" / ")
+        : fmt.post.length + " post counters on one face " + fmt.postFaces[0] + " and " + fmt.head.length
+          + " header counters on " + fmt.headFaces[0] + ", numbers " + counters.map((r) => r.text).join(" "));
+  check("ux:a-counter-keeps-its-number-beside-its-icon", side.ok,
+    side.hung.length ? side.hung.map((r) => r.where + " " + r.kind + " sits " + r.off + "px off its icon, past "
+      + (r.lh / HALF)).join(", ")
+      : counters.length + " counters, worst off " + side.worst + " inside half a line, over " + wrapped
+        + " posts whose text drew two lines or more");
+  /* 대조군 둘. 글꼴을 줄인 칸과 자릿점을 빈칸으로 쓴 칸이 표기 축을 빨갛게 만들어야 하고, 수를 아이콘
+     아래로 내린 칸이 자리 축을 빨갛게 만들어야 한다. 셋 다 심고 곧바로 도로 뺀다. */
+  await p.evaluate(() => { document.querySelector("#gram .react i em").style.fontSize = "11px"; });
+  const smallFont = format(await p.evaluate(COUNTS));
+  await p.evaluate(() => { document.querySelector("#gram .react i em").style.fontSize = ""; });
+  await p.evaluate(() => { const e = document.querySelector("#gram .react i em"); e.dataset.was = e.textContent; e.textContent = "12 345"; });
+  const oddText = format(await p.evaluate(COUNTS));
+  await p.evaluate(() => { const e = document.querySelector("#gram .react i em"); e.textContent = e.dataset.was; delete e.dataset.was; });
+  const backFmt = format(await p.evaluate(COUNTS));
+  check("control:an-odd-counter-format-reddens-the-format-axis",
+    smallFont.ok === false && oddText.ok === false && backFmt.ok === fmt.ok,
+    "11px font caught " + (smallFont.ok === false) + ", a space for the separator caught " + (oddText.ok === false)
+    + ", restored to " + backFmt.ok);
+  await p.evaluate(() => { const e = document.querySelector("#gram .react i"); e.style.display = "flex"; e.style.flexDirection = "column"; });
+  const stacked = beside(await p.evaluate(COUNTS));
+  await p.evaluate(() => { const e = document.querySelector("#gram .react i"); e.style.display = ""; e.style.flexDirection = ""; });
+  const backSide = beside(await p.evaluate(COUNTS));
+  check("control:a-number-stacked-under-its-icon-reddens-the-beside-axis",
+    stacked.ok === false && backSide.ok === side.ok,
+    "stacking one counter moved it " + (stacked.hung.length ? stacked.hung[0].off : "?") + "px off its icon, restored to " + backSide.ok);
+  /* 호버가 이 표면에 닿는지를 화면에 대고 센다. 규칙 문자열을 눈으로 훑는 대신 글 카드가 그 선택자에
+     실제로 맞는지를 물어, 다른 창의 호버 규칙이 이름만 비슷해서 세어지는 일이 없게 한다. */
+  const hoverReach = await p.evaluate(() => {
+    const post = document.querySelector("#gram .post");
+    let n = 0;
+    for (const sheet of document.styleSheets) {
+      let rules = null;
+      try { rules = sheet.cssRules; } catch (e) { rules = null; }
+      if (!rules) continue;
+      for (const r of rules) {
+        if (!r.selectorText || r.selectorText.indexOf(":hover") < 0) continue;
+        for (const one of r.selectorText.split(",")) {
+          const sel = one.trim().split(":hover").join("");
+          try { if (post && (post.matches(sel) || post.querySelector(sel))) n += 1; } catch (e) { n += 0; }
+        }
+      }
+    }
+    return { n: n, handler: post ? Boolean(post.onpointerenter || post.onmouseenter) : null };
+  });
   await p.evaluate(() => window.__gram(false));
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
+  console.log("표본 범위: 자동으로 돈 한 창의 피드 글 전부와 계정 머리의 수 칸 둘, 1280x720. 호버 문법은 이 표면에 안 선다: 글 카드에 닿는 :hover 규칙 "
+    + hoverReach.n + "개, 카드의 포인터 진입 처리기 " + hoverReach.handler);
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
   console.log(fails.length ? "gram FAIL " + fails.length : "gram PASS");

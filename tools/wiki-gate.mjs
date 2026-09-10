@@ -488,6 +488,115 @@ try {
     "painted at 740x360 " + say(drew) + ", grown to 1280x720 without a click " + say(grew)
       + ", back to 740x360 " + say(shrank));
 
+  /* 일반 앱 UX 문법 둘. 위의 축들은 이 게임의 상수와 카테고리를 알아야 읽히지만, 아래 둘은 도움말이
+     어느 앱의 것이든 같은 것을 묻는다. 표면마다 도메인 축 옆에 같은 문법을 세운다는 래칫의 요구다.
+     하나. 같은 종류의 칸은 같은 표기로 선다. 카테고리 여덟은 한 줄에 나란히 선 같은 종류라, 한 칸만
+     글꼴이나 굵기가 다르면 그 칸이 다른 층의 것으로 읽힌다. 지금 선 칸이 아리아로만 갈리고 글꼴로는
+     안 갈리는 것도 같이 확인한다. 현재 칸을 굵게 만드는 앱이 흔하고, 그러면 여덟 중 하나가 다른 표기가 된다.
+     둘. 상태를 바꾸는 조작이 그 상태가 사는 동안 내내 열려 있다. 도움말이 열려 있는 내내 카테고리를
+     바꿀 수 있어야 하고, 본문을 끝까지 굴린 자리에서도, 아래끝 그늘이 서 있는 자리에서도 그대로여야 한다.
+     굴린 김에 안 닿게 되는 칸은 사람이 위로 되감아야 겨우 누른다. 묻는 것은 disabled 하나가 아니라
+     화면이 실제로 그 누름을 받는가이므로, elementFromPoint로 그 칸이 맨 앞인지까지 본다.
+     문턱은 hand-gate가 창 밖 누름에 쓴 것과 같다. 그 자는 커밋된 입력으로 확인하고 이 자는 열린 칸이
+     바뀌는 것으로 확인하지만, 묻는 문법은 하나다. */
+  const CATS = () => {
+    const font = (e) => { const s = getComputedStyle(e); return [s.fontFamily.split(",")[0], s.fontSize, s.fontWeight, s.fontStyle, s.letterSpacing, s.textTransform].join("|"); };
+    return [...document.querySelectorAll("#wiki .cats button")].map((e) => {
+      const q = e.getBoundingClientRect();
+      const mid = document.elementFromPoint(q.x + q.width / 2, q.y + q.height / 2);
+      return { key: e.dataset.cat, label: (e.textContent || "").trim(), font: font(e),
+        cur: e.getAttribute("aria-current") === "true", off: e.disabled,
+        pe: getComputedStyle(e).pointerEvents, hit: mid === e || (mid && e.contains(mid)),
+        w: Math.round(q.width), h: Math.round(q.height) };
+    });
+  };
+  const oneFace = (cs) => {
+    const fonts = [...new Set(cs.map((c) => c.font))];
+    return { fonts: fonts, ok: cs.length === KEYS.length && fonts.length === 1 && cs.every((c) => c.label.length > 0) };
+  };
+  const shutTight = (cs) => cs.filter((c) => c.off || c.pe === "none" || !c.hit || c.w < 1 || c.h < 1);
+
+  await p.setViewportSize({ width: 1280, height: 720 });
+  await p.waitForTimeout(360);
+  await p.evaluate(OPEN_CAT, "coin");
+  await p.waitForTimeout(240);
+  const catsRest = await p.evaluate(CATS);
+  const face = oneFace(catsRest);
+  check("ux:the-category-buttons-read-one-format", face.ok,
+    face.fonts.length > 1 ? catsRest.length + " buttons carry " + face.fonts.length + " faces: "
+      + catsRest.map((c) => c.key + " " + c.font).join(" / ")
+      : catsRest.length + " buttons, one face " + face.fonts[0]);
+  /* 대조군. 열린 칸 하나를 굵게 세우면 여덟이 두 표기로 갈리고 위 축이 그것을 봐야 한다. 심고 도로 뺀다.
+     제품이 지금 아리아로만 갈리므로, 이 심기가 잡히지 않으면 위의 초록은 표기를 안 본 초록이다. */
+  await p.evaluate(() => { document.querySelector('#wiki .cats [aria-current="true"]').style.fontWeight = "900"; });
+  await p.waitForTimeout(160);
+  const boldFace = oneFace(await p.evaluate(CATS));
+  await p.evaluate(() => { document.querySelector('#wiki .cats [aria-current="true"]').style.fontWeight = ""; });
+  await p.waitForTimeout(160);
+  const backFace = oneFace(await p.evaluate(CATS));
+  check("control:a-bolded-current-category-reddens-the-format-axis",
+    boldFace.ok === false && backFace.ok === face.ok,
+    "bolded set carries " + boldFace.fonts.length + " faces, restored to " + backFace.ok);
+
+  /* 굴린 뒤에도 열려 있는가. 넘치는 칸을 골라 끝까지 굴리고, 그 자리에서 칸을 실제로 바꿔 본다.
+     조작 칸은 740에서 넘치고 1280에서 안 넘치므로, 넘치는 칸은 좁은 폭에서 고른다. */
+  await p.setViewportSize({ width: 740, height: 360 });
+  await p.waitForTimeout(380);
+  const live = [];
+  for (const k of KEYS) {
+    await p.evaluate(OPEN_CAT, k);
+    await p.waitForTimeout(200);
+    const c = await p.evaluate(CUE);
+    if (c && c.over > 1) { live.push(k); break; }
+  }
+  const rolled = live[0] || KEYS[0];
+  await p.evaluate(OPEN_CAT, rolled);
+  await p.waitForTimeout(220);
+  /* 두 자리에서 잰다. 반쯤 굴린 자리는 아래끝 그늘이 켜져 있는 자리이고, 끝까지 굴린 자리는 그늘이
+     뒤집힌 자리다. 끝만 재면 그늘이 선 동안을 아무도 안 잰 채로 초록이 난다. */
+  const roomy = await p.evaluate(CUE);
+  await p.evaluate(SCROLL, Math.max(1, Math.round(roomy.over / 2)));
+  await p.waitForTimeout(240);
+  const cueMid = await p.evaluate(CUE);
+  const catsMid = await p.evaluate(CATS);
+  await p.evaluate(SCROLL, -1);
+  await p.waitForTimeout(220);
+  const cueDown = await p.evaluate(CUE);
+  const catsRolled = await p.evaluate(CATS);
+  const deaf = shutTight(catsMid).concat(shutTight(catsRolled));
+  // 실제로 바꿔 본다. 닿는다는 것과 그 누름이 본문을 바꾼다는 것은 다른 주장이다.
+  const other = KEYS.find((k) => k !== rolled);
+  const bodyBefore = await p.evaluate(() => (document.querySelector("#wiki .body").textContent || "").slice(0, 40));
+  await p.locator('#wiki .cats [data-cat="' + other + '"]').click({ timeout: 4000 }).catch(() => {});
+  await p.waitForTimeout(260);
+  const moved2 = await p.evaluate(() => ({
+    cur: (document.querySelector('#wiki .cats [aria-current="true"]') || {}).dataset,
+    body: (document.querySelector("#wiki .body").textContent || "").slice(0, 40) }));
+  check("ux:the-category-buttons-stay-live-while-the-body-scrolls",
+    deaf.length === 0 && cueMid !== null && cueMid.at > 0 && cueMid.down !== null && cueMid.down.op === 1
+      && cueDown !== null && cueDown.at > 0 && moved2.cur && moved2.cur.cat === other
+      && moved2.body !== bodyBefore,
+    deaf.length ? deaf.map((c) => c.key + " off " + c.off + " pointer " + c.pe + " hit " + c.hit).join(", ")
+      : rolled + " scrolled to " + (cueMid ? cueMid.at : "?") + " of " + (roomy ? roomy.over : "?")
+        + " with the bottom cue lit at " + (cueMid && cueMid.down ? cueMid.down.op : "?")
+        + " and then to " + (cueDown ? cueDown.at : "?") + " where it flips to "
+        + (cueDown && cueDown.down ? cueDown.down.op : "?")
+        + ", all " + catsRolled.length + " buttons hit-testable at both, and clicking " + other
+        + " swapped the body");
+  /* 대조군. 굴린 자리에서 칸 하나를 비활성으로 만들면 위 축이 빨개져야 한다. 제품을 안 건드리고
+     화면 위에서만 심었다가 도로 뺀다. */
+  await p.evaluate((k) => { document.querySelector('#wiki .cats [data-cat="' + k + '"]').disabled = true; }, rolled);
+  await p.waitForTimeout(140);
+  const numb = shutTight(await p.evaluate(CATS));
+  await p.evaluate((k) => { document.querySelector('#wiki .cats [data-cat="' + k + '"]').disabled = false; }, rolled);
+  await p.waitForTimeout(140);
+  const woke = shutTight(await p.evaluate(CATS));
+  check("control:a-disabled-category-reddens-the-live-axis",
+    numb.length > 0 && woke.length === 0,
+    "planting disabled on " + rolled + " caught " + numb.length + " dead buttons, restored to " + woke.length);
+  await p.setViewportSize({ width: 1280, height: 720 });
+  await p.waitForTimeout(320);
+
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 
