@@ -1,0 +1,30 @@
+#!/bin/sh
+# 커밋 제목이 72자를 넘는지, 그리고 메시지에 비ASCII가 있는지 본다.
+#
+# AGENTS.md는 제목 72자 상한과 전부 영어를 못박았는데 이 레포에는 부르는 훅이 없었다.
+# 실측으로 최근 예순 커밋 중 열하나가 72자를 넘고 최장은 134자였으며, 한 세션 안에서
+# 3894a13(73), 10489d2(77), b2fb83e(76), fe17889(73)가 검증자 보고서에 같은 줄로 네 번 적혔다.
+# 같은 규칙이 네 번 깨지면 규칙이 아니라 자리를 고친다. 부르는 사람이 없는 검사는 안 도는 검사다.
+#
+# 영어 판정은 daedal-games-gtg의 같은 훅과 같다. 비ASCII 바이트의 유무이고, 주석 줄(#)과
+# 서명 줄은 사람이 쓴 본문이 아니므로 뺀다. LC_ALL=C에서 [:print:]는 0x20~0x7E뿐이다.
+# 길이는 첫 줄의 바이트 수다. 제목은 ASCII만 허용되므로 바이트 수가 곧 글자 수다.
+
+msg=$1
+subject=$(grep -v '^#' "$msg" | sed -n '1p')
+body=$(grep -v '^#' "$msg" | grep -v '^Signed-off-by:')
+
+if printf '%s' "$body" | LC_ALL=C grep -q '[^[:print:][:blank:]]'; then
+  echo ''
+  echo 'The commit message carries a non-ASCII byte. Subject and body are English.'
+  printf '%s' "$body" | LC_ALL=C grep -n '[^[:print:][:blank:]]' | sed 's/^/  /'
+  exit 1
+fi
+
+len=$(printf '%s' "$subject" | wc -c | tr -d ' ')
+if [ "$len" -gt 72 ]; then
+  echo ''
+  echo "The subject is $len characters; the cap is 72."
+  echo "  $subject"
+  exit 1
+fi
