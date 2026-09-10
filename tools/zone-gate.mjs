@@ -37,8 +37,16 @@ t.unref();
 const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 const one = (x) => x.toFixed(1);
+/* 화소가 다르다고 부를 채널 차이와, 도는 것을 증명하는 최소 몫. thumb-gate가 호버 회전에 쓰는 두 수 그대로다. */
+const TURN_DELTA = 8;
+const TURN_SHARE = 0.02;
+/* 사람이 봤다고 부를 화소 몫. wiki와 mepane의 그늘 축이 쓰는 바닥과 같은 수다. */
+const SEEN_SHARE = 0.12;
+/* 판때기 셋이 한 줄을 나눠 가질 때 허락하는 어긋남. chrome-gate의 리듬 축과 같은 여유이고,
+   정수로 끊기는 offset과 소수로 오는 상자를 같이 품는다. */
+const TILE_TOL = 2;
 /* 길이 어느 쪽으로 갈라져도 판정 줄 수는 이만큼이다. 줄 수를 세는 축 자신은 빼고 센 값이다. */
-const ROWS = 20;
+const ROWS = 24;
 /* 봇이 갈린 구를 안 내주면 그 뒤 축들은 잴 기회가 없다. 그때 줄을 통째로 빼면 못 잰 축이 통과한 축으로
    읽히고 판정 수만 조용히 줄어든다. 못 쟀다고 적어 빨간 줄로 남긴다. */
 const unmeasured = (names, why) => { for (const n of names) check(n, false, "unmeasured: " + why); };
@@ -244,6 +252,133 @@ try {
     await ctx.close();
   }
 
+  /* 일반 앱 UX 문법 둘. 위의 축들은 이 게임의 선호와 배지를 알아야 읽히지만, 아래 둘은 게임을 몰라도
+     잡히는 자리다. 표면마다 도메인 축 옆에 같은 문법을 세운다는 래칫의 요구가 여기에 서는 자리다.
+     하나. 상태를 바꾼 조작이 그 밑의 정지 그림을 실제로 갈아 끼우는가. 위의 판때기 축들은 네모 안 평균
+     밝기를 견주므로 판이 조금 밝아지기만 해도 초록이 난다. 이 자는 같은 판때기를 선호 전후로 두 장 찍어
+     실제로 바뀐 화소의 몫을 세고, 바닥은 한 번도 선호가 아닌 이웃 판때기가 같은 두 순간에 움직인 몫이다.
+     thumb-gate가 호버 회전에 쓰는 자와 같은 식이고 채널 차 8과 몫 0.02도 그 자의 수다.
+     둘. 세 판때기가 한 줄을 빈 칸 없이 채우는가. #pad 한 줄을 flex:1 셋이 나눠 갖는 자리라, 칸 하나가
+     빠지면 그 자리가 배경으로 남고 남은 둘이 넓어진다. 문법 다섯 중 창 열림은 hand-gate가 같은 패드에서
+     이미 재므로 여기에 두 번 세우지 않는다.
+     판을 잠그고 잰다. 구가 굴러가면 두 프레임 사이에 공과 자막이 바뀌어, 센 화소가 판때기가 아니라 그
+     판의 것이 된다. 잠긴 판에서 패드는 비활성으로 흐려지지만 선호 표기는 그대로 칠해진다. hud.css에서
+     .zone.pref>svg가 .zone:disabled svg 뒤에 서서 같은 특이도로 이기기 때문이다. 선호를 옮기는 것은
+     pointerup이고 그 자리에는 창 관문이 없으므로, 잠긴 판에서도 사람 손가락과 같은 길로 옮겨 간다. */
+  {
+    const { ctx, p } = await start(BASE);
+    await settled(p);
+    await p.evaluate(() => window.__lockRound());
+    await p.waitForTimeout(800);
+    await calm(p);
+    const rects = await plateRects(p);
+    const shotOf = () => p.screenshot().then((x) => x.toString("base64"));
+    /* 두 장에서 같은 네모를 잘라 바뀐 화소의 몫을 센다. 이미지 폭과 뷰포트 폭의 배율은 meter와 같은
+       이유로 다시 잰다. 잘라 내는 자리가 밀리면 안 움직인 판때기도 통째로 움직인 것으로 읽힌다. */
+    const shareOf = (one, two, box) => p.evaluate(([a, c, r, d]) => Promise.all([a, c].map((s) => new Promise((res) => {
+      const im = new Image();
+      im.onload = () => {
+        const k = im.width / window.innerWidth;
+        const cv = document.createElement("canvas");
+        cv.width = Math.max(1, Math.round(r.width * k));
+        cv.height = Math.max(1, Math.round(r.height * k));
+        const g = cv.getContext("2d");
+        g.drawImage(im, Math.round(r.x * k), Math.round(r.y * k), cv.width, cv.height, 0, 0, cv.width, cv.height);
+        res(g.getImageData(0, 0, cv.width, cv.height));
+      };
+      im.src = "data:image/png;base64," + s;
+    }))).then(([u, v]) => {
+      if (u.width !== v.width || u.height !== v.height) return -1;
+      let n = 0;
+      for (let i = 0; i < u.data.length; i += 4) {
+        const m = Math.max(Math.abs(u.data[i] - v.data[i]), Math.abs(u.data[i + 1] - v.data[i + 1]), Math.abs(u.data[i + 2] - v.data[i + 2]));
+        if (m > d) n += 1;
+      }
+      return n / (u.width * u.height);
+    }), [one, two, box, TURN_DELTA]);
+    // 손가락과 같은 길로 누른다. 좌표로 눌러야 히트테스트를 지나고, 선호를 옮기는 것은 손이 올라오는 순간이다.
+    const tapPad = async (dive) => {
+      const box = await p.locator('.zone[data-dive="' + dive + '"]').boundingBox();
+      await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await p.mouse.down();
+      await p.mouse.up();
+    };
+    const tile = () => p.evaluate(() => {
+      const zs = [...document.querySelectorAll(".zone")];
+      const r = zs.map((z) => z.getBoundingClientRect());
+      const host = document.getElementById("pad").getBoundingClientRect();
+      return { w: r.map((q) => +q.width.toFixed(2)), gaps: r.slice(1).map((q, i) => +(q.left - r[i].right).toFixed(2)),
+        lead: +(r[0].left - host.left).toFixed(2), trail: +(host.right - r[2].right).toFixed(2) };
+    });
+    const tiled = (t) => {
+      const spread = +(Math.max.apply(null, t.w) - Math.min.apply(null, t.w)).toFixed(2);
+      const holes = t.gaps.filter((g) => Math.abs(g) > TILE_TOL);
+      const edge = Math.max(Math.abs(t.lead), Math.abs(t.trail));
+      return { spread: spread, holes: holes, edge: edge, ok: spread <= TILE_TOL && holes.length === 0 && edge <= TILE_TOL };
+    };
+    const sayTile = (t, v) => "widths " + t.w.join("/") + " spread " + v.spread + ", gaps " + t.gaps.join("/")
+      + ", row edges " + t.lead + " and " + t.trail;
+
+    const bareLook = await p.evaluate(() => {
+      const s = getComputedStyle(document.querySelectorAll(".zone > svg")[0]);
+      return { color: s.color, background: s.backgroundColor, shadow: s.boxShadow };
+    });
+    const before = await shotOf();
+    const beforeMarks = await marks(p);
+    await tapPad(-1);
+    await p.waitForFunction(() => document.querySelector('.zone[data-dive="-1"]').classList.contains("pref"),
+      null, { timeout: 3000 }).catch(() => {});
+    await calm(p);
+    const after = await shotOf();
+    const afterMarks = await marks(p);
+    const gained = await shareOf(before, after, rects[0]);
+    const resting = await shareOf(before, after, rects[2]);
+    check("ux:the-standing-preference-repaints-the-pad-in-rendered-pixels",
+      onlyAt(beforeMarks, 0, "pref") && onlyAt(afterMarks, -1, "pref")
+        && gained > resting + TURN_SHARE && gained >= SEEN_SHARE,
+      (gained * 100).toFixed(1) + "% of the left plate moved when the preference landed on it, a never-preferred neighbour "
+      + (resting * 100).toFixed(1) + "%, floor " + Math.max((resting + TURN_SHARE) * 100, SEEN_SHARE * 100).toFixed(1)
+      + "%, marks " + fmt(beforeMarks) + " then " + fmt(afterMarks));
+    /* 대조군. 표기가 아무것도 안 칠하면 위 축은 빨개져야 한다. 선호는 그대로 둔 채 그 판때기에
+       선호 이전의 색과 바탕과 그림자를 도로 심어, 표기만 든 채 그림은 안 바뀐 화면을 만든다. */
+    await p.evaluate((look) => {
+      const s = document.querySelectorAll(".zone > svg")[0].style;
+      s.color = look.color; s.background = look.background; s.boxShadow = look.shadow;
+    }, bareLook);
+    await p.waitForTimeout(220);
+    const planted = await shotOf();
+    const plantShare = await shareOf(before, planted, rects[0]);
+    await p.evaluate(() => {
+      const s = document.querySelectorAll(".zone > svg")[0].style;
+      s.color = ""; s.background = ""; s.boxShadow = "";
+    });
+    await p.waitForTimeout(220);
+    const backMarks = await marks(p);
+    check("control:a-preference-that-paints-nothing-reddens-the-repaint-axis",
+      plantShare < resting + TURN_SHARE && plantShare < SEEN_SHARE && onlyAt(backMarks, -1, "pref"),
+      "the marked plate wearing its bare paint moves " + (plantShare * 100).toFixed(1) + "% against the "
+      + Math.max((resting + TURN_SHARE) * 100, SEEN_SHARE * 100).toFixed(1) + "% floor, restored to " + fmt(backMarks));
+
+    const row = await tile();
+    const rowOk = tiled(row);
+    check("ux:the-three-pads-tile-the-row-with-no-vacated-slot", rowOk.ok,
+      rowOk.holes.length ? "gap " + rowOk.holes.join("/") + "px between pads, " + sayTile(row, rowOk)
+        : rowOk.spread > TILE_TOL ? "pads differ by " + rowOk.spread + "px, " + sayTile(row, rowOk)
+          : sayTile(row, rowOk));
+    // 대조군. 가운데 판때기 앞에 46px을 심으면 그 줄에 빈 칸이 생기고 위 축이 그것을 봐야 한다.
+    await p.evaluate(() => { document.querySelectorAll(".zone")[1].style.marginLeft = "46px"; });
+    await p.waitForTimeout(160);
+    const hurt = await tile();
+    const hurtOk = tiled(hurt);
+    await p.evaluate(() => { document.querySelectorAll(".zone")[1].style.marginLeft = ""; });
+    await p.waitForTimeout(160);
+    const healed = tiled(await tile());
+    check("control:a-planted-46px-hole-reddens-the-tiling-axis",
+      hurtOk.ok === false && healed.ok === rowOk.ok,
+      "planted " + sayTile(hurt, hurtOk) + ", restored to " + healed.ok);
+    await ctx.close();
+  }
+
   // 봇. 선호를 왼쪽에 세운 뒤 크레딧을 사고 자동을 켠다. 봇이 선호와 다른 쪽을 고른 구에서만 배지가 선호와
   // 갈리는지 잴 수 있다. 같은 쪽을 골라 겹친 구는 증거가 아니므로 갈리는 구가 올 때까지 기다리고, 끝내 안 오면
   // unmeasured로 떨어뜨린다. 배지는 다음 구가 열리면 걷히므로 그 구가 나는 동안 찍는다.
@@ -330,7 +465,7 @@ try {
   /* 못 잰 축을 빨간 줄로 남기는 것과 그 줄이 실제로 다 나왔는지는 다른 주장이다. 뒤엣것을 여기서 센다. */
   const drawn = notes.length + fails.length;
   check("instrument:every-axis-reported-a-row", drawn === ROWS, drawn + " rows against " + ROWS);
-  console.log("표본 범위: veteran 손 모드 대기·왼쪽 누름·다음 두 구, rich 크레딧 봇 한 구와 그 다음 구, 1280x720");
+  console.log("표본 범위: veteran 손 모드 대기·왼쪽 누름·다음 두 구, 잠근 판에서 선호를 옮긴 두 프레임, rich 크레딧 봇 한 구와 그 다음 구, 1280x720");
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
   console.log(fails.length ? "zone FAIL " + fails.length : "zone PASS " + notes.length);

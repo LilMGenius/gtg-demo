@@ -486,6 +486,201 @@ try {
     check("pullshow:a-rare-card-does-not-look-like-a-plain-one", gap > 12,
       "channel gap " + gap.toFixed(1) + " over 12");
   }
+  /* 일반 앱 UX 문법 둘. 위의 축들은 이 게임의 등급과 단을 알아야 읽히지만, 아래 둘은 어느 앱의
+     전체 화면 창이든 같은 것을 묻는다. 표면마다 도메인 축 옆에 같은 문법을 세운다는 래칫의 요구다.
+     하나. 상태를 바꾸는 조작이 그 상태가 사는 동안 내내 열려 있다. 이 창에서 상태를 바꾸는 조작은
+     넘기고 닫는 한 마디뿐이고, 제품은 그것을 판 전체를 덮는 투명 버튼으로 세웠다. 그러면 봉인 단이든
+     마지막 단이든 창 어느 자리를 눌러도 그 버튼이 받아야 한다. 묻는 것은 disabled 하나가 아니라
+     화면이 실제로 그 누름을 받는가이므로, 카드 한가운데를 비롯한 여섯 자리에서 elementFromPoint가
+     그 버튼을 내는지 본다. 층이 겹쳐 다른 판이 앞에 서면 사람이 카드를 눌렀는데 아무 일도 안 난다.
+     둘. 옮기거나 지운 요소가 남긴 빈 칸이 없다. 한 장짜리 회차에서 이미 나온 줄은 채울 것이 영영
+     없으므로, 그 줄이 자리를 잡고 서 있으면 그것은 여백이 아니라 사라진 물건으로 읽힌다.
+     빈 칸인지는 화소로 묻는다. 줄을 그대로 찍은 프레임과 그 줄만 감춘 프레임이 한 화소도 안 갈리면
+     그 줄은 아무것도 안 그린다. 채널 차 8은 thumb-gate가 회전에, wiki-gate가 그늘에 쓰는 수다. */
+  const UX_PIX = 8;
+  const uxShot = (clip) => p.screenshot({ clip: clip }).then((x) => x.toString("base64"));
+  const uxMoved = (a, z) => p.evaluate(([s1, s2, tol]) => Promise.all([s1, s2].map((s) => new Promise((res) => {
+    const im = new Image();
+    im.onload = () => {
+      const cv = document.createElement("canvas");
+      cv.width = im.width; cv.height = im.height;
+      const g = cv.getContext("2d");
+      g.drawImage(im, 0, 0);
+      res(g.getImageData(0, 0, im.width, im.height));
+    };
+    im.src = "data:image/png;base64," + s;
+  }))).then(([u, v]) => {
+    if (u.width !== v.width || u.height !== v.height) return -1;
+    let n = 0;
+    for (let i = 0; i < u.data.length; i += 4) {
+      const m = Math.max(Math.abs(u.data[i] - v.data[i]), Math.abs(u.data[i + 1] - v.data[i + 1]), Math.abs(u.data[i + 2] - v.data[i + 2]));
+      if (m > tol) n += 1;
+    }
+    return n / (u.width * u.height);
+  }), [a, z, UX_PIX]);
+  /* 흐름에 선 줄만 센다. 넘기는 한 마디는 inset:0으로 판을 통째로 덮는 절대 위치라 기둥의 칸이 아니다.
+     자리는 offsetTop으로 잰다. 카드가 기울어 서서 getBoundingClientRect는 회전된 상자를 돌려준다. */
+  const uxRows = () => {
+    const box = document.getElementById("pull");
+    if (!box || box.hidden) return null;
+    const gap = parseFloat(getComputedStyle(box).rowGap) || 0;
+    const rows = [...box.children].filter((e) => {
+      const s = getComputedStyle(e);
+      return s.position !== "absolute" && s.position !== "fixed" && s.display !== "none";
+    }).map((e) => {
+      const q = e.getBoundingClientRect();
+      return { cls: (e.className || e.tagName).split(" ")[0], top: e.offsetTop, h: e.offsetHeight,
+        clip: { x: Math.round(q.x), y: Math.round(q.y), width: Math.round(q.width), height: Math.round(q.height) },
+        kids: e.childElementCount, chars: (e.textContent || "").trim().length,
+        minH: getComputedStyle(e).minHeight };
+    });
+    const r = window.__reveal();
+    return { gap: gap, rows: rows, drawn: r.drawn, shown: r.shown };
+  };
+  const uxHide = (i, on) => p.evaluate(([k, v]) => {
+    const box = document.getElementById("pull");
+    const kids = [...box.children].filter((e) => {
+      const s = getComputedStyle(e);
+      return s.position !== "absolute" && s.position !== "fixed" && s.display !== "none";
+    });
+    if (kids[k]) kids[k].style.visibility = v ? "hidden" : "";
+  }, [i, on]);
+  // 한 바퀴. 흐름의 줄마다 그대로 찍은 것과 그 줄만 감춘 것을 견줘, 아무것도 안 그리는 줄을 걷어 낸다.
+  const uxSweep = async () => {
+    const live = await p.evaluate(uxRows);
+    if (!live) return null;
+    const out = [];
+    for (let i = 0; i < live.rows.length; i += 1) {
+      const r = live.rows[i];
+      if (r.clip.width < 1 || r.clip.height < 1) { out.push(Object.assign({ share: 0 }, r)); continue; }
+      const on = await uxShot(r.clip);
+      await uxHide(i, true);
+      await p.waitForTimeout(60);
+      const off = await uxShot(r.clip);
+      await uxHide(i, false);
+      await p.waitForTimeout(60);
+      out.push(Object.assign({ share: await uxMoved(on, off) }, r));
+    }
+    const bare = out.filter((r) => !(r.share > 0));
+    return { gap: live.gap, drawn: live.drawn, rows: out, bare: bare,
+      cost: bare.reduce((a, r) => a + r.h + live.gap, 0), ok: out.length > 0 && bare.length === 0 };
+  };
+  const uxTap = () => {
+    const box = document.getElementById("pull");
+    const t = box ? box.querySelector(".tap") : null;
+    const now = box ? box.querySelector(".now") : null;
+    if (!box || !t || !now) return { there: false, stage: "?" };
+    const owns = (e) => Boolean(e) && (e === t || t.contains(e));
+    const name = (e) => (e ? String((e.className && e.className.baseVal !== undefined ? e.className.baseVal : e.className) || e.tagName) : "none");
+    const at = (x, y) => { const e = document.elementFromPoint(x, y); return { hit: owns(e), who: name(e) }; };
+    const q = now.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    const spots = {
+      card: at(q.x + q.width / 2, q.y + q.height / 2),
+      cardTop: at(q.x + q.width / 2, q.y + 14),
+      cardFoot: at(q.x + q.width / 2, q.bottom - 14),
+      overCard: at(b.x + b.width / 2, Math.max(b.y + 2, q.y - 14)),
+      underCard: at(b.x + b.width / 2, Math.min(b.bottom - 2, q.bottom + 14)),
+      strip: at(b.x + b.width / 2, b.bottom - 8)
+    };
+    return { there: true, stage: now.dataset.stage, tag: t.tagName, off: t.disabled,
+      pe: getComputedStyle(t).pointerEvents, text: (t.textContent || "").trim(),
+      w: Math.round(t.getBoundingClientRect().width), h: Math.round(t.getBoundingClientRect().height),
+      spots: spots, deaf: Object.keys(spots).filter((k) => !spots[k].hit) };
+  };
+  const uxLive = (s) => Boolean(s) && s.there && s.tag === "BUTTON" && s.off === false && s.pe !== "none" && s.deaf.length === 0;
+  const uxSay = (s) => (s ? "stage " + s.stage + " " + JSON.stringify(s.text) + " " + s.w + "x" + s.h
+    + (s.deaf.length ? ", dead at " + s.deaf.map((k) => k + " (" + s.spots[k].who + ")").join(" and ") : ", live at all six spots")
+    : "no reveal");
+
+  /* 한 장짜리 회차를 연다. 묶음 회차에서는 이미 나온 줄이 채워지므로 빈 줄이 안 보이고, 그 줄이
+     영영 안 채워지는 것은 한 장을 뽑았을 때다. 이 회차는 모든 표본을 받은 뒤라 위 축들의 뽑기 자리를
+     앞뒤로 안 옮긴다. 지갑은 앞선 회차들이 얼마를 썼든 살 수 있게 채운다. */
+  let uxOpen = false;
+  try {
+    await p.evaluate(() => { const w = window.__wallet(); w.coin = Math.max(w.coin, 20000); });
+    await p.evaluate(() => window.__shop(true));
+    await p.waitForSelector("#shop .buy.pull", { timeout: 8000 });
+    await p.click('#shop .kind[data-kind="town"]', { force: true });
+    await p.waitForTimeout(200);
+    await p.locator("#shop .buy.pull").nth(0).click({ timeout: 6000 });
+    await p.waitForFunction(() => {
+      const e = document.getElementById("pull");
+      return Boolean(e && !e.hidden && e.querySelector(".now") && window.__reveal().drawn === 1);
+    }, null, { timeout: 12000, polling: 30 });
+    uxOpen = true;
+  } catch (e) { uxOpen = false; }
+  if (!uxOpen) {
+    check("ux:the-tap-stays-open-at-every-stage", false, "unmeasured: no single-card round opened");
+    check("control:a-tap-that-takes-no-pointer-reddens-the-open-axis", false, "unmeasured: no single-card round opened");
+    check("ux:a-single-card-reveal-leaves-no-vacated-row", false, "unmeasured: no single-card round opened");
+    check("control:the-vacated-row-axis-follows-a-planted-and-a-cleared-hole", false, "unmeasured: no single-card round opened");
+  } else {
+    const sealed = await p.evaluate(uxTap);
+    await p.waitForFunction(() => {
+      const n = document.querySelector("#pull .now");
+      return Boolean(n) && n.dataset.stage === String(4);
+    }, null, { timeout: 12000, polling: 30 }).catch(() => {});
+    await p.waitForTimeout(220);
+    const opened = await p.evaluate(uxTap);
+    check("ux:the-tap-stays-open-at-every-stage", uxLive(sealed) && uxLive(opened),
+      uxSay(sealed) + " | " + uxSay(opened));
+    // 대조군. 그 버튼이 누름을 안 받게 심으면 위 축이 빨개져야 한다. 심고 곧바로 도로 뺀다.
+    await p.evaluate(() => { document.querySelector("#pull .tap").style.pointerEvents = "none"; });
+    await p.waitForTimeout(140);
+    const numb = await p.evaluate(uxTap);
+    await p.evaluate(() => { document.querySelector("#pull .tap").style.pointerEvents = ""; });
+    await p.waitForTimeout(140);
+    const woke = await p.evaluate(uxTap);
+    check("control:a-tap-that-takes-no-pointer-reddens-the-open-axis",
+      uxLive(numb) === false && uxLive(woke) === uxLive(opened),
+      "planting pointer-events none left " + numb.deaf.length + " of six spots dead, restored to "
+      + (6 - woke.deaf.length) + " live");
+
+    const uxNow = await uxSweep();
+    check("ux:a-single-card-reveal-leaves-no-vacated-row", Boolean(uxNow) && uxNow.ok && uxNow.drawn === 1,
+      !uxNow ? "no reveal on screen"
+        : uxNow.bare.length
+          ? uxNow.bare.map((r) => "." + r.cls + " stands " + r.h + "px tall with " + r.kids + " children and paints "
+            + (r.share * 100).toFixed(1) + "% (min-height " + r.minH + ")").join(", ")
+            + ", costing " + uxNow.cost + "px of the column with " + uxNow.drawn
+            + " card drawn, so the card sits " + (uxNow.cost / 2) + "px above centre"
+          : uxNow.rows.length + " rows all inked over " + uxNow.drawn + " card, lowest "
+            + (Math.min.apply(null, uxNow.rows.map((r) => r.share)) * 100).toFixed(1) + "%");
+    /* 대조군은 양쪽으로 민다. 빈 칸을 하나 더 심으면 빨개져야 하고, 지금 빈 칸으로 잡힌 줄을 걷으면
+       초록으로 돌아와야 한다. 한쪽만 보면 늘 빨간 자와 실제로 재는 자를 못 가른다. */
+    await p.evaluate(() => {
+      const box = document.getElementById("pull");
+      const hole = document.createElement("div");
+      hole.id = "uxHole";
+      hole.style.minHeight = "34px";
+      hole.style.width = "120px";
+      box.insertBefore(hole, box.querySelector(".tap"));
+    });
+    await p.waitForTimeout(160);
+    const uxPlanted = await uxSweep();
+    await p.evaluate(() => { const e = document.getElementById("uxHole"); if (e) e.remove(); });
+    await p.waitForTimeout(160);
+    await p.evaluate((names) => {
+      const box = document.getElementById("pull");
+      for (const e of [...box.children]) if (names.indexOf((e.className || "").split(" ")[0]) >= 0) e.style.display = "none";
+    }, (uxNow && uxNow.bare.length ? uxNow.bare : []).map((r) => r.cls));
+    await p.waitForTimeout(160);
+    const uxCleared = await uxSweep();
+    await p.evaluate(() => { for (const e of [...document.getElementById("pull").children]) e.style.display = ""; });
+    await p.waitForTimeout(160);
+    check("control:the-vacated-row-axis-follows-a-planted-and-a-cleared-hole",
+      Boolean(uxPlanted) && uxPlanted.ok === false && Boolean(uxCleared) && uxCleared.ok === true,
+      "a planted 34px hole read " + (uxPlanted ? uxPlanted.bare.length + " bare rows" : "nothing")
+      + ", clearing " + ((uxNow && uxNow.bare.length) ? uxNow.bare.map((r) => "." + r.cls).join(" and ") : "nothing")
+      + " read " + (uxCleared ? uxCleared.bare.length + " bare rows" : "nothing"));
+    for (let i = 0; i < 4; i += 1) {
+      if (await p.evaluate(() => document.getElementById("pull").hidden)) break;
+      await p.click("#pull", { force: true });
+      await p.waitForTimeout(220);
+    }
+  }
+
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 

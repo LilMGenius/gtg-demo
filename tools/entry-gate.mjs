@@ -162,6 +162,81 @@ try {
   check("entry:the-condition-slot-paints-an-icon-in-every-band", blank.length === 0,
     blank.length ? "no ink in " + blank.join(",") + " | " + said.join(" | ") : said.join(" | "));
 
+  /* 재화 띠의 일반 앱 UX 문법 둘. 도메인 축과 달리 게임을 몰라도 잡히는 자리다.
+     하나. 한 표기가 한 자리에서만 선다. 칩 셋은 같은 종류의 칸이므로 같은 글꼴 토큰과 같은 자릿점과
+     같은 아이콘-숫자 차례로 서야 한다. 팬 5,000과 땀 8,000과 스폰 1,000이 한 줄에 붙어 서는 띠라,
+     한 칩만 자릿점이 다르면 읽는 눈이 그 수를 다른 단위로 받는다.
+     둘. 옮기거나 지운 칩이 자리를 남기지 않는다. 자리는 offsetLeft로 잰다. 띠가 -1.1도 기울어
+     getBoundingClientRect는 회전된 상자를 돌려주고, 실측으로 같은 12px 간격이 11.55px로 읽힌다.
+     여유 2px과 대역을 그 판에서 다시 내는 방식은 chrome-gate의 리듬 축과 같은 식이다. 그 자는
+     기둥의 세로 리듬을 갖고 이 자는 띠 안의 가로 리듬을 가지므로, 같은 자리를 두 번 재지 않는다. */
+  const TOL = 2;
+  const CHIP = () => {
+    const font = (e) => { const s = getComputedStyle(e); return [s.fontFamily.split(",")[0], s.fontSize, s.fontWeight, s.fontStyle, s.letterSpacing].join("|"); };
+    return [...document.querySelectorAll("#purse .cur")].map((c, i) => {
+      const val = c.querySelector("b,i,u,em");
+      const icon = c.querySelector("svg");
+      const kids = [...c.children];
+      return { id: c.id || ("chip" + i), tag: val ? val.tagName : "none",
+        text: val ? val.textContent.trim() : "", font: val ? font(val) : "none",
+        iconFirst: Boolean(icon) && Boolean(val) && kids.indexOf(icon) === 0 && kids.indexOf(icon) < kids.indexOf(val),
+        left: c.offsetLeft, width: c.offsetWidth, ink: val ? Math.round(val.getBoundingClientRect().width) : 0 };
+    });
+  };
+  // 자릿점은 세 자리마다 쉼표다. state가 toLocaleString으로 굽는 모양이고, 칩 셋이 그것을 같이 쓴다.
+  const NUM = /^[0-9]{1,3}(,[0-9]{3})*$/;
+  const oneFormat = (cs) => {
+    const fonts = [...new Set(cs.map((c) => c.font))];
+    const off = cs.filter((c) => !NUM.test(c.text) || !c.iconFirst);
+    return { fonts: fonts, off: off, ok: cs.length >= 3 && fonts.length === 1 && off.length === 0 };
+  };
+  const rhythm = (cs) => {
+    const gaps = cs.slice(1).map((c, i) => ({ pair: cs[i].id + " to " + c.id, gap: c.left - (cs[i].left + cs[i].width) }));
+    const lo = gaps.length ? Math.min.apply(null, gaps.map((g) => g.gap)) : 0;
+    const hi = gaps.length ? Math.max.apply(null, gaps.map((g) => g.gap)) : 0;
+    return { gaps: gaps, lo: lo, hi: hi, holes: gaps.filter((g) => g.gap > lo + TOL),
+      blank: cs.filter((c) => c.ink <= 0 || c.text.length === 0),
+      ok: gaps.length >= 2 && hi - lo <= TOL && cs.every((c) => c.ink > 0 && c.text.length > 0) };
+  };
+  const chips3 = await p.evaluate(CHIP);
+  const fmt = oneFormat(chips3);
+  const beat = rhythm(chips3);
+  const sayChips = (cs) => cs.map((c) => c.id + " " + JSON.stringify(c.text) + " " + c.tag).join(", ");
+  check("ux:the-currency-chips-read-one-number-format", fmt.ok,
+    fmt.off.length ? fmt.off.map((c) => c.id + " draws " + JSON.stringify(c.text) + " icon-first " + c.iconFirst).join(", ")
+      : fmt.fonts.length > 1 ? chips3.length + " chips carry " + fmt.fonts.length + " fonts: " + fmt.fonts.join(" vs ")
+        : chips3.length + " chips, one font " + fmt.fonts[0] + ", " + sayChips(chips3));
+  check("ux:the-resource-strip-leaves-no-vacated-slot", beat.ok,
+    beat.blank.length ? beat.blank.map((c) => c.id + " stands empty at " + c.left + " wide " + c.width).join(", ")
+      : beat.holes.length ? beat.holes.map((g) => g.pair + " " + g.gap + "px against a " + beat.lo + "px band").join(", ")
+        : beat.gaps.map((g) => g.pair + " " + g.gap).join(", ") + "px, band " + beat.lo + " to " + beat.hi + ", every chip inked");
+  /* 대조군 둘을 한 축에 둔다. 자릿점을 빈칸으로 바꾼 칩과 글꼴을 줄인 칩이 각각 위의 표기 축을
+     빨갛게 만들어야 하고, 46px을 밀어 넣은 칩이 리듬 축을 빨갛게 만들어야 한다. 심은 뒤에 도로 뺀다. */
+  const plantText = await p.evaluate(() => {
+    const val = document.querySelectorAll("#purse .cur")[1].querySelector("b,i,u,em");
+    val.dataset.was = val.textContent;
+    // 자릿점을 빈칸으로 쓰는 칩 하나. 이 판의 수가 세 자리 아래라 원문을 고쳐 쓰면 아무것도 안 심는다.
+    val.textContent = "12 345";
+    return val.textContent;
+  });
+  const afterText = oneFormat(await p.evaluate(CHIP));
+  await p.evaluate(() => { const v = document.querySelectorAll("#purse .cur")[1].querySelector("b,i,u,em"); v.textContent = v.dataset.was; delete v.dataset.was; });
+  await p.evaluate(() => { const v = document.querySelectorAll("#purse .cur")[1].querySelector("b,i,u,em"); v.style.fontSize = "13px"; });
+  const afterFont = oneFormat(await p.evaluate(CHIP));
+  await p.evaluate(() => { document.querySelectorAll("#purse .cur")[1].querySelector("b,i,u,em").style.fontSize = ""; });
+  const back = oneFormat(await p.evaluate(CHIP));
+  check("control:an-odd-chip-format-reddens-the-format-axis",
+    afterText.ok === false && afterFont.ok === false && back.ok === fmt.ok,
+    "separator " + JSON.stringify(plantText) + " caught " + (afterText.ok === false)
+    + ", 13px font caught " + (afterFont.ok === false) + ", restored to " + back.ok);
+  await p.evaluate(() => { document.querySelectorAll("#purse .cur")[1].style.marginLeft = "46px"; });
+  const afterGap = rhythm(await p.evaluate(CHIP));
+  await p.evaluate(() => { document.querySelectorAll("#purse .cur")[1].style.marginLeft = ""; });
+  const backGap = rhythm(await p.evaluate(CHIP));
+  check("control:a-planted-46px-hole-reddens-the-rhythm-axis",
+    afterGap.ok === false && backGap.ok === beat.ok,
+    "planted band " + afterGap.lo + " to " + afterGap.hi + ", holes " + afterGap.holes.length + ", restored to " + backGap.ok);
+
   // 누름을 받는 것은 button이어야 한다. 글자 조각에 붙은 핸들러는 누를 수 있다는 신호를 화면에 안 낸다.
   const handlers = await p.evaluate(() => { const bad = []; for (const el of document.querySelectorAll("#hud *")) { if (!el.onclick && !el.onpointerdown) continue; if (el.tagName !== "BUTTON") bad.push((el.id || el.className || el.tagName) + ":" + el.tagName.toLowerCase()); } return bad; });
   check("affordance:every-hud-click-target-is-a-button", handlers.length === 0, handlers.join(", ") || "all buttons");
