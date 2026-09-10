@@ -1241,7 +1241,11 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 /* 명성 9 이상. 마흔여섯 중 여덟이라 자주 안 오므로, 올 때는 판 전체가 달라야 한다. */
 #pull .now.rare{border-color:#ffd83d;background:#3a3312;box-shadow:10px 12px 0 var(--edge), 0 0 0 6px #ffd83d3d}
 #pull .now.rare .foot > b,#pull .now.rare u,#pull .now.rare .stats b{color:#ffd83d}
-/* 이미 나온 카드가 쌓이는 줄. 아래에 눕혀 두면 몇 장을 열었는지가 세지 않아도 보인다. */
+/* 이미 나온 카드가 쌓이는 줄. 아래에 눕혀 두면 몇 장을 열었는지가 세지 않아도 보인다.
+   34는 첫 칩이 앉을 자리를 미리 잡아 두는 자다. 실측으로 이 수를 0으로 두면 열한 장 회차의
+   첫 장에서 카드 위가 163이었다가 두 번째 칩이 앉는 순간 147로 16만큼 뛰고, 34가 서 있으면
+   두 자리 다 146이다. 한 장짜리 회차는 판정이 이 줄을 아예 안 세운다. 쌓일 카드가 영영 없어
+   34에 기둥 사이 12를 더한 46이 카드 아래에 빈 채로 남기 때문이다. */
 #pull .done{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--gap-1);
   width:min(92vw,720px);min-height:34px}
 #pull .done i{display:grid;place-items:center;min-width:64px;height:32px;padding:0 8px;
