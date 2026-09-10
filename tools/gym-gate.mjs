@@ -3,6 +3,11 @@ import { chromium } from "playwright";
 // 훈련장 게이트. 성장 칸이 전부 상한에 닿았을 때 훈련이 사표가 되는가.
 // 이 축은 파운더가 먼저 본 결함이다. 만렙에 닿은 저장을 어느 게이트도 입력으로 쓴 적이 없었다.
 // 종단 상태는 주입 훅(?preset=maxed)으로 앞당기고, 판정식은 건드리지 않는다.
+// 두 번째 축 무리는 격자가 화면 안에 있는가다. F3 6.7은 740x360에서 다섯째 열이 잘린다고 적었는데
+// 실측은 그렇지 않았다. 카드의 오른끝은 그림자까지 725.78px이고 화면은 740px이라 14.22px이 남는다.
+// 남은 사실은 기울기다. 그림자가 오른쪽 여백만 8px 먹어 왼쪽 22.20px 오른쪽 14.22px로 갈리고,
+// 리포트는 그 기울기를 잘림으로 읽었다. 그래서 이 축은 잘림을 고치는 대신 잘리지 않음을 붙잡는다.
+// 그림자는 레이아웃 상자 밖에 그려져서 rect만 재면 안 보인다. 계산된 box-shadow의 x 오프셋을 더한다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html";
 // 훈련 한 회의 환전 단가. wallet.mjs의 COIN_DRILL과 같은 값이어야 한다.
@@ -34,16 +39,19 @@ try {
     return { head: box.querySelector("h4").textContent, rows, swap: sw ? { text: sw.textContent, off: sw.disabled } : null };
   });
 
-  const boot = async (q) => {
-    await p.goto(BASE + q, { waitUntil: "load" });
-    await p.evaluate(() => localStorage.clear());
-    await p.reload({ waitUntil: "load" });
-    await p.waitForTimeout(1200);
-    await p.click("#go", { force: true });
-    await p.waitForTimeout(1400);
-    await p.click("#gymBtn", { force: true });
-    await p.waitForTimeout(300);
+  // 좁은 폭은 제 창을 따로 열어야 해서 부팅이 페이지를 받는다. 두 창이 같은 순서를 밟아야
+  // 넓은 쪽과 좁은 쪽의 차이가 폭에서만 오고 진행 상태에서 오지 않는다.
+  const bootOn = async (pg, q) => {
+    await pg.goto(BASE + q, { waitUntil: "load" });
+    await pg.evaluate(() => localStorage.clear());
+    await pg.reload({ waitUntil: "load" });
+    await pg.waitForTimeout(1200);
+    await pg.click("#go", { force: true });
+    await pg.waitForTimeout(1400);
+    await pg.click("#gymBtn", { force: true });
+    await pg.waitForTimeout(300);
   };
+  const boot = (q) => bootOn(p, q);
 
   // 대조군. 주입이 없으면 성장 칸은 상한이 아니고, 환전 줄 자체가 화면에 없다.
   // 이게 없으면 본시험의 녹색은 화면이 늘 그렇게 생긴 것과 구분되지 않는다.
@@ -75,12 +83,72 @@ try {
   const done = await gym();
   check("exit:spent-swap-row-says-why-it-is-dead", !!done.swap && done.swap.off && done.swap.text.includes("바꿀 훈련이 없다"), done.swap ? done.swap.text + " off=" + done.swap.off : "absent");
 
+  // 카드 한 장의 오른끝. 레이아웃 상자에 그림자 x 오프셋을 더한 값이고, inset 그림자는 상자 안이라 뺀다.
+  const edges = () => {
+    const cards = [...document.querySelectorAll("#gym .row button")];
+    let worst = -Infinity, who = "", left = Infinity;
+    for (const el of cards) {
+      const r = el.getBoundingClientRect();
+      let dx = 0;
+      for (const one of getComputedStyle(el).boxShadow.split(/,(?![^(]*\))/)) {
+        if (/inset/.test(one)) continue;
+        const m = one.match(/(-?[\d.]+)px\s+(-?[\d.]+)px\s+(-?[\d.]+)px(?:\s+(-?[\d.]+)px)?/);
+        if (m) dx = Math.max(dx, +m[1] + +m[3] + (m[4] === undefined ? 0 : +m[4]));
+      }
+      const over = r.right + dx - innerWidth;
+      if (over > worst) { worst = over; who = el.dataset.k || ""; }
+      left = Math.min(left, r.left);
+    }
+    return { n: cards.length, worst: +worst.toFixed(2), who, left: +left.toFixed(2), iw: innerWidth };
+  };
+  const said = (e) => e.n + " cards, worst right edge " + (e.iw + e.worst).toFixed(2) + " of " + e.iw + " on " + e.who +
+    " (" + (e.worst > 0 ? "over by " + e.worst.toFixed(2) : "clear by " + (-e.worst).toFixed(2)) + "px), left " + e.left;
+  const inside = (e) => e.n === SLOTS && e.worst <= 0 && e.left >= 0;
+
+  // 본시험. 리포트가 찍은 화면과 같은 740x360이다.
+  const mob = await b.newContext({ viewport: { width: 740, height: 360 }, deviceScaleFactor: 2 });
+  const mp = await mob.newPage();
+  mp.on("pageerror", (e) => errs.push(String(e)));
+  mp.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+  // 상한 주입은 이 축과 상관이 없다. 리포트가 판정한 그 화면을 그대로 다시 세워야
+  // 이 게이트가 찍는 그림이 10-gym-740.png와 같은 자리에서 비교된다.
+  await bootOn(mp, "?seed=20&preset=veteran");
+  // 커서가 카드 위에 남으면 hover 그림자(8px 10px)가 섞인다. 재기 전에 화면 밖으로 뺀다.
+  await mp.mouse.move(2, 2);
+  await mp.waitForTimeout(150);
+  const narrow = await mp.evaluate(edges);
+  check("gym:every-card-and-its-shadow-stays-inside-the-viewport-at-740x360", inside(narrow), said(narrow));
+  if (shot) await mp.screenshot({ path: shot.replace(/\.png$/, "") + "-740.png" });
+  await mob.close();
+
+  // 대조군. 같은 판정식이 1280x720에서도 통과해야 이 축이 폭 하나에만 붙은 것이 아니다.
+  await p.mouse.move(2, 2);
+  await p.waitForTimeout(150);
+  const wide = await p.evaluate(edges);
+  check("control:every-card-and-its-shadow-stays-inside-the-viewport-at-1280x720", inside(wide), said(wide));
+
+  // 음성 대조군. 폭을 억지로 늘려 카드를 화면 밖으로 밀고, 판정식이 그때 실제로 빨개지는지 본다.
+  // 이게 없으면 위 두 줄의 녹색은 판정식이 아무것도 안 재는 경우와 구분되지 않는다.
+  await p.evaluate(() => {
+    const s = document.createElement("style");
+    s.id = "plant";
+    s.textContent = "#gym .row{width:calc(100vw + 120px)}";
+    document.head.append(s);
+  });
+  await p.waitForTimeout(150);
+  const planted = await p.evaluate(edges);
+  await p.evaluate(() => document.getElementById("plant").remove());
+  await p.waitForTimeout(150);
+  const back = await p.evaluate(edges);
+  check("control:planted-width-pushes-a-card-past-the-viewport-edge", !inside(planted) && inside(back),
+    "planted " + said(planted) + " | restored " + said(back));
+
   if (shot) await p.screenshot({ path: shot });
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
 
   console.log(notes.map((s) => "  ok   " + s).join("\n"));
   if (fails.length) console.log(fails.map((s) => "  FAIL " + s).join("\n"));
-  console.log(fails.length ? "gym FAIL " + fails.length : "gym PASS");
+  console.log(fails.length ? "gym FAIL " + fails.length : "gym PASS " + notes.length);
   if (fails.length) process.exitCode = 1;
 } finally {
   clearTimeout(t);
