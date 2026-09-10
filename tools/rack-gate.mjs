@@ -193,6 +193,80 @@ const ALIGN = () => {
   }
   return out;
 };
+
+/* 한 선반 줄이 격자 한 줄로 읽히는가. 이름이 두 줄로 접힌 카드 밑에서 효과 한 줄이 형제보다
+   한 줄 아래에 서면, 넉 장을 훑는 눈이 효과를 카드마다 다른 높이에서 다시 찾는다.
+   줄은 offsetTop으로 묶고 좌표도 offsetTop으로 잰다. 카드마다 rotate가 걸려 있어
+   getBoundingClientRect는 회전된 바깥 상자를 돌려주고, 같은 줄에 선 형제의 좌표가 1px 넘게 갈린다
+   (실측: 1280에서 같은 줄의 배지 rect top이 452.48과 453.63). offsetTop은 배치 좌표라 변형에 안 흔들린다.
+   배지는 위끝이 아니라 아래끝으로 잰다. foot의 auto 여백이 배지를 카드 바닥에 못 박으므로 줄이
+   공유하는 변은 아래끝이고, 위끝은 버튼 높이만큼 갈린다(실측: 1280 타투 선반에서 착용 버튼이 값 배지보다
+   6px 짧아 위끝은 457 대 451인데 아래끝은 넷 다 509). 위끝으로 재면 이름 접힘과 무관한 버튼 높이 차이가
+   빨갛게 뜨고, 이름 칸을 고쳐도 안 꺼진다.
+   줄 수는 그려진 글자로 센다. 상자 높이로 세면 이름 칸에 두 줄을 미리 잡아 둔 뒤로 한 줄 이름도
+   두 줄로 읽혀, 아래 계기가 섞인 줄을 영영 못 찾는다. */
+const ROWS = () => {
+  const out = [];
+  for (const tab of [...document.querySelectorAll("#shop .tab")]) {
+    tab.click();
+    for (const card of document.querySelectorAll("#shop .rack .card.gear")) {
+      const b = card.querySelector("b");
+      const em = card.querySelector("em");
+      const buy = card.querySelector(".buy");
+      if (!b || !em || !buy) continue;
+      const rng = document.createRange();
+      rng.selectNodeContents(b);
+      out.push({ tab: tab.dataset.tab, name: (b.textContent || "").trim(), row: card.offsetTop,
+        lines: rng.getClientRects().length,
+        em: card.offsetTop + em.offsetTop,
+        px: card.offsetTop + buy.offsetTop + buy.offsetHeight });
+    }
+  }
+  return out;
+};
+
+/* 대조군은 같은 화면에서 만든다. 한 줄에서 이름이 가장 긴 카드에 줄을 심어 그 카드만 형제보다 길게 만들면,
+   효과 축은 빨개지고 배지 아래끝은 그대로여야 한다. 가장 긴 이름을 고르는 이유는 짧은 이름에 심으면
+   형제와 줄 수가 같아져 아무 일도 안 일어나기 때문이다.
+   심는 자리는 셋째 줄이다. 이름 칸이 두 줄을 미리 잡고 있어서 한 줄만 심으면 그 줄이 잡아 둔 자리 안에
+   들어앉고 화면은 안 움직인다(실측: 한 줄만 심었을 때 1280과 620에서 어긋남이 0px에 머물러 이 대조군이
+   눈이 멀었고, 이름 칸을 안 잡는 740에서만 22px로 빨개졌다). 셋째 줄은 어느 폭에서든 그 자리를 넘는다.
+   심은 것은 도로 뽑고, 뽑힌 자리를 다시 재서 뒤에 오는 축이 이 자가 민 화면을 안 재게 한다. */
+const PLANT = () => {
+  const spread = (a) => (a.length ? Math.max.apply(null, a) - Math.min.apply(null, a) : -1);
+  const read = (row) => ({
+    em: spread(row.map((c) => c.offsetTop + c.querySelector("em").offsetTop)),
+    px: spread(row.map((c) => c.offsetTop + c.querySelector(".buy").offsetTop + c.querySelector(".buy").offsetHeight)) });
+  const drawn = (c) => { const rng = document.createRange(); rng.selectNodeContents(c.querySelector("b")); return rng.getClientRects().length; };
+  /* 심은 뒤의 줄 수는 상자로 센다. Range는 심어 넣은 br과 글자를 조각마다 세어 세 줄짜리를 일곱으로 읽고,
+     격자 줄이 보는 것은 조각 수가 아니라 이름 상자의 높이다. */
+  const box = (c) => { const b = c.querySelector("b"); const lh = parseFloat(getComputedStyle(b).lineHeight); return lh > 0 ? Math.round(b.getBoundingClientRect().height / lh) : -1; };
+  for (const tab of [...document.querySelectorAll("#shop .tab")]) {
+    tab.click();
+    const cards = [...document.querySelectorAll("#shop .rack .card.gear")]
+      .filter((c) => c.querySelector("b") && c.querySelector("em") && c.querySelector(".buy"));
+    if (cards.length < 2) continue;
+    const row = cards.filter((c) => c.offsetTop === cards[0].offsetTop);
+    if (row.length < 2) continue;
+    let tall = row[0];
+    for (const c of row) if (drawn(c) > drawn(tall)) tall = c;
+    const from = drawn(tall);
+    const before = read(row);
+    const mark = document.createElement("span");
+    for (let i = Math.max(1, 3 - from); i > 0; i -= 1) {
+      mark.appendChild(document.createElement("br"));
+      mark.appendChild(document.createTextNode("가"));
+    }
+    tall.querySelector("b").appendChild(mark);
+    const grew = box(tall);
+    const after = read(row);
+    mark.remove();
+    const back = read(row);
+    return { tab: tab.dataset.tab, name: (tall.querySelector("b").textContent || "").trim(),
+      cards: row.length, from: from, grew: grew, before: before, after: after, back: back };
+  }
+  return null;
+};
 let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
@@ -212,6 +286,8 @@ try {
     const fit = await p.evaluate(FIT);
     const dur = await p.evaluate(DURATION);
     const align = await p.evaluate(ALIGN);
+    const rows = await p.evaluate(ROWS);
+    const plant = await p.evaluate(PLANT);
     /* 내려온 설명 문장이 어디에 서 있는가. 페이지가 이미 불러 둔 판을 다시 부르는 것이라
        모듈이 두 번 돌지 않고, 화면에 안 그려지는 값을 화면 쪽에서 읽는 유일한 길이다. */
     const parked = await p.evaluate(async () => {
@@ -222,7 +298,7 @@ try {
       return out;
     }).catch(() => null);
     await ctx.close();
-    return { count, rare, fit, parked, dur, align };
+    return { count, rare, fit, parked, dur, align, rows, plant };
   };
   const full = await at(WIDE, 720);
   const thin = await at(NARROW, 720);
@@ -371,6 +447,59 @@ try {
     unseen.slice(0, 2).map((r) => r.at + " stays inside " + (r.a.pinned.lh / 2) + " at off " + r.a.pinned.off).join(", ")
       || wrapped.length + " two-line readings go red when pinned to the first line, off "
         + wrapped.map((r) => r.a.pinned.off).join(" / "));
+  /* 선반 줄. 세 폭에서 열 선반을 훑어 격자 줄마다 효과 줄의 위끝과 값 배지의 아래끝을 맞댄다.
+     문턱 1px은 지어낸 수가 아니라 offsetTop이 정수라 같은 자리도 반올림 하나가 갈리는 폭이다. */
+  const bucket = new Map();
+  for (const [w, h, list] of [[WIDE, 720, full.rows], [NARROW, 720, thin.rows], [HAND_W, HAND_H, hand.rows]])
+    for (const r of list) {
+      const key = w + "x" + h + " " + r.tab + " row " + r.row;
+      if (!bucket.has(key)) bucket.set(key, []);
+      bucket.get(key).push(r);
+    }
+  const shelfRows = [...bucket].map((e) => {
+    const key = e[0], cards = e[1];
+    const gap = (get) => {
+      const sorted = cards.slice().sort((a, c) => get(a) - get(c));
+      const lo = sorted[0], hi = sorted[sorted.length - 1];
+      return { off: get(hi) - get(lo),
+        say: key + " " + get(hi) + " under " + JSON.stringify(hi.name) + " against " + get(lo) + " under " + JSON.stringify(lo.name) };
+    };
+    return { key: key, cards: cards, em: gap((r) => r.em), px: gap((r) => r.px),
+      mixed: new Set(cards.map((r) => r.lines)).size > 1 };
+  });
+  const worstOf = (get) => shelfRows.slice().sort((a, c) => get(c) - get(a))[0];
+  const raggedEm = shelfRows.filter((g) => g.em.off > 1);
+  const worstEm = shelfRows.length ? worstOf((g) => g.em.off) : null;
+  check("rack:a-wrapped-name-keeps-its-shelf-row-on-one-effect-line", shelfRows.length > 0 && raggedEm.length === 0,
+    raggedEm.length ? raggedEm.length + " of " + shelfRows.length + " shelf rows drop an effect line, worst " + worstEm.em.say
+      : shelfRows.length + " shelf rows read on one effect line, worst " + worstEm.em.off + "px at " + worstEm.key);
+  const raggedPx = shelfRows.filter((g) => g.px.off > 1);
+  const worstPx = shelfRows.length ? worstOf((g) => g.px.off) : null;
+  check("rack:a-wrapped-name-does-not-push-its-badge-off-the-row", shelfRows.length > 0 && raggedPx.length === 0,
+    raggedPx.length ? raggedPx.length + " of " + shelfRows.length + " shelf rows drop a badge, worst " + worstPx.px.say
+      : shelfRows.length + " shelf rows keep every badge on one line, worst " + worstPx.px.off + "px at " + worstPx.key);
+  /* 계기. 한 줄 이름과 두 줄 이름이 같은 격자 줄에 같이 선 표본이 없으면 위 두 축은 아무것도 안 물은 것이다.
+     한 줄짜리만 모아 놓고 낸 초록은 줄이 맞는다는 뜻이 아니라 접힌 이름을 한 장도 못 만났다는 뜻이다. */
+  const mixedRows = shelfRows.filter((g) => g.mixed);
+  check("instrument:a-shelf-row-held-a-one-line-and-a-two-line-name", mixedRows.length > 0,
+    mixedRows.length ? mixedRows.length + " of " + shelfRows.length + " rows mix name lines: "
+      + mixedRows.slice(0, 4).map((g) => g.key + " lines " + g.cards.map((r) => r.lines).join(",")).join(", ")
+      : "no shelf row put a one-line name beside a two-line name over " + shelfRows.length + " rows");
+  const plants = [[WIDE, 720, full.plant], [NARROW, 720, thin.plant], [HAND_W, HAND_H, hand.plant]]
+    .map((e) => ({ at: e[0] + "x" + e[1], p: e[2] })).filter((x) => x.p);
+  const blindPlant = plants.filter((x) => x.p.after.em <= 1);
+  check("control:a-third-name-line-breaks-the-effect-row", plants.length > 0 && blindPlant.length === 0,
+    blindPlant.length ? blindPlant.map((x) => x.at + " " + x.p.tab + " stays at " + x.p.after.em + "px on a " + x.p.grew + " line name box").join(", ")
+      : plants.map((x) => x.at + " " + x.p.tab + " " + JSON.stringify(x.p.name) + " " + x.p.from + " line name grown to a " + x.p.grew + " line box, effect row " + x.p.before.em + "->" + x.p.after.em + "px").join(", "));
+  const moved = plants.filter((x) => x.p.after.px > 1);
+  check("control:a-third-name-line-leaves-the-badge-row-alone", plants.length > 0 && moved.length === 0,
+    moved.map((x) => x.at + " badge row " + x.p.before.px + "->" + x.p.after.px).join(", ")
+      || plants.map((x) => x.at + " badge row holds at " + x.p.after.px + "px on a " + x.p.grew + " line name box").join(", "));
+  /* 심은 줄을 도로 뽑았는가. 안 뽑히면 이 자가 민 화면을 다음 축이 재고, 그 초록은 제품이 아니라 대조군의 것이다. */
+  const stuckPlant = plants.filter((x) => x.p.back.em !== x.p.before.em || x.p.back.px !== x.p.before.px);
+  check("instrument:the-planted-name-line-was-taken-back-out", plants.length > 0 && stuckPlant.length === 0,
+    stuckPlant.map((x) => x.at + " came back at em " + x.p.back.em + " px " + x.p.back.px + ", not " + x.p.before.em + " / " + x.p.before.px).join(", ")
+      || plants.map((x) => x.at + " back to em " + x.p.back.em + " px " + x.p.back.px).join(", "));
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
 
   for (const k of racks) console.log("  " + k.padEnd(7) + " cards " + wide[k].cards + "  columns " + wide[k].cols + " at " + WIDE + "px, " + narrow[k].cols + " at " + NARROW + "px");
