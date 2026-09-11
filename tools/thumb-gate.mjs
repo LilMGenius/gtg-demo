@@ -231,12 +231,18 @@ try {
      무늬가 칸 위쪽 귀퉁이에 손톱만 하게 걸리고 나머지를 소매와 유니폼이 먹은 채로
      네 등급이 전부 초록으로 지나갔다. 실측: 옛 겨냥에서 세 유료 등급의 무늬가 칸의
      16.6과 18.4와 18.1퍼센트였고, 카드 크기에서 사람이 본 것은 타투가 아니라 어두운 쐐기였다.
-     무늬만 골라 세는 방법은 색이 아니라 반사실이다. 같은 등급을 무늬 없이 한 번 더 굽고
-     두 장을 견주면 달라진 화소가 곧 살에 새긴 그림이다. 색으로 고르면 0등급이 까는 띠가
-     같이 잡혀 맨살 대조군이 죽는다. inkGrade만 0으로 내리면 띠의 색과 폭과 두께는 그대로 남는다. */
-  // 42퍼센트. 새 겨냥이 잰 84.2퍼센트의 절반이다. 무늬가 조금 작아지는 것으로는 안 울고,
-  // 겨냥이 옛 자리로 돌아가면 반드시 운다. 옛 겨냥의 최악은 16.6퍼센트였다.
+     무늬는 색이 아니라 견줌으로 센다. 견주는 기준은 상점이 실제로 파는 맨살 칸, 곧 0등급을
+     그대로 구운 장이다. 값을 치른 사람이 얻는 것은 그 칸과 달라진 화소이고, 그것이 산 그림이다.
+     inkGrade만 0으로 내린 반사실을 기준으로 삼으면 안 된다. 그 장은 등급의 띠 폭 전체를
+     한 번 덮어 칠하는데(texture.mjs의 0등급 분기), 1등급과 2등급이 팔리는 장은 그 자리를
+     맨 소매로 둔다. 그래서 차이에 상품이 칠한 적 없는 대조군의 띠가 통째로 섞인다.
+     실측: 2등급이 그 자로 84.4퍼센트였고 상품이 칠한 그림은 28.6퍼센트였다.
+     색으로 고르는 길은 따로 막혀 있다. 0등급이 까는 띠가 같이 잡혀 맨살 대조군이 죽는다. */
+  // 42퍼센트. 여기 박힌 상수다. db998fe에서 반사실 자가 잰 84.2퍼센트의 절반이고, 그 84.2도
+  // 상수로 같이 찍는다. 절반이라는 문장을 살아 있는 최솟값으로 다시 세면 빨간 판에서
+  // 42는 16.6의 절반이라는 거짓 문장이 찍힌다. 실제로 그렇게 찍힌 적이 있다.
   const INK_FILL = 0.42;
+  const INK_FILL_FROM = "half of 84.2% measured at db998fe";
   // 채널 최대 차 8. 압축 잔파동과 안티에일리어싱 위이고, 아래의 회전 자가 쓰는 그 폭이다.
   const FILL_DELTA = 8;
   // 심는 대조군. 이 자리로 겨냥을 되돌리면 위의 축이 빨개져야 한다.
@@ -256,11 +262,7 @@ try {
       };
       im.src = src;
     });
-    const share = async (n, over) => {
-      const bare = g.lookOf({ ink: n });
-      bare.inkGrade = 0;
-      const a = await read(m.thumbURL("ink", k, g.lookOf({ ink: n }), over));
-      const c = await read(m.thumbURL("ink", k, bare, over));
+    const moved = (a, c) => {
       if (a.width !== c.width || a.height !== c.height) return -1;
       let d = 0;
       for (let i = 0; i < a.data.length; i += 4) {
@@ -270,24 +272,43 @@ try {
       }
       return d / (a.width * a.height);
     };
-    const live = [], was = [];
-    for (let n = 0; n < g.TATTOOS.length; n += 1) {
-      live.push(await share(n));
-      was.push(await share(n, old));
-    }
-    return { live, was };
+    const rig = async (over) => {
+      const skin = await read(m.thumbURL("ink", k, g.lookOf({ ink: 0 }), over));
+      const sold = [], flat = [];
+      for (let n = 0; n < g.TATTOOS.length; n += 1) {
+        const bare = g.lookOf({ ink: n });
+        bare.inkGrade = 0;
+        const a = await read(m.thumbURL("ink", k, g.lookOf({ ink: n }), over));
+        sold.push(moved(a, skin));
+        flat.push(moved(a, await read(m.thumbURL("ink", k, bare, over))));
+      }
+      return { sold, flat };
+    };
+    const live = await rig();
+    const was = await rig(old);
+    const one = m.thumbURL("ink", k, g.lookOf({ ink: 0 }));
+    const two = m.thumbURL("ink", k, g.lookOf({ ink: 0 }));
+    return { live, was, base: { same: one === two, len: one.length } };
   }, [FILL_DELTA, OLD_INK_AIM]);
   const pct = (x) => (x * 100).toFixed(1) + "%";
-  const paid = fills.live.slice(1);
+  const paid = fills.live.sold.slice(1);
+  /* 자의 바닥. 위의 모든 수는 맨살 장 하나와 견준 차이라, 그 장이 구울 때마다 흔들리면
+     차이가 세는 것은 상품이 아니라 굽는 잡음이다. 두 번 구워 글자까지 같은지 먼저 묻는다. */
+  check("instrument:the-bare-skin-card-bakes-the-same-bytes", fills.base.same && fills.base.len > 0,
+    fills.base.same ? "grade 0 baked twice is the same " + fills.base.len + " char still"
+      : "grade 0 moved between two bakes");
   check("thumb:the-tattoo-fills-its-card", paid.length > 0 && paid.every((x) => x >= INK_FILL),
-    "grades 1..3 paint " + paid.map(pct).join(" ") + " of the card, floor " + pct(INK_FILL)
-    + ", half the measured " + pct(Math.min.apply(null, paid)));
-  check("control:bare-skin-carries-no-tattoo", fills.live[0] >= 0 && fills.live[0] < 0.005,
-    (fills.live[0] * 100).toFixed(2) + "% on grade 0, the rank that sells no tattoo");
-  const wasWorst = Math.min.apply(null, fills.was.slice(1));
+    "grades 1..3 paint " + paid.map(pct).join(" ") + " of the card over the sold bare-skin card, floor "
+    + pct(INK_FILL) + " (" + INK_FILL_FROM + "); the forced-grade-0 counterfactual reads "
+    + fills.live.flat.slice(1).map(pct).join(" ") + " on the same bakes");
+  check("control:bare-skin-carries-no-tattoo", fills.live.sold[0] >= 0 && fills.live.sold[0] < 0.005,
+    (fills.live.sold[0] * 100).toFixed(2) + "% on grade 0, the rank that sells no tattoo");
+  const wasWorst = Math.min.apply(null, fills.was.sold.slice(1));
   check("control:the-old-arm-aim-misses-the-tattoo-floor", wasWorst >= 0 && wasWorst < INK_FILL,
     "the planted rig dist 0.58 lift -0.12 high 0.08 yaw -0.70 paints "
-    + fills.was.slice(1).map(pct).join(" ") + ", worst " + pct(wasWorst) + " under the " + pct(INK_FILL) + " floor");
+    + fills.was.sold.slice(1).map(pct).join(" ") + " (counterfactual "
+    + fills.was.flat.slice(1).map(pct).join(" ") + "), worst " + pct(wasWorst)
+    + " under the " + pct(INK_FILL) + " floor");
 
   // 대조군. 같은 등급을 두 번 구우면 같은 그림이어야 한다. 매번 달라지면 위의 다름은
   // 상품의 차이가 아니라 굽는 잡음이고, 그 축은 아무것도 증명하지 않는다.
