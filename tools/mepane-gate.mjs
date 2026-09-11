@@ -11,6 +11,9 @@ import { KICKERS, ROLES } from "../src/roster.mjs";
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 // famous는 라포 줄을, seed 20은 전적 줄을, rich는 영입 카드의 값을 살아 있게 만든다.
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=famous,rich,veteran";
+// 새 계정 판. 프리셋은 개봉을 건너뛰는 것 하나만 남긴다. 빈 아는 얼굴 칸은 라포가 없는 사람의
+// 화면이라, 라포를 심어 둔 이 판에서는 구조적으로 안 나온다.
+const NEW = BASE.replace(/preset=[^&]*/, "preset=veteran");
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();
@@ -363,6 +366,73 @@ try {
   check("mepane:a-known-face-stands-as-a-card",
     metView.length > 0 && metView.every((m) => m.face > 0 && m.bar > 0 && m.go.length > 0),
     metView.length ? JSON.stringify(metView) : "no cards in the people pane");
+
+  /* 빈 아는 얼굴 칸. 라포가 하나도 없는 사람에게는 라벨 둘과 빈 띠만 섰다. 띠는 서 있는데 그 안이
+     비어서, 화면은 덜 그려진 것으로 읽히고 무엇이 이 칸을 채우는지는 어디에도 없었다.
+     재는 것은 셋이다. 글자가 있는가, 흐린 톤으로 서는가, 띠가 한 줄만큼 실제로 부풀었는가.
+     textContent만 읽으면 숨은 글자도 초록이 되므로 색과 상자를 같이 잰다. */
+  const ZERO_MIN = 8;
+  const zeroRead = () => {
+    const box = document.getElementById("me");
+    const pane = box ? box.querySelector(".pane") : null;
+    if (!pane) return null;
+    // 흐린 톤은 토큰에서 되뽑는다. 띠 자신의 색을 자로 쓰면 어떤 색이든 자기와 같아 늘 통과한다.
+    const probe = document.createElement("span");
+    probe.style.cssText = "position:fixed;visibility:hidden;color:var(--dim)";
+    document.body.append(probe);
+    const token = getComputedStyle(probe).color;
+    probe.remove();
+    const met = pane.querySelectorAll(".note.met").length;
+    const strip = pane.querySelector(".note.dim");
+    if (!strip) return { met, token, strip: false, text: "", chars: 0, color: "", line: 0, fontPx: 0, stripH: 0, textH: 0 };
+    const inner = strip.querySelector("span") || strip;
+    const cs = getComputedStyle(inner);
+    // 자는 em 상자다. 인라인 글자 상자는 줄 높이가 아니라 글꼴 오르내림으로 서기 때문에, 한 줄이
+    // 제대로 그려져도 줄 높이보다 낮다. 실측 24px 줄에 21px 상자였다. 줄 높이를 자로 대면 멀쩡한 글자가 빨개진다.
+    const fontPx = Math.round(Number.parseFloat(cs.fontSize));
+    const line = Math.round(Number.parseFloat(cs.lineHeight) || fontPx);
+    const drawn = inner.getClientRects()[0];
+    const text = inner.textContent.trim();
+    return { met, token, strip: true, text, chars: [...text].length, color: cs.color, line, fontPx,
+      stripH: Math.round(strip.getBoundingClientRect().height), textH: drawn ? Math.round(drawn.height) : 0 };
+  };
+  // 대조군. 아는 얼굴이 선 판에는 빈 칸 글자가 없어야 한다. 카드와 안내가 같이 서면 그 안내는 거짓이다.
+  const zeroFull = await p.evaluate(zeroRead);
+  check("control:a-people-pane-with-a-face-carries-no-zero-state",
+    Boolean(zeroFull) && zeroFull.met > 0 && !zeroFull.strip,
+    zeroFull ? zeroFull.met + " cards, dim strip "
+      + (zeroFull.strip ? "still standing with " + JSON.stringify(zeroFull.text) : "gone") : "no pane in the people tab");
+
+  /* 표본을 새 계정으로 바꾼다. 이 판의 사람은 라포를 심어 둔 사람이라 빈 칸이 구조적으로 안 나온다.
+     같은 창 안에 판을 하나 더 열고 계정을 지워, 신규 저장이 이 칸에서 보는 그림을 잰다.
+     판을 잠그고 라포를 비운 뒤에 연다. 한 구가 도는 사이에 행인이 붙으면 표본이 빈 칸을 벗어난다. */
+  const fresh = await ctx.newPage();
+  fresh.on("pageerror", (e) => errs.push(String(e)));
+  fresh.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+  await fresh.goto(NEW, { waitUntil: "load" });
+  await fresh.evaluate(() => { localStorage.removeItem("gtg.session.v1"); });
+  await fresh.reload({ waitUntil: "load" });
+  await fresh.waitForSelector("#go", { timeout: 15000 });
+  await fresh.click("#go", { force: true });
+  await fresh.waitForTimeout(700);
+  await fresh.evaluate(() => window.__lockRound());
+  const carried = await fresh.evaluate(() => {
+    const r = window.__rapport() || {};
+    const n = Object.keys(r).length;
+    for (const k of Object.keys(r)) delete r[k];
+    return n;
+  });
+  await fresh.evaluate(() => window.__me(true));
+  await fresh.click('#me .tab[data-tab="face"]', { force: true });
+  await fresh.waitForTimeout(320);
+  const zero = await fresh.evaluate(zeroRead);
+  await fresh.close();
+  const zeroOk = Boolean(zero) && zero.strip && zero.met === 0 && zero.chars >= ZERO_MIN
+    && zero.color === zero.token && zero.textH >= zero.fontPx && zero.stripH > zero.line;
+  check("mepane:an-empty-people-pane-says-what-fills-it", zeroOk,
+    zero ? JSON.stringify(zero.text) + " " + zero.chars + " chars in " + zero.color + " against the token "
+      + zero.token + ", text " + zero.textH + "px in a " + zero.fontPx + "px em on a " + zero.line + "px line, strip " + zero.stripH
+      + "px, cards " + zero.met + ", rapport keys cleared " + carried : "no pane on a fresh account");
 
   // 대조군. 닫고 다시 열면 능력치 칸으로 돌아온다. 안 돌아오면 다음에 연 사람이 탭을 눌러야 한다.
   await p.evaluate(() => { window.__me(false); window.__me(true); });
