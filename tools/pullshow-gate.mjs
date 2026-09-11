@@ -743,6 +743,175 @@ try {
     }
   }
 
+  /* 판. 이름과 능력치 다섯 줄이 구운 초상 위에 바로 앉으면, 글자 뒤에 무엇이 오는지를 카드가 아니라
+     그림이 정한다. 1280에서 이름이 키퍼의 가슴을 가로지르고 그 옆에 장갑이 섰고, 이름표는 카드 왼쪽 끝에
+     값은 오른쪽 끝에 붙어 눈이 카드 폭만큼 몸을 건너야 했다. 740에서는 그 장갑이 이름과 첫 값 사이를
+     뚫고 들어왔다. 위의 축들은 이 게임의 등급과 단을 알아야 읽히지만 아래 셋은 어느 앱이든 같은 것을
+     묻는다. 글자는 판 위에 앉고, 값은 제 이름표 옆에 선다.
+     이름 자리는 화소로 묻는다. 글자색만 투명으로 두면 배치는 그대로이고 칠만 빠지므로 남는 화소는
+     전부 판이어야 하고, 한 점이라도 판의 색에서 벗어나면 그 자리는 판이 아니라 그림이다.
+     얼굴 자리는 그림 상자의 위 45%로 둔다. 카드 rig가 몸통을 겨냥해 위로 올려 잡아 머리가 초상의
+     윗부분에 서므로 실제 머리는 그보다 위에서 끝나고, 이 자는 제품에 유리한 쪽으로 안 틀린다.
+     카드가 기울어 서므로 화면 좌표는 회전을 통과시켜 얻는다. getBoundingClientRect는 기울어진 상자를
+     감싸는 곧은 상자라, 그 상자의 모서리에는 판 밖의 화소가 들어와 판의 결함으로 읽힌다. */
+  const HEAD_SHARE = 0.45;
+  // 이름 상자 안을 3화소 격자로 훑는다. 1280에서 팔백 점이 넘어 장갑 하나가 들어오면 수십 점이 걸린다.
+  const PLATE_STEP = 3;
+  const plateInk = (off) => p.evaluate((v) => {
+    const nm = document.querySelector("#pull .now .foot > b");
+    if (!nm) return false;
+    nm.style.color = v ? "transparent" : "";
+    return true;
+  }, off);
+  const plateGeo = (share, step) => p.evaluate(([sh, st]) => {
+    const now = document.querySelector("#pull .now");
+    if (!now) return null;
+    const foot = now.querySelector(".foot");
+    const img = now.querySelector("img");
+    const nm = foot ? foot.querySelector(":scope > b") : null;
+    if (!foot || !img || !nm) return null;
+    const cs = getComputedStyle(now);
+    const M = cs.transform === "none" ? new DOMMatrixReadOnly() : new DOMMatrixReadOnly(cs.transform);
+    const q = now.getBoundingClientRect();
+    const cx = q.x + q.width / 2;
+    const cy = q.y + q.height / 2;
+    const bl = parseFloat(cs.borderLeftWidth) || 0;
+    const bt = parseFloat(cs.borderTopWidth) || 0;
+    /* 카드 안쪽 한 점을 화면 좌표로. 회전축은 상자 한가운데이고 위 조상에는 변형이 없으므로,
+       안쪽 좌표에서 가운데를 뺀 자리에 행렬을 곱하고 가운데를 도로 더하면 그 점이다. */
+    const on = (lx, ly) => {
+      const dx = bl + lx - now.offsetWidth / 2;
+      const dy = bt + ly - now.offsetHeight / 2;
+      return [cx + M.a * dx + M.c * dy, cy + M.b * dx + M.d * dy];
+    };
+    const nx = foot.offsetLeft + nm.offsetLeft;
+    const ny = foot.offsetTop + nm.offsetTop;
+    const pts = [];
+    for (let y = ny + 2; y <= ny + nm.offsetHeight - 2; y += st) {
+      for (let x = nx + 2; x <= nx + nm.offsetWidth - 2; x += st) pts.push(on(x, y));
+    }
+    // 이름표와 값 사이. 둘은 같은 상자 안에 서므로 회전을 안 통과시켜도 거리가 안 흔들린다.
+    const rows = [...foot.querySelectorAll(".stats > span")].map((s) => {
+      const lab = s.querySelector("i");
+      const val = s.querySelector("b");
+      if (!lab || !val) return null;
+      return { n: lab.textContent,
+        gap: Math.round((val.offsetLeft - lab.offsetLeft - lab.offsetWidth) * 10) / 10 };
+    }).filter((r) => r);
+    return { vw: innerWidth, vh: innerHeight, cardH: now.offsetHeight, pts: pts, rows: rows,
+      plateTop: Math.round(foot.offsetTop * 10) / 10,
+      headBottom: Math.round((img.offsetTop + img.offsetHeight * sh) * 10) / 10,
+      bg: getComputedStyle(foot).backgroundColor,
+      gap2: parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--gap-2")) || 0 };
+  }, [share, step]);
+  // 찍은 한 장에서 그 점들의 색을 읽는다. 판의 색에서 문턱만큼 벗어난 점 하나면 그 자리는 그림이다.
+  const plateSample = (png, pts, want, tol) => p.evaluate(([s, list, hue, t]) => new Promise((res) => {
+    const im = new Image();
+    im.onload = () => {
+      const cv = document.createElement("canvas");
+      cv.width = im.width; cv.height = im.height;
+      const g = cv.getContext("2d");
+      g.drawImage(im, 0, 0);
+      const d = g.getImageData(0, 0, im.width, im.height).data;
+      const m = hue.match(/[0-9.]+/g) || [];
+      const rgb = [Number(m[0]) || 0, Number(m[1]) || 0, Number(m[2]) || 0];
+      let off = 0, worst = 0, sum = 0, sq = 0, n = 0;
+      for (const pt of list) {
+        const x = Math.round(pt[0]), y = Math.round(pt[1]);
+        if (x < 0 || y < 0 || x >= im.width || y >= im.height) continue;
+        const i = (y * im.width + x) * 4;
+        const far = Math.max(Math.abs(d[i] - rgb[0]), Math.abs(d[i + 1] - rgb[1]), Math.abs(d[i + 2] - rgb[2]));
+        if (far > worst) worst = far;
+        if (far > t) off += 1;
+        const lum = d[i] * 0.2126 + d[i + 1] * 0.7152 + d[i + 2] * 0.0722;
+        sum += lum; sq += lum * lum; n += 1;
+      }
+      res({ n: n, off: off, worst: worst,
+        sd: n ? Math.sqrt(Math.max(0, sq / n - (sum / n) * (sum / n))) : -1 });
+    };
+    im.src = "data:image/png;base64," + s;
+  }), [png, pts, want, tol]);
+  // 한 폭에서 한 벌. 폭을 바꾸고 카드가 마지막 단에 가만히 선 뒤에 재고 찍는다.
+  const plateAt = async (w, h) => {
+    await p.setViewportSize({ width: w, height: h });
+    await p.waitForTimeout(300);
+    await p.waitForFunction(() => {
+      const n = document.querySelector("#pull .now");
+      return Boolean(n) && n.dataset.stage === String(4)
+        && !n.getAnimations({ subtree: true }).some((a) => a.playState === "running");
+    }, null, { timeout: 8000, polling: "raf" }).catch(() => {});
+    const geo = await plateGeo(HEAD_SHARE, PLATE_STEP);
+    if (!geo) return null;
+    await plateInk(true);
+    await p.waitForTimeout(90);
+    const png = (await p.screenshot()).toString("base64");
+    await plateInk(false);
+    return Object.assign({ ink: await plateSample(png, geo.pts, geo.bg, PIXEL_TOL) }, geo);
+  };
+
+  /* 한 장짜리 회차를 다시 연다. 위의 ux 한 바퀴가 판을 닫고 나갔고, 이 자는 폭을 두 번 바꾸므로
+     제 회차를 따로 열어야 앞 축들이 본 화면을 안 흔든다. */
+  let plateOpen = false;
+  try {
+    await p.evaluate(() => { const w = window.__wallet(); w.coin = Math.max(w.coin, 20000); });
+    await p.evaluate(() => window.__shop(true));
+    await p.waitForSelector("#shop .buy.pull", { timeout: 8000 });
+    await p.click('#shop .kind[data-kind="town"]', { force: true });
+    await p.waitForTimeout(200);
+    await p.locator("#shop .buy.pull").nth(0).click({ timeout: 6000 });
+    await p.waitForFunction(() => {
+      const e = document.getElementById("pull");
+      return Boolean(e && !e.hidden && e.querySelector(".now") && window.__reveal().drawn === 1);
+    }, null, { timeout: 12000, polling: 30 });
+    await p.waitForFunction(() => {
+      const n = document.querySelector("#pull .now");
+      return Boolean(n) && n.dataset.stage === String(4);
+    }, null, { timeout: 12000, polling: 30 });
+    plateOpen = true;
+  } catch (e) { plateOpen = false; }
+  if (!plateOpen) {
+    check("pullshow:the-name-sits-on-a-plate-not-on-the-artwork", false, "unmeasured: no single-card round opened");
+    check("pullshow:a-stat-value-stands-beside-its-label", false, "unmeasured: no single-card round opened");
+    check("pullshow:the-plate-leaves-the-face-clear", false, "unmeasured: no single-card round opened");
+    check("control:a-transparent-plate-reddens-the-name-axis", false, "unmeasured: no single-card round opened");
+  } else {
+    const wide = await plateAt(1280, 720);
+    const tight = await plateAt(740, 360);
+    const plateSay = (x) => (x ? x.vw + "x" + x.vh : "unmeasured");
+    const plateFlat = (x) => Boolean(x) && Boolean(x.ink) && x.ink.n > 0 && x.ink.off === 0;
+    const statNear = (x) => Boolean(x) && x.rows.length === STAT_ROWS
+      && x.rows.every((r) => r.gap <= x.gap2 * 2);
+    const faceClear = (x) => Boolean(x) && x.plateTop > x.headBottom;
+    const pair = (f) => [wide, tight].map(f).join(" | ");
+    check("pullshow:the-name-sits-on-a-plate-not-on-the-artwork",
+      plateFlat(wide) && plateFlat(tight),
+      pair((x) => (!x ? "unmeasured" : plateSay(x) + " " + x.ink.off + " of " + x.ink.n
+        + " samples off the plate " + x.bg + ", worst channel " + x.ink.worst + " over " + PIXEL_TOL
+        + ", luminance sd " + x.ink.sd.toFixed(1))));
+    check("pullshow:a-stat-value-stands-beside-its-label",
+      statNear(wide) && statNear(tight),
+      pair((x) => (!x ? "unmeasured" : plateSay(x) + " widest gap "
+        + top(x.rows.map((r) => r.gap)).toFixed(1) + "px over " + (x.gap2 * 2) + " across "
+        + x.rows.length + " rows")));
+    check("pullshow:the-plate-leaves-the-face-clear",
+      faceClear(wide) && faceClear(tight),
+      pair((x) => (!x ? "unmeasured" : plateSay(x) + " plate top " + x.plateTop
+        + "px against head bottom " + x.headBottom + "px of a " + x.cardH + "px card")));
+    /* 대조군. 판의 바탕만 투명으로 심으면 이름 자리가 그림으로 돌아가야 하고, 걷으면 다시 판이어야 한다.
+       한쪽만 보면 늘 빨간 자와 실제로 재는 자를 못 가른다. */
+    const coat = await p.addStyleTag({ content: "#pull .now .foot{background:transparent}" });
+    await p.waitForTimeout(140);
+    const bare = await plateAt(1280, 720);
+    await coat.evaluate((e) => e.remove());
+    await p.waitForTimeout(140);
+    const back = await plateAt(1280, 720);
+    check("control:a-transparent-plate-reddens-the-name-axis",
+      plateFlat(bare) === false && plateFlat(back) === true,
+      "a transparent plate left " + (bare ? bare.ink.off + " of " + bare.ink.n + " samples off "
+        + bare.bg + ", worst channel " + bare.ink.worst : "nothing measured") + "; removing it read "
+      + (back ? back.ink.off + " of " + back.ink.n + " off " + back.bg : "nothing measured"));
+  }
+
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 
