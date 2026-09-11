@@ -91,6 +91,9 @@ const CARRY_MS = 52000;
 // 이 자가 무엇을 갈랐는지 한 줄로 못 읽는다. 이 판에서는 일어서기와 걷기와 복귀 가속이 다 빨갛다.
 const WAS_REV = (process.argv.find((a) => a.startsWith("--was=")) || "--was=40352dd").slice(6);
 const WAS = process.argv.some((a) => a === "--was" || a.startsWith("--was="));
+/* 심은 대조군. BOB_Y만 0으로 둔 판을 라우팅한다. --was는 걷기 자체가 없던 판이라
+   상하 진동 축이 그 판에서 빨개져도 그것이 이 상수 때문인지를 말하지 못한다. */
+const BOB0 = process.argv.some((a) => a === "--bob0");
 const LAYER = ["web/src/render/scene.mjs"];
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 
@@ -107,8 +110,13 @@ const KNL_X = 7 * 3;
 const KNR_X = 9 * 3;
 /* 몸통이 어느 쪽으로 옮겨 갔는지는 목의 좌우 오프셋에 있다. 척추를 z축으로 굴리는 각이라 목은 x로 간다.
    앞뒤인 z를 읽으면 진폭 0.0012의 잡음을 읽고, 그 잡음이 상관계수 -0.67을 낸다. 같은 표본에서 x는
-   진폭 0.0951에 부호가 네 번 갈린다. 위아래인 y도 0.0042라 아래 죽은 띠 0.005 안에 들어간다. */
+   진폭 0.0951에 부호가 네 번 갈린다. 위아래인 y는 걸음마다 한 번 뜨는 성분이 지나는 채널이라 아래가 따로 묻는다. */
 const NECK_X = 1 * 3;
+/* 걸음마다 한 번 몸이 뜨는가. 척추 마디를 올리는 항이라 목의 상하 오프셋에 그대로 얹힌다.
+   루트는 안 움직인다. 접지 보정이 몸의 최저점을 땅에 붙여 두므로 이 항으로는 발이 뜨지 않는다.
+   정규화 인자가 루트에서 척추까지의 거리라 상체가 뜨면 이 채널의 값은 오히려 내려간다.
+   묻는 것은 방향이 아니라 다리의 두 배로 도는 진동이 있느냐다. */
+const NECK_Y = 1 * 3 + 1;
 
 const mean = (a) => a.reduce((s, v) => s + v, 0) / Math.max(1, a.length);
 const amp = (a) => { const m = mean(a); return Math.max(0, ...a.map((v) => Math.abs(v - m))); };
@@ -160,6 +168,8 @@ function analyse(rec, ref) {
   const legRest = rest.map((r) => r.v[KNL_Y] - r.v[KNR_Y]);
   const torso = win.map((r) => r.v[NECK_X]);
   const torsoRest = rest.map((r) => r.v[NECK_X]);
+  const bob = win.map((r) => r.v[NECK_Y]);
+  const bobRest = rest.map((r) => r.v[NECK_Y]);
   /* 어느 다리가 +x 쪽에 서는지를 표본에서 받아 적는다. 왼오 이름을 뒤집으면 무릎 차의 부호와 이 곱이
      같이 뒤집히므로 판정이 이름 짓기에 안 걸린다. 곱한 신호는 낮은 무릎이 +x 쪽일 때 양수다. */
   const side = mean(win.map((r) => r.v[KNR_X])) >= mean(win.map((r) => r.v[KNL_X])) ? 1 : -1;
@@ -173,6 +183,8 @@ function analyse(rec, ref) {
     flips: flips(leg.map((v) => v - m), Math.max(0.01, 2 * amp(legRest))),
     legAmp: amp(leg), legFloor: amp(legRest), lean: corr(low, torso), side, back,
     tflips: flips(torso.map((v) => v - mean(torso)), Math.max(TORSO_DEAD, 2 * amp(torsoRest))),
+    bobAmp: amp(bob), bobFloor: amp(bobRest),
+    bflips: flips(bob.map((v) => v - mean(bob)), Math.max(TORSO_DEAD, 2 * amp(bobRest))),
     d0: dist(rec[0].v, ref), dOff: dist(rec[off].v, ref)
   };
 }
@@ -386,6 +398,14 @@ if (WAS) {
     routed.set(f, was);
   }
 }
+if (BOB0) {
+  if (WAS) { console.log("--was and --bob0 route the same file. INSTRUMENT DEAD"); process.exit(2); }
+  const f = LAYER[0];
+  const live = readFileSync(ROOT + f, "utf8");
+  const hits = live.match(/const BOB_Y = [0-9.]+;/g) || [];
+  if (hits.length !== 1) { console.log("BOB_Y " + hits.length + ". INSTRUMENT DEAD"); process.exit(2); }
+  routed.set(f, live.replace(hits[0], "const BOB_Y = 0;"));
+}
 
 let browser;
 const errAll = [];
@@ -401,7 +421,7 @@ try {
     const a = analyse(s.rec, s.ref);
     console.log("  " + tag + " land " + a.x0.toFixed(2) + " travel " + a.travel.toFixed(2)
       + "m off@" + a.off + "f/" + a.ageOff.toFixed(2) + "s home@" + a.home + "f/" + a.ageHome.toFixed(2) + "s age0 " + a.age0.toFixed(2) + " flips " + a.flips + " legAmp " + a.legAmp.toFixed(3)
-      + " floor " + a.legFloor.toFixed(3) + " lean " + a.lean.toFixed(2) + "/" + a.tflips + "/" + a.side + " rz " + a.rzOff.toFixed(3)
+      + " floor " + a.legFloor.toFixed(3) + " bob " + a.bobAmp.toFixed(4) + "/" + a.bflips + " lean " + a.lean.toFixed(2) + "/" + a.tflips + "/" + a.side + " rz " + a.rzOff.toFixed(3)
       + "->" + a.rzEnd.toFixed(3) + " ready " + a.d0.toFixed(2) + "->" + a.dOff.toFixed(2));
     if (walkOff) {
       say("control:the-stop-fallback-keeps-him-where-he-landed",
@@ -422,6 +442,11 @@ try {
     say("walk:the-torso-leans-over-the-planted-leg " + tag, a.lean >= CORR_BAR && a.tflips >= FLIP_BAR,
       "lean " + a.lean.toFixed(2) + " between the lower knee side and the neck offset over " + a.tflips
       + " torso sign changes, +x leg " + (a.side > 0 ? "R" : "L"));
+    say("walk:the-body-rises-once-per-step " + tag,
+      a.bobAmp >= TORSO_DEAD && a.bflips >= 2 * FLIP_BAR && a.bflips > a.flips,
+      a.bflips + " sign changes of the neck height over " + a.flips + " of the legs, amplitude "
+      + a.bobAmp.toFixed(4) + " over a standing floor of " + a.bobFloor.toFixed(4)
+      + " and a dead band of " + TORSO_DEAD);
     say("walk:the-return-is-monotone " + tag, a.back <= BACK_TOL, "worst back step " + a.back.toFixed(3) + "m");
     say("walk:he-arrives-home-standing " + tag,
       Math.hypot(a.xEnd, a.zEnd - KEEPER_Z) <= HOME_TOL && Math.abs(a.rzEnd) < RZ_BAR,
@@ -491,6 +516,12 @@ if (WAS) {
     || r[1].startsWith("branch:")).length;
   console.log(red > 0 ? "walkback CONTROL PASS " + red + " walk axes red on " + WAS_REV
     : "walkback CONTROL FAIL 0 walk axes red on " + WAS_REV);
+  process.exitCode = red > 0 ? 0 : 1;
+} else if (BOB0) {
+  // 심은 대조군. 상하 진동 축만 빨개져야 그 축이 BOB_Y를 재고 있는 것이다.
+  const red = fails.filter((r) => r[1].startsWith("walk:the-body-rises-once-per-step")).length;
+  console.log(red > 0 ? "walkback CONTROL PASS " + red + " bob axes red on BOB_Y 0"
+    : "walkback CONTROL FAIL 0 bob axes red on BOB_Y 0");
   process.exitCode = red > 0 ? 0 : 1;
 } else {
   console.log(fails.length ? "walkback FAIL " + fails.length : "walkback PASS " + oks.length);

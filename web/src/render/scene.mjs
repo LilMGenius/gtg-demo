@@ -879,6 +879,11 @@ const TOUCHED = new Set(['contact']);
   const KNEE_LIFT = 0.34;
   // 몸통 좌우 기울기. 0.10라디안은 5.7도이고 목을 0.075미터 옮긴다.
   const TORSO_BOB = 0.10;
+  /* 걸음마다 한 번 몸이 뜨는 높이. 다리 위상의 두 배로 돌아 한 걸음에 한 번 오른다.
+     좌우 기울기만 있으면 몸은 위아래로 안 움직인다. 실측으로 목의 상하 오프셋은
+     진폭 0.0042에 멈췄고, 그것은 walkback 게이트가 잡음으로 치는 죽은 띠 0.005 안이다.
+     0.03미터는 목 높이 1.02미터의 3퍼센트다. */
+  const BOB_Y = 0.03;
   /* 복귀 동안의 포즈 추종 속도. 0.12로 끌면 시정수가 0.14초라 2.1Hz 보행의 진폭이 39% 깎여
      다리를 덜 흔든 것으로 보인다. 0.5는 시정수 0.033초라 5%만 깎인다. */
   const WALK_RATE = 0.5;
@@ -2087,6 +2092,12 @@ const TOUCHED = new Set(['contact']);
       }
       kRate = WALK_RATE;
     }
+    /* 뜨는 몸은 골반 위를 올린다. 골반 마디(hip)를 올리면 다리가 같이 올라가 몸의 최저점이
+       그만큼 오르고, 접지 보정(keeper.position.y += hover - footY)이 루트를 그만큼 내려
+       화면에서는 아무 일도 안 일어난다. 척추 마디는 최저점이 아니라 발은 땅에 남고 상체만 오른다.
+       위상 0에서 값이 0이라 걷기가 시작하는 프레임에 몸이 튀지 않는다. */
+    keeper.userData.joints.spine.position.y = back && back.r >= 1
+      ? BOB_Y * (0.5 - 0.5 * Math.cos(2 * back.phase)) : 0;
     drive('keeper', kp, kRate);
     // 예비는 느리게 잡혀야 버틴 것으로 보이고, 임팩트는 한 프레임에 가까워야 터진 것으로 보인다.
     drive('kicker', kk, kkId === POSES.strike ? 0.62 : (kkId === POSES.follow ? 0.24 : (kkId === POSES.plant ? 0.16 : (kkId === POSES.cheer ? 0.30 : 0.10))));
