@@ -3,7 +3,13 @@
 // 카메라가 기준 자리로 돌아온 것을 확인하고 다시 멈춰서 같은 자리를 찍는다.
 // 게임은 사건 사이에도 진행한다. 행인이 걷고 키커가 걸어와 공을 놓으며 카메라 shake 잔여가 남는다.
 // 그래서 대기 시간만으로는 정지 화면이 만들어지지 않고, 대조군이 화면 전체의 변화를 자국으로 읽는다.
-// 바: 대조군 클러스터 0, 본 측정에서 40px 이상 어두워진 클러스터 3개 이상.
+// 바: 대조군 클러스터 0, 본 측정에서 40px 이상 어두워진 클러스터 3개 이상, 붓을 막은 바퀴에서 3개 미만.
+//
+// 대조군 0은 계기가 없는 자국을 지어내지 않는다는 것만 말한다. 제품이 칠하기를 그만둬도 그 줄은 0 그대로라서,
+// 기본 회차만 도는 한 이 축은 한쪽 방향으로만 잰다. 반대쪽은 붓을 막고 세는 것이고, 그 길은 손으로만 켤 수 있어
+// 한 번도 안 돌았다. 실측(64ffa12): 같은 사건을 치고 붓만 막으면 클러스터 5가 0으로 떨어진다.
+// 그래서 한 실행이 두 바퀴를 돈다. 붓이 살아 있는 컨텍스트에서 세고 붓만 막은 컨텍스트에서 다시 세서,
+// 두 방향이 다 맞아야 통과한다. 손으로 켜야 하는 대조군은 잊히는 대조군이다.
 //
 // 기다림을 벽시계로 끊으면 그 사이에 세계가 몇 걸음 갔는지를 그날의 기계 부하가 정한다.
 // 사건 여섯 번이 모두 그 기다림 위에 서 있어서, 프레임이 빠진 회차는 흙이 덜 파인 채로 두 번째 컷을 찍는다.
@@ -174,9 +180,11 @@ async function cluster([A, B, W]) {
   return out.slice(0, 12);
 }
 
-let br;
-try {
-  br = await chromium.launch({ executablePath: EXE });
+// 한 바퀴가 한 방향을 잰다. nomark를 켜면 자국 붓만 막고 나머지 길은 그대로 간다.
+// 바퀴마다 컨텍스트를 새로 열고 끝나면 닫는다. 앞 바퀴의 페이지를 열어둔 채 뒤 바퀴를 돌리면
+// 그 페이지의 rAF가 계속 돌아 뒤 바퀴가 앞 바퀴를 부하로 안고 달린다. 부하가 이 계기를 흔든다는 것은 05b9db4에서 이미 쟀다.
+// 저장 상태도 컨텍스트에 남으므로, 같은 컨텍스트를 다시 쓰면 두 바퀴가 같은 판을 보지 않는다.
+async function lap(br, nomark, tag) {
   const ctx = await br.newContext({ viewport: { width: 1280, height: 720 } });
   // 세계시계를 프레임에 못 박는다. 페이지가 열리기 전에 걸어야 손잡이가 생기는 그 틱에 켜진다.
   await pinClock(ctx, STEP);
@@ -197,28 +205,28 @@ try {
   await freeze(true);
   await waitFrames(p, SETTLE);
   const base = await camPos();
-  console.log("BARE " + JSON.stringify(await p.evaluate(bare, true)));
+  console.log(tag + "BARE " + JSON.stringify(await p.evaluate(bare, true)));
   await waitFrames(p, BARED);
   const scanA = await p.evaluate(boxScan, 6);
-  if (!scanA) { console.log("NOWINDOW  FAIL"); process.exit(1); }
+  if (!scanA) { console.log(tag + "NOWINDOW  FAIL"); process.exit(1); }
   const A = await shot();
   await waitFrames(p, CTRL);
   const A2 = await shot();
   await p.evaluate(bare, false);
 
   const winA = { ...scanA, ...WIN, allow: scanA.cells };
-  console.log("WINDOW y " + scanA.y0 + ".." + scanA.y1 + " x " + scanA.x0 + ".." + scanA.x1 + " cells " + scanA.cells.length);
-  const ctrlRes = await p.evaluate(cluster, [A, A2, winA]);
-  console.log("CONTROL " + ctrlRes.length + " " + JSON.stringify(ctrlRes.slice(0, 3)));
+  console.log(tag + "WINDOW y " + scanA.y0 + ".." + scanA.y1 + " x " + scanA.x0 + ".." + scanA.x1 + " cells " + scanA.cells.length);
+  const ctrl = await p.evaluate(cluster, [A, A2, winA]);
+  console.log(tag + "CONTROL " + ctrl.length + " " + JSON.stringify(ctrl.slice(0, 3)));
 
   // 자국 붓을 막고 같은 사건을 치면 클러스터가 바 아래로 떨어져야 한다.
   // 떨어지지 않으면 이 게이트가 세는 것은 자국이 아니라 몸이거나 그림자다.
-  if (process.env.GTG_NOMARK) {
+  if (nomark) {
     await p.evaluate(() => {
       const box = window.__sceneRoot().getObjectByName("box");
       box.userData.mark = () => {};
     });
-    console.log("NOMARK on");
+    console.log(tag + "on");
   }
 
   await freeze(false);
@@ -231,7 +239,7 @@ try {
       await p.keyboard.press(side > 0 ? "ArrowRight" : "ArrowLeft");
       at = await planAfterDive(p, side, KINDS[i], PRE);
     }
-    if (at < 0) { console.log("NODIVE " + KINDS[i] + "  FAIL"); process.exit(1); }
+    if (at < 0) { console.log(tag + "NODIVE " + KINDS[i] + "  FAIL"); process.exit(1); }
     await p.waitForFunction((n) => window.__frames() >= n, at + POST, { timeout: 300000, polling: "raf" });
   }
 
@@ -242,18 +250,34 @@ try {
     back = now.every((v, k) => Math.abs(v - base[k]) <= 0.02);
     if (!back) await waitFrames(p, CAM);
   }
-  console.log("CAMBACK " + back + " " + JSON.stringify(await camPos()) + " base " + JSON.stringify(base));
+  console.log(tag + "CAMBACK " + back + " " + JSON.stringify(await camPos()) + " base " + JSON.stringify(base));
   await freeze(true);
   await waitFrames(p, SETTLE);
   await p.evaluate(bare, true);
   await waitFrames(p, BARED);
   const B = await shot();
   const res = await p.evaluate(cluster, [A, B, winA]);
-  for (const c of res) console.log("cluster px=" + c.px + " mean=" + c.mean.toFixed(1) + " x=" + c.x0 + ".." + c.x1);
+  for (const c of res) console.log(tag + "cluster px=" + c.px + " mean=" + c.mean.toFixed(1) + " x=" + c.x0 + ".." + c.x1);
+  await ctx.close();
+  return { ctrl, res };
+}
 
-  const ok = ctrlRes.length === 0 && res.length >= BAR;
-  console.log("CLUSTERS " + res.length + "  CONTROL " + ctrlRes.length + "  BAR " + BAR + "  " + (ok ? "PASS" : "FAIL"));
-  if (!ok) process.exitCode = 1;
+let br;
+try {
+  br = await chromium.launch({ executablePath: EXE });
+  // 산 바퀴가 먼저다. 이 바퀴의 길은 예전 한 바퀴짜리 게이트와 같고, 다섯 자국도 같은 자리에 남는다.
+  const live = await lap(br, false, "");
+  // 막은 바퀴. 같은 사건을 치되 붓만 막으므로, 여기서 세지는 것이 있다면 그것은 자국이 아니다.
+  const nom = await lap(br, true, "NOMARK ");
+  console.log("NOMARK CLUSTERS " + nom.res.length + "  under BAR " + BAR + "  " + (nom.res.length < BAR ? "ok" : "no"));
+
+  // 두 방향이 다 맞아야 통과다. 하나라도 어긋나면 어느 쪽이 깨졌는지 이름을 붙여 말한다.
+  const broke = [];
+  if (live.ctrl.length !== 0) broke.push("control");
+  if (live.res.length < BAR) broke.push("live");
+  if (nom.res.length >= BAR) broke.push("nomark");
+  console.log("CLUSTERS " + live.res.length + "  NOMARK " + nom.res.length + "  CONTROL " + live.ctrl.length + "  BAR " + BAR + "  " + (broke.length ? "FAIL " + broke.join(",") : "PASS"));
+  if (broke.length) process.exitCode = 1;
 } finally {
   clearTimeout(t);
   if (br) await br.close();
