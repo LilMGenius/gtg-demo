@@ -290,6 +290,55 @@ try {
       "identity left the post at " + FACE_FIX.city + ":" + flatPosts.cmAt + ", which is "
       + flatPosts.cmWho + " and not " + FACE_FIX.name);
   }
+  /* 이동표에 줄이 없는 도시. 오늘은 동네가 넷이라 이 키가 저장에 들어올 길이 없지만, 키를 거르는 자는
+     세 길 중 하나에만 서 있다. 라포는 readRapport가 [0-3]으로 막고, 팔로우와 쪽지는 readSocial이 도시를
+     안 막고, 글은 기록 안의 칸이라 거르는 정규식이 아예 없다. 줄이 없는 도시는 옮길 표가 없으니 제자리여야
+     한다. 라포 키도 같이 심는다. 읽는 자리에서 버려져 화면에는 안 뜨지만, 세 길이 한 저장 안에 같이 있어야
+     다섯 번째 동네가 붙는 날 이 축이 그 저장을 통째로 본다. */
+  const FAR = { city: 4, was: 7, n: 5 };
+  const FAR_KEY = FAR.city + ":" + FAR.was;
+  const farPost = { n: FACE_FIX.name, c: false, g: 0, t: "cm", lb: 0, ct: FAR.city, l: 1,
+    cm: { city: FAR.city, passer: FAR.was, tier: 3, who: FACE_FIX.name, text: "x" } };
+  const farCm = JSON.stringify(farPost.cm);
+  const seatFar = async () => {
+    await p.evaluate(([f, g, post]) => {
+      const s = JSON.parse(localStorage.getItem(window.__saveKey()));
+      const old = f.city + ":" + f.was;
+      delete s.faces;
+      s.rapport = { [old]: f.n };
+      s.social = { follows: { [old]: g.back }, dm: { [old]: { at: g.at } } };
+      s.posts = [post];
+      localStorage.setItem(window.__saveKey(), JSON.stringify(s));
+    }, [FAR, SOCIAL_FIX, farPost]);
+    await p.reload({ waitUntil: "load" });
+    await p.waitForTimeout(900);
+    const got = await p.evaluate(() => ({ social: window.__social(), posts: window.__posts() }));
+    const fk = Object.keys((got.social && got.social.follows) || {});
+    const one = fk.length === 1 ? fk[0] : "";
+    const dm = one && got.social.dm ? got.social.dm[one] : null;
+    const cm = ((Array.isArray(got.posts) ? got.posts : []).find((x) => x && x.cm) || {}).cm || null;
+    return { fk, cm: cm ? JSON.stringify(cm) : null, back: one ? got.social.follows[one] : -1,
+      dmAt: dm ? Number(dm.at) : -1 };
+  };
+  const far = await seatFar();
+  check("save:an-unknown-town-key-passes-the-migration-untouched",
+    far.fk.length === 1 && far.fk[0] === FAR_KEY && far.back === SOCIAL_FIX.back
+    && far.dmAt === SOCIAL_FIX.at && far.cm === farCm,
+    "wrote a follow, a dm and a post on " + FAR_KEY + ", a town the move table has no row for, and read back "
+    + JSON.stringify(far.fk) + ", follow " + far.back + ", dm at " + far.dmAt + ", post record " + far.cm);
+  /* 심은 대조군. 줄을 고르는 그 한 줄에서 도시를 마지막 줄로 다시 눌러 오늘의 바이트를 되살린다.
+     앵커가 위 대조군이 세어 둔 그 줄이라, 막는 자를 함수의 어디에 세우든 대조군은 같은 자리에 선다. */
+  if (hits.length === 1) {
+    await p.route("**/web/src/state/passer.mjs", (r) => r.fulfill({ status: 200,
+      contentType: "text/javascript; charset=utf-8",
+      body: face.replace(hits[0], "const row = FACE_MOVES[Math.max(0, Math.min(FACE_MOVES.length - 1, c))];") }));
+    const pinned = await seatFar();
+    await p.unroute("**/web/src/state/passer.mjs");
+    check("control:a-copy-without-the-guard-clamps-that-key-onto-the-last-row",
+      pinned.fk.length === 1 && pinned.fk[0] !== FAR_KEY && pinned.cm !== farCm,
+      "the clamped copy moved the follow to " + JSON.stringify(pinned.fk) + " and the post record to "
+      + pinned.cm + ", neither of which is " + FAR_KEY);
+  }
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
 
   console.log(notes.map((s) => "  ok   " + s).join("\n"));

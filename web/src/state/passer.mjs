@@ -122,9 +122,13 @@ const FACE_MOVES = [
 ];
 
 /* 옛 번호가 지금 앉아 있는 자리. 줄이 없는 도시나 줄 밖의 번호는 제자리다.
-   제자리로 두는 것이 맞다. 새 도시가 붙어도 그 도시의 저장이 안 흔들린다. */
+   제자리로 두는 것이 맞다. 새 도시가 붙어도 그 도시의 저장이 안 흔들린다.
+   도시를 마지막 줄로 눌러 두면 그 말이 거짓이 된다. 줄이 없는 4번 도시가 3번 도시의 순열을 받아
+   movedFace(4, 7)이 7 대신 3을 돌려주고, 그 3이 도시 4의 키로 다시 박힌다. 줄 밖의 번호는 아래 row
+   검사가 돌려보내지만 도시는 그 검사에 안 걸리므로, 안 누르는 것이 도시를 지키는 유일한 자리다.
+   remapFaceKeys와 gram.mjs의 migratePosts는 도시를 안 거르고 그대로 넘긴다. */
 export function movedFace(city, passer) {
-  const c = Math.max(0, Math.min(FACE_MOVES.length - 1, Math.floor(Number(city) || 0)));
+  const c = Math.floor(Number(city) || 0);
   const p = Math.floor(Number(passer));
   const row = FACE_MOVES[c];
   if (!row || !Number.isFinite(p) || p < 0 || p >= row.length) return p;
