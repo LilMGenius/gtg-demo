@@ -14,6 +14,10 @@ const BASE = "http://127.0.0.1:10310/web/index.html";
 const COIN_DRILL = 24;
 // 성장 칸 수. ledger.mjs GROWABLE의 길이다.
 const SLOTS = 15;
+// 성장 상한이 값 자리에 내는 글자. main.mjs 훈련장의 만렙 판정과 같은 값이어야 한다.
+const CEIL_TEXT = "10";
+// 상한 칸이 값과 꺼짐을 한 몸으로 들고 있는가. 심은 대조군이 같은 식을 다시 타야 한다.
+const cappedOk = (rows) => rows.length === SLOTS && rows.every((r) => r.tail === CEIL_TEXT && r.off);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();
 
@@ -57,7 +61,7 @@ try {
   // 이게 없으면 본시험의 녹색은 화면이 늘 그렇게 생긴 것과 구분되지 않는다.
   await boot("?seed=20&preset=veteran");
   const plain = await gym();
-  check("control:fresh-save-is-not-at-the-ceiling", plain.rows.some((r) => r.tail !== "MAX"), plain.rows.filter((r) => r.tail === "MAX").length + "/" + plain.rows.length + " max");
+  check("control:fresh-save-is-not-at-the-ceiling", plain.rows.every((r) => r.tail !== CEIL_TEXT), plain.rows.filter((r) => r.tail === CEIL_TEXT).length + "/" + plain.rows.length + " at the cap, first tail " + JSON.stringify(plain.rows[0] ? plain.rows[0].tail : ""));
   check("control:swap-row-is-absent-below-the-ceiling", plain.swap === null, plain.swap ? plain.swap.text : "absent");
 
   // 본시험. 만렙 저장에서 훈련장을 연다.
@@ -65,8 +69,25 @@ try {
   const applied = await p.evaluate(() => window.__preset);
   check("preset:maxed-was-applied", Array.isArray(applied) && applied.includes("maxed"), JSON.stringify(applied));
   const maxed = await gym();
-  check("ceiling:every-slot-reads-max", maxed.rows.length === SLOTS && maxed.rows.every((r) => r.tail === "MAX"), maxed.rows.filter((r) => r.tail === "MAX").length + "/" + maxed.rows.length);
+  check("ceiling:every-slot-reads-max", maxed.rows.length === SLOTS && maxed.rows.every((r) => r.tail === CEIL_TEXT), maxed.rows.filter((r) => r.tail === CEIL_TEXT).length + "/" + maxed.rows.length);
   check("ceiling:every-slot-is-unclickable", maxed.rows.every((r) => r.off), maxed.rows.filter((r) => !r.off).map((r) => r.k).join(",") || "all off");
+  /* 상한 칸이 화면에 내는 글자. 값 자리에는 값만 서고, 못 누른다는 사실은 버튼이 들고 있다.
+     위 두 줄과 같은 표본을 보지만 묻는 것이 다르다. 저쪽은 열다섯이 다 상한인가이고,
+     이쪽은 상한 칸 하나가 값과 꺼짐을 한 몸으로 들고 있는가다. */
+  check("gym:a-capped-drill-shows-the-number-and-stays-disabled", cappedOk(maxed.rows),
+    maxed.rows.filter((r) => r.tail === CEIL_TEXT && r.off).length + "/" + maxed.rows.length
+    + " capped drills draw " + JSON.stringify(CEIL_TEXT) + " with the button disabled, first tail "
+    + JSON.stringify(maxed.rows[0] ? maxed.rows[0].tail : "") + " off=" + (maxed.rows[0] ? maxed.rows[0].off : "none"));
+  /* 대조군. 상한 칸 하나에 낱말을 심으면 위 축이 빨개져야 한다. 심고 곧바로 도로 뺀다.
+     이게 없으면 위 줄의 초록은 판정식이 아무것도 안 재는 경우와 구분되지 않는다. */
+  await p.evaluate(() => { const e = document.querySelector("#gym .row button em"); e.dataset.was = e.textContent; e.textContent = "MAX"; });
+  const worded = await gym();
+  await p.evaluate(() => { const e = document.querySelector("#gym .row button em"); e.textContent = e.dataset.was; delete e.dataset.was; });
+  const wordBack = await gym();
+  check("control:a-worded-tail-reddens-the-capped-drill-axis", !cappedOk(worded.rows) && cappedOk(wordBack.rows),
+    "planting a word in one tail left " + worded.rows.filter((r) => r.tail === CEIL_TEXT && r.off).length + "/"
+    + worded.rows.length + " capped, restored to "
+    + wordBack.rows.filter((r) => r.tail === CEIL_TEXT && r.off).length + "/" + wordBack.rows.length);
 
   const before = await p.evaluate(() => ({ points: window.__points(), coin: window.__wallet().coin }));
   // 이 게이트의 산출물. 만렙에서 훈련이 사표가 되지 않고 환전으로 빠져나갈 문이 있는가.

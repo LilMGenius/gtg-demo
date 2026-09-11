@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { KICKERS, ROLES } from "../src/roster.mjs";
+import { GROWABLE } from "../src/ledger.mjs";
 
 // 내 정보 칸과 선수단 칸의 자. 한 창이 성격이 다른 넷을 한 두루마리에 쌓으면, 무엇을 보러 들어왔든
 // 나머지 셋을 지나가야 답이 나온다. 칸을 갈랐다는 주장은 갈린 뒤에도 셋이 다 보이면 거짓이다.
@@ -14,6 +15,8 @@ const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=famous,rich,v
 // 새 계정 판. 프리셋은 개봉을 건너뛰는 것 하나만 남긴다. 빈 아는 얼굴 칸은 라포가 없는 사람의
 // 화면이라, 라포를 심어 둔 이 판에서는 구조적으로 안 나온다.
 const NEW = BASE.replace(/preset=[^&]*/, "preset=veteran");
+// 증거 그림 자리. run-gates는 인자 없이 부르므로 없으면 안 찍는다.
+const shot = process.argv[2];
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();
@@ -980,6 +983,73 @@ try {
     "planting pointer-events none killed " + uxDead.length + " of " + uxTabs.length + " tabs, restored to "
     + (uxTabs.length - uxAlive.length) + " live");
   await p.evaluate(() => window.__me(false));
+
+  /* 만렙 칸. 이 자는 늘 1레벨 새 저장에서 열려서, 성장 칸이 상한에 닿은 화면을 한 번도 안 봤다.
+     값 자리에 낱말이 서는 것은 위 문법 축이 심은 대조군으로만 잡혔고, 제품이 제 손으로 그리는
+     만렙 칸은 아무도 안 쟀다. 여기서 한 칸만 상한에 올린 저장을 넣고 그 칸을 직접 읽는다.
+     한 칸만 올리는 이유는 닿은 칸과 안 닿은 칸이 같은 격자에 나란히 서야, 읽은 것이 격자 전체의
+     성질이 아니라 그 칸의 성질이기 때문이다.
+     표본은 제 판이 지은 저장을 제자리에서 고쳐 다시 연다. 저장을 다른 판에서 떠다 옮기면 계정
+     자리까지 같이 옮겨야 하고, 그 자리가 한 칸이라도 어긋나면 게임은 조용히 새 판을 짓는다.
+     실측으로 그 경로는 만렙 대신 신인을 세웠고, 화면에 선 열다섯 수가 주입 전과 똑같았다.
+     save-gate가 쓰는 읽고 고쳐 쓰고 다시 여는 자세가 그 어긋남을 통째로 없앤다.
+     여는 순서는 이 자의 본판과 같다. 시작을 안 누르면 입구 화면이 그대로 덮고 있고, 그 아래에서
+     연 칸은 DOM에는 있지만 사람이 보는 화면에는 없다. 실측으로 그 자세의 증거 그림은 입구
+     화면이었고 격자 수치만 맞았다. 그래서 칸이 맨 앞인지까지 재고 나서 읽는다. */
+  const CEIL = 10;
+  const CEIL_STAT = "diving";
+  const ceilCtx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  const ceilPage = await ceilCtx.newPage();
+  ceilPage.on("pageerror", (e) => errs.push(String(e)));
+  ceilPage.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+  const ceilBoot = async () => {
+    await ceilPage.waitForSelector("#go", { timeout: 15000 });
+    await ceilPage.click("#go", { force: true });
+    await ceilPage.waitForTimeout(1300);
+  };
+  await ceilPage.goto(NEW, { waitUntil: "load" });
+  await ceilBoot();
+  const ceilSeed = await ceilPage.evaluate(([stat, cap, list]) => {
+    window.__persist();
+    const key = window.__saveKey();
+    const s = JSON.parse(localStorage.getItem(key));
+    const head = Array.isArray(s.squad) ? s.squad[Number(s.pick) || 0] : s.keeper;
+    for (const k of list) head[k] = Math.min(Number(head[k]) || 1, cap - 1);
+    head[stat] = cap;
+    s.keeper = head;
+    localStorage.setItem(key, JSON.stringify(s));
+    return { key: key, wrote: head[stat] };
+  }, [CEIL_STAT, CEIL, GROWABLE]);
+  await ceilPage.reload({ waitUntil: "load" });
+  await ceilBoot();
+  const ceilRead = await ceilPage.evaluate((stat) => window.__keeperStats()[stat], CEIL_STAT);
+  await ceilPage.evaluate(() => window.__me(true));
+  await ceilPage.waitForTimeout(460);
+  const ceilPane = await ceilPage.evaluate(() => {
+    const e = document.getElementById("me");
+    const q = e.getBoundingClientRect();
+    const mid = document.elementFromPoint(Math.round(q.x + q.width / 2), Math.round(q.y + q.height / 2));
+    return { shut: e.hidden, w: Math.round(q.width), h: Math.round(q.height), front: mid === e || e.contains(mid) };
+  });
+  const ceilGrid = await ceilPage.evaluate(() => [...document.querySelectorAll("#me .grid > span")].map((s) => {
+    const v = s.querySelector("b");
+    return { text: v ? v.textContent.trim() : "", max: s.classList.contains("max") };
+  }));
+  if (shot) await ceilPage.screenshot({ path: shot });
+  const ceilHit = ceilGrid.filter((r) => r.max);
+  const ceilNum = ceilGrid.filter((r) => r.text === String(CEIL));
+  /* 표본이 실제로 만렙으로, 그리고 사람이 보는 자리에 열렸는가. 이게 없으면 아래 축의 빨강이
+     제품의 결함인지 주입이 안 실린 것인지 안 갈리고, 초록은 입구 화면 뒤에서 잰 수가 된다. */
+  check("instrument:the-seeded-save-opened-at-the-ceiling-on-the-front-pane",
+    ceilRead === CEIL && !ceilPane.shut && ceilPane.w > 0 && ceilPane.front,
+    CEIL_STAT + " wrote " + ceilSeed.wrote + " into " + ceilSeed.key + ", the reopened board reads " + ceilRead
+    + ", the profile pane is " + ceilPane.w + "x" + ceilPane.h + " shut=" + ceilPane.shut + " front=" + ceilPane.front);
+  check("mepane:a-capped-growth-slot-shows-the-number",
+    ceilGrid.length === GROWABLE.length && ceilHit.length === 1 && ceilHit[0].text === String(CEIL) && ceilNum.length === 1,
+    ceilHit.length + " of " + ceilGrid.length + " slots carry class max and draw "
+    + (ceilHit.map((r) => JSON.stringify(r.text)).join(" ") || "nothing") + ", " + ceilNum.length + " reads "
+    + CEIL + ", the rest draw " + ceilGrid.filter((r) => !r.max).map((r) => r.text).join(" "));
+  await ceilCtx.close();
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();

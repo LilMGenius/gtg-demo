@@ -739,7 +739,8 @@ function renderGym() {
     const v = state.keeper[k];
     // 10은 성장 상한이다. 상한에 닿은 칸을 눌리게 두면 포인트만 사라진다.
     const off = v >= 10 || state.points <= 0;
-    const tail = v >= 10 ? 'MAX' : v + ' → ' + (v + 1);
+    // 값 자리에는 값만 적는다. 상한에 닿은 것은 못 누르는 버튼이 말한다.
+    const tail = v >= 10 ? String(v) : v + ' → ' + (v + 1);
     return '<button data-k="' + k + '"' + (off ? ' disabled' : '') + '><span class="who">' + STAT_ICON[k]
       + CAUSE_LABEL[k] + '</span><em>' + tail + '</em></button>';
   }).join('') + '</div>' + swap + '<button class="close">닫기</button>';
@@ -1309,8 +1310,9 @@ function renderMe() {
   const grid = GROWABLE.map((s) => {
     const v = k[s];
     // 10은 성장 상한이다. 훈련장과 같은 기준이어야 두 창이 어긋나지 않는다.
+    // 값 자리에는 값만 적는다. 상한에 닿은 것은 max 칸이 말한다.
     return '<span class="' + (v >= 10 ? 'max' : '') + '"><span class="who">' + STAT_ICON[s] + CAUSE_LABEL[s]
-      + '</span><b>' + (v >= 10 ? 'MAX' : v) + '</b></span>';
+      + '</span><b>' + v + '</b></span>';
   }).join('');
   const traits = (k.traits && k.traits.length)
     ? k.traits.map((t) => '<div class="note"><b>' + t + '</b><i>' + (TRAITS[t] ? TRAITS[t].note : '') + '</i></div>').join('')
