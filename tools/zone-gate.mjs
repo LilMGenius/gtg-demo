@@ -51,7 +51,7 @@ const SEEN_SHARE = 0.12;
    정수로 끊기는 offset과 소수로 오는 상자를 같이 품는다. */
 const TILE_TOL = 2;
 /* 길이 어느 쪽으로 갈라져도 판정 줄 수는 이만큼이다. 줄 수를 세는 축 자신은 빼고 센 값이다. */
-const ROWS = 28;
+const ROWS = 31;
 /* 봇이 갈린 구를 안 내주면 그 뒤 축들은 잴 기회가 없다. 그때 줄을 통째로 빼면 못 잰 축이 통과한 축으로
    읽히고 판정 수만 조용히 줄어든다. 못 쟀다고 적어 빨간 줄로 남긴다. */
 const unmeasured = (names, why) => { for (const n of names) check(n, false, "unmeasured: " + why); };
@@ -573,6 +573,78 @@ try {
       planted === true && hurt.off > 0 && hurt.frames > hurt.off && healed === 0,
       "planting disabled for " + PLANT_MS + "ms caught " + hurt.off + " of " + hurt.frames
       + " frames on " + (hurt.first || "none") + ", pulled back to " + healed + " dead pads");
+    await ctx.close();
+  }
+
+  /* 자판 문법 둘. 위의 축들은 손가락이 닿는 자리를 재므로 자판만 쓰는 사람이 같은 판을 못 눌러도 초록이 난다.
+     하나. 초점이 선 판에서 Enter와 space는 그 판의 방향이다. space는 창 전체가 가운데로 읽어 가던 키라,
+     초점이 선 판을 눌렀는데 가운데가 들어가면 자판 쓰는 사람만 다른 게임을 한다.
+     둘. 읽어 주는 자에게 창이 열렸는지가 들린다. 흐림은 눈에만 보이고 묶음 이름은 귀에 남는다. */
+  {
+    const { ctx, p } = await start(BASE);
+    await settled(p);
+    const padRole = () => p.evaluate(() => {
+      const g = document.getElementById("pad");
+      return { role: g.getAttribute("role"), label: g.getAttribute("aria-label"),
+        live: document.querySelectorAll(".zone.live").length };
+    });
+    const focusKey = async (dive, key) => {
+      const sel = '.zone[data-dive="' + dive + '"]';
+      await p.focus(sel);
+      const on = await p.evaluate((s) => document.activeElement === document.querySelector(s), sel);
+      await p.keyboard.press(key);
+      return on;
+    };
+    /* 창 안에서 왼쪽 판에 초점을 세우고 Enter를 누른다. 커밋된 입력이 -1이면 그 키가 그 판으로 갔다. */
+    await open(p);
+    const labelOpen = await padRole();
+    const beforeEnter = await p.evaluate(() => window.__lastInput);
+    const focusedL = await focusKey(-1, "Enter");
+    const tookEnter = await p.waitForFunction(() => window.__lastInput?.dive === -1 && window.__lastInput?.auto === false,
+      null, { timeout: PRESS_MS }).then(() => true).catch(() => false);
+    const enterInput = await p.evaluate(() => window.__lastInput);
+    /* 다음 구에서 오른쪽 판에 초점을 세우고 space를 누른다. 창 전체가 받던 길이 살아 있으면 가운데가
+       들어가므로, 들어온 값이 1이라는 것은 그 길이 이 누름에는 안 섰다는 말이기도 하다. */
+    await waitRound(p);
+    const focusedR = await focusKey(1, " ");
+    const tookSpace = await p.waitForFunction(() => window.__lastInput?.dive === 1 && window.__lastInput?.auto === false,
+      null, { timeout: PRESS_MS }).then(() => true).catch(() => false);
+    const spaceInput = await p.evaluate(() => window.__lastInput);
+    check("ux:enter-and-space-on-a-focused-pad-mean-that-pad",
+      focusedL && focusedR && tookEnter && tookSpace && enterInput?.dive === -1 && spaceInput?.dive === 1
+        && enterInput?.auto === false && spaceInput?.auto === false,
+      "focus left then Enter judged " + JSON.stringify(enterInput) + " (was " + JSON.stringify(beforeEnter)
+      + "), focus right then space judged " + JSON.stringify(spaceInput)
+      + ", the centre path fired " + (spaceInput?.dive === 0));
+    /* 대조군. 판이 제 keydown을 잃으면 위 축은 빨개져야 한다. 초점만 세우고 Enter를 눌러도 아무것도
+       안 커밋되는 것이 그 증거다. 누르기 전 값이 1이므로 -1이 들어오면 그것은 이 누름이 만든 것이다. */
+    await waitRound(p);
+    const cut = await p.evaluate(() => {
+      const z = document.querySelector('.zone[data-dive="-1"]');
+      const had = typeof z.onkeydown === "function";
+      z.onkeydown = null;
+      return had;
+    });
+    const beforeCut = await p.evaluate(() => window.__lastInput);
+    const focusedCut = await focusKey(-1, "Enter");
+    const tookCut = await p.waitForFunction(() => window.__lastInput?.dive === -1,
+      null, { timeout: PRESS_MS }).then(() => true).catch(() => false);
+    const cutInput = await p.evaluate(() => window.__lastInput);
+    check("control:a-pad-stripped-of-its-keydown-reddens-the-focused-key-axis",
+      cut === true && focusedCut && tookCut === false && cutInput?.dive !== -1,
+      "with the left pad onkeydown nulled, Enter on it judged " + JSON.stringify(cutInput)
+      + " (was " + JSON.stringify(beforeCut) + "), a handler was there to pull " + cut);
+    /* 묶음 이름은 창이 열린 프레임과 닫힌 프레임에서 따로 읽는다. 한 자리에서만 읽으면 안 움직이는
+       이름도 초록이 난다. */
+    await shut(p);
+    const labelShut = await padRole();
+    check("ux:the-pad-group-names-its-window-state",
+      labelOpen.role === "group" && labelShut.role === "group"
+        && Boolean(labelOpen.label) && Boolean(labelShut.label) && labelOpen.label !== labelShut.label
+        && labelOpen.live === 3 && labelShut.live === 0,
+      "role " + JSON.stringify(labelShut.role) + ", open " + JSON.stringify(labelOpen.label)
+      + " with " + labelOpen.live + " live pads, shut " + JSON.stringify(labelShut.label)
+      + " with " + labelShut.live);
     await ctx.close();
   }
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
