@@ -1,6 +1,8 @@
 // 아웃문그램의 사회. 글은 벽에 붙는 종이가 아니라 누가 보고 반응하는 자리다.
 // 좋아요와 댓글은 그 구가 만들고, 팔로우는 사람이 건다. 셋 다 판정식 밖이고 팔로워 축에만 붙는다.
 
+import { FACES_V_SOCIAL, remapFaceKeys } from './passer.mjs';
+
 // 한 글에 붙는 좋아요. 화제가 클수록, 사람이 많은 동네일수록 많이 붙는다.
 // 팔로워 증가분만 쓰면 초반 한 자리 수에서 0이 되어, 아무도 안 본 글이 계정을 채운다.
 export const LIKE_BASE = 3;
@@ -43,6 +45,15 @@ export function newSocial() {
 // 한 사람의 키. 동네가 다르면 다른 사람이다. 이름은 라포와 같은 규칙으로 만든다.
 export function whoKey(city, passer) {
   return (Number(city) || 0) + ':' + (Number(passer) || 0);
+}
+
+/* 얼굴표가 움직이기 전에 쓰인 저장의 팔로우와 쪽지를 지금 표로 옮긴다. 키를 만드는 규칙이 라포와
+   같으니 옮기는 규칙도 같다. 값은 그대로다. 0은 선팔, 1은 맞팔이고 쪽지는 답장한 판 수다.
+   둘을 한 번에 옮긴다. 한쪽만 옮기면 readSocial이 짝이 없는 쪽지를 버려 답장한 시각이 사라진다. */
+export function migrateSocial(social, from) {
+  if (!social || typeof social !== 'object') return social;
+  if (Number(from) >= FACES_V_SOCIAL) return social;
+  return Object.assign({}, social, { follows: remapFaceKeys(social.follows), dm: remapFaceKeys(social.dm) });
 }
 
 // 저장에서 읽는다. 아는 모양만 받는다. 0은 선팔, 1은 맞팔이다.
