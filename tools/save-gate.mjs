@@ -1,9 +1,16 @@
 import { chromium } from "playwright";
+import { readFileSync } from "node:fs";
+import { passerAt } from "../web/src/state/passer.mjs";
 
 // 저장 게이트. 탭을 닫아도 키퍼가 남는가, 자리를 비운 시간이 상한 안에서만 쌓이는가.
 // 대조군 셋: 저장이 비었을 때 0, 시계를 되돌렸을 때 0, 몇 달 비웠을 때도 상한.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const URL = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
+const FACE_SRC = import.meta.dirname + "/../web/src/state/passer.mjs";
+/* 얼굴표가 한 번 재배열됐다(web/src/state/passer.mjs FACES_V). 라포는 (도시, 번호)로 붙으므로
+   그 전에 쓰인 저장은 익힌 얼굴을 옆 사람에게 붙여 놓는다. 아래는 옛 표에서 3번 도시 7번 자리에
+   앉아 있던 사람이고, 지금 표에서 그 이름은 다른 번호에 앉아 있다. */
+const FACE_FIX = { city: 3, was: 7, name: "알콩달", n: 5 };
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();
 
@@ -133,6 +140,45 @@ try {
     await p.waitForTimeout(500);
   }
   check('maxed:the-run-keeps-advancing', moved, samples + ' samples, last=' + lastSeen);
+  /* 옛 표로 쓰인 저장 하나. 판번호를 지우고 그 시절 번호에 라포를 앉힌 뒤 다시 읽는다.
+     묻는 것은 번호가 아니라 이름이다. 번호로 물으면 이동표를 이동표로 재는 셈이라 아무것도 안 가른다. */
+  const seat = async () => {
+    await p.evaluate((f) => {
+      const s = JSON.parse(localStorage.getItem(window.__saveKey()));
+      delete s.faces;
+      s.rapport = { [f.city + ":" + f.was]: f.n };
+      localStorage.setItem(window.__saveKey(), JSON.stringify(s));
+    }, FACE_FIX);
+    await p.reload({ waitUntil: "load" });
+    await p.waitForTimeout(900);
+    const r = await p.evaluate(() => window.__rapport());
+    const keys = Object.keys(r || {});
+    const at = keys.length === 1 ? Number(keys[0].split(":")[1]) : -1;
+    const who = at >= 0 ? (passerAt(FACE_FIX.city, at) || {}).name : null;
+    return { keys, at, who, n: at >= 0 ? r[keys[0]] : 0 };
+  };
+  const carried = await seat();
+  check("save:a-reordered-face-table-keeps-rapport-on-the-same-person",
+    carried.who === FACE_FIX.name && carried.n === FACE_FIX.n,
+    "wrote " + FACE_FIX.city + ":" + FACE_FIX.was + ", the seat " + FACE_FIX.name
+    + " held in the old table, and read back " + JSON.stringify(carried.keys) + " which is "
+    + carried.who + " at " + carried.n);
+  /* 심은 대조군. 이동표를 안 읽는 판을 라우팅한다. 서버가 no-store라 새로 읽어 간다.
+     같은 저장이 옛 자리에 그대로 남고 그 자리가 이제 다른 사람이어야, 위 축이 이동표를 재고 있는 것이다. */
+  const face = readFileSync(FACE_SRC, "utf8");
+  const hits = face.match(/const row = FACE_MOVES\[c\];/g) || [];
+  check("instrument:the-planted-control-found-its-one-anchor", hits.length === 1,
+    hits.length + " reads of the move table in " + FACE_SRC);
+  if (hits.length === 1) {
+    await p.route("**/web/src/state/passer.mjs", (r) => r.fulfill({ status: 200,
+      contentType: "text/javascript; charset=utf-8", body: face.replace(hits[0], "const row = null;") }));
+    const flat = await seat();
+    await p.unroute("**/web/src/state/passer.mjs");
+    check("control:an-identity-map-leaves-the-rapport-on-someone-else",
+      flat.at === FACE_FIX.was && flat.who !== FACE_FIX.name,
+      "identity left it at " + FACE_FIX.city + ":" + flat.at + ", which is " + flat.who
+      + " and not " + FACE_FIX.name);
+  }
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
 
   console.log(notes.map((s) => "  ok   " + s).join("\n"));

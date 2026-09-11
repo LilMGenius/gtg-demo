@@ -98,6 +98,30 @@ export function personaAt(passer) {
   return PERSONAS[personaKindAt(passer)];
 }
 
+/* 얼굴표 판번호. 위 표에서 자리가 한 번이라도 움직이면 이 수가 오르고 아래 이동표에 그 줄이 선다.
+   라포는 (도시, 번호)로 붙으므로, 자리가 움직인 표를 모르는 저장은 익힌 얼굴을 옆 사람에게 붙여 놓는다. */
+export const FACES_V = 1;
+
+/* 판 0에서 판 1로 가는 자리 이동. 칸의 자리가 옛 번호이고 칸의 값이 지금 번호다.
+   판 0은 도시마다 제 순서를 따로 썼고, 판 1은 네 줄의 같은 자리를 같은 kind로 맞췄다.
+   네 줄 다 순열이라 두 사람이 한 자리로 들어오는 일은 없다. */
+const FACE_MOVES = [
+  [0, 3, 1, 4, 2],
+  [0, 3, 2, 5, 1, 4, 6],
+  [0, 1, 2, 5, 4, 6, 8, 7, 3],
+  [0, 2, 1, 4, 6, 5, 7, 3, 8, 9, 10]
+];
+
+/* 옛 번호가 지금 앉아 있는 자리. 줄이 없는 도시나 줄 밖의 번호는 제자리다.
+   제자리로 두는 것이 맞다. 새 도시가 붙어도 그 도시의 저장이 안 흔들린다. */
+export function movedFace(city, passer) {
+  const c = Math.max(0, Math.min(FACE_MOVES.length - 1, Math.floor(Number(city) || 0)));
+  const p = Math.floor(Number(passer));
+  const row = FACE_MOVES[c];
+  if (!row || !Number.isFinite(p) || p < 0 || p >= row.length) return p;
+  return row[p];
+}
+
 // 이름은 라포 1단계부터 열린다. 세 번 말을 섞기 전까지는 차림새로만 기억한다.
 // 처음부터 이름을 주면 얼굴을 트는 과정 자체가 화면에서 사라진다.
 export function passerName(city, passer, tier) {
