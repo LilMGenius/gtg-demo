@@ -247,7 +247,23 @@ try {
   const FILL_DELTA = 8;
   // 심는 대조군. 이 자리로 겨냥을 되돌리면 위의 축이 빨개져야 한다.
   const OLD_INK_AIM = { part: "arm", dist: 0.58, lift: -0.12, high: 0.08, yaw: -0.7 };
-  const fills = await p.evaluate(async ([delta, old]) => {
+  /* 위의 자는 그림이 카드를 얼마나 덮는지만 묻는다. 그래서 카메라가 팔 윤곽 안에 들어앉아
+     카드 넷이 전부 대각선 쐐기가 된 채로 초록이 났다. 실측: 세 유료 등급의 무늬가 카드의
+     82.8과 77.0과 85.1퍼센트인데 사람이 본 것은 팔이 아니라 초록 귀퉁이가 붙은 쐐기였다.
+     팔로 읽히게 하는 단서는 무늬 위쪽에 남은 살, 곧 어깨 쪽의 맨살이다. 띠의 위 끝을 열마다
+     찾아 그 위의 맨살 화소를 센다. 띠 아래는 안 묻는다. INK_FOOT 0.3이 띠의 발을 위팔
+     3할 지점에 박아 두어 가까운 겨냥에서는 그 발이 카드 밖이고, 실측으로 0.39까지 띠 아래
+     불투명 화소가 0이다. 없는 것을 묻는 축은 겨냥이 아니라 텍스처에 답을 요구한다.
+     살색은 상점이 실제로 파는 0등급 장이 소유한다. 위의 자가 기준으로 삼는 그 한 장에서
+     채널마다 5퍼센타일과 95퍼센타일을 읽고 6을 덧댄 상자다. 여기 색을 박으면 유니폼이나
+     빛이 바뀐 날 모든 화소가 살로 읽히고 이 축이 영원히 초록이 된다. */
+  // 2000화소. 448x205 카드의 2.2퍼센트다. 실측으로 지금 겨냥이 5808과 8410과 3854라
+  // 통과용으로 맞춘 수가 아니고, 0.28로 붙인 대조군이 995와 1785와 0으로 운다.
+  const INK_SKIN = 2000;
+  const SKIN_PAD = 6;
+  // 심는 대조군. 이 거리로 붙으면 띠가 카드를 삼켜 위의 축이 빨개져야 한다.
+  const NEAR_INK_DIST = 0.28;
+  const fills = await p.evaluate(async ([delta, old, pad, nearDist]) => {
     const m = await import("/web/src/render/thumb.mjs");
     const g = await import("/web/src/state/gear.mjs");
     const k = { height: 188, weight: 84 };
@@ -272,24 +288,76 @@ try {
       }
       return d / (a.width * a.height);
     };
+    /* 살색 상자. 파는 0등급 장의 불투명 화소만 모아 채널마다 5에서 95퍼센타일을 읽는다.
+       그 장이 이 겨냥에서 실제로 보여 주는 색의 폭이라, 겨냥이 움직이면 상자도 같이 움직인다. */
+    const toneOf = (im) => {
+      const ch = [[], [], []];
+      for (let i = 0; i < im.data.length; i += 4) {
+        if (im.data[i + 3] <= 16) continue;
+        ch[0].push(im.data[i]); ch[1].push(im.data[i + 1]); ch[2].push(im.data[i + 2]);
+      }
+      return ch.map((q) => {
+        q.sort((x, y) => x - y);
+        return q.length ? [q[Math.floor(q.length * 0.05)] - pad, q[Math.floor(q.length * 0.95)] + pad] : [1, 0];
+      });
+    };
+    /* 띠 위의 맨살. 열마다 파는 장과 달라진 첫 행이 띠의 위 끝이고, 그 위에서 살 상자에
+       드는 불투명 화소를 센다. 열의 첫 행부터 띠면 그 열은 어깨가 카드 밖이라 세지 않는다. */
+    const skinAbove = (a, c, box) => {
+      if (a.width !== c.width || a.height !== c.height) return -1;
+      const W = a.width, H = a.height;
+      let n = 0;
+      for (let x = 0; x < W; x += 1) {
+        let top = -1;
+        for (let y = 0; y < H; y += 1) {
+          const i = (y * W + x) * 4;
+          const hit = Math.max(Math.abs(a.data[i] - c.data[i]), Math.abs(a.data[i + 1] - c.data[i + 1]),
+            Math.abs(a.data[i + 2] - c.data[i + 2]), Math.abs(a.data[i + 3] - c.data[i + 3]));
+          if (hit > delta) { top = y; break; }
+        }
+        if (top <= 0) continue;
+        for (let y = 0; y < top; y += 1) {
+          const i = (y * W + x) * 4;
+          if (a.data[i + 3] <= 16) continue;
+          if (a.data[i] >= box[0][0] && a.data[i] <= box[0][1] && a.data[i + 1] >= box[1][0]
+            && a.data[i + 1] <= box[1][1] && a.data[i + 2] >= box[2][0] && a.data[i + 2] <= box[2][1]) n += 1;
+        }
+      }
+      return n;
+    };
     const rig = async (over) => {
       const skin = await read(m.thumbURL("ink", k, g.lookOf({ ink: 0 }), over));
-      const sold = [], flat = [];
+      const box = toneOf(skin);
+      const sold = [], flat = [], above = [];
       for (let n = 0; n < g.TATTOOS.length; n += 1) {
         const bare = g.lookOf({ ink: n });
         bare.inkGrade = 0;
         const a = await read(m.thumbURL("ink", k, g.lookOf({ ink: n }), over));
         sold.push(moved(a, skin));
         flat.push(moved(a, await read(m.thumbURL("ink", k, bare, over))));
+        above.push(skinAbove(a, skin, box));
       }
-      return { sold, flat };
+      return { sold, flat, above, box };
+    };
+    /* 대조군은 맨살 축이 쓰는 장만 굽는다. 반사실까지 같이 구우면 한 회차가 아홉 장 더
+       늘어나고, 이 판의 굽는 수는 옆 게이트의 page.goto를 30초 밖으로 밀어낸 적이 있다. */
+    const nearSkin = async (dist) => {
+      const over = { dist };
+      const skin = await read(m.thumbURL("ink", k, g.lookOf({ ink: 0 }), over));
+      const box = toneOf(skin);
+      const above = [];
+      for (let n = 0; n < g.TATTOOS.length; n += 1) {
+        above.push(skinAbove(await read(m.thumbURL("ink", k, g.lookOf({ ink: n }), over)), skin, box));
+      }
+      return { above, box };
     };
     const live = await rig();
     const was = await rig(old);
+    const near = await nearSkin(nearDist);
     const one = m.thumbURL("ink", k, g.lookOf({ ink: 0 }));
     const two = m.thumbURL("ink", k, g.lookOf({ ink: 0 }));
-    return { live, was, base: { same: one === two, len: one.length } };
-  }, [FILL_DELTA, OLD_INK_AIM]);
+    return { live, was, near, base: { same: one === two, len: one.length } };
+  }, [FILL_DELTA, OLD_INK_AIM, SKIN_PAD, NEAR_INK_DIST]);
   const pct = (x) => (x * 100).toFixed(1) + "%";
   const paid = fills.live.sold.slice(1);
   /* 자의 바닥. 위의 모든 수는 맨살 장 하나와 견준 차이라, 그 장이 구울 때마다 흔들리면
@@ -309,6 +377,17 @@ try {
     + fills.was.sold.slice(1).map(pct).join(" ") + " (counterfactual "
     + fills.was.flat.slice(1).map(pct).join(" ") + "), worst " + pct(wasWorst)
     + " under the " + pct(INK_FILL) + " floor");
+  const skinUp = fills.live.above.slice(1);
+  const boxOf = (q) => q.map((c) => c[0] + ".." + c[1]).join("/");
+  check("thumb:skin-shows-above-the-tattoo", skinUp.length > 0 && skinUp.every((n) => n >= INK_SKIN),
+    "grades 1..3 keep " + skinUp.join(" ") + " skin pixels above the band's top edge, floor "
+    + INK_SKIN + "; the skin box r/g/b " + boxOf(fills.live.box)
+    + " came from the sold grade-0 card, the same still the fill axis measures against");
+  const nearWorst = Math.min.apply(null, fills.near.above.slice(1));
+  check("control:a-closer-arm-aim-loses-the-skin-above-the-band", nearWorst >= 0 && nearWorst < INK_SKIN,
+    "the planted rig dist " + NEAR_INK_DIST + " keeps " + fills.near.above.slice(1).join(" ")
+    + " skin pixels above the band (skin box " + boxOf(fills.near.box) + "), worst " + nearWorst
+    + " under the " + INK_SKIN + " floor");
 
   // 대조군. 같은 등급을 두 번 구우면 같은 그림이어야 한다. 매번 달라지면 위의 다름은
   // 상품의 차이가 아니라 굽는 잡음이고, 그 축은 아무것도 증명하지 않는다.
