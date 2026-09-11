@@ -329,7 +329,7 @@ function partPoint(k, part) {
    칸의 39.0퍼센트가 바뀌었고, 사람은 그것을 뒤집힌 뒤에 도는 그림으로 읽었다.
    장면 칸은 겨냥할 몸이 없어 겨냥표를 안 쓰므로 기본값이 따로다.
    over는 계기가 덮어쓴 겨냥이라 그 각이 있으면 그것이 이 칸의 각이다. */
-function yawOf(kind, aim) {
+export function yawOf(kind, aim) {
   const a = aim || AIM[kind];
   if (a && a.yaw !== undefined) return a.yaw;
   return SCENE[kind] ? -0.35 : -0.7;
@@ -358,7 +358,7 @@ function frame(kind, keeper, look, yaw, over) {
     scene.add(sceneRig);
     // 동네는 하늘이 상품의 절반이다. 골대 칸은 배경을 비워 그물이 칸을 채우게 둔다.
     scene.background = sceneRig.userData.sky === undefined ? null : new THREE.Color(sceneRig.userData.sky);
-    const a = yaw === undefined ? yawOf(kind) : yaw;
+    const a = yaw === undefined ? yawOf(kind, over) : yaw;
     // 눈높이는 칸이 정한다. 골대와 행인은 크기가 여섯 배 차이라 같은 각으로 보면 한쪽이 늘 잘린다.
     cam.position.set(made.at.x + Math.sin(a) * made.dist, made.at.y + made.dist * made.high, made.at.z + Math.cos(a) * made.dist);
     cam.lookAt(made.at);
@@ -381,9 +381,11 @@ function frame(kind, keeper, look, yaw, over) {
   R.render(scene, cam);
 }
 
-export function thumbURL(kind, keeper, look) {
+// over는 굽는 각을 덮어쓰는 자리다. 계기가 반사실을 구울 때만 쓰고, 화면은 안 쓴다.
+// 장면 칸은 겨냥표를 안 써서 이 자리가 그 칸의 하나뿐인 각 손잡이다.
+export function thumbURL(kind, keeper, look, over) {
   if (!AIM[kind] && !SCENE[kind]) return "";
-  frame(kind, keeper, look);
+  frame(kind, keeper, look, undefined, over);
   return R.domElement.toDataURL("image/png");
 }
 

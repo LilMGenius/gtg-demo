@@ -374,8 +374,20 @@ try {
      한 번에 바뀌었고, 장면 칸 넷은 정지 그림이 -0.35인데 같은 -0.7에서 출발해 5.9에서 30.2퍼센트가 바뀌었다.
      바닥은 그 칸 자신의 두 프레임 몫이다. 도는 속도가 선반마다 달라서(0.9에서 18.8퍼센트) 고정값 하나로 재면
      빠른 칸이 영원히 빨갛거나 느린 칸이 영원히 초록이 된다. 이웃 잡음 자와 같은 규칙으로 TURN_SHARE를 얹는다.
+     그 몫을 살아 있는 회전에서 뜨면 자가 재이는 것을 따라간다. 두 프레임을 뜬 각이 곧 출발각이라,
+     많이 움직이는 각으로 튄 회귀는 자기를 심판할 바닥을 같이 올린다. 실측: 같은 잉크 선반의 바닥이
+     초록 회차에서 18.2퍼센트, 출발각을 pi 튼 대조군 회차에서 4.5퍼센트로 네 배 갈렸다. 잉크의 정직한
+     도약은 3.5퍼센트라, 18.2퍼센트 바닥 앞에서는 그 여섯 배도 초록으로 지나간다. 기계가 바빠 프레임을
+     흘리면 같은 방향으로 밀려, 쓸기가 도는 동안 이 자가 가장 너그러워진다.
+     그래서 바닥은 굽는다. 정지 그림이 선 각과 거기서 두 프레임만큼 돌린 각을 각각 한 장씩 구워
+     그 둘의 거리를 바닥으로 쓴다. 부하에도 출발각에도 안 움직이고, 회차마다 같은 수가 나온다.
      구운 화소끼리 견준다. 칸을 찍으면 자리와 각이 한 수에 섞여서, 위의 자리 축이 이미 답한 것을 다시 묻게 된다. */
-  const startAt = await p.evaluate(async (delta) => {
+  /* 한 바퀴가 8초라 60헤르츠 두 프레임은 33.3밀리초, 곧 0.0262라디안이고 1.50도다.
+     사라진 실측 자와 같은 폭이라 초록 회차가 재던 수와 그대로 견줘진다. */
+  const TURN_STEP = Math.PI * 2 * ((2 / 60) * 1000) / 8000;
+  const startAt = await p.evaluate(async ([delta, sweep]) => {
+    const m = await import("/web/src/render/thumb.mjs");
+    const g = await import("/web/src/state/gear.mjs");
     const read = (src) => new Promise((res) => {
       const im = new Image();
       im.onload = () => {
@@ -391,8 +403,8 @@ try {
       if (u.width !== v.width || u.height !== v.height) return -1;
       let n = 0;
       for (let k = 0; k < u.data.length; k += 4) {
-        const m = Math.max(Math.abs(u.data[k] - v.data[k]), Math.abs(u.data[k + 1] - v.data[k + 1]), Math.abs(u.data[k + 2] - v.data[k + 2]));
-        if (m > delta) n += 1;
+        const hit = Math.max(Math.abs(u.data[k] - v.data[k]), Math.abs(u.data[k + 1] - v.data[k + 1]), Math.abs(u.data[k + 2] - v.data[k + 2]));
+        if (hit > delta) n += 1;
       }
       return n / (u.width * u.height);
     };
@@ -401,6 +413,12 @@ try {
       const step = () => (left -= 1) <= 0 ? res() : requestAnimationFrame(step);
       requestAnimationFrame(step);
     });
+    /* 구울 인자는 화면이 쓴 것과 같아야 한다. 탭 이름과 굽는 종류가 갈리는 선반이 있고(장갑 탭은 grip을 굽는다),
+       걸치는 칸과 자리 칸과 봇이 받는 인자가 세 모양이라, 그 표를 여기 옮겨 적으면 화면이 바뀐 날
+       바닥만 조용히 딴 물건을 잰다. 그래서 적지 않고 맞춰 본다. 후보를 구워 칸에 걸린 정지 그림과
+       바이트로 같은 장이 나오면 그것이 화면이 쓴 짝이다. 못 찾으면 그 줄은 안 잰 것으로 적는다. */
+    const gear = window.__gear();
+    const me = window.__keeperStats();
     const out = [];
     for (const tab of [...document.querySelectorAll("#shop .tab")].map((x) => x.dataset.tab)) {
       for (const x of document.querySelectorAll("#shop .tab")) if (x.dataset.tab === tab) x.click();
@@ -409,28 +427,39 @@ try {
       if (!card) continue;
       const shot = card.querySelector(".shot");
       const still = shot.querySelector("img").getAttribute("src");
+      const rank = Number(shot.dataset.rank);
+      let turn = null;
+      for (const kind of [shot.dataset.kind].concat(Object.keys(g.SKINS))) {
+        const y = m.yawOf(kind);
+        for (const arg of [g.lookOf(Object.assign({}, gear, { [kind]: rank }), me.name), { rank, skin: 0 }, rank]) {
+          let rest = "";
+          try { rest = m.thumbURL(kind, me, arg, { yaw: y }); } catch (e) { rest = ""; }
+          if (rest !== still) continue;
+          try { turn = m.thumbURL(kind, me, arg, { yaw: y + sweep }); } catch (e) { turn = null; }
+          break;
+        }
+        if (turn) break;
+      }
       card.dispatchEvent(new PointerEvent("pointerenter", { bubbles: false }));
-      /* 두 프레임 안에 잡는다. 한 바퀴가 8초라 두 프레임은 1.9도이고, 출발각이 맞으면 그 몫은
-         아래의 두 프레임 몫과 같은 크기다. 더 늦게 잡으면 도약과 정상 회전이 한 수에 섞인다. */
+      /* 한 프레임 안에 잡는다. 더 늦게 잡으면 도약과 정상 회전이 한 수에 섞인다. */
       await frames(1);
       const cv = shot.querySelector("canvas");
       const one = cv ? cv.toDataURL("image/png") : "";
-      await frames(2);
-      const two = cv ? cv.toDataURL("image/png") : "";
       card.dispatchEvent(new PointerEvent("pointerleave", { bubbles: false }));
       await new Promise((res) => setTimeout(res, 80));
-      if (!one || !two) { out.push({ tab, jump: -1, step: -1 }); continue; }
+      if (!one || !turn) { out.push({ tab, jump: -1, step: -1 }); continue; }
       const a = await read(still);
       const b = await read(one);
-      const c = await read(two);
-      out.push({ tab, jump: gap(a, b), step: gap(b, c) });
+      const c = await read(turn);
+      out.push({ tab, jump: gap(a, b), step: gap(a, c) });
     }
     return out;
-  }, TURN_DELTA);
+  }, [TURN_DELTA, TURN_STEP]);
   const jumped = startAt.filter((x) => !(x.jump >= 0 && x.step >= 0 && x.jump <= x.step + TURN_SHARE));
   check("thumb:the-spin-starts-from-the-still", startAt.length > 0 && jumped.length === 0,
-    startAt.map((x) => x.tab + " " + (x.jump * 100).toFixed(1) + "% vs floor "
-      + ((x.step + TURN_SHARE) * 100).toFixed(1) + "%").join(", ") || "no shelf was read");
+    startAt.map((x) => x.jump < 0 || x.step < 0 ? x.tab + " unmeasured"
+      : x.tab + " " + (x.jump * 100).toFixed(1) + "% vs floor "
+        + ((x.step + TURN_SHARE) * 100).toFixed(1) + "%").join(", ") || "no shelf was read");
 
   /* 대조군. 굽는 자가 없는 종류는 호버해도 정지 그림이 그대로 서야 한다. startSpin은 그런
      종류에서 먼저 돌아 나가는데, 숨기는 규칙이 그 앞에 서면 캔버스도 그림도 없는 빈 칸이 남는다.
