@@ -367,6 +367,71 @@ try {
     "still " + back.vis + " " + back.w + "x" + back.h + " (rested " + swap.rest.w + "x" + swap.rest.h + "), canvas "
     + (back.canvas ? "still in the box" : "gone"));
 
+  /* 도는 그림은 정지 그림이 선 그 각에서 출발해야 한다. 출발각을 여기서 상수로 박으면
+     겨냥이 그 상수와 다른 선반마다 정지 그림과 첫 프레임 사이에 각 차이만큼의 도약이 생기고,
+     사람이 보는 것은 회전이 아니라 한 번에 돌아간 뒤에 도는 그림이다.
+     실측: 유니폼 겨냥은 2.7인데 출발이 -0.7이라 3.4라디안을 한 프레임에 건너뛰어 칸의 39.1퍼센트가
+     한 번에 바뀌었고, 장면 칸 넷은 정지 그림이 -0.35인데 같은 -0.7에서 출발해 5.9에서 30.2퍼센트가 바뀌었다.
+     바닥은 그 칸 자신의 두 프레임 몫이다. 도는 속도가 선반마다 달라서(0.9에서 18.8퍼센트) 고정값 하나로 재면
+     빠른 칸이 영원히 빨갛거나 느린 칸이 영원히 초록이 된다. 이웃 잡음 자와 같은 규칙으로 TURN_SHARE를 얹는다.
+     구운 화소끼리 견준다. 칸을 찍으면 자리와 각이 한 수에 섞여서, 위의 자리 축이 이미 답한 것을 다시 묻게 된다. */
+  const startAt = await p.evaluate(async (delta) => {
+    const read = (src) => new Promise((res) => {
+      const im = new Image();
+      im.onload = () => {
+        const cv = document.createElement("canvas");
+        cv.width = im.width; cv.height = im.height;
+        const c = cv.getContext("2d");
+        c.drawImage(im, 0, 0);
+        res(c.getImageData(0, 0, im.width, im.height));
+      };
+      im.src = src;
+    });
+    const gap = (u, v) => {
+      if (u.width !== v.width || u.height !== v.height) return -1;
+      let n = 0;
+      for (let k = 0; k < u.data.length; k += 4) {
+        const m = Math.max(Math.abs(u.data[k] - v.data[k]), Math.abs(u.data[k + 1] - v.data[k + 1]), Math.abs(u.data[k + 2] - v.data[k + 2]));
+        if (m > delta) n += 1;
+      }
+      return n / (u.width * u.height);
+    };
+    const frames = (n) => new Promise((res) => {
+      let left = n;
+      const step = () => (left -= 1) <= 0 ? res() : requestAnimationFrame(step);
+      requestAnimationFrame(step);
+    });
+    const out = [];
+    for (const tab of [...document.querySelectorAll("#shop .tab")].map((x) => x.dataset.tab)) {
+      for (const x of document.querySelectorAll("#shop .tab")) if (x.dataset.tab === tab) x.click();
+      await new Promise((res) => setTimeout(res, 260));
+      const card = [...document.querySelectorAll("#shop .rack .card")].find((c) => c.querySelector(".shot img"));
+      if (!card) continue;
+      const shot = card.querySelector(".shot");
+      const still = shot.querySelector("img").getAttribute("src");
+      card.dispatchEvent(new PointerEvent("pointerenter", { bubbles: false }));
+      /* 두 프레임 안에 잡는다. 한 바퀴가 8초라 두 프레임은 1.9도이고, 출발각이 맞으면 그 몫은
+         아래의 두 프레임 몫과 같은 크기다. 더 늦게 잡으면 도약과 정상 회전이 한 수에 섞인다. */
+      await frames(1);
+      const cv = shot.querySelector("canvas");
+      const one = cv ? cv.toDataURL("image/png") : "";
+      await frames(2);
+      const two = cv ? cv.toDataURL("image/png") : "";
+      card.dispatchEvent(new PointerEvent("pointerleave", { bubbles: false }));
+      await new Promise((res) => setTimeout(res, 80));
+      if (!one || !two) { out.push({ tab, jump: -1, step: -1 }); continue; }
+      const a = await read(still);
+      const b = await read(one);
+      const c = await read(two);
+      out.push({ tab, jump: gap(a, b), step: gap(b, c) });
+    }
+    return out;
+  }, TURN_DELTA);
+  const jumped = startAt.filter((x) => !(x.jump >= 0 && x.step >= 0 && x.jump <= x.step + TURN_SHARE));
+  check("thumb:the-spin-starts-from-the-still", startAt.length > 0 && jumped.length === 0,
+    startAt.map((x) => x.tab + " " + (x.jump * 100).toFixed(1) + "% vs floor "
+      + ((x.step + TURN_SHARE) * 100).toFixed(1) + "%").join(", ") || "no shelf was read");
+
   /* 대조군. 굽는 자가 없는 종류는 호버해도 정지 그림이 그대로 서야 한다. startSpin은 그런
      종류에서 먼저 돌아 나가는데, 숨기는 규칙이 그 앞에 서면 캔버스도 그림도 없는 빈 칸이 남는다.
      그 칸은 호버해야만 비므로 위의 잉크 축이 영원히 못 본다. */

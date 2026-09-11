@@ -42,11 +42,14 @@ const AIM = {
   grip: { part: "glove", dist: 0.94, lift: 0.03, high: 0.12 },
   // 축구화가 파는 것은 밑창이다. 위에서 내려다보면 돌기가 갑피에 가려 여덟 개나 셋이나 같다.
   studs: { part: "boot", dist: 0.72, lift: -0.02, high: -0.34 },
-  // 앞에서 잡으면 준비 자세의 장갑 둘이 가슴을 가려 상의가 띠 하나로 남는다.
-  // 뒤에서 잡는다. 단체복 이름이 등에 박힌 철물점 이름을 말하기도 한다.
-  // 겨냥점이 몸통 메시의 원점이라 허리께다. 보정 없이 잡으면 어깨가 칸 위로 잘려
-  // 어깨에 스펀지를 넣은 저지와 체육복이 같은 그림이 된다.
-  pads: { part: "torso", dist: 1.7, lift: 0.3, high: 0.1, yaw: 2.7 },
+  /* 앞에서 잡는다. 다른 선반과 같은 각이라 쉬는 그림과 도는 그림이 한 자세에서 이어진다.
+     준비 자세의 장갑 둘이 가슴을 일부 가리지만 네 등급은 그래도 갈린다. 실측: 앞에서 최악 쌍의
+     IoU가 0.716으로 자의 상한 0.75 아래이고, 가장 마른 등급이 칠하는 화소가 7485로 하한 1000의
+     일곱 배다. 뒤에서 잡으면 0.709에 9252라, 등을 보여 버는 것은 화소 19퍼센트에 갈림 0.007이고
+     그 몫으로는 한 선반만 다른 각에 세울 이유가 안 된다.
+     겨냥점이 몸통 메시의 원점이라 허리께다. 보정 없이 잡으면 어깨가 칸 위로 잘려
+     어깨에 스펀지를 넣은 저지와 체육복이 같은 그림이 된다. */
+  pads: { part: "torso", dist: 1.7, lift: 0.3, high: 0.1 },
   socks: { part: "shin", dist: 1.05, lift: 0.02 },
   // 겨냥점은 머리 한가운데인데 파는 것은 그 위에 얹힌 껍데기다. 보정 없이 잡으면
   // 모히칸의 무게중심이 칸 위에서 13퍼센트 지점에 걸려 볏이 잘린다.
@@ -320,6 +323,18 @@ function partPoint(k, part) {
   return v;
 }
 
+/* 한 칸이 쉬는 각. 굽는 자리와 도는 자리가 이 한 곳에서 각을 받는다.
+   두 곳에서 따로 풀면 겨냥표에 각을 단 칸만 두 값이 갈리고, 그 칸은 호버한 첫 프레임에서
+   그 차이만큼 건너뛴다. 실측: 유니폼이 겨냥 2.7에 출발 -0.7이라 3.4라디안을 한 번에 건너뛰어
+   칸의 39.0퍼센트가 바뀌었고, 사람은 그것을 뒤집힌 뒤에 도는 그림으로 읽었다.
+   장면 칸은 겨냥할 몸이 없어 겨냥표를 안 쓰므로 기본값이 따로다.
+   over는 계기가 덮어쓴 겨냥이라 그 각이 있으면 그것이 이 칸의 각이다. */
+function yawOf(kind, aim) {
+  const a = aim || AIM[kind];
+  if (a && a.yaw !== undefined) return a.yaw;
+  return SCENE[kind] ? -0.35 : -0.7;
+}
+
 // 한 장을 굽는다. 같은 자세와 같은 각도로 구워야 등급끼리의 차이가 색과 모양에서만 나온다.
 // over는 겨냥 한 칸만 덮어쓰는 자리다. 계기가 반사실을 구울 때만 쓰고, 화면은 안 쓴다.
 function frame(kind, keeper, look, yaw, over) {
@@ -343,7 +358,7 @@ function frame(kind, keeper, look, yaw, over) {
     scene.add(sceneRig);
     // 동네는 하늘이 상품의 절반이다. 골대 칸은 배경을 비워 그물이 칸을 채우게 둔다.
     scene.background = sceneRig.userData.sky === undefined ? null : new THREE.Color(sceneRig.userData.sky);
-    const a = yaw === undefined ? -0.35 : yaw;
+    const a = yaw === undefined ? yawOf(kind) : yaw;
     // 눈높이는 칸이 정한다. 골대와 행인은 크기가 여섯 배 차이라 같은 각으로 보면 한쪽이 늘 잘린다.
     cam.position.set(made.at.x + Math.sin(a) * made.dist, made.at.y + made.dist * made.high, made.at.z + Math.cos(a) * made.dist);
     cam.lookAt(made.at);
@@ -359,7 +374,7 @@ function frame(kind, keeper, look, yaw, over) {
   const aim = Object.assign({}, AIM[kind] || { part: "torso", dist: 1.3, lift: 0 }, over || {});
   const at = partPoint(rig, aim.part);
   at.y += aim.lift;
-  const a = yaw === undefined ? (aim.yaw === undefined ? -0.7 : aim.yaw) : yaw;
+  const a = yaw === undefined ? yawOf(kind, aim) : yaw;
   const high = aim.high === undefined ? 0.22 : aim.high;
   cam.position.set(at.x + Math.sin(a) * aim.dist, at.y + aim.dist * high, at.z + Math.cos(a) * aim.dist);
   cam.lookAt(at);
@@ -395,10 +410,13 @@ export function startSpin(host, kind, keeper, look) {
   spinHost = host;
   host.classList.add("spinning");
   const t0 = performance.now();
+  /* 출발각은 그 칸이 쉬는 각이다. 여기 상수를 박으면 겨냥이 그 상수와 다른 칸마다
+     첫 프레임에서 각 차이만큼 한 번에 돌고, 그 도약은 회전이 아니라 다른 물건으로 읽힌다. */
+  const y0 = yawOf(kind);
   const tick = () => {
     if (!spinning) return;
     // 한 바퀴에 8초. 더 빠르면 물건을 보는 것이 아니라 돌아가는 것을 보게 된다.
-    frame(kind, keeper, look, -0.7 + ((performance.now() - t0) / 8000) * Math.PI * 2);
+    frame(kind, keeper, look, y0 + ((performance.now() - t0) / 8000) * Math.PI * 2);
     spinning = requestAnimationFrame(tick);
   };
   spinning = requestAnimationFrame(tick);
