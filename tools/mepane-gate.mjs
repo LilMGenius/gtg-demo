@@ -367,34 +367,39 @@ try {
     metView.length > 0 && metView.every((m) => m.face > 0 && m.bar > 0 && m.go.length > 0),
     metView.length ? JSON.stringify(metView) : "no cards in the people pane");
 
-  /* 빈 아는 얼굴 칸. 라포가 하나도 없는 사람에게는 라벨 둘과 빈 띠만 섰다. 띠는 서 있는데 그 안이
-     비어서, 화면은 덜 그려진 것으로 읽히고 무엇이 이 칸을 채우는지는 어디에도 없었다.
-     재는 것은 셋이다. 글자가 있는가, 흐린 톤으로 서는가, 띠가 한 줄만큼 실제로 부풀었는가.
-     textContent만 읽으면 숨은 글자도 초록이 되므로 색과 상자를 같이 잰다. */
-  const ZERO_MIN = 8;
+  /* 빈 아는 얼굴 칸. 규칙은 파운더 것이고 열거형이다. .omo/plans/gtg-remaster.md:33이 '안내 문장형
+     라벨. 빈 칸은 빈 채로 둔다'이고, todo 4의 :105가 '안내문은 없다(빈 칸은 빈 채로 두거나 아이콘)'이다.
+     빈 칸이 받는 것은 둘뿐이라 글자는 셋째 것이고, 문장이 아니어도 셋째 것이다.
+     그래서 이 자는 무엇을 채웠는지를 재지 않고 안 채운 것을 지킨다. 띠가 서 있는가, 그 안의 글자가
+     다듬어서 비어 있는가, 안에 든 것이 있다면 아이콘인가.
+     띠 하나만 보면 띠를 비워 둔 채 머리 옆에 안내문을 세우는 길이 열린다. 그래서 칸 전체의 글자
+     마디를 훑어 문장으로 끝나는 것이 하나도 없는 것까지 같이 잰다. */
+  const ZERO_END = /(?:다|요)$|[.!?]$/;
   const zeroRead = () => {
     const box = document.getElementById("me");
     const pane = box ? box.querySelector(".pane") : null;
     if (!pane) return null;
-    // 흐린 톤은 토큰에서 되뽑는다. 띠 자신의 색을 자로 쓰면 어떤 색이든 자기와 같아 늘 통과한다.
-    const probe = document.createElement("span");
-    probe.style.cssText = "position:fixed;visibility:hidden;color:var(--dim)";
-    document.body.append(probe);
-    const token = getComputedStyle(probe).color;
-    probe.remove();
     const met = pane.querySelectorAll(".note.met").length;
+    // 칸 안의 글자 마디를 하나씩 센다. textContent 한 덩이로 읽으면 줄과 줄이 이어 붙어
+    // 끝 글자가 다음 줄 첫 글자에 가려지고, 문장 하나가 그 이음매에서 사라진다.
+    const said = [];
+    const w = document.createTreeWalker(pane, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const s = n.textContent.trim();
+      if (s) said.push(s);
+    }
     const strip = pane.querySelector(".note.dim");
-    if (!strip) return { met, token, strip: false, text: "", chars: 0, color: "", line: 0, fontPx: 0, stripH: 0, textH: 0 };
-    const inner = strip.querySelector("span") || strip;
-    const cs = getComputedStyle(inner);
-    // 자는 em 상자다. 인라인 글자 상자는 줄 높이가 아니라 글꼴 오르내림으로 서기 때문에, 한 줄이
-    // 제대로 그려져도 줄 높이보다 낮다. 실측 24px 줄에 21px 상자였다. 줄 높이를 자로 대면 멀쩡한 글자가 빨개진다.
-    const fontPx = Math.round(Number.parseFloat(cs.fontSize));
-    const line = Math.round(Number.parseFloat(cs.lineHeight) || fontPx);
-    const drawn = inner.getClientRects()[0];
-    const text = inner.textContent.trim();
-    return { met, token, strip: true, text, chars: [...text].length, color: cs.color, line, fontPx,
-      stripH: Math.round(strip.getBoundingClientRect().height), textH: drawn ? Math.round(drawn.height) : 0 };
+    if (!strip) return { met, said, strip: false, text: "", chars: 0, icons: 0, alien: [], stripH: 0 };
+    /* 아이콘은 규칙이 이름으로 허락한 것이다. 빈 span은 제 글자도 제 그림도 없어 빈 채로 둔 것과
+       같고, 아이콘을 감싼 겹도 제 글자가 없으면 겹일 뿐이다. 걸러 내는 것은 제 글자를 든 것이다. */
+    const icon = (e) => e.tagName === "svg" || e.tagName === "IMG";
+    const kids = [...strip.querySelectorAll("*")];
+    const text = strip.textContent.trim();
+    return { met, said, strip: true, text, chars: [...text].length,
+      icons: kids.filter(icon).length,
+      alien: kids.filter((e) => !icon(e) && !e.closest("svg") && e.textContent.trim().length > 0)
+        .map((e) => e.tagName.toLowerCase()),
+      stripH: Math.round(strip.getBoundingClientRect().height) };
   };
   // 대조군. 아는 얼굴이 선 판에는 빈 칸 글자가 없어야 한다. 카드와 안내가 같이 서면 그 안내는 거짓이다.
   const zeroFull = await p.evaluate(zeroRead);
@@ -427,12 +432,16 @@ try {
   await fresh.waitForTimeout(320);
   const zero = await fresh.evaluate(zeroRead);
   await fresh.close();
-  const zeroOk = Boolean(zero) && zero.strip && zero.met === 0 && zero.chars >= ZERO_MIN
-    && zero.color === zero.token && zero.textH >= zero.fontPx && zero.stripH > zero.line;
-  check("mepane:an-empty-people-pane-says-what-fills-it", zeroOk,
-    zero ? JSON.stringify(zero.text) + " " + zero.chars + " chars in " + zero.color + " against the token "
-      + zero.token + ", text " + zero.textH + "px in a " + zero.fontPx + "px em on a " + zero.line + "px line, strip " + zero.stripH
-      + "px, cards " + zero.met + ", rapport keys cleared " + carried : "no pane on a fresh account");
+  const zeroSaid = zero ? zero.said.filter((s) => ZERO_END.test(s)) : [];
+  const zeroOk = Boolean(zero) && zero.strip && zero.met === 0 && zero.chars === 0
+    && zero.alien.length === 0 && zeroSaid.length === 0;
+  check("mepane:an-empty-people-pane-stays-empty-or-carries-an-icon", zeroOk,
+    zero ? "the dim strip " + (zero.strip ? "stands " + zero.stripH + "px" : "is gone")
+      + " holding " + zero.chars + " chars " + JSON.stringify(zero.text) + " and " + zero.icons
+      + " icons, " + zero.alien.length + " text-bearing children " + JSON.stringify(zero.alien)
+      + ", " + zeroSaid.length + " of " + zero.said.length + " text runs in the pane end a sentence "
+      + JSON.stringify(zeroSaid) + ", cards " + zero.met + ", rapport keys cleared " + carried
+      : "no pane on a fresh account");
 
   // 대조군. 닫고 다시 열면 능력치 칸으로 돌아온다. 안 돌아오면 다음에 연 사람이 탭을 눌러야 한다.
   await p.evaluate(() => { window.__me(false); window.__me(true); });

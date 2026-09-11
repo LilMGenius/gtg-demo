@@ -1241,10 +1241,10 @@ const TIER_TOP = rapportTier({ '0:0': 999 }, 0, 0);
 function rapportRows() {
   const keys = Object.keys(state.rapport || {});
   const head = '<div class="note"><b>아는 얼굴</b><i>라포</i></div>';
-  /* 파운더가 '아는 얼굴 쪽 ui도 너무 구리다'고 짚은 자리다. 라포가 없는 사람에게는 라벨 둘 아래로
-     빈 띠만 서서, 덜 그려진 화면으로 읽혔다. 빈 칸은 빈 채로 두는 규칙이 막는 것은 지어낸 내용이지
-     이 칸이 무엇으로 차는지가 아니다. 안내 문장 대신 명사구 한 줄을 같은 흐린 띠 안에 세운다. */
-  if (!keys.length) return head + '<div class="note dim"><span>판 사이에 마주친 행인과 말 섞기</span></div>';
+  /* 빈 칸은 빈 채로 둔다. 파운더가 세운 규칙이고, 이 칸이 받는 것은 빈 채로 두기와 아이콘 둘뿐이다.
+     안내 문장이든 명사구 한 줄이든 글자는 셋째 것이라 여기 안 선다. 라포가 없는 사람의 화면을
+     무엇으로 채울지는 파운더가 고르는 자리다. */
+  if (!keys.length) return head + '<div class="note dim"><span></span></div>';
   // 많이 마주친 순. 같으면 키 순이라 같은 동네가 흩어지지 않는다.
   keys.sort((a, b) => (state.rapport[b] - state.rapport[a]) || a.localeCompare(b));
   const rows = keys.map((key) => {
