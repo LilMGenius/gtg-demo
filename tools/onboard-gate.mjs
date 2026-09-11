@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { PULL_BULK, PULL_BONUS, pullYield, ELEVEN, ROLES, ROLE_SLOTS, kickerByName } from "../src/roster.mjs";
+import { STAGE_LAST, pressOpen, tapClose } from "./draw.mjs";
 
 // 첫 진입의 자. 가입 직후 아무것도 안 뽑고 판이 열렸다. 첫 키퍼와 주전 열하나가 조용히 배정돼서
 // 플레이어는 자기가 무엇을 들고 시작하는지를 본 적이 없었고, 이 장르가 파는 첫 순간이 통째로 없었다.
@@ -9,11 +10,6 @@ import { PULL_BULK, PULL_BONUS, pullYield, ELEVEN, ROLES, ROLE_SLOTS, kickerByNa
 // 대조군은 이미 하던 사람이다. 그 사람에게 이 화면이 다시 열리면 판이 뒤집힌다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
-// 카드가 지나는 다섯 단의 마지막 번호. 길이는 판정의 STAGE_MS가 정하고 계기는 그 수를 마주 든다.
-const STAGE_LAST = 4;
-/* 길게 누름이 남은 것을 여는 것을 기다리는 상한. 제품 문턱이 0.45초라 여섯 배가 넘고,
-   문턱이 아니라 상한이므로 초록 회차에서는 0.5초 언저리에 풀린다. */
-const PRESS_MS = 3000;
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();
@@ -33,29 +29,6 @@ try {
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
   p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
-  /* 닫힌 판은 누를 자리가 없다. 빨간 자에서 한 번 더 누르면 거기서 오류로 끝나 결과 줄이
-     아예 안 남고, 무엇이 빨간지 못 읽는다. 누름 수가 갈리는 자리에서만 이 손을 쓴다. */
-  const tap = async () => {
-    if (await p.evaluate(() => document.getElementById("pull").hidden)) return false;
-    await p.click("#pull", { force: true });
-    return true;
-  };
-  /* 길게 누르면 남은 것이 전부 열린다. 짧은 누름은 한 단만 올리므로 열한 장을 그것으로 끝내려면
-     쉰다섯 번을 눌러야 하고, 그 사이에 이 자가 보려던 두 마디가 지나간다. 손가락이 내려가 있는 동안
-     열리는 물건이라 누름과 뗌을 따로 보내고, 열린 것을 보고 뗀다. */
-  const press = async () => {
-    if (await p.evaluate(() => document.getElementById("pull").hidden)) return false;
-    const spot = await p.locator("#pull .tap").boundingBox();
-    if (!spot) return false;
-    await p.mouse.move(spot.x + spot.width / 2, spot.y + spot.height / 2);
-    await p.mouse.down();
-    await p.waitForFunction((last) => {
-      const r = window.__reveal();
-      return r.drawn > 0 && r.shown === r.drawn && r.stage === last;
-    }, STAGE_LAST, { timeout: PRESS_MS, polling: "raf" }).catch(() => {});
-    await p.mouse.up();
-    return true;
-  };
   await p.goto(BASE, { waitUntil: "load" });
   await p.waitForSelector("#go", { timeout: 15000 });
   await p.click("#go", { force: true });
@@ -107,8 +80,8 @@ try {
 
   /* 길게 눌러 마지막 단까지 세우고 그 다음 누름이 닫는다. 닫으면 키커가 이어 열린다.
      두 마디가 한 흐름이라 사이에 판을 굴리지 않는다. */
-  await press();
-  await tap();
+  await pressOpen(p);
+  await tapClose(p);
   await p.waitForFunction(() => window.__reveal().drawn > 1, { timeout: 8000 });
   await p.waitForTimeout(300);
   const second = await p.evaluate(() => ({
@@ -120,9 +93,9 @@ try {
     "open " + second.open + ", cards " + second.n);
 
   // 열한 장은 길게 눌러 전부 열고 한 번 눌러 닫는다.
-  await press();
+  await pressOpen(p);
   await p.waitForTimeout(300);
-  await tap();
+  await tapClose(p);
   await p.waitForTimeout(400);
   const after = await p.evaluate(() => ({
     kickers: window.__kickers(),

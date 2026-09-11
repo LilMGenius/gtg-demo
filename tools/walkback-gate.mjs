@@ -2,6 +2,7 @@ import { chromium } from "playwright";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { pinClock } from "./clock.mjs";
+import { clearDraw } from "./draw.mjs";
 
 // 막은 뒤 골문 한가운데로 돌아오는 몸을 재는 자. 좌표만 보면 미끄러진 것과 걸어온 것이 같은 곡선이라,
 // 위치와 관절을 한 궤적에서 같이 읽는다. 다리가 교대로 오르내리지 않으면 그 이동은 걸음이 아니다.
@@ -22,12 +23,6 @@ const LINE = String.fromCharCode(10);
 const W = 1280;
 const H = 720;
 const STEP = 1 / 60;
-// 개봉 카드 한 장을 넘기고 다음 마디가 설 때까지. 0.7초를 프레임으로 옮긴 값이다.
-const CARD_STEPS = 42;
-// 개봉 한 장의 단 수. main.mjs STAGE_LAST와 같은 수이고 여기서 다시 정하지 않고 받아 적는다.
-const STAGE_LAST = 4;
-// 긴 누름을 붙들고 있는 상한. main.mjs LONG_MS 450보다 넉넉해야 문턱을 넘는다.
-const PRESS_MS = 3000;
 // 사건을 건 프레임에서 이만큼 뒤에 세계를 멈춘다. 6.67초이고 복귀 예산(3.6+0.5+2.0=6.1초)보다 길어서
 // 멈춘 프레임은 이미 도착한 뒤의 한 컷이다.
 const STOP_FRAMES = 400;
@@ -215,7 +210,7 @@ async function sample(browser, routed, kind, side, walkOff) {
   await page.goto(BASE + (walkOff ? "&walk=0" : ""), { waitUntil: "load" });
   await page.waitForSelector("#go", { timeout: 15000 });
   await page.click("#go", { force: true });
-  await clearPull(page);
+  await clearDraw(page);
   // 흔들림 위상을 못 박는다. 안 박으면 같은 프레임의 몸이 회차마다 조금 다른 자리에 선다.
   const pinned = await page.evaluate(() => (window.__swayPin ? window.__swayPin(0) : -1));
   // 준비 자세의 기준 실루엣. 일어서기가 끝났는지는 이 벡터와의 거리로만 물을 수 있다.
@@ -276,29 +271,6 @@ const padOpen = (page) => page.waitForFunction(() => {
   return Boolean(z) && z.classList.contains("live");
 }, null, { timeout: 60000, polling: "raf" });
 
-/* 개봉 자리를 치운다. 짧은 누름은 한 단만 올리므로(main.mjs LONG_MS 450) 정해진 횟수만 두드리면
-   열한 장이 안 열린 채로 남고 개봉 자리가 화면에 그대로 선다. 실측으로 700밀리초 간격 여섯 번이
-   열한 장 중 셋을 2단에 남겼다. 길게 눌러 남은 것을 한 번에 열고 그다음 한 번 두드려 닫는다.
-   손가락이 내려가 있는 동안 열리는 물건이라 누름과 뗌을 따로 보내고, 열린 것을 보고 뗀다.
-   긴 누름이 만든 click은 화면이 스스로 삼키므로(main.mjs longDone) 닫는 두드림은 따로 보내야 한다. */
-async function clearPull(page) {
-  for (let i = 0; i < 6; i += 1) {
-    const open = await page.evaluate(() => { const e = document.getElementById("pull"); return Boolean(e) && !e.hidden; });
-    if (!open) return;
-    const spot = await page.locator("#pull .tap").boundingBox();
-    if (!spot) return;
-    await page.mouse.move(spot.x + spot.width / 2, spot.y + spot.height / 2);
-    await page.mouse.down();
-    await page.waitForFunction((last) => {
-      const r = window.__reveal();
-      return r.drawn > 0 && r.shown === r.drawn && r.stage === last;
-    }, STAGE_LAST, { timeout: PRESS_MS, polling: "raf" }).catch(() => {});
-    await page.mouse.up();
-    await page.click("#pull", { force: true });
-    await page.waitForFunction((n) => window.__frames() >= n, (await page.evaluate(() => window.__frames())) + CARD_STEPS, { timeout: 20000 });
-  }
-}
-
 /* 잠그지 않은 한 판. 선호를 놓고 손을 뗀 뒤, 리셋이 복귀 도중이나 그 전에 오는 판 하나를 고른다.
    세계를 안 멈추므로 프레임이 아니라 공과 꼬리가 시각을 알려 준다. */
 async function carrySample(browser, routed, seed, dir, home) {
@@ -315,7 +287,7 @@ async function carrySample(browser, routed, seed, dir, home) {
     + (home ? "&home=" + home : ""), { waitUntil: "load" });
   await page.waitForSelector("#go", { timeout: 15000 });
   await page.click("#go", { force: true });
-  await clearPull(page);
+  await clearDraw(page);
   await page.evaluate(() => (window.__swayPin ? window.__swayPin(0) : -1));
   let pref = dir === 0;
   for (let i = 0; i < 40 && !pref; i += 1) {
