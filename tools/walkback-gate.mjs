@@ -179,6 +179,10 @@ function analyse(rec, ref) {
   const side = mean(win.map((r) => r.v[KNR_X])) >= mean(win.map((r) => r.v[KNL_X])) ? 1 : -1;
   const low = leg.map((v) => v * side);
   const m = mean(leg);
+  /* 두 다리가 얼마나 벌어졌는가. 무릎 높이 차는 두 다리가 스칠 때 0이고 가장 벌어졌을 때 극값이라
+     평균을 뺀 절대값이 그대로 벌어진 정도다. walkPose가 hipL을 sin(ph)로 hipR을 sin(ph+파이)로
+     흔드니 이 값은 |sin(ph)|를 따라간다. 다리 축이 이미 읽는 채널이라 새 채널을 안 만든다. */
+  const apart = leg.map((v) => Math.abs(v - m));
   let back = 0;
   for (let i = off + 1; i <= home; i += 1) back = Math.max(back, Math.abs(rec[i].x) - Math.abs(rec[i - 1].x));
   return {
@@ -188,6 +192,10 @@ function analyse(rec, ref) {
     legAmp: amp(leg), legFloor: amp(legRest), lean: corr(low, torso), side, back,
     tflips: flips(torso.map((v) => v - mean(torso)), Math.max(TORSO_DEAD, 2 * amp(torsoRest))),
     bobAmp: amp(bob), bobFloor: amp(bobRest),
+    /* 몸이 높은 순간과 다리가 벌어진 순간의 관계. 이 채널은 목의 상하 오프셋인데 정규화 인자가
+       루트에서 척추까지의 거리라 상체가 뜨면 값이 오히려 내려간다. 그래서 부호를 뒤집은 것이
+       높이다. 실측으로 이 채널과 머리 월드 y의 상관이 -0.55와 -0.79로 두 판 모두 음수였다. */
+    cross: corr(bob.map((v) => -v), apart),
     bflips: flips(bob.map((v) => v - mean(bob)), Math.max(TORSO_DEAD, 2 * amp(bobRest))),
     d0: dist(rec[0].v, ref), dOff: dist(rec[off].v, ref)
   };
@@ -438,7 +446,7 @@ try {
     const a = analyse(s.rec, s.ref);
     console.log("  " + tag + " land " + a.x0.toFixed(2) + " travel " + a.travel.toFixed(2)
       + "m off@" + a.off + "f/" + a.ageOff.toFixed(2) + "s home@" + a.home + "f/" + a.ageHome.toFixed(2) + "s age0 " + a.age0.toFixed(2) + " flips " + a.flips + " legAmp " + a.legAmp.toFixed(3)
-      + " floor " + a.legFloor.toFixed(3) + " bob " + a.bobAmp.toFixed(4) + "/" + a.bflips + " lean " + a.lean.toFixed(2) + "/" + a.tflips + "/" + a.side + " rz " + a.rzOff.toFixed(3)
+      + " floor " + a.legFloor.toFixed(3) + " bob " + a.bobAmp.toFixed(4) + "/" + a.bflips + " cross " + a.cross.toFixed(2) + " lean " + a.lean.toFixed(2) + "/" + a.tflips + "/" + a.side + " rz " + a.rzOff.toFixed(3)
       + "->" + a.rzEnd.toFixed(3) + " ready " + a.d0.toFixed(2) + "->" + a.dOff.toFixed(2));
     if (walkOff) {
       say("control:the-stop-fallback-keeps-him-where-he-landed",
@@ -464,6 +472,13 @@ try {
       a.bflips + " sign changes of the neck height over " + a.flips + " of the legs, amplitude "
       + a.bobAmp.toFixed(4) + " over a standing floor of " + a.bobFloor.toFixed(4)
       + " and a dead band of " + TORSO_DEAD);
+    /* 뜨는 위상이 맞는가. 위 축은 두 배로 도는 진동이 있느냐만 묻고 그 마루가 어디 서는지는 안 묻는다.
+       걸음은 디딘 다리가 몸 아래 곧게 설 때 가장 높고 두 다리가 벌어졌을 때 가장 낮다. 그래서 높이와
+       벌어진 정도는 음의 상관이어야 한다. 바는 몸통 기울기 축이 쓰는 CORR_BAR를 부호만 뒤집어 쓴다. */
+    say("walk:the-body-is-highest-when-the-legs-cross " + tag,
+      a.cross <= -CORR_BAR,
+      "correlation " + a.cross.toFixed(2) + " between the body height and the leg spread, bar "
+      + (-CORR_BAR).toFixed(2));
     say("walk:the-return-is-monotone " + tag, a.back <= BACK_TOL, "worst back step " + a.back.toFixed(3) + "m");
     say("walk:he-arrives-home-standing " + tag,
       Math.hypot(a.xEnd, a.zEnd - KEEPER_Z) <= HOME_TOL && Math.abs(a.rzEnd) < RZ_BAR,
@@ -535,8 +550,9 @@ if (WAS) {
     : "walkback CONTROL FAIL 0 walk axes red on " + WAS_REV);
   process.exitCode = red > 0 ? 0 : 1;
 } else if (BOB0) {
-  // 심은 대조군. 상하 진동 축만 빨개져야 그 축이 BOB_Y를 재고 있는 것이다.
-  const red = fails.filter((r) => r[1].startsWith("walk:the-body-rises-once-per-step")).length;
+  // 심은 대조군. 상하 진동을 읽는 두 축만 빨개져야 그 축들이 BOB_Y를 재고 있는 것이다.
+  const red = fails.filter((r) => r[1].startsWith("walk:the-body-rises-once-per-step")
+    || r[1].startsWith("walk:the-body-is-highest-when-the-legs-cross")).length;
   console.log(red > 0 ? "walkback CONTROL PASS " + red + " bob axes red on BOB_Y 0"
     : "walkback CONTROL FAIL 0 bob axes red on BOB_Y 0");
   process.exitCode = red > 0 ? 0 : 1;
