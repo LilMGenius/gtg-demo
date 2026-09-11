@@ -35,6 +35,49 @@ check("earn:the-cap-stops-the-count", ticketGain(clean, TICKET_CAP) === TICKET_C
 // 판이 안 끝난 자리에서 부르면 아무 일도 없어야 한다. 빈 배열을 완봉으로 읽으면 매 판이 공짜 한 장이다.
 check("control:an-unplayed-set-pays-nothing", ticketGain([], 4) === 4, String(ticketGain([], 4)));
 
+/* 개봉 판을 걷는 손. 이 모양의 임자는 tools/onboard-gate.mjs이고 여기 것은 그 자의 press와 tap을
+   그대로 옮긴 사본이다. 뽑으면 개봉 화면이 상점 위를 통째로 덮는데, 짧은 누름은 한 단만 올리므로
+   (web/src/main.mjs의 LONG_MS 450) 정해진 횟수만 두드려서는 열한 장짜리 판을 못 걷는다. 실측으로
+   세 번 두드린 뒤에도 판은 첫 장 마지막 단에 서 있었고, 이어진 낱장 클릭은 상점 버튼이 아니라 그
+   덮개가 먹어 이용권이 안 나간 것으로 읽혔다. 그 침묵을 값이 안 나갔다는 판정으로 읽으면 계기가
+   자기 덮개를 제품의 결함이라고 말한다. 문턱보다 오래 붙들면 남은 것이 그 자리에서 전부 열리고,
+   뗀 뒤 한 번 누르는 것이 닫는다. */
+async function clearDraw(page) {
+  // 카드가 지나는 다섯 단의 마지막 번호. 길이는 제품의 STAGE_MS가 정하고 계기는 그 수를 마주 든다.
+  const STAGE_LAST = 4;
+  /* 긴 누름이 남은 것을 여는 것을 기다리는 상한. 제품 문턱이 0.45초라 여섯 배가 넘고,
+     문턱이 아니라 상한이므로 초록 회차에서는 0.5초 언저리에 풀린다. */
+  const PRESS_MS = 3000;
+  // 마디 수의 상한. 상점 뽑기 한 번은 한 마디가 끝이고, 남는 셋은 손이 헛나갔을 때의 자리다.
+  const BEATS = 4;
+  // 닫힌 판은 누를 자리가 없다. 그 자리에서 한 번 더 누르면 오류로 끝나 결과 줄이 아예 안 남는다.
+  const standing = () => page.evaluate(() => { const e = document.getElementById("pull"); return Boolean(e) && !e.hidden; });
+  for (let beat = 0; beat < BEATS; beat += 1) {
+    if (!(await standing())) return true;
+    const spot = await page.locator("#pull .tap").boundingBox();
+    if (!spot) return false;
+    /* 손가락이 내려가 있는 동안 열리는 물건이라 누름과 뗌을 따로 보내고, 열린 것을 보고 뗀다.
+       뗄 때 브라우저가 만드는 click은 제 일을 한 긴 누름의 것이라 제품이 삼키므로 닫는 누름은 따로 간다. */
+    await page.mouse.move(spot.x + spot.width / 2, spot.y + spot.height / 2);
+    await page.mouse.down();
+    await page.waitForFunction((last) => {
+      const r = window.__reveal();
+      return r.drawn > 0 && r.shown === r.drawn && r.stage === last;
+    }, STAGE_LAST, { timeout: PRESS_MS, polling: "raf" }).catch(() => {});
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    if (await standing()) await page.click("#pull", { force: true });
+    /* 닫히거나, 닫혀서 다음 마디가 이어 열리거나. 둘 중 하나가 설 때까지가 이 마디의 끝이다. */
+    await page.waitForFunction(() => {
+      const e = document.getElementById("pull");
+      if (!e || e.hidden) return true;
+      const r = window.__reveal();
+      return r.drawn > 0 && r.shown < r.drawn;
+    }, null, { timeout: PRESS_MS, polling: "raf" }).catch(() => {});
+  }
+  return !(await standing());
+}
+
 let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
@@ -49,11 +92,7 @@ try {
   await p.waitForTimeout(900);
   /* 처음 온 계정은 카드부터 열린다. 그 흐름을 안 달고 상점을 열면 개봉 덮개가 클릭을 먹어
      값이 안 나간 것으로 읽힌다. 사람도 똑같이 닫고 나서 상점에 간다. */
-  for (let i = 0; i < 6; i += 1) {
-    if (await p.evaluate(() => document.getElementById("pull").hidden)) break;
-    await p.click("#pull", { force: true });
-    await p.waitForTimeout(350);
-  }
+  await clearDraw(p);
   await p.waitForTimeout(1300);
   const applied = await p.evaluate(() => window.__preset);
   check("preset:ticketed-was-applied", Array.isArray(applied) && applied.includes("ticketed"), JSON.stringify(applied));
@@ -64,16 +103,6 @@ try {
      그 사이에 굴러간 구를 뽑기가 쓴 값으로 읽는다. 재는 동안 판을 멈춘다. */
   await p.evaluate(() => window.__lockRound());
   const wants = await p.evaluate(() => [...document.querySelectorAll("#shop .buy[data-want]")].map((e) => Number(e.dataset.want)));
-  /* 뽑으면 개봉 화면이 상점 위를 통째로 덮는다. 사람도 그것을 닫아야 다음 버튼에 닿으므로
-     계기도 같은 문을 쓴다. 안 닫고 다음 클릭을 보내면 덮개가 먹어 아무 일도 안 일어나고,
-     그 침묵이 값이 안 나갔다는 판정으로 잘못 읽힌다. */
-  const dismiss = async () => {
-    for (let i = 0; i < 3; i += 1) {
-      if (await p.evaluate(() => document.getElementById("pull").hidden)) return;
-      await p.click("#pull", { force: true });
-      await p.waitForTimeout(200);
-    }
-  };
   check("pullstack:both-sizes-stand", wants.length === 2 && wants[0] === 1 && wants[1] === PULL_BULK, wants.join(" and "));
   const shown = await p.evaluate(() => {
     const e = document.querySelector("#shop .card .held");
@@ -85,7 +114,7 @@ try {
 
   const before = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin, squad: window.__squad().squad.length }));
   await p.click('#shop .buy[data-want="' + PULL_BULK + '"]', { force: true });
-  await dismiss();
+  await clearDraw(p);
   await p.waitForTimeout(500);
   const after = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin, squad: window.__squad().squad.slice() }));
   const want = pullBill(PULL_BULK, before.t, before.coin);
@@ -103,7 +132,7 @@ try {
   // 낱장은 남은 이용권으로 돌아간다. 값이 안 나가야 이용권이 먼저 쓰인 것이다.
   const mid = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin }));
   await p.click('#shop .buy[data-want="1"]', { force: true });
-  await dismiss();
+  await clearDraw(p);
   await p.waitForTimeout(400);
   const one = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin }));
   check("pullstack:a-single-draw-uses-the-leftover-ticket", mid.t - one.t === 1 && one.coin === mid.coin,
@@ -111,11 +140,11 @@ try {
 
   // 대조군. 이용권이 바닥나면 같은 자리가 값을 치른다. 안 그러면 위의 0원은 공짜 뽑기다.
   await p.evaluate(() => { while (window.__tickets() > 0) document.querySelector('#shop .buy[data-want="1"]').click(); });
-  await dismiss();
+  await clearDraw(p);
   await p.waitForTimeout(600);
   const dry = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin }));
   await p.click('#shop .buy[data-want="1"]', { force: true });
-  await dismiss();
+  await clearDraw(p);
   await p.waitForTimeout(400);
   const paid = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin }));
   check("control:with-no-ticket-left-the-same-button-charges", dry.t === 0 && dry.coin - paid.coin === PULL_COST,
