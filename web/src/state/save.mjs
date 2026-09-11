@@ -3,6 +3,9 @@
 /* 저장 자리가 브라우저 하나에 하나였다. 같은 기기를 쓰는 두 사람이 한 판을 나눠 썼다는 뜻이다.
    이제 계정마다 갈린다. 계정이 없던 시절의 저장은 이름 없는 자리에 남아 있고, 첫 가입이
    그 자리를 물려받는다. 처음 시작한 사람의 판이 가입했다고 사라지면 안 되기 때문이다. */
+import { FACES_V } from './passer.mjs';
+import { migrateRapport } from './rapport.mjs';
+
 const BASE = 'gtg.save.v1';
 let who = null;
 const KEY = () => (who ? BASE + ':' + who : BASE);
@@ -44,6 +47,13 @@ export function load() {
     // 구버전은 키퍼 하나만 저장했다. 보유 목록이 없어도 살려서 읽는다.
     const head = s && (Array.isArray(s.squad) ? s.squad[Number(s.pick) || 0] : s.keeper);
     if (!head || typeof head !== 'object' || !Number.isFinite(head.level)) return null;
+    /* 얼굴표가 재배열된 판을 모르는 저장이다. 읽는 자리에서 한 번만 옮기고 판번호를 찍는다.
+       저장된 바이트는 그대로 두고 다음 save가 새 판번호로 덮는다. 매번 옛 바이트에서 다시 옮기므로
+       두 번 옮기는 일은 없다. */
+    if (!(Number(s.faces) >= FACES_V)) {
+      s.rapport = migrateRapport(s.rapport, s.faces);
+      s.faces = FACES_V;
+    }
     return s;
   } catch {
     return null;
@@ -68,7 +78,7 @@ export function save(squad, pick, auto, fans, points, wallet, posts, record, gea
     const i = Number(pick) || 0;
     // 저장 호출자가 옛 형태여도 가운데를 써야 선호가 손상된 값으로 남지 않는다.
     const savedPref = [-1, 0, 1].includes(Number(pref)) ? Number(pref) : 0;
-    localStorage.setItem(KEY(), JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], record: record || {}, gear: gear || {}, bot: bot || {}, buff: buff || {}, rapport: rapport || {}, tickets: Number(tickets) || 0, social: social || {}, kickers: Array.isArray(kickers) ? kickers : [], eleven: Array.isArray(eleven) ? eleven : [], onboard: Number(onboard) || 0, pref: savedPref, at: Date.now() }));
+    localStorage.setItem(KEY(), JSON.stringify({ squad, pick: i, keeper: squad[i], auto, fans, points, wallet, posts: Array.isArray(posts) ? posts : [], record: record || {}, gear: gear || {}, bot: bot || {}, buff: buff || {}, rapport: rapport || {}, faces: FACES_V, tickets: Number(tickets) || 0, social: social || {}, kickers: Array.isArray(kickers) ? kickers : [], eleven: Array.isArray(eleven) ? eleven : [], onboard: Number(onboard) || 0, pref: savedPref, at: Date.now() }));
   } catch {
     // 사파리 프라이빗 모드는 쓰기를 막는다. 저장이 안 되는 것과 게임이 죽는 것은 다른 일이다.
   }
