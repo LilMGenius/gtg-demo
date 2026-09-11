@@ -28,7 +28,7 @@ const STAGE_LAST = 4;
 // 한 판은 다섯 구다. 판정이 세는 수와 같은 수를 세야 판이 끝난 자리에서 그림을 찍는다.
 const BALLS = 5;
 // 걸음 한 장을 찾으려고 훑는 횟수와 간격. 24 x 90ms면 막고 돌아오는 2초 남짓을 덮는다.
-const WALK_N = 24;
+const WALK_N = 64;
 const WALK_MS = 90;
 const LINE = String.fromCharCode(10);
 
@@ -98,6 +98,9 @@ const padOpen = (page) => page.waitForFunction(
   () => document.querySelectorAll(".zone:not([disabled])").length === 3, null, { timeout: STEP_MS });
 const padShut = (page) => page.waitForFunction(
   () => Array.from(document.querySelectorAll(".zone")).every((b) => b.disabled), null, { timeout: STEP_MS });
+/* 창이 닫힌 것을 기다리는 자리. waitForSelector는 기본이 보일 때까지라 숨은 요소에 물으면 영영 안 온다.
+   실측으로 훈련장을 닫고 26초를 기다리다 죽었다. 숨은 것은 보이기가 아니라 속성으로 묻는다. */
+const gone = (page, id) => page.waitForFunction((x) => document.getElementById(x).hidden, id, { timeout: STEP_MS });
 const pipCount = (page) => page.evaluate(() => document.querySelectorAll("#pips i.gone, #pips i.save").length);
 const ballDone = (page, before) => page.waitForFunction(
   (n) => document.querySelectorAll("#pips i.gone, #pips i.save").length > n, before, { timeout: STEP_MS });
@@ -183,13 +186,14 @@ async function revealLeg(page) {
     document.addEventListener("pointerup", () => { window.__qaTapAt = window.__reveal(); }, true);
   });
   const sealed = await revealAt(page);
-  await snap(page, "03-reveal-sealed");
+  /* 카드가 선 순간 곧바로 한 번 누른다. 단은 0.3초마다 혼자 오르므로 누르기 전에 그림부터 찍으면
+     그 사이 사다리가 한 단을 올려, 누름이 올린 단을 아무도 못 본다. 봉인 층은 열한 장짜리 회차가 받는다. */
   await page.click("#pull", { force: true });
   const tapped = await revealAt(page);
   const pre = await page.evaluate(() => window.__qaTapAt);
   await snap(page, "04-reveal-stage1");
-  await snap(page, "04-reveal-stage1-card", "#pull .now");
   const shotAt = await revealAt(page);
+  await snap(page, "04-reveal-stage1-card", "#pull .now");
   const held = await hold(page);
   const opened = await revealAt(page);
   await snap(page, "05-reveal-end");
@@ -217,13 +221,19 @@ async function revealLeg(page) {
 async function walkLeg(page) {
   const path = [];
   let got = false;
+  let peak = 0;
   for (let i = 0; i < WALK_N; i += 1) {
     const at = await page.evaluate(() => {
       const p = window.__keeperPos();
       return { x: Math.round(p.x * 1000) / 1000, y: Math.round(p.y * 1000) / 1000, t: Math.round(performance.now()) };
     });
     path.push(at);
-    if (!got && Math.abs(at.x) > 0.25 && Math.abs(at.x) < 1.05) {
+    const ax = Math.abs(at.x);
+    if (ax > peak) peak = ax;
+    /* 가장 멀리 나갔던 자리에서 한 걸음 이상 돌아왔고 아직 가운데에 안 닿은 구간이 걸음의 중간이다.
+       누운 자리에 그대로 있는 프레임을 찍으면 걸음이 아니라 정지가 증거로 남는다. 실측으로 막은 직후
+       2초는 x가 1.29에 붙어 있었고 걸음은 그 뒤에 시작했다. */
+    if (!got && peak > 0.5 && ax < peak - 0.08 && ax > 0.12) {
       await snap(page, "10-walk-back");
       await snap(page, "10-walk-back-crop", "#stage");
       got = true;
@@ -231,7 +241,7 @@ async function walkLeg(page) {
     }
     await page.waitForTimeout(WALK_MS);
   }
-  put("walk", { got, path });
+  put("walk", { got, peak, path });
 }
 
 async function ballsLeg(page) {
@@ -360,7 +370,7 @@ async function gymLeg(page) {
   await snap(page, "12-gym-row", "#gym .row");
   put("fontsGym", await fontsAt(page));
   await page.click("#gym .close", { force: true });
-  await page.waitForSelector("#gym[hidden]", { timeout: STEP_MS });
+  await gone(page, "gym");
 }
 
 const shelfAt = (page) => page.evaluate(() => {
@@ -540,7 +550,7 @@ async function tryOnLeg(page, buy) {
 
 async function rosterLeg(page) {
   await page.click("#shopBtn", { force: true });
-  await page.waitForSelector("#shop[hidden]", { timeout: STEP_MS });
+  await gone(page, "shop");
   await page.click("#rosterBtn", { force: true });
   await page.waitForSelector("#roster:not([hidden])", { timeout: STEP_MS });
   await page.waitForTimeout(600);
@@ -554,7 +564,7 @@ async function rosterLeg(page) {
   await snap(page, "22-roster");
   for (let i = 0; i < 4; i += 1) await snap(page, "22-roster-face-" + i, "#roster img:nth-of-type(" + (i + 1) + ")");
   await page.click("#rosterBtn", { force: true });
-  await page.waitForSelector("#roster[hidden]", { timeout: STEP_MS });
+  await gone(page, "roster");
 }
 
 const meAt = (page) => page.evaluate(() => {
@@ -602,7 +612,7 @@ async function meLeg(page) {
   put("me", panes);
   put("fontsMe", await fontsAt(page));
   await page.click("#meBtn", { force: true });
-  await page.waitForSelector("#me[hidden]", { timeout: STEP_MS });
+  await gone(page, "me");
 }
 
 const wikiAt = (page) => page.evaluate(() => {
@@ -648,7 +658,7 @@ async function wikiLeg(page) {
   await snap(page, "28-wiki-scrolled");
   put("wiki", { cats, wheel: { before, after } });
   await page.click("#wikiBtn", { force: true });
-  await page.waitForSelector("#wiki[hidden]", { timeout: STEP_MS });
+  await gone(page, "wiki");
 }
 
 async function botLeg(page) {
@@ -663,7 +673,7 @@ async function botLeg(page) {
   put("botBuy", await page.evaluate(() => ({ bot: window.__bot(), wallet: window.__wallet().coin })));
   await snap(page, "29-bot-bought");
   await page.click("#shop .close", { force: true });
-  await page.waitForSelector("#shop[hidden]", { timeout: STEP_MS });
+  await gone(page, "shop");
   // 창이 닫히면 두 기둥이 0.24초 동안 제자리로 미끄러져 돌아온다. 움직이는 중에 누르면 빈 자리를 누른다.
   await page.waitForTimeout(600);
   await page.click("#auto", { force: true });
