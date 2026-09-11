@@ -460,13 +460,20 @@ const specAt = (page) => page.evaluate(() => {
   return { at: spec.dataset.at, head: (spec.querySelector("b") || { textContent: "" }).textContent, rows };
 });
 
-const spinAt = (page) => page.evaluate(() => {
+const spinAt = (page) => page.evaluate(async () => {
   const shot = document.querySelector("#shop .shot.spinning");
   if (!shot) return { spinning: false };
   const img = shot.querySelector("img");
   const cv = shot.querySelector("canvas");
   const sr = shot.getBoundingClientRect();
   const cr = cv ? cv.getBoundingClientRect() : null;
+  /* 도는지는 클래스가 아니라 화소가 말한다. 한 바퀴가 8초라 0.13초 사이는 6도뿐이고, 그 두 장은
+     사람 눈에도 계기에도 같은 그림이다. 0.9초를 두면 40도라 각이 눈에 보이고, 그래도 화소가
+     안 움직이면 사람이 본 것은 회전이 아니라 멈춘 그림이다. */
+  const read = () => (cv && cv.toDataURL ? cv.toDataURL() : "");
+  const a = read();
+  await new Promise((done) => setTimeout(done, 900));
+  const b = read();
   return {
     spinning: true,
     // 도는 그림이 멈춘 그림을 대신하는지. 멈춘 그림이 남아 있으면 도는 것이 그 뒤에서 가려진다.
@@ -474,7 +481,8 @@ const spinAt = (page) => page.evaluate(() => {
     canvas: Boolean(cv),
     fillW: cr ? Math.round((cr.width / sr.width) * 100) : null,
     fillH: cr ? Math.round((cr.height / sr.height) * 100) : null,
-    shotW: Math.round(sr.width), shotH: Math.round(sr.height)
+    shotW: Math.round(sr.width), shotH: Math.round(sr.height),
+    moved: Boolean(a && b && a !== b), px: a.length + "/" + b.length
   };
 });
 
@@ -520,9 +528,12 @@ async function shopLeg(page) {
       }
       if (!log.m.spin || !log.m.spin.spinning) put("spin", await spinAt(page));
       if (tab === "hair" && i === 1) {
-        put("spinHair", await spinAt(page));
         await snap(page, "19-spin-hover");
         await snap(page, "19-spin-hover-shot", "#shop .shot.spinning");
+        // 같은 칸을 0.9초 뒤에 한 번 더 뜬다. 두 장의 각이 다르면 그 회전은 사람 눈에도 보인다.
+        put("spinHair", await spinAt(page));
+        await snap(page, "19b-spin-late");
+        await snap(page, "19b-spin-late-shot", "#shop .shot.spinning");
       }
     }
   }
