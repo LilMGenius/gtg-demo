@@ -2,7 +2,7 @@
 // 판정 안으로 새 롤을 넣지 않는다. resolve의 gazeP 식은 그대로 두고 밖에서 승수만 곱한다.
 // 새 rng() 호출을 하나라도 늘리면 이후 모든 구가 밀려 shot/band/save/pose 네 게이트가 통째로 흔들린다.
 
-import { FACES_V, movedFace } from './passer.mjs';
+import { FACES_V_RAPPORT, remapFaceKeys } from './passer.mjs';
 
 // 도시마다 행인 풀이 다르다. 키는 city:passerIndex.
 // 등급을 올려 새 동네로 가면 라포는 처음부터다. 아는 얼굴은 동네에 묶인다.
@@ -50,18 +50,13 @@ export function readRapport(raw) {
 
 /* 얼굴표의 자리가 움직이기 전에 쓰인 저장을 지금 표로 옮긴다. 번호가 가리키는 사람이 바뀌었으므로
    옮기지 않으면 익힌 얼굴이 옆 사람 것이 된다. 값은 그대로 두고 키만 옮긴다.
-   옮길 것이 없는 판번호는 원본을 그대로 돌려준다. 여기서 clamp하지 않는 이유는 readRapport가 바로 뒤에서 하기 때문이다. */
+   키를 옮기는 일은 같은 모양을 쓰는 쪽과 나눠 쓴다. 이 모듈이 정하는 것은 언제 옮기느냐 하나다.
+   라포를 옮긴 판이 1이므로 그 수부터는 원본을 그대로 돌려준다. 판 1로 찍힌 저장을 여기서 또 옮기면
+   한 번 옮긴 키가 다시 움직인다. 여기서 clamp하지 않는 이유는 readRapport가 바로 뒤에서 하기 때문이다. */
 export function migrateRapport(rapport, from) {
   if (!rapport || typeof rapport !== 'object') return newRapport();
-  if (Number(from) >= FACES_V) return rapport;
-  const out = {};
-  for (const key of Object.keys(rapport)) {
-    const m = /^([0-3]):(\d{1,2})$/.exec(key);
-    if (!m) continue;
-    const next = rapportKey(m[1], movedFace(Number(m[1]), Number(m[2])));
-    if (next) out[next] = rapport[key];
-  }
-  return out;
+  if (Number(from) >= FACES_V_RAPPORT) return rapport;
+  return remapFaceKeys(rapport);
 }
 
 // talked가 난 구에서만 부른다. distracted는 0이다.

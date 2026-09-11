@@ -99,8 +99,14 @@ export function personaAt(passer) {
 }
 
 /* 얼굴표 판번호. 위 표에서 자리가 한 번이라도 움직이면 이 수가 오르고 아래 이동표에 그 줄이 선다.
-   라포는 (도시, 번호)로 붙으므로, 자리가 움직인 표를 모르는 저장은 익힌 얼굴을 옆 사람에게 붙여 놓는다. */
-export const FACES_V = 1;
+   라포는 (도시, 번호)로 붙으므로, 자리가 움직인 표를 모르는 저장은 익힌 얼굴을 옆 사람에게 붙여 놓는다.
+   수가 둘인 것은 표가 두 번 움직여서가 아니다. 그 한 번을 저장의 어느 지도에 적용했는지가 판마다 다르다.
+   판 1은 라포만 옮겼고, 판 2는 같은 키를 쓰는 팔로우와 쪽지까지 옮겼다. 판 1로 찍혀 나간 저장이 있으므로
+   두 수를 하나로 두면 그 저장의 라포가 두 번 옮겨져 다시 옆 사람에게 간다. */
+export const FACES_V_RAPPORT = 1;
+export const FACES_V_SOCIAL = 2;
+// 새로 쓰는 저장에 찍는 수. 지도를 하나 더 옮기는 날 여기가 그 새 수를 가리킨다.
+export const FACES_V = FACES_V_SOCIAL;
 
 /* 판 0에서 판 1로 가는 자리 이동. 칸의 자리가 옛 번호이고 칸의 값이 지금 번호다.
    판 0은 도시마다 제 순서를 따로 썼고, 판 1은 네 줄의 같은 자리를 같은 kind로 맞췄다.
@@ -120,6 +126,22 @@ export function movedFace(city, passer) {
   const row = FACE_MOVES[c];
   if (!row || !Number.isFinite(p) || p < 0 || p >= row.length) return p;
   return row[p];
+}
+
+/* 옛 번호로 박힌 키를 지금 번호로 옮긴다. 값은 안 보고 자리만 옮긴다.
+   라포와 팔로우와 쪽지가 city:passer라는 한 모양을 같이 쓰므로 옮기는 자리도 하나여야 한다.
+   세 벌로 두면 한 벌만 고쳐지는 날이 오고, 실제로 라포만 고쳐진 판이 한 번 나갔다.
+   모양이 아닌 키는 버린다. 읽는 쪽이 바로 뒤에서 또 거르므로 여기서 값은 안 만진다. */
+export function remapFaceKeys(map) {
+  if (!map || typeof map !== 'object') return {};
+  const out = {};
+  for (const key of Object.keys(map)) {
+    const m = /^(\d+):(\d+)$/.exec(key);
+    if (!m) continue;
+    const city = Number(m[1]);
+    out[city + ':' + movedFace(city, Number(m[2]))] = map[key];
+  }
+  return out;
 }
 
 // 이름은 라포 1단계부터 열린다. 세 번 말을 섞기 전까지는 차림새로만 기억한다.
