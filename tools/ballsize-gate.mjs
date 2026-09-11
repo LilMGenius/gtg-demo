@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { pinClock } from "./clock.mjs";
 
 // 공 크기의 자. 크기는 두 가지가 곱해진 것이다. 거리에서 오는 배율과 발에 맞은 순간의 짜부라짐.
 // 앞엣것은 이어져야 하고 뒤엣것은 튀어야 한다. 한 수로 재면 그 둘이 구분되지 않는다.
@@ -7,10 +8,21 @@ import { chromium } from "playwright";
 // 짜부라짐은 여전히 한 프레임에 터지는가. 표본은 브라우저 안에서 프레임마다 모은다.
 // 밖에서 폴링하면 프레임을 건너뛰고, 건너뛴 자리가 곧 튐이 숨는 자리다.
 // 표본 범위: 판정을 안 부른다. 화면 크기만 재므로 키퍼 표본이 결론을 안 바꾼다.
+// 표본 창을 벽시계로 끊으면 그 안에 든 프레임 수를 그날의 기계 부하가 정한다. 거리 배율은
+// 프레임마다 걷는 값이라, 한 장이 빠진 자리에서는 이웃한 두 표본 사이에 세계가 두 걸음 간다.
+// 실측(6c3fdb4 sweep): 프레임이 빠진 자리의 걸음이 0.082, 같은 판을 혼자 돌리면 0.036, 바는 0.08이다.
+// 바를 넘은 것은 자가 무언가를 잰 것이 아니라 기계가 바빴던 것이고,
+// 조용한 기계에서 두 번 초록인 것도 그래서 안정의 증거가 아니다.
+// 그래서 세계시계를 1/60로 못 박고(clock.mjs pinClock) 창을 프레임 수로 끊는다.
+// 걸음 폭이 고정되므로 0.08은 떨어진 프레임이 아니라 정해진 한 걸음에 대고 재는 바가 된다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
 const LINE = String.fromCharCode(10);
-const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);
+const STEP = 1 / 60;
+// 창의 폭. 60프레임 시계에서 4.2초에 해당한다. 한 구가 통째로 들어와야 아래 두 계기 축이 선다.
+const FRAMES = 252;
+// 프레임으로 세는 자는 바쁜 기계에서 벽시계가 늘어난다. 여기서 죽으면 그 늘어남이 다시 판정에 섞인다.
+const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 300000);
 t.unref();
 
 const fails = [], notes = [];
@@ -20,6 +32,8 @@ let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
   const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  // 세계시계를 프레임에 못 박는다. 페이지가 열리기 전에 걸어야 손잡이가 생기는 그 틱에 켜진다.
+  await pinClock(ctx, STEP);
   const p = await ctx.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -34,7 +48,8 @@ try {
     const tick = () => { window.__rec.push(window.__ballSize()); requestAnimationFrame(tick); };
     requestAnimationFrame(tick);
   });
-  await p.waitForTimeout(4200);
+  // 창을 프레임으로 끊는다. 여기가 벽시계로 남으면 위의 못 박기가 아무것도 안 한다.
+  await p.waitForFunction((n) => window.__rec.length >= n, FRAMES, { timeout: 240000, polling: "raf" });
   const rec = await p.evaluate(() => window.__rec);
 
   const moved = Math.max.apply(null, rec.map((r) => r.z)) - Math.min.apply(null, rec.map((r) => r.z));
