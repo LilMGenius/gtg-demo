@@ -5,7 +5,7 @@
    그 자리를 물려받는다. 처음 시작한 사람의 판이 가입했다고 사라지면 안 되기 때문이다. */
 import { FACES_V } from './passer.mjs';
 import { migrateRapport } from './rapport.mjs';
-import { migrateSocial } from './gram.mjs';
+import { migrateSocial, migratePosts } from './gram.mjs';
 
 const BASE = 'gtg.save.v1';
 let who = null;
@@ -50,11 +50,13 @@ export function load() {
     if (!head || typeof head !== 'object' || !Number.isFinite(head.level)) return null;
     /* 얼굴표가 재배열된 판을 모르는 저장이다. 읽는 자리에서 한 번만 옮기고 판번호를 찍는다.
        저장된 바이트는 그대로 두고 다음 save가 새 판번호로 덮는다. 매번 옛 바이트에서 다시 옮기므로
-       두 번 옮기는 일은 없다. 도장은 하나인데 옮길 지도는 둘이다. 어느 지도를 옮길지는 각 모듈이
-       제 판번호로 정한다. 라포만 옮기고 나간 판 1 저장은 여기서 팔로우와 쪽지만 옮겨 간다. */
+       두 번 옮기는 일은 없다. 도장은 하나인데 옮길 지도는 여러 장이다. 어느 지도를 옮길지는 각 모듈이
+       제 판번호로 정한다. 라포만 옮기고 나간 판 1 저장은 여기서 팔로우와 쪽지와 글을 옮기고,
+       그 둘까지 옮기고 나간 판 2 저장은 글만 옮겨 간다. */
     if (!(Number(s.faces) >= FACES_V)) {
       s.rapport = migrateRapport(s.rapport, s.faces);
       s.social = migrateSocial(s.social, s.faces);
+      s.posts = migratePosts(s.posts, s.faces);
       s.faces = FACES_V;
     }
     return s;
