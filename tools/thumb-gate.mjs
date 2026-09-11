@@ -250,13 +250,17 @@ try {
   /* 위의 자는 그림이 카드를 얼마나 덮는지만 묻는다. 그래서 카메라가 팔 윤곽 안에 들어앉아
      카드 넷이 전부 대각선 쐐기가 된 채로 초록이 났다. 실측: 세 유료 등급의 무늬가 카드의
      82.8과 77.0과 85.1퍼센트인데 사람이 본 것은 팔이 아니라 초록 귀퉁이가 붙은 쐐기였다.
-     팔로 읽히게 하는 단서는 무늬 위쪽에 남은 살, 곧 어깨 쪽의 맨살이다. 띠의 위 끝을 열마다
-     찾아 그 위의 맨살 화소를 센다. 띠 아래는 안 묻는다. INK_FOOT 0.3이 띠의 발을 위팔
-     3할 지점에 박아 두어 가까운 겨냥에서는 그 발이 카드 밖이고, 실측으로 0.39까지 띠 아래
-     불투명 화소가 0이다. 없는 것을 묻는 축은 겨냥이 아니라 텍스처에 답을 요구한다.
-     살색은 상점이 실제로 파는 0등급 장이 소유한다. 위의 자가 기준으로 삼는 그 한 장에서
+     팔로 읽히게 하는 단서는 무늬 위쪽에 카드 제 표면이 남아 있는 것이다. 띠의 위 끝을 열마다
+     찾아 그 위에서 파는 0등급 장의 색 상자에 드는 불투명 화소를 센다. 어깨의 유니폼도 그 색에
+     들어 같이 세어진다. 이 축은 맨살을 안 센다. 셀 살이 없어서다. 3등급은 위팔의 0.98을 덮는
+     소매라 띠 위에 남는 것은 어깨와 유니폼이고, 띠 위 상자 안 화소의 평균색이 15/63/51이다.
+     카드의 불투명 화소 85993 가운데 붉은 채널이 100을 넘는 것이 하나도 없다.
+     띠 아래는 안 묻는다. INK_FOOT 0.3이 띠의 발을 위팔 3할 지점에 박아 두어 가까운 겨냥에서는
+     그 발이 카드 밖이고, 실측으로 0.39까지 띠 아래 불투명 화소가 0이다. 없는 것을 묻는 축은
+     겨냥이 아니라 텍스처에 답을 요구한다.
+     색 상자는 상점이 실제로 파는 0등급 장이 소유한다. 위의 자가 기준으로 삼는 그 한 장에서
      채널마다 5퍼센타일과 95퍼센타일을 읽고 6을 덧댄 상자다. 여기 색을 박으면 유니폼이나
-     빛이 바뀐 날 모든 화소가 살로 읽히고 이 축이 영원히 초록이 된다. */
+     빛이 바뀐 날 모든 화소가 상자에 들고 이 축이 영원히 초록이 된다. */
   // 2000화소. 448x205 카드의 2.2퍼센트다. 실측으로 지금 겨냥이 5808과 8410과 3854라
   // 통과용으로 맞춘 수가 아니고, 0.28로 붙인 대조군이 995와 1785와 0으로 운다.
   const INK_SKIN = 2000;
@@ -288,8 +292,9 @@ try {
       }
       return d / (a.width * a.height);
     };
-    /* 살색 상자. 파는 0등급 장의 불투명 화소만 모아 채널마다 5에서 95퍼센타일을 읽는다.
-       그 장이 이 겨냥에서 실제로 보여 주는 색의 폭이라, 겨냥이 움직이면 상자도 같이 움직인다. */
+    /* 카드 색 상자. 파는 0등급 장의 불투명 화소만 모아 채널마다 5에서 95퍼센타일을 읽는다.
+       그 장이 이 겨냥에서 실제로 보여 주는 색의 폭이라, 겨냥이 움직이면 상자도 같이 움직인다.
+       붉은 채널의 위 끝이 40이라 살색은 이 상자에 애초에 못 든다. */
     const toneOf = (im) => {
       const ch = [[], [], []];
       for (let i = 0; i < im.data.length; i += 4) {
@@ -301,8 +306,9 @@ try {
         return q.length ? [q[Math.floor(q.length * 0.05)] - pad, q[Math.floor(q.length * 0.95)] + pad] : [1, 0];
       });
     };
-    /* 띠 위의 맨살. 열마다 파는 장과 달라진 첫 행이 띠의 위 끝이고, 그 위에서 살 상자에
-       드는 불투명 화소를 센다. 열의 첫 행부터 띠면 그 열은 어깨가 카드 밖이라 세지 않는다. */
+    /* 띠 위의 카드 색. 열마다 파는 장과 달라진 첫 행이 띠의 위 끝이고, 그 위에서 카드 색 상자에
+       드는 불투명 화소를 센다. 어깨의 유니폼도 그 색에 들어 같이 세어진다.
+       열의 첫 행부터 띠면 그 열은 어깨가 카드 밖이라 세지 않는다. */
     const skinAbove = (a, c, box) => {
       if (a.width !== c.width || a.height !== c.height) return -1;
       const W = a.width, H = a.height;
@@ -339,7 +345,7 @@ try {
       }
       return { sold, flat, above, box };
     };
-    /* 대조군은 맨살 축이 쓰는 장만 굽는다. 반사실까지 같이 구우면 한 회차가 아홉 장 더
+    /* 대조군은 띠 위 축이 쓰는 장만 굽는다. 반사실까지 같이 구우면 한 회차가 아홉 장 더
        늘어나고, 이 판의 굽는 수는 옆 게이트의 page.goto를 30초 밖으로 밀어낸 적이 있다. */
     const nearSkin = async (dist) => {
       const over = { dist };
@@ -379,15 +385,16 @@ try {
     + " under the " + pct(INK_FILL) + " floor");
   const skinUp = fills.live.above.slice(1);
   const boxOf = (q) => q.map((c) => c[0] + ".." + c[1]).join("/");
-  check("thumb:skin-shows-above-the-tattoo", skinUp.length > 0 && skinUp.every((n) => n >= INK_SKIN),
-    "grades 1..3 keep " + skinUp.join(" ") + " skin pixels above the band's top edge, floor "
-    + INK_SKIN + "; the skin box r/g/b " + boxOf(fills.live.box)
-    + " came from the sold grade-0 card, the same still the fill axis measures against");
+  check("thumb:card-tone-stands-above-the-tattoo", skinUp.length > 0 && skinUp.every((n) => n >= INK_SKIN),
+    "grades 1..3 keep " + skinUp.join(" ") + " opaque pixels above the band's top edge inside the tone box, floor "
+    + INK_SKIN + "; the tone box r/g/b " + boxOf(fills.live.box)
+    + " came from the sold grade-0 card's whole tone, the same still the fill axis measures against,"
+    + " and the shoulder's uniform is inside it");
   const nearWorst = Math.min.apply(null, fills.near.above.slice(1));
-  check("control:a-closer-arm-aim-loses-the-skin-above-the-band", nearWorst >= 0 && nearWorst < INK_SKIN,
+  check("control:a-closer-arm-aim-loses-the-card-above-the-band", nearWorst >= 0 && nearWorst < INK_SKIN,
     "the planted rig dist " + NEAR_INK_DIST + " keeps " + fills.near.above.slice(1).join(" ")
-    + " skin pixels above the band (skin box " + boxOf(fills.near.box) + "), worst " + nearWorst
-    + " under the " + INK_SKIN + " floor");
+    + " opaque pixels above the band inside the tone box (tone box " + boxOf(fills.near.box)
+    + "), worst " + nearWorst + " under the " + INK_SKIN + " floor");
 
   // 대조군. 같은 등급을 두 번 구우면 같은 그림이어야 한다. 매번 달라지면 위의 다름은
   // 상품의 차이가 아니라 굽는 잡음이고, 그 축은 아무것도 증명하지 않는다.
