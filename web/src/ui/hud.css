@@ -842,6 +842,11 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #me .note i{display:block;font-style:normal;font-size:var(--fs-body);font-weight:700;
   color:var(--good);margin-top:3px}
 #me .note.dim{color:var(--dim);text-align:center}
+/* 빈 칸의 실루엣. 띠는 빈 span이 남긴 26px 그대로 서야 한다. 아이콘을 그냥 세우면 띠가
+   20px 자라 아래 칸이 통째로 밀리고, 빈 칸을 채운 일이 칸을 옮긴 일이 된다. 그래서 위
+   규칙의 안쪽 여백 9/11을 음수 여백으로 되돌려, 그 여백 자리에 그대로 앉힌다.
+   20px는 아는 얼굴 카드와 팔로워 칸의 실루엣이 이미 쓰는 크기다. */
+#me .note.dim svg{display:block;width:20px;height:20px;margin:-9px auto -11px}
 /* 최근 열 판. 두 칸씩 끊는다. 이름이 긴 키커가 많아 세 칸으로 깔면 표시가 줄바꿈된다. */
 #me .log{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--gap-1)}
 #me .log span{display:flex;justify-content:space-between;gap:10px;padding:7px 10px 9px;

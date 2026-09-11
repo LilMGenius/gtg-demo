@@ -198,11 +198,18 @@ function say(line, cause) {
 /* 상단 세 칸은 문장이 아니라 값이다. '아웃문그램 1,200'처럼 이름을 매번 읽히면
    글자 폭이 숫자를 밀어내고, 한 판에 수십 번 지나가는 자리라 이름은 첫 회에만 새 정보다.
    3px 격자 픽셀 SVG는 #pad와 우측 기둥이 이미 쓰는 관례라 손그림 톤이 안 갈린다. */
-const G = (t, body) => '<svg viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges"'
-  + ' role="img" aria-label="' + t + '"><title>' + t + '</title>' + body + '</svg>';
+const SVG = (att, body) => '<svg viewBox="0 0 24 24" fill="currentColor" shape-rendering="crispEdges" '
+  + att + '>' + body + '</svg>';
+const G = (t, body) => SVG('role="img" aria-label="' + t + '"', '<title>' + t + '</title>' + body);
 const R = (x, y, w, h) => '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '"/>';
 // 팔로워. 이름 대신 사람 하나를 세운다. Outmoongram이라는 이름은 관리창 안에서만 쓴다.
-const IC_FANS = G('팔로워', R(9, 3, 6, 6) + R(6, 12, 12, 3) + R(3, 15, 18, 6));
+// 머리 하나와 어깨 한 단. 아는 얼굴 카드와 빈 칸이 같이 쓰므로 몸은 한 곳에서만 그린다.
+const FACE_PX = R(9, 3, 6, 6) + R(6, 12, 12, 3) + R(3, 15, 18, 6);
+const IC_FANS = G('팔로워', FACE_PX);
+/* 아는 얼굴이 아직 없는 칸에 서는 실루엣. 부를 이름이 없어 제목을 안 단다. 제목은 그 칸의
+   글자가 되어, 빈 채로 둔 칸을 글자를 든 칸으로 바꾼다. 그림은 카드가 세우는 그 실루엣
+   그대로다. 여기만 다른 것을 그리면 빈 칸이 가리키는 것이 사람인지가 안 읽힌다. */
+const IC_NOFACE = SVG('aria-hidden="true"', FACE_PX);
 // 좋아요. 3px 격자에서 하트는 봉우리 둘과 아래로 좁아지는 세 단이면 선다.
 // 24 격자의 가운데가 12라 마지막 단은 6폭이 하한이다. 3폭으로 좁히면 중심이 격자 밖으로 나간다.
 const IC_LIKE = G('좋아요', R(6, 3, 3, 3) + R(15, 3, 3, 3) + R(3, 6, 18, 3) + R(3, 9, 18, 3)
@@ -1241,10 +1248,12 @@ const TIER_TOP = rapportTier({ '0:0': 999 }, 0, 0);
 function rapportRows() {
   const keys = Object.keys(state.rapport || {});
   const head = '<div class="note"><b>아는 얼굴</b><i>라포</i></div>';
-  /* 빈 칸은 빈 채로 둔다. 파운더가 세운 규칙이고, 이 칸이 받는 것은 빈 채로 두기와 아이콘 둘뿐이다.
-     안내 문장이든 명사구 한 줄이든 글자는 셋째 것이라 여기 안 선다. 라포가 없는 사람의 화면을
-     무엇으로 채울지는 파운더가 고르는 자리다. */
-  if (!keys.length) return head + '<div class="note dim"><span></span></div>';
+  /* 빈 칸이 받는 것은 빈 채로 두기와 아이콘 둘뿐이다. 파운더가 세운 규칙이고 열거형이라,
+     안내 문장이든 명사구 한 줄이든 글자는 셋째 것이라 여기 안 선다. 둘 중 아이콘을 세운다.
+     빈 띠 하나는 화면이 덜 그려진 것으로 읽혔고, 실루엣 하나면 이 자리에 설 것이 사람이라는
+     것이 글자 없이 선다. 띠의 높이는 그대로 둔다. 아이콘이 띠를 밀면 빈 칸을 채운 일이
+     아래 칸을 다 내리는 일이 된다. */
+  if (!keys.length) return head + '<div class="note dim">' + IC_NOFACE + '</div>';
   // 많이 마주친 순. 같으면 키 순이라 같은 동네가 흩어지지 않는다.
   keys.sort((a, b) => (state.rapport[b] - state.rapport[a]) || a.localeCompare(b));
   const rows = keys.map((key) => {

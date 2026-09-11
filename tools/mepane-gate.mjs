@@ -431,6 +431,32 @@ try {
   await fresh.click('#me .tab[data-tab="face"]', { force: true });
   await fresh.waitForTimeout(320);
   const zero = await fresh.evaluate(zeroRead);
+  /* 그 아이콘 자체. 위의 자는 글자가 없는 것만 지키므로, 아이콘이 0px로 접혀 화면에 아무것도
+     없어도 초록이 난다. 규칙이 이름으로 허락한 둘 중 뒤엣것을 골랐으면, 고른 것이 그려졌는지와
+     띠를 안 밀었는지까지 같이 재야 그 선택이 화면에 선다.
+     기준은 같은 판에서 아이콘만 빼고 그 자리에서 다시 잰다. 수로만 적어 두면 안쪽 여백이 바뀐
+     날 이 자가 규칙이 아니라 옛 수를 지킨다. 86b8818이 빈 span으로 세웠던 26px은 그 다시 잰
+     수가 그날의 띠와 같은 띠인지를 한 번 더 묻는 자리라 따로 둔다.
+     한 줄의 높이도 같은 칸의 머리글에서 꺼낸다. 24를 적으면 본문 크기가 움직인 날 어긋난다. */
+  const ZERO_STRIP = 26;
+  const mark = await fresh.evaluate(() => {
+    const pane = document.querySelector("#me .pane");
+    const strip = pane ? pane.querySelector(".note.dim") : null;
+    const g = strip ? strip.querySelector("svg") : null;
+    if (!strip || !g) return null;
+    const box = g.getBoundingClientRect();
+    const row = pane.querySelector(".note:not(.dim)");
+    const held = Math.round(strip.getBoundingClientRect().height);
+    // 빼고 다시 잰다. display:none은 흐름에서 통째로 빠지므로 빈 span이 서 있던 그 띠와 같다.
+    g.style.display = "none";
+    const bare = Math.round(strip.getBoundingClientRect().height);
+    g.style.display = "";
+    return { h: Math.round(box.height), w: Math.round(box.width),
+      row: row ? Math.round(parseFloat(getComputedStyle(row).lineHeight)) : 0,
+      ink: g.querySelectorAll("rect,circle,path,polygon").length,
+      said: g.textContent.trim().length, held, bare,
+      back: Math.round(strip.getBoundingClientRect().height) };
+  });
   await fresh.close();
   const zeroSaid = zero ? zero.said.filter((s) => ZERO_END.test(s)) : [];
   const zeroOk = Boolean(zero) && zero.strip && zero.met === 0 && zero.chars === 0
@@ -442,6 +468,14 @@ try {
       + ", " + zeroSaid.length + " of " + zero.said.length + " text runs in the pane end a sentence "
       + JSON.stringify(zeroSaid) + ", cards " + zero.met + ", rapport keys cleared " + carried
       : "no pane on a fresh account");
+  const markOk = Boolean(mark) && mark.ink > 0 && mark.said === 0 && mark.h > 0 && mark.h <= mark.row
+    && mark.held === mark.bare && mark.bare === ZERO_STRIP && mark.back === mark.held;
+  check("mepane:the-empty-people-pane-icon-is-a-silhouette-of-fixed-size", markOk,
+    mark ? "the silhouette draws " + mark.ink + " shapes and " + mark.said + " chars at "
+      + mark.w + "x" + mark.h + "px inside a " + mark.row + "px note row, and the strip stands "
+      + mark.held + "px with it, " + mark.bare + "px with it pulled and " + mark.back
+      + "px back, against the " + ZERO_STRIP + "px 86b8818 left"
+      : "no svg in the empty people pane");
 
   // 대조군. 닫고 다시 열면 능력치 칸으로 돌아온다. 안 돌아오면 다음에 연 사람이 탭을 눌러야 한다.
   await p.evaluate(() => { window.__me(false); window.__me(true); });
