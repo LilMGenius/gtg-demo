@@ -226,6 +226,69 @@ try {
     check("control:" + s.tab + ":the-same-cut-paints-the-same-pixels", s.control > 0.999, s.control.toFixed(4));
   }
 
+  /* 타투 칸이 파는 것은 팔이 아니라 팔에 새긴 그림이다. 위의 축들은 등급끼리 다른가와
+     무엇이든 칠해졌는가만 묻고, 그 그림이 칸에서 얼마를 차지하는지는 안 묻는다. 그래서
+     무늬가 칸 위쪽 귀퉁이에 손톱만 하게 걸리고 나머지를 소매와 유니폼이 먹은 채로
+     네 등급이 전부 초록으로 지나갔다. 실측: 옛 겨냥에서 세 유료 등급의 무늬가 칸의
+     16.6과 18.4와 18.1퍼센트였고, 카드 크기에서 사람이 본 것은 타투가 아니라 어두운 쐐기였다.
+     무늬만 골라 세는 방법은 색이 아니라 반사실이다. 같은 등급을 무늬 없이 한 번 더 굽고
+     두 장을 견주면 달라진 화소가 곧 살에 새긴 그림이다. 색으로 고르면 0등급이 까는 띠가
+     같이 잡혀 맨살 대조군이 죽는다. inkGrade만 0으로 내리면 띠의 색과 폭과 두께는 그대로 남는다. */
+  // 42퍼센트. 새 겨냥이 잰 84.2퍼센트의 절반이다. 무늬가 조금 작아지는 것으로는 안 울고,
+  // 겨냥이 옛 자리로 돌아가면 반드시 운다. 옛 겨냥의 최악은 16.6퍼센트였다.
+  const INK_FILL = 0.42;
+  // 채널 최대 차 8. 압축 잔파동과 안티에일리어싱 위이고, 아래의 회전 자가 쓰는 그 폭이다.
+  const FILL_DELTA = 8;
+  // 심는 대조군. 이 자리로 겨냥을 되돌리면 위의 축이 빨개져야 한다.
+  const OLD_INK_AIM = { part: "arm", dist: 0.58, lift: -0.12, high: 0.08, yaw: -0.7 };
+  const fills = await p.evaluate(async ([delta, old]) => {
+    const m = await import("/web/src/render/thumb.mjs");
+    const g = await import("/web/src/state/gear.mjs");
+    const k = { height: 188, weight: 84 };
+    const read = (src) => new Promise((res) => {
+      const im = new Image();
+      im.onload = () => {
+        const cv = document.createElement("canvas");
+        cv.width = im.width; cv.height = im.height;
+        const c = cv.getContext("2d");
+        c.drawImage(im, 0, 0);
+        res(c.getImageData(0, 0, im.width, im.height));
+      };
+      im.src = src;
+    });
+    const share = async (n, over) => {
+      const bare = g.lookOf({ ink: n });
+      bare.inkGrade = 0;
+      const a = await read(m.thumbURL("ink", k, g.lookOf({ ink: n }), over));
+      const c = await read(m.thumbURL("ink", k, bare, over));
+      if (a.width !== c.width || a.height !== c.height) return -1;
+      let d = 0;
+      for (let i = 0; i < a.data.length; i += 4) {
+        const hit = Math.max(Math.abs(a.data[i] - c.data[i]), Math.abs(a.data[i + 1] - c.data[i + 1]),
+          Math.abs(a.data[i + 2] - c.data[i + 2]), Math.abs(a.data[i + 3] - c.data[i + 3]));
+        if (hit > delta) d += 1;
+      }
+      return d / (a.width * a.height);
+    };
+    const live = [], was = [];
+    for (let n = 0; n < g.TATTOOS.length; n += 1) {
+      live.push(await share(n));
+      was.push(await share(n, old));
+    }
+    return { live, was };
+  }, [FILL_DELTA, OLD_INK_AIM]);
+  const pct = (x) => (x * 100).toFixed(1) + "%";
+  const paid = fills.live.slice(1);
+  check("thumb:the-tattoo-fills-its-card", paid.length > 0 && paid.every((x) => x >= INK_FILL),
+    "grades 1..3 paint " + paid.map(pct).join(" ") + " of the card, floor " + pct(INK_FILL)
+    + ", half the measured " + pct(Math.min.apply(null, paid)));
+  check("control:bare-skin-carries-no-tattoo", fills.live[0] >= 0 && fills.live[0] < 0.005,
+    (fills.live[0] * 100).toFixed(2) + "% on grade 0, the rank that sells no tattoo");
+  const wasWorst = Math.min.apply(null, fills.was.slice(1));
+  check("control:the-old-arm-aim-misses-the-tattoo-floor", wasWorst >= 0 && wasWorst < INK_FILL,
+    "the planted rig dist 0.58 lift -0.12 high 0.08 yaw -0.70 paints "
+    + fills.was.slice(1).map(pct).join(" ") + ", worst " + pct(wasWorst) + " under the " + pct(INK_FILL) + " floor");
+
   // 대조군. 같은 등급을 두 번 구우면 같은 그림이어야 한다. 매번 달라지면 위의 다름은
   // 상품의 차이가 아니라 굽는 잡음이고, 그 축은 아무것도 증명하지 않는다.
   const twice = await p.evaluate(async () => {
