@@ -139,6 +139,50 @@ try {
   await mp.waitForTimeout(150);
   const narrow = await mp.evaluate(edges);
   check("gym:every-card-and-its-shadow-stays-inside-the-viewport-at-740x360", inside(narrow), said(narrow));
+  /* 창이 열리면 두 조작 기둥은 화면 밖으로 나가고 재화 띠만 물 아래 남는다. 그러면 훈련장의 첫 줄은
+     띠 아래에서 시작해야 한다. 띠의 바닥은 --strip-b가 정하지만 레벨 칩이 그 상자 밖으로 내려오므로,
+     토큰과 실제 잉크 중 아래쪽을 바닥으로 읽는다(실측 740x360: 토큰 63, 상자 65.16, 잉크 67.5).
+     F3 6.5가 남긴 잔여물이 이 자리다. 제목 상자가 5.46에 서서 셋째 칩의 가로 312~332를 물었고,
+     같은 비교자로 칩 잉크의 18.22퍼센트가 제목과 같이 움직였다. */
+  const column = () => {
+    const rnd = (n) => Math.round(n * 100) / 100;
+    const g = document.getElementById("gym");
+    const strip = document.getElementById("top");
+    let ink = strip.getBoundingClientRect().bottom;
+    for (const el of strip.querySelectorAll("*")) ink = Math.max(ink, el.getBoundingClientRect().bottom);
+    // 토큰은 계산식이라 글자로는 못 읽는다. 같은 식을 키로 받는 상자를 하나 세워 풀린 px을 받는다.
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:absolute;top:0;left:0;width:1px;height:var(--strip-b);visibility:hidden";
+    document.body.append(probe);
+    const token = probe.getBoundingClientRect().height;
+    probe.remove();
+    const head = g.querySelector("h4").getBoundingClientRect();
+    const close = g.querySelector(".close").getBoundingClientRect();
+    const mid = document.elementFromPoint((close.left + close.right) / 2, (close.top + close.bottom) / 2);
+    return { token: rnd(token), ink: rnd(ink), floor: rnd(Math.max(token, ink)), head: rnd(head.top),
+      close: rnd(close.bottom), spare: rnd(innerHeight - close.bottom), ih: innerHeight,
+      hit: mid ? mid.tagName + "." + String(mid.className) : "none" };
+  };
+  const below = (c) => c.head >= c.floor;
+  const reach = (c) => c.spare >= 8 && c.hit === "BUTTON.close";
+  const saidHead = (c) => "title top " + c.head + " against strip bottom " + c.floor + " (token " + c.token + ", ink " + c.ink + "), "
+    + (below(c) ? "clear by " + (c.head - c.floor).toFixed(2) : "under by " + (c.floor - c.head).toFixed(2)) + "px";
+  const saidClose = (c) => "close bottom " + c.close + " of " + c.ih + ", spare " + c.spare + "px of 8, hit " + c.hit;
+  const col = await mp.evaluate(column);
+  check("gym:the-title-starts-below-the-status-strip-at-740", below(col), saidHead(col));
+  // 닫기는 이 창의 유일한 출구다. 띠만큼 기둥을 내리면 아래끝이 화면 밖으로 나갈 수 있으므로,
+  // 상자의 아래끝과 그 가운데를 짚는 손이 같이 녹색이어야 한다.
+  check("gym:the-close-button-stays-inside-the-viewport-at-740", reach(col), saidClose(col));
+  // 음성 대조군. 위 여백을 도로 걷으면 제목이 띠 밑으로 들어가야 한다.
+  // 이게 없으면 위 축의 녹색은 판정식이 아무것도 안 재는 경우와 구분되지 않는다.
+  const bald = await mp.addStyleTag({ content: "#gym{padding-top:0}" });
+  await mp.waitForTimeout(150);
+  const plantedTop = await mp.evaluate(column);
+  await bald.evaluate((n) => n.remove());
+  await mp.waitForTimeout(150);
+  const restoredTop = await mp.evaluate(column);
+  check("control:stripping-the-top-padding-buries-the-title-under-the-strip", !below(plantedTop) && below(restoredTop),
+    "planted " + saidHead(plantedTop) + " | restored " + saidHead(restoredTop));
   if (shot) await mp.screenshot({ path: shot.replace(/\.png$/, "") + "-740.png" });
   await mob.close();
 
