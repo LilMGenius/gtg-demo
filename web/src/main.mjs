@@ -763,7 +763,10 @@ function renderGym() {
     const tail = v >= 10 ? String(v) : v + ' → ' + (v + 1);
     return '<button data-k="' + k + '"' + (off ? ' disabled' : '') + '><span class="who">' + STAT_ICON[k]
       + CAUSE_LABEL[k] + '</span><em>' + tail + '</em></button>';
-  }).join('') + '</div>' + swap + '<button class="close">닫기</button>';
+  }).join('') + '</div>' + swap + '<button class="close">닫기</button>'
+    /* 굴러간다는 자국. 내 정보가 쓰는 그 겹을 같은 클래스로 둔다. 마지막에 두는 것은 칠하는 차례
+       때문이다. 앞에 두면 자리를 잡은 칸들이 이 겹을 덮는다. */
+    + '<div class="cue down" aria-hidden="true"></div>';
   box.querySelector('.close').onclick = closeGym;
   const sw = box.querySelector('.swap');
   if (sw) sw.onclick = () => {
@@ -786,6 +789,12 @@ function renderGym() {
       renderGym();
     };
   }
+  /* 굴러가는 창이 제가 구른다는 사실을 화면에 하나도 안 적었다. 실측 740x360에서 성장 칸이 전부
+     상한이면 환전 줄이 한 칸 더 붙어 기둥이 327px이 되고, 닫기는 402px에 서서 화면 밖에 남는다.
+     내 정보가 쓰던 그 신호를 그대로 부른다. 구르는 것이 칸이 아니라 창이라 굴러가는 상자를 밖에서
+     넘긴다. 안 넘기면 첫 자식인 제목 줄을 재게 되어 넘침이 늘 0이고 신호가 영영 안 켜진다. */
+  box.onscroll = () => scrollCue(box, box);
+  scrollCue(box, box);
 }
 
 // 창은 한 번에 하나만 선다. 닫기 전에 겹쳐 열리면 뒤엣것이 앞엣것을 덮고,

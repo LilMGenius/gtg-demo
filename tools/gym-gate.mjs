@@ -159,20 +159,67 @@ try {
     const head = g.querySelector("h4").getBoundingClientRect();
     const close = g.querySelector(".close").getBoundingClientRect();
     const mid = document.elementFromPoint((close.left + close.right) / 2, (close.top + close.bottom) / 2);
+    /* 굴러간다는 자국. 그늘은 opacity로 켜지고 꺼지므로 있고 없고가 아니라 그려졌는가를 읽는다.
+       높이를 같이 보는 것은 대조군이 겹을 display로 걷어도 붙어 있던 opacity는 1로 남아서다. */
+    const sign = g.querySelector(":scope > .cue.down");
+    const cueH = sign ? rnd(sign.getBoundingClientRect().height) : 0;
     return { token: rnd(token), ink: rnd(ink), floor: rnd(Math.max(token, ink)), head: rnd(head.top),
       close: rnd(close.bottom), spare: rnd(innerHeight - close.bottom), ih: innerHeight,
+      top: rnd(g.scrollTop), over: rnd(g.scrollHeight - g.clientHeight), rolls: g.scrollHeight > g.clientHeight,
+      cue: Boolean(sign) && cueH > 0 && Number(getComputedStyle(sign).opacity) > 0.5, cueH,
       hit: mid ? mid.tagName + "." + String(mid.className) : "none" };
   };
   const below = (c) => c.head >= c.floor;
   const reach = (c) => c.spare >= 8 && c.hit === "BUTTON.close";
+  /* 쉼 자리의 닫기. 화면 안에 서 있으면 그것으로 끝이고, 접힘 아래로 내려갔다면 굴러간다는 자국이
+     켜져 있을 때만 봐준다. 자국이 없으면 나갈 길이 있다는 것을 사람이 알 방법이 없다. */
+  const allowed = (c) => reach(c) || (c.rolls && c.cue);
+  // 자국은 구르는 화면에서만 선다. 안 구르는 화면에서 켜지면 그 그늘은 거짓말이다.
+  const rested = (c) => c.top === 0 && c.cue === c.rolls;
   const saidHead = (c) => "title top " + c.head + " against strip bottom " + c.floor + " (token " + c.token + ", ink " + c.ink + "), "
     + (below(c) ? "clear by " + (c.head - c.floor).toFixed(2) : "under by " + (c.floor - c.head).toFixed(2)) + "px";
-  const saidClose = (c) => "close bottom " + c.close + " of " + c.ih + ", spare " + c.spare + "px of 8, hit " + c.hit;
+  const saidClose = (c) => "close bottom " + c.close + " of " + c.ih + ", spare " + c.spare + "px of 8, hit " + c.hit
+    + (reach(c) ? "" : ", below the fold with the cue " + (c.cue ? "on" : "off"));
+  const saidCue = (c) => "scrollTop " + c.top + ", " + (c.rolls ? "rolls " + c.over + "px past the fold" : "does not roll")
+    + ", cue " + (c.cue ? "on" : "off") + " " + c.cueH + "px";
   const col = await mp.evaluate(column);
-  check("gym:the-title-starts-below-the-status-strip-at-740", below(col), saidHead(col));
-  // 닫기는 이 창의 유일한 출구다. 띠만큼 기둥을 내리면 아래끝이 화면 밖으로 나갈 수 있으므로,
-  // 상자의 아래끝과 그 가운데를 짚는 손이 같이 녹색이어야 한다.
-  check("gym:the-close-button-stays-inside-the-viewport-at-740", reach(col), saidClose(col));
+  /* 두 번째 740. 씨앗과 순서는 위와 같고 주입만 다르다. 성장 칸이 전부 상한이면 환전 줄이 한 칸 더
+     붙어 기둥이 화면보다 길어지고, 그때부터 이 창이 제 스크롤로 받는다. 이 게이트는 그 상태를 한 번도
+     안 세웠다. 위의 두 축은 안 구르는 화면에서만 초록이었고, 사람이 닫기에 닿으려면 반드시 지나야
+     하는 자리를 아무도 안 쟀다. */
+  const roll = await b.newContext({ viewport: { width: 740, height: 360 }, deviceScaleFactor: 2 });
+  const rp = await roll.newPage();
+  rp.on("pageerror", (e) => errs.push(String(e)));
+  rp.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+  await bootOn(rp, "?seed=20&preset=maxed,veteran");
+  await rp.mouse.move(2, 2);
+  await rp.waitForTimeout(150);
+  const ceil = await rp.evaluate(column);
+  if (shot) await rp.screenshot({ path: shot.replace(/\.png$/, "") + "-740-maxed.png" });
+  check("gym:the-title-starts-below-the-status-strip-at-740", below(col) && below(ceil), "plain " + saidHead(col) + " | ceiling " + saidHead(ceil));
+  // 닫기는 이 창의 유일한 출구다. 띠만큼 기둥을 내리면 아래끝이 화면 밖으로 나갈 수 있으므로, 상자의
+  // 아래끝과 그 가운데를 짚는 손이 같이 녹색이거나, 그 아래에 더 있다는 자국이 켜져 있어야 한다.
+  check("gym:the-close-button-stays-inside-the-viewport-at-740", allowed(col) && allowed(ceil), "plain " + saidClose(col) + " | ceiling " + saidClose(ceil));
+  check("gym:a-rolling-gym-shows-its-cue-at-rest", rested(col) && rested(ceil), "ceiling " + saidCue(ceil) + " | plain " + saidCue(col));
+  /* 끝까지 굴린 자리. 휠로 밀면 마지막 한 칸이 남았는지 끝인지를 이 게이트가 못 가리므로, 굴림값을
+     상한까지 밀어 브라우저가 소수 자리까지 맞추게 둔다. */
+  await rp.evaluate(() => { const g = document.getElementById("gym"); g.scrollTop = g.scrollHeight; });
+  await rp.waitForTimeout(200);
+  const rolled = await rp.evaluate(column);
+  check("gym:the-close-button-is-reachable-after-the-roll", reach(rolled), saidClose(rolled) + ", " + saidCue(rolled));
+  /* 음성 대조군. 자국 한 겹을 걷으면 쉼 자리의 두 축이 같이 빨개져야 한다. 걷고 곧바로 도로 붙인다.
+     이게 없으면 위 두 줄의 초록은 판정식이 아무것도 안 재는 경우와 구분되지 않는다. */
+  await rp.evaluate(() => { document.getElementById("gym").scrollTop = 0; });
+  await rp.waitForTimeout(200);
+  const blind = await rp.addStyleTag({ content: "#gym > .cue.down{display:none}" });
+  await rp.waitForTimeout(150);
+  const blinded = await rp.evaluate(column);
+  await blind.evaluate((n) => n.remove());
+  await rp.waitForTimeout(150);
+  const lit = await rp.evaluate(column);
+  check("control:hiding-the-cue-reddens-the-resting-gym", !rested(blinded) && !allowed(blinded) && rested(lit) && allowed(lit),
+    "planted " + saidCue(blinded) + " / " + saidClose(blinded) + " | restored " + saidCue(lit) + " / " + saidClose(lit));
+  await roll.close();
   // 음성 대조군. 위 여백을 도로 걷으면 제목이 띠 밑으로 들어가야 한다.
   // 이게 없으면 위 축의 녹색은 판정식이 아무것도 안 재는 경우와 구분되지 않는다.
   const bald = await mp.addStyleTag({ content: "#gym{padding-top:0}" });
