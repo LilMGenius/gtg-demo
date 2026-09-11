@@ -11,11 +11,18 @@
 // 그래서 세계시계를 1/60로 못 박고(clock.mjs pinClock) 기다림을 프레임 수로 센다.
 // window.__frames()는 세계가 멈춘 동안에도 올라간다. 그래서 대조군의 두 컷 사이도 같은 자로 끊는다.
 // 누른 뒤의 DOM 정착만 짧은 벽시계로 두고, 측정을 가르는 기다림은 하나도 거기 안 남긴다.
+// 시계를 못 박아도 판 안의 회차 편차가 남으면 같은 사건이 회차마다 다른 자리를 판다. 그것까지 ?vary=0으로 끈다.
 import { chromium } from "playwright";
 import { pinClock } from "./clock.mjs";
 
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const URL = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
+// vary는 꼬리 연출의 회차 편차다. 판정 rng가 아니라 Math.random을 세 번 돌려 뽑으므로(scene.mjs:1143)
+// 같은 씨드를 줘도 그 세 값은 회차마다 다르다. 그 값이 키퍼가 뛰어가 서는 자리와 몸의 진폭을 흔든다.
+// 흙을 파는 자리는 그 순간 장갑의 월드 좌표라(scene.mjs:1573 gloveWorld), 편차가 켜져 있으면
+// 사건 여섯 번이 회차마다 다른 자리를 파고, 클러스터 수가 바에 대고 흔들린다.
+// 실측(05b9db4): 같은 바이트를 세 번 돌려 3, 5, 7로 갈렸고 부하가 가장 큰 회차가 가장 많이 셌다.
+// 부하 순서가 거꾸로 달려 있으므로 그 흔들림은 기계가 아니라 판 안의 무작위다.
+const URL = "http://127.0.0.1:10310/web/index.html?seed=20&vary=0&preset=veteran";
 const KINDS = ["downed", "reboundMiss", "carriedIn", "spill", "rebound", "save"];
 const BAR = 3;
 const STEP = 1 / 60;
