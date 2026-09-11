@@ -754,6 +754,10 @@ try {
     await botLeg(page);
   }
   put("guest", await page.evaluate(() => Object.keys(localStorage).sort()));
+  /* 마지막 창이 닫히고 기둥이 제자리에 설 때까지 기다린 뒤에 잰다. 미끄러지는 도중에 재면
+     실측처럼 mute가 x=1314, auto가 x=-81로 읽혀 화면 밖에 선 버튼 목록이 증거로 남는다. */
+  await settle(page, "#mute").catch(() => {});
+  await settle(page, "#auto").catch(() => {});
   put("chrome", await chromeAt(page));
   put("fontsEnd", await fontsAt(page));
   put("end", await page.evaluate(() => ({
