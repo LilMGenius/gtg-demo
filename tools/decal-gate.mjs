@@ -4,14 +4,67 @@
 // 게임은 사건 사이에도 진행한다. 행인이 걷고 키커가 걸어와 공을 놓으며 카메라 shake 잔여가 남는다.
 // 그래서 대기 시간만으로는 정지 화면이 만들어지지 않고, 대조군이 화면 전체의 변화를 자국으로 읽는다.
 // 바: 대조군 클러스터 0, 본 측정에서 40px 이상 어두워진 클러스터 3개 이상.
+//
+// 기다림을 벽시계로 끊으면 그 사이에 세계가 몇 걸음 갔는지를 그날의 기계 부하가 정한다.
+// 사건 여섯 번이 모두 그 기다림 위에 서 있어서, 프레임이 빠진 회차는 흙이 덜 파인 채로 두 번째 컷을 찍는다.
+// 실측(1d02a4e sweep): 부하 아래서 클러스터가 바 3에 못 미치는 2, 같은 판을 혼자 돌리면 5다.
+// 그래서 세계시계를 1/60로 못 박고(clock.mjs pinClock) 기다림을 프레임 수로 센다.
+// window.__frames()는 세계가 멈춘 동안에도 올라간다. 그래서 대조군의 두 컷 사이도 같은 자로 끊는다.
+// 누른 뒤의 DOM 정착만 짧은 벽시계로 두고, 측정을 가르는 기다림은 하나도 거기 안 남긴다.
 import { chromium } from "playwright";
+import { pinClock } from "./clock.mjs";
 
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const URL = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const KINDS = ["downed", "reboundMiss", "carriedIn", "spill", "rebound", "save"];
 const BAR = 3;
-const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
+const STEP = 1 / 60;
+// 기다림의 폭. 세계는 프레임마다 STEP만큼 걷고, 아래 수는 예전 벽시계 자리를 60프레임으로 옮긴 것이다.
+const BOOT = 72;    // 시작을 누르기 전 판이 자리를 잡는 동안. 1.2초 자리다.
+const OPEN = 108;   // 판이 서는 동안. 1.8초 자리다.
+const SETTLE = 18;  // 세계를 멈춘 뒤 렌더가 자리를 잡는 동안. 0.3초 자리다.
+const BARED = 12;   // 몸을 숨기고 다시 그려질 때까지. 0.2초 자리다.
+const CTRL = 54;    // 대조군 두 컷 사이. 0.9초 자리다.
+const PRE = 42;     // 방향키를 누르고 사건을 걸 때까지. 0.7초 자리다.
+const POST = 150;   // 사건이 끝나고 흙이 남을 때까지. 2.5초 자리다.
+const CAM = 6;      // 카메라 복귀를 되묻는 간격. 0.1초 자리다.
+// 프레임으로 세는 자는 바쁜 기계에서 벽시계가 늘어난다. 여기서 죽으면 그 늘어남이 다시 판정에 섞인다.
+const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 540000);
 t.unref();
+
+/* 프레임으로 기다린다. 벽시계로 기다리면 부하가 걸린 기계에서 세계가 덜 간 채로 다음 줄이 실행된다.
+   세계가 멈춘 구간에서도 렌더 프레임은 계속 도므로 이 자는 두 구간 모두에 쓴다. */
+const waitFrames = (page, n) => page.evaluate((k) => new Promise((done) => {
+  const f0 = window.__frames();
+  const tick = () => (window.__frames() >= f0 + k ? done(window.__frames()) : requestAnimationFrame(tick));
+  requestAnimationFrame(tick);
+}), n);
+
+/* 방향키는 대기 마디에서만 먹는다(main.mjs setPad가 .zone을 잠갔다 연다). 닫힌 프레임에 누르면
+   그 누름이 판정에 안 들어가고, 키퍼가 제자리에 선 채로 여섯 사건이 같은 흙에 겹쳐 칠해진다.
+   실측: 패드를 안 보고 누르면 클러스터가 회차마다 1과 3으로 갈렸다. walkback-gate.mjs의 padOpen과 같은 자다. */
+const padOpen = (page) => page.waitForFunction(() => {
+  const z = document.querySelector(".zone");
+  return Boolean(z) && !z.disabled;
+}, null, { timeout: 120000, polling: "raf" });
+
+/* 사건을 프레임에 맡긴다(scene.mjs planAct). 바깥에서 __act를 부르면 왕복이 한두 프레임을 먹고,
+   그 사이 다이빙 중인 몸은 다른 자세로 흙에 닿아 같은 사건이 회차마다 다른 넓이의 자국을 남긴다.
+   누름이 판정에 들어간 프레임을 페이지 안에서 읽고 거기서 lead 프레임 뒤를 예약하면,
+   사건이 걸리는 순간의 자세가 기계 부하와 무관하게 같다. 실측: 예약 없이 부른 회차가 8과 5로 갈렸다.
+   멈출 프레임은 -1이라 세계는 안 멈춘다. 사건 사이에도 판이 돌아야 이 자의 전제가 선다. */
+const planAfterDive = (page, side, kind, lead) => page.evaluate(([s, k, n]) => new Promise((done) => {
+  let left = 240;
+  const tick = () => {
+    if (window.__lastInput && window.__lastInput.dive === s) {
+      const f = window.__frames() + n;
+      window.__plan(f, k, -1);
+      done(f);
+    } else if ((left -= 1) <= 0) done(-1);
+    else requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}), [side, kind, lead]);
 
 // 자국은 박스 평면에만 칠해진다. 창을 화소로 못 박으면 프레이밍이 바뀔 때마다 계기가 엉뚱한 땅을 본다.
 // 실측: 창을 640..720에 고정했더니 그 밴드는 골라인 뒤 ground였고, 자국은 한 개도 그 안에 없었다.
@@ -118,11 +171,16 @@ let br;
 try {
   br = await chromium.launch({ executablePath: EXE });
   const ctx = await br.newContext({ viewport: { width: 1280, height: 720 } });
+  // 세계시계를 프레임에 못 박는다. 페이지가 열리기 전에 걸어야 손잡이가 생기는 그 틱에 켜진다.
+  await pinClock(ctx, STEP);
   const p = await ctx.newPage();
   await p.goto(URL, { waitUntil: "load" });
-  await p.waitForTimeout(1200);
+  await p.waitForSelector("#go", { timeout: 15000 });
+  await p.waitForFunction(() => typeof window.__frames === "function", null, { timeout: 15000, polling: "raf" });
+  // 누르기 전에도 세계는 걷는다. 그 걸음 수를 기계에 맡기면 누른 순간의 세계가 회차마다 달라진다.
+  await waitFrames(p, BOOT);
   await p.click("#go", { force: true });
-  await p.waitForTimeout(1800);
+  await waitFrames(p, OPEN);
 
   const shot = async () => (await p.screenshot()).toString("base64");
   const freeze = (on) => p.evaluate((v) => window.__freeze(v), on);
@@ -130,14 +188,14 @@ try {
 
   // 세계시간만 멈추고 렌더는 계속 돌린다. 렌더까지 멈추면 대조군이 계기의 잡음 바닥을 못 잰다.
   await freeze(true);
-  await p.waitForTimeout(300);
+  await waitFrames(p, SETTLE);
   const base = await camPos();
   console.log("BARE " + JSON.stringify(await p.evaluate(bare, true)));
-  await p.waitForTimeout(200);
+  await waitFrames(p, BARED);
   const scanA = await p.evaluate(boxScan, 6);
   if (!scanA) { console.log("NOWINDOW  FAIL"); process.exit(1); }
   const A = await shot();
-  await p.waitForTimeout(900);
+  await waitFrames(p, CTRL);
   const A2 = await shot();
   await p.evaluate(bare, false);
 
@@ -158,10 +216,16 @@ try {
 
   await freeze(false);
   for (let i = 0; i < KINDS.length; i += 1) {
-    await p.keyboard.press(i % 2 ? "ArrowRight" : "ArrowLeft");
-    await p.waitForTimeout(700);
-    await p.evaluate((k) => window.__act(k), KINDS[i]);
-    await p.waitForTimeout(2500);
+    // 누름은 대기 마디에서만 먹고, 그 누름이 판정에 들어가야 키퍼가 움직인다.
+    const side = i % 2 ? 1 : -1;
+    let at = -1;
+    for (let k = 0; k < 8 && at < 0; k += 1) {
+      await padOpen(p);
+      await p.keyboard.press(side > 0 ? "ArrowRight" : "ArrowLeft");
+      at = await planAfterDive(p, side, KINDS[i], PRE);
+    }
+    if (at < 0) { console.log("NODIVE " + KINDS[i] + "  FAIL"); process.exit(1); }
+    await p.waitForFunction((n) => window.__frames() >= n, at + POST, { timeout: 300000, polling: "raf" });
   }
 
   // 두 컷의 카메라가 다르면 남는 차이는 자국이 아니라 시점 이동이다. 기준 자리 복귀를 기다린다.
@@ -169,13 +233,13 @@ try {
   for (let i = 0; i < 30 && !back; i += 1) {
     const now = await camPos();
     back = now.every((v, k) => Math.abs(v - base[k]) <= 0.02);
-    if (!back) await p.waitForTimeout(100);
+    if (!back) await waitFrames(p, CAM);
   }
   console.log("CAMBACK " + back + " " + JSON.stringify(await camPos()) + " base " + JSON.stringify(base));
   await freeze(true);
-  await p.waitForTimeout(300);
+  await waitFrames(p, SETTLE);
   await p.evaluate(bare, true);
-  await p.waitForTimeout(200);
+  await waitFrames(p, BARED);
   const B = await shot();
   const res = await p.evaluate(cluster, [A, B, winA]);
   for (const c of res) console.log("cluster px=" + c.px + " mean=" + c.mean.toFixed(1) + " x=" + c.x0 + ".." + c.x1);
