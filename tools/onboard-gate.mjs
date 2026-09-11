@@ -4,13 +4,16 @@ import { PULL_BULK, PULL_BONUS, pullYield, ELEVEN, ROLES, ROLE_SLOTS, kickerByNa
 // 첫 진입의 자. 가입 직후 아무것도 안 뽑고 판이 열렸다. 첫 키퍼와 주전 열하나가 조용히 배정돼서
 // 플레이어는 자기가 무엇을 들고 시작하는지를 본 적이 없었고, 이 장르가 파는 첫 순간이 통째로 없었다.
 //
-// 축은 다섯이다. 처음 온 사람에게 카드가 열리는가, 봉인된 채로 누르면 닫히지 않고 먼저 열리는가,
+// 축은 다섯이다. 처음 온 사람에게 카드가 열리는가, 봉인된 채로 짧게 누르면 닫히지 않고 한 단이 오르는가,
 // 첫 키퍼가 못 박혀 있는가, 이어서 키커 열한 장이 오는가, 그 열한 장이 실제로 주전에 서는가.
 // 대조군은 이미 하던 사람이다. 그 사람에게 이 화면이 다시 열리면 판이 뒤집힌다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
 // 카드가 지나는 다섯 단의 마지막 번호. 길이는 판정의 STAGE_MS가 정하고 계기는 그 수를 마주 든다.
 const STAGE_LAST = 4;
+/* 길게 누름이 남은 것을 여는 것을 기다리는 상한. 제품 문턱이 0.45초라 여섯 배가 넘고,
+   문턱이 아니라 상한이므로 초록 회차에서는 0.5초 언저리에 풀린다. */
+const PRESS_MS = 3000;
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();
@@ -37,12 +40,34 @@ try {
     await p.click("#pull", { force: true });
     return true;
   };
+  /* 길게 누르면 남은 것이 전부 열린다. 짧은 누름은 한 단만 올리므로 열한 장을 그것으로 끝내려면
+     쉰다섯 번을 눌러야 하고, 그 사이에 이 자가 보려던 두 마디가 지나간다. 손가락이 내려가 있는 동안
+     열리는 물건이라 누름과 뗌을 따로 보내고, 열린 것을 보고 뗀다. */
+  const press = async () => {
+    if (await p.evaluate(() => document.getElementById("pull").hidden)) return false;
+    const spot = await p.locator("#pull .tap").boundingBox();
+    if (!spot) return false;
+    await p.mouse.move(spot.x + spot.width / 2, spot.y + spot.height / 2);
+    await p.mouse.down();
+    await p.waitForFunction((last) => {
+      const r = window.__reveal();
+      return r.drawn > 0 && r.shown === r.drawn && r.stage === last;
+    }, STAGE_LAST, { timeout: PRESS_MS, polling: "raf" }).catch(() => {});
+    await p.mouse.up();
+    return true;
+  };
   await p.goto(BASE, { waitUntil: "load" });
   await p.waitForSelector("#go", { timeout: 15000 });
   await p.click("#go", { force: true });
   await p.waitForSelector("#pull .now", { timeout: 10000 });
   /* 봉인 단에서 바로 읽는다. 첫 단이 0.3초라 여기서 재야 사람이 처음 보는 화면을 그대로 본다.
      반 초를 기다리고 읽으면 이미 지나간 화면을 재게 되고, 급해서 누른 사람이 겪는 자리가 통째로 빠진다. */
+  /* 누른 순간의 상태를 브라우저 안에서 잡아 둔다. 밖에서 누르기 전에 한 번 읽고 누른 뒤에 또 읽으면
+     그 사이에 자동 사다리가 한 단을 올릴 수 있고, 그러면 이 축이 누름의 몫을 못 가른다. */
+  await p.evaluate(() => {
+    window.__tapAt = null;
+    document.addEventListener("pointerup", () => { window.__tapAt = window.__reveal(); }, true);
+  });
   const first = await p.evaluate(() => ({
     open: !document.getElementById("pull").hidden,
     n: window.__reveal().drawn,
@@ -58,30 +83,32 @@ try {
   check("onboard:the-card-that-opened-is-the-one-standing-in-goal", wearing === first.name,
     "card " + first.name + ", in goal " + wearing);
 
-  /* 아직 봉인이다. 이 자리에서 누름이 하는 일은 여는 것이므로 버튼은 건너뛰기라고 적혀 있어야 한다.
+  /* 아직 봉인이다. 이 자리에서 누름이 하는 일은 한 단을 올리는 것이므로 버튼은 다음이라고 적혀 있어야 한다.
      닫기라고 적어 두면 사람은 그 글자를 읽고 누르고, 자기 키퍼를 못 본 채 화면을 넘긴다. */
-  check("onboard:the-close-button-said-skip-while-the-card-was-sealed",
-    first.label === "건너뛰기" && first.stage < STAGE_LAST,
+  check("onboard:the-close-button-said-next-while-the-card-was-sealed",
+    first.label === "다음" && first.stage < STAGE_LAST,
     "label " + first.label + ", stage " + first.stage);
 
   /* 봉인된 채로 눌러 본다. 급한 사람의 첫 누름이라 이것이 닫으면 첫 키퍼는 한 번도 안 열린다.
-     열린 뒤에야 닫는 누름이 되므로, 여기서는 마지막 단까지 서고 화면은 그대로 있어야 한다. */
+     짧은 누름은 한 단만 올리므로 봉인에서 누르면 등급 신호로 올라서고 화면은 그대로 있어야 한다. */
   await p.click("#pull", { force: true });
-  await p.waitForTimeout(200);
   const sealedTap = await p.evaluate(() => ({
     open: !document.getElementById("pull").hidden,
+    pre: window.__tapAt,
     r: window.__reveal(),
     label: (document.querySelector("#pull .tap") || {}).textContent || ""
   }));
   check("onboard:a-tap-on-a-sealed-keeper-opens-it-first",
-    sealedTap.open && sealedTap.r.stage === STAGE_LAST && sealedTap.r.shown === 1
-      && sealedTap.r.drawn === 1 && sealedTap.label === "닫기",
-    "open " + sealedTap.open + ", stage " + sealedTap.r.stage + ", " + sealedTap.r.shown
-      + " of " + sealedTap.r.drawn + ", label " + sealedTap.label);
+    sealedTap.open && Boolean(sealedTap.pre) && sealedTap.pre.stage === 0 && sealedTap.r.stage === 1
+      && sealedTap.r.shown === 1 && sealedTap.r.drawn === 1 && sealedTap.label === "다음",
+    "open " + sealedTap.open + ", stage " + (sealedTap.pre ? sealedTap.pre.stage : "none")
+      + " to " + sealedTap.r.stage + ", " + sealedTap.r.shown + " of " + sealedTap.r.drawn
+      + ", label " + sealedTap.label);
 
-  /* 두 번째 누름이 닫는다. 닫으면 키커가 이어 열린다. 두 마디가 한 흐름이라 사이에 판을 굴리지 않는다.
-     상태를 안 보고 더 누르면 그 누름이 이미 열린 키커를 통째로 까 버린다. */
-  await p.click("#pull", { force: true });
+  /* 길게 눌러 마지막 단까지 세우고 그 다음 누름이 닫는다. 닫으면 키커가 이어 열린다.
+     두 마디가 한 흐름이라 사이에 판을 굴리지 않는다. */
+  await press();
+  await tap();
   await p.waitForFunction(() => window.__reveal().drawn > 1, { timeout: 8000 });
   await p.waitForTimeout(300);
   const second = await p.evaluate(() => ({
@@ -92,8 +119,8 @@ try {
     second.open && second.n === PULL_BULK + PULL_BONUS,
     "open " + second.open + ", cards " + second.n);
 
-  // 열한 장은 한 번 눌러 전부 열고 한 번 더 눌러 닫는다.
-  await tap();
+  // 열한 장은 길게 눌러 전부 열고 한 번 눌러 닫는다.
+  await press();
   await p.waitForTimeout(300);
   await tap();
   await p.waitForTimeout(400);

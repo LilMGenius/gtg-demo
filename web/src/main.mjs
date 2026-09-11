@@ -1896,8 +1896,16 @@ const RARE_HOLD_MS = 800;
 const BEAM_STAGE = 1;
 // 마지막 단의 번호. 다섯 단이므로 4다.
 const STAGE_LAST = STAGE_MS.length - 1;
+/* 짧은 누름과 긴 누름을 가르는 문턱. 이보다 먼저 손가락이 올라오면 한 단만 오르고, 넘겨서 붙들고
+   있으면 남은 것이 그 자리에서 전부 열린다. 0.45초는 넘기려고 스쳐 누르는 손가락보다 한참 길고
+   답답해서 붙들고 있는 손가락보다는 짧아서, 둘 중 어느 쪽도 상대의 뜻으로 안 읽힌다. */
+const LONG_MS = 450;
 // 지금 카드가 선 단. 화면은 이 수 하나를 읽어 어느 층까지 보여 줄지 정한다.
 let pullStage = 0;
+/* 길게 누름의 예약과, 그 예약이 이미 제 일을 했는지. 전부 열리면 판을 다시 그리느라 버튼이 새 것으로
+   갈리므로, 이 둘은 버튼이 아니라 모듈이 들고 있어야 누름 하나가 두 번 읽히지 않는다. */
+let longTimer = 0;
+let longDone = false;
 
 // 한 장씩 연다. 예약을 하나만 들고 있으므로 다시 뽑으면 앞의 연출이 끊긴다.
 function revealNext() {
@@ -2008,18 +2016,45 @@ function paintPull() {
     + (lastPull.length === 1 ? '' : '<div class="done">' + done + '</div>')
     /* 누름을 받는 것은 판이 아니라 버튼이다. div에 핸들러를 걸면 누를 수 있다는 신호가
        화면에 안 남고 키보드로는 닿지도 않는다. 판 전체를 덮는 투명 버튼이 그 자리를 맡는다. */
-    + '<button class="tap">' + (over ? '닫기' : '건너뛰기') + '</button>';
+    + '<button class="tap">' + (over ? '닫기' : '다음') + '</button>';
   box.hidden = false;
   // 놓이는 동작은 클래스를 다시 붙여야 다시 돈다. 같은 노드를 재사용하면 두 번째 장이 안 움직인다.
   const now = box.querySelector('.now');
   void now.offsetWidth;
   now.classList.add('turn');
-  box.querySelector('.tap').onclick = () => {
-    // 안 연 장이 남았거나 이 장이 마지막 단 전이면 먼저 연다. 닫는 것은 그 뒤다.
-    if (shown < lastPull.length || pullStage < STAGE_LAST) return revealAll();
+  const btn = box.querySelector('.tap');
+  /* 짧은 누름은 한 단만 올린다. 올릴 단이 없으면 다음 장으로 가고, 그것도 없을 때에야 닫는다.
+     누름 하나가 회차를 통째로 털어 가면 다섯 단을 세운 이유가 없어진다. 급한 사람의 손은 아래 긴 누름이다.
+     예약을 먼저 걷는 것은, revealNext가 제 손잡이를 안 걷고 0으로 덮어써서 남은 예약이 뒤에 한 단을
+     더 올리기 때문이다. */
+  const step = () => {
+    if (revealTimer) { clearTimeout(revealTimer); revealTimer = 0; }
+    if (pullStage < STAGE_LAST) { pullStage += 1; paintStage(); holdStage(); return; }
+    if (shown < lastPull.length) return revealNext();
     stopReveal();
     // 첫 진입은 두 마디다. 키퍼를 닫으면 그 자리에서 키커가 이어 열린다.
     onboardStep();
+  };
+  /* 붙들고 있는 동안 문턱을 넘으면 그 자리에서 전부 열린다. 떼는 것을 기다렸다가 길이를 재면 긴 누름이
+     짧은 누름과 같은 순간에 일어나서, 사람은 자기가 무엇을 하고 있는지 손을 떼기 전에는 못 본다.
+     손가락을 이 버튼에 묶는 것은, 안 묶으면 누른 채로 창 밖으로 나간 손의 예약이 살아남아 0.45초 뒤에
+     화면이 혼자 열리기 때문이다. 끌려 나간 손가락은 pointercancel이 그 예약을 걷는다. */
+  btn.onpointerdown = (e) => {
+    if (longTimer) clearTimeout(longTimer);
+    longDone = false;
+    if (btn.setPointerCapture) btn.setPointerCapture(e.pointerId);
+    longTimer = setTimeout(() => { longTimer = 0; longDone = true; revealAll(); }, LONG_MS);
+  };
+  const drop = () => { if (longTimer) { clearTimeout(longTimer); longTimer = 0; } };
+  btn.onpointerup = drop;
+  btn.onpointercancel = () => { drop(); longDone = false; };
+  /* 손가락이 만든 click은 손이 올라오고 나서 한 번 더 오므로, 이미 제 일을 한 긴 누름의 것은 여기서 삼킨다.
+     키보드는 포인터를 안 쓴다. Enter와 Space는 click으로만 오고 그 click은 detail이 0이라
+     손가락이 만든 것과 갈리고, 삼킬 것이 남아 있어도 키보드 누름은 안 먹힌다. */
+  btn.onclick = (e) => {
+    if (e.detail > 0 && longDone) { longDone = false; return; }
+    longDone = false;
+    step();
   };
 }
 
@@ -2437,7 +2472,7 @@ window.__persist = () => { persist(); return true; };
 window.__saveKey = () => saveKey();
 window.__kickers = () => state.kickers.slice();
 // 뒤집힌 카드 수와 뽑은 카드 수와 지금 선 단. 연출이 도는 동안 계기가 이 셋을 읽어 한 번에 안 열리는 것을 본다.
-window.__reveal = () => ({ shown, drawn: lastPull.length, stage: pullStage });
+window.__reveal = () => ({ shown, drawn: lastPull.length, stage: pullStage, long: LONG_MS });
 // 누가 무엇을 걸쳤는가. 계기가 교체 전후로 이 둘을 읽어 착용이 사람을 따라가는지 본다.
 window.__worn = () => ({ pick: state.pick, name: state.keeper.name,
   worn: Object.assign({}, state.keeper.worn), place: Object.assign({}, state.place),
