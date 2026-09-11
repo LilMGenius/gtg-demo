@@ -31,19 +31,19 @@ try {
     await page.goto(url, { waitUntil: "load" });
     await page.waitForSelector("#go", { timeout: ROUND_MS });
     await page.click("#go", { force: true });
-    await page.waitForFunction(() => document.querySelectorAll(".zone:not([disabled])").length === 3, null, { timeout: ROUND_MS });
+    await page.waitForFunction(() => document.querySelectorAll(".zone.live").length === 3, null, { timeout: ROUND_MS });
     return { ctx, page };
   };
   const waitRound = async (page) => {
     const before = await page.evaluate(() => document.querySelectorAll("#pips i.gone, #pips i.save").length);
     await page.waitForFunction((n) => document.querySelectorAll("#pips i.gone, #pips i.save").length > n, before, { timeout: ROUND_MS });
-    await page.waitForFunction(() => document.querySelectorAll(".zone:not([disabled])").length === 3, null, { timeout: ROUND_MS });
+    await page.waitForFunction(() => document.querySelectorAll(".zone.live").length === 3, null, { timeout: ROUND_MS });
   };
-  // 입력창이 닫힌 순간. 세 판이 모두 비활성이면 그 구는 이미 커밋됐고 판정은 굴러갔다.
-  const shut = (page) => page.waitForFunction(() => [...document.querySelectorAll(".zone")].every((b) => b.disabled), null, { timeout: ROUND_MS });
-  /* 창 밖의 판을 누르는 자리. 비활성 버튼은 click의 활성 검사에서 멈추므로 좌표로 직접 누른다. 실측으로
-     크롬은 비활성 버튼에도 pointerdown과 pointerup을 그대로 보내고 click과 mousedown만 죽이므로, 실제
-     손가락이 보내는 것과 같은 이벤트가 화면에 닿는다. dispatchEvent는 맞아도 히트테스트를 안 지난다. */
+  // 입력창이 닫힌 순간. 세 판이 모두 꺼져 있으면 그 구는 이미 커밋됐고 판정은 굴러갔다.
+  const shut = (page) => page.waitForFunction(() => [...document.querySelectorAll(".zone")].every((b) => !b.classList.contains("live")), null, { timeout: ROUND_MS });
+  /* 창 밖의 판을 누르는 자리. 판때기는 이제 어느 마디에서도 안 잠기지만 좌표로 직접 누르는 것은 그대로
+     둔다. 사람 손가락이 보내는 것과 같은 이벤트가 히트테스트를 지나 화면에 닿아야 하고, dispatchEvent는
+     맞아도 그 길을 안 지나기 때문이다. */
   const tap = async (page, dive) => {
     const box = await page.locator('.zone[data-dive="' + dive + '"]').boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -114,7 +114,7 @@ try {
       const flying = await page.evaluate(() => window.__lastInput);
       await tap(page, 1);
       const moved = await page.evaluate(() => ({
-        shut: [...document.querySelectorAll(".zone")].every((b) => b.disabled),
+        shut: [...document.querySelectorAll(".zone")].every((b) => !b.classList.contains("live")),
         dive: window.__lastInput?.dive,
       }));
       const movedMarks = await pressed(page);
@@ -157,7 +157,7 @@ try {
       await page.reload({ waitUntil: "load" });
       await page.waitForSelector("#go", { timeout: ROUND_MS });
       await page.click("#go", { force: true });
-      await page.waitForFunction(() => document.querySelectorAll(".zone:not([disabled])").length === 3, null, { timeout: ROUND_MS });
+      await page.waitForFunction(() => document.querySelectorAll(".zone.live").length === 3, null, { timeout: ROUND_MS });
       await waitRound(page);
       const after = await page.evaluate(() => ({ pref: JSON.parse(localStorage.getItem(window.__saveKey())).pref, dive: window.__lastInput?.dive }));
       check("save:preferred-left-survives-reload", saved?.pref === -1 && after.pref === -1 && after.dive === -1, JSON.stringify({ before: saved?.pref, after }));

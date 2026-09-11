@@ -53,12 +53,12 @@ const waitFrames = (page, n) => page.evaluate((k) => new Promise((done) => {
   requestAnimationFrame(tick);
 }), n);
 
-/* 방향키는 대기 마디에서만 먹는다(main.mjs setPad가 .zone을 잠갔다 연다). 닫힌 프레임에 누르면
-   그 누름이 판정에 안 들어가고, 키퍼가 제자리에 선 채로 여섯 사건이 같은 흙에 겹쳐 칠해진다.
+/* 방향키가 이 구의 판정에 들어가는 것은 대기 마디뿐이다(main.mjs setPad가 .zone에 live를 붙였다 뗀다). 닫힌 프레임에 누르면
+   그 누름은 선호만 옮기고, 키퍼가 제자리에 선 채로 여섯 사건이 같은 흙에 겹쳐 칠해진다.
    실측: 패드를 안 보고 누르면 클러스터가 회차마다 1과 3으로 갈렸다. walkback-gate.mjs의 padOpen과 같은 자다. */
 const padOpen = (page) => page.waitForFunction(() => {
   const z = document.querySelector(".zone");
-  return Boolean(z) && !z.disabled;
+  return Boolean(z) && z.classList.contains("live");
 }, null, { timeout: 120000, polling: "raf" });
 
 /* 사건을 프레임에 맡긴다(scene.mjs planAct). 바깥에서 __act를 부르면 왕복이 한두 프레임을 먹고,

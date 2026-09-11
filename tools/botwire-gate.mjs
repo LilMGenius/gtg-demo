@@ -81,7 +81,7 @@ try {
         if (until(base, now)) break;
       }
       if (clickPad) {
-        const z = await p.$(".zone:not([disabled])");
+        const z = await p.$(".zone.live");
         if (z) await z.click({ force: true });
       }
       const r = await p.evaluate(() => window.__botRan());
