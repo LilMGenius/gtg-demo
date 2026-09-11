@@ -53,6 +53,9 @@ const LADDER = Array.from({ length: STAGES }, (v, i) => i).join(",");
 const WANT = [0, 2, STAGES - 1];
 // 묶음 회차에서 안 연 채 남길 장수. 탭 축이 열 것이 없으면 그 축은 아무것도 안 잰다.
 const SPARE = 2;
+/* 길게 누름이 남은 것을 여는 것을 기다리는 상한. 제품 문턱이 0.45초라 여섯 배가 넘고,
+   문턱이 아니라 상한이므로 초록 회차에서는 0.5초 언저리에 풀린다. */
+const PRESS_MS = 3000;
 // 낱장 회차 상한. 좁은 창을 놓치면 다음 회차가 새로 열고, 여섯이면 화소 넷을 다 받고도 남는다.
 const SOLO_CAP = 6;
 // 창 하나를 기다리는 상한. 희귀 카드가 마지막 단까지 2.1초라 그보다 넉넉하다.
@@ -237,6 +240,41 @@ try {
   const want = () => pix.some((c) => c.f[0] && c.f[4]) && pix.some((c) => !c.rare && c.f[2] && c.f[4])
     && pix.some((c) => c.rare && c.f[4]) && pix.some((c) => !c.rare && c.f[4]);
 
+  /* 닫힌 판은 누를 자리가 없다. 빨간 자에서 한 번 더 누르면 거기서 오류로 끝나 결과 줄이 아예 안 남고,
+     무엇이 빨간지 못 읽는다. 누른 것과 누를 자리가 없던 것을 가르므로 축도 그 둘을 안 섞는다. */
+  const tap = async () => {
+    if (await p.evaluate(() => document.getElementById("pull").hidden)) return false;
+    await p.click("#pull", { force: true });
+    return true;
+  };
+
+  /* 길게 누른다. 손가락이 내려가 있는 동안 남은 것이 전부 열리는 물건이라 누름과 뗌을 따로 보내고,
+     열린 것을 보고 뗀다. 뗌이 뒤따라 보내는 누름은 제품이 삼키므로 여기서 다시 안 센다. */
+  const press = async () => {
+    if (await p.evaluate(() => document.getElementById("pull").hidden)) return false;
+    const spot = await p.locator("#pull .tap").boundingBox();
+    if (!spot) return false;
+    await p.mouse.move(spot.x + spot.width / 2, spot.y + spot.height / 2);
+    await p.mouse.down();
+    await p.waitForFunction((last) => {
+      const r = window.__reveal();
+      return r.drawn > 0 && r.shown === r.drawn && r.stage === last;
+    }, STAGES - 1, { timeout: PRESS_MS, polling: "raf" }).catch(() => {});
+    await p.mouse.up();
+    return true;
+  };
+
+  /* 화면을 닫는다. 다 안 열린 회차는 길게 눌러 전부 열고 그 다음 누름이 닫는다. 짧은 누름은 한 단만
+     올리므로 누름 수만 세어 닫으려 들면 열한 장짜리 회차가 영영 안 닫히고, 다음 회차가 선반에 못 닿는다. */
+  const dismiss = async () => {
+    for (let i = 0; i < 4; i += 1) {
+      if (await p.evaluate(() => document.getElementById("pull").hidden)) return;
+      await press();
+      await tap();
+      await p.waitForTimeout(220);
+    }
+  };
+
   /* 낱장 한 회차. 사서 봉인과 실루엣과 열린 단을 한 장씩 찍고 닫는다.
      닫아야 다음 회차를 산다. 개봉 화면이 선반을 통째로 덮기 때문이다. */
   const solo = async (kind) => {
@@ -256,11 +294,7 @@ try {
     /* 걸은 것을 여기서 접는다. 아래 닫기가 마지막 단으로 건너뛰므로, 닫은 뒤에 접으면
        그 건너뜀이 제품이 단을 빠뜨린 것으로 기록에 남는다. */
     fold(await drain());
-    for (let i = 0; i < 4; i += 1) {
-      if (await p.evaluate(() => document.getElementById("pull").hidden)) break;
-      await p.click("#pull", { force: true });
-      await p.waitForTimeout(200);
-    }
+    await dismiss();
   };
 
   await p.goto(BASE, { waitUntil: "load" });
@@ -269,11 +303,7 @@ try {
   await p.waitForTimeout(900);
   /* 처음 온 계정은 카드부터 연다. 그 흐름을 안 닫고 상점을 열면 이 자의 판정이
      첫 진입 개봉과 상점 개봉을 섞어 읽는다. 사람도 똑같이 닫고 나서 상점에 간다. */
-  for (let i = 0; i < 6; i += 1) {
-    if (await p.evaluate(() => document.getElementById("pull").hidden)) break;
-    await p.click("#pull", { force: true });
-    await p.waitForTimeout(350);
-  }
+  await dismiss();
   await p.evaluate(() => window.__shop(true));
   await p.waitForSelector("#shop .buy.pull", { timeout: 8000 });
 
@@ -383,11 +413,42 @@ try {
   }, SPARE, { timeout: 90000, polling: "raf" }).catch(() => {});
   fold(await drain());
 
-  // 건너뛰기. 기다리는 것이 연출이지 벌은 아니다.
-  await p.click("#pull");
+  /* 짧은 누름 한 번. 이것은 한 단만 올린다. 자동 사다리가 같은 창에서 또 올리면 이 축이 무엇을
+     잰 것인지 갈리므로, 누른 순간의 상태를 브라우저 안에서 잡아 그 짝과 비교한다. */
+  await p.evaluate(() => {
+    window.__tapAt = null;
+    document.addEventListener("pointerup", () => { window.__tapAt = window.__reveal(); }, true);
+  });
+  let step = null;
+  for (let i = 0; i < 6 && !step; i += 1) {
+    /* 판이 이미 걷혔으면 여기서 그친다. 없는 자리를 누르면 그 기다림이 결과 줄을 통째로 삼켜
+       무엇이 빨간지 못 읽는다. 누를 자리가 있고 아직 올릴 단이 남은 창만 이 손을 쓴다. */
+    const live = await p.waitForFunction((last) => {
+      const e = document.getElementById("pull");
+      if (!e || e.hidden) return { gone: true };
+      const r = window.__reveal();
+      return (r.drawn > 0 && r.shown > 0 && r.shown < r.drawn && r.stage < last) ? { gone: false } : null;
+    }, STAGES - 1, { timeout: 8000, polling: "raf" }).then((h) => h.jsonValue()).catch(() => ({ gone: true }));
+    if (live.gone) break;
+    await p.evaluate(() => { window.__tapAt = null; });
+    if (!(await tap())) break;
+    const seen = await p.evaluate(() => ({ pre: window.__tapAt, post: window.__reveal() }));
+    if (seen.pre && seen.pre.stage < STAGES - 1 && seen.pre.shown < seen.pre.drawn) step = seen;
+  }
+  check("instrument:a-tap-landed-while-a-stage-was-still-left", Boolean(step),
+    step ? "pressed at stage " + step.pre.stage + ", " + step.pre.shown + " of " + step.pre.drawn
+      : "no press landed below the last stage");
+  check("pullshow:a-tap-advances-one-stage",
+    Boolean(step) && step.post.shown === step.pre.shown && step.post.stage === step.pre.stage + 1,
+    step ? "stage " + step.pre.stage + " to " + step.post.stage + ", shown " + step.pre.shown
+      + " to " + step.post.shown + " of " + step.post.drawn : "unmeasured");
+
+  // 길게 누르면 남은 것이 한 번에 열린다. 기다리는 것이 연출이지 벌은 아니다.
+  await press();
   await p.waitForTimeout(260);
   const skipped = await p.evaluate(() => window.__reveal());
-  check("pullshow:one-tap-opens-the-rest", skipped.shown === skipped.drawn,
+  check("pullshow:a-long-press-opens-the-rest-at-once",
+    skipped.drawn > 0 && skipped.shown === skipped.drawn,
     skipped.shown + " of " + skipped.drawn);
   const done = await p.evaluate(() => document.querySelectorAll("#pull .done i").length);
   check("pullshow:the-cards-already-opened-stay-on-screen", done === skipped.drawn - 1,
@@ -397,10 +458,11 @@ try {
   check("pullshow:the-skipped-card-lands-fully-open",
     landed.stage === STAGES - 1 && landed.rows === STAT_ROWS,
     "stage " + landed.stage + " of " + (STAGES - 1) + ", " + landed.rows + " stat rows");
-  await p.click("#pull");
+  const closing = await tap();
   await p.waitForTimeout(220);
   const closed = await p.evaluate(() => document.getElementById("pull").hidden);
-  check("pullshow:the-next-tap-closes-it", closed === true, "hidden " + closed);
+  check("pullshow:the-next-tap-closes-it", closing && closed === true,
+    "tapped " + closing + ", hidden " + closed);
 
   /* 전설 선반 낱장. 하한이 명성 9라 이 회차의 카드는 반드시 희귀하고, 등급 축 둘이 여기서 표본을 받는다.
      동네 열한 장은 명성 9가 무게로 8.5%뿐이라 한 장도 안 나오는 회차가 셋에 하나꼴이고,
