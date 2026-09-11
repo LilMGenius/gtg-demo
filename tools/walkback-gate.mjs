@@ -269,11 +269,11 @@ const waitFrames = (page, n) => page.evaluate((k) => new Promise((done) => {
   requestAnimationFrame(tick);
 }), n);
 
-/* 방향키는 대기 마디에서만 먹는다. 그 마디가 열렸는지는 다이브 패드의 zone 단추가 살아 있는지로
-   읽는다(main.mjs setPad). 패드가 열린 프레임에 눌러야 그 누름이 판정에 들어간다. */
+/* 방향키가 이 구의 판정에 들어가는 것은 대기 마디뿐이다. 그 마디가 열렸는지는 다이브 패드의 zone 단추가 열려 있는지로
+   읽는다(main.mjs setPad). 패드가 열린 프레임에 눌러야 그 누름이 판정에 들어가고, 닫힌 프레임의 누름은 선호만 옮긴다. */
 const padOpen = (page) => page.waitForFunction(() => {
   const z = document.querySelector(".zone");
-  return Boolean(z) && !z.disabled;
+  return Boolean(z) && z.classList.contains("live");
 }, null, { timeout: 60000, polling: "raf" });
 
 /* 개봉 자리를 치운다. 짧은 누름은 한 단만 올리므로(main.mjs LONG_MS 450) 정해진 횟수만 두드리면
@@ -333,7 +333,7 @@ async function carrySample(browser, routed, seed, dir, home) {
       const k = window.__keeperPos();
       const b = window.__ballPos();
       const zone = document.querySelector(".zone");
-      const open = Boolean(zone) && !zone.disabled;
+      const open = Boolean(zone) && zone.classList.contains("live");
       if (centre && open && !armed) {
         const out = document.getElementById("out");
         if (out && !out.classList.contains("on")) out.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));

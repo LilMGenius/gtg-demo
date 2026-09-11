@@ -25,11 +25,16 @@ const CORNER = 25;
 // 봇이 선호와 다른 쪽을 고르는 구를 기다리는 상한. 판단력이 낮을수록 세 쪽을 고르게 굴리므로 넷이면 넉넉하다.
 const BOT_BALLS = 4;
 /* 손 모드 입력창은 비행 0.55~1.1초에 꼬리 0.26초라 가장 짧은 구가 0.81초다. 창이 닫힌 뒤의 누름은
-   chooseDive의 phase 관문에서 그대로 돌아가므로 놓친 창은 다음 구에서 다시 잡는다. 세 구를 다 놓치면
+   판정에 안 들어가고 선호만 옮기므로(main.mjs chooseDive) 놓친 창은 다음 구에서 다시 잡는다. 세 구를 다 놓치면
    그것은 창이 아니라 화면이 누름을 안 받는 것이다. */
 const PRESS_TRIES = 3;
 // 누름이 실제 입력으로 커밋됐는지 기다리는 상한. 커밋은 pointerdown과 같은 태스크에서 끝나므로 1초면 넉넉하다.
 const PRESS_MS = 1000;
+/* 자막 한 줄은 제 타이머로 0.85초를 산다(main.mjs rollCaptions). 막 선 줄에서 누르면 다음 걸음까지
+   그만큼 남으므로, 이 안에 줄이 바뀌면 그 걸음은 타이머가 아니라 손가락이다. */
+const SKIP_MS = 250;
+/* 심은 disabled를 프레임마다 세는 창. 비행 한 마디보다 짧아야 그 구를 안 넘기고 도로 뽑는다. */
+const PLANT_MS = 200;
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, WATCHDOG_MS);
 t.unref();
@@ -46,7 +51,7 @@ const SEEN_SHARE = 0.12;
    정수로 끊기는 offset과 소수로 오는 상자를 같이 품는다. */
 const TILE_TOL = 2;
 /* 길이 어느 쪽으로 갈라져도 판정 줄 수는 이만큼이다. 줄 수를 세는 축 자신은 빼고 센 값이다. */
-const ROWS = 24;
+const ROWS = 28;
 /* 봇이 갈린 구를 안 내주면 그 뒤 축들은 잴 기회가 없다. 그때 줄을 통째로 빼면 못 잰 축이 통과한 축으로
    읽히고 판정 수만 조용히 줄어든다. 못 쟀다고 적어 빨간 줄로 남긴다. */
 const unmeasured = (names, why) => { for (const n of names) check(n, false, "unmeasured: " + why); };
@@ -108,11 +113,11 @@ const marks = (p) => p.evaluate(() => [...document.querySelectorAll(".zone")].ma
   pref: b.classList.contains("pref"),
   pressed: b.getAttribute("aria-pressed"),
   badge: Boolean(b.querySelector(".bot:not([hidden])")),
-  off: b.disabled,
+  off: !b.classList.contains("live"),
 })));
-const open = (p) => p.waitForFunction(() => document.querySelectorAll(".zone:not([disabled])").length === 3, null, { timeout: ROUND_MS });
+const open = (p) => p.waitForFunction(() => document.querySelectorAll(".zone.live").length === 3, null, { timeout: ROUND_MS });
 // 한 구가 커밋되는 순간. commit이 setPad(false)와 markDive를 같은 태스크에서 끝내므로 그 구가 그린 표시를 본다.
-const shut = (p) => p.waitForFunction(() => [...document.querySelectorAll(".zone")].every((b) => b.disabled), null, { timeout: ROUND_MS });
+const shut = (p) => p.waitForFunction(() => [...document.querySelectorAll(".zone")].every((b) => !b.classList.contains("live")), null, { timeout: ROUND_MS });
 /* 첫 입력창은 #hud가 0.3초 동안 떠오르는 도중에 열린다. 그 사이에 찍은 판 셋은 같은 판인데도 밝기가
    28 갈렸다. 판을 찍는 것은 덮개가 완전히 뜬 뒤여야 한다. */
 const settled = (p) => p.waitForFunction(() => getComputedStyle(document.getElementById("hud")).opacity === "1", null, { timeout: 5000 });
@@ -125,6 +130,34 @@ const back = (p, sel) => p.waitForFunction((s) => {
   const e = document.querySelector(s);
   return Boolean(e) && e.getBoundingClientRect().x >= 0 && e.getAnimations().length === 0;
 }, sel, { timeout: 5000 });
+/* 프레임마다 패드를 훑는 자. 한 구는 대기와 비행과 자막과 쉬는 참으로 마디를 갈아타므로 스냅숏 한 장은
+   그중 한 마디만 본다. 죽은 단추가 한 프레임도 없다는 말은 프레임마다 세야 주장이 된다.
+   마디는 자막으로 읽는다. 커밋이 자막을 비우고(main.mjs commit) 되감기 줄만 .tick을 달기 때문에,
+   빈 자막은 비행이고 .tick이 붙은 줄은 쉬는 참이며 나머지는 글자가 선 마디다. */
+const watch = (p) => p.evaluate(() => {
+  if (window.__zpad) window.__zpad.on = false;
+  const s = { on: true, frames: 0, off: 0, air: 0, line: 0, rest: 0, first: null };
+  window.__zpad = s;
+  const tick = () => {
+    if (!s.on) return;
+    const dead = [...document.querySelectorAll(".zone")].filter((z) => z.hasAttribute("disabled"));
+    s.frames += 1;
+    if (dead.length) { s.off += 1; if (!s.first) s.first = dead.map((z) => z.dataset.dive).join("/"); }
+    const cap = document.getElementById("caption");
+    if (!cap.textContent.trim()) s.air += 1;
+    else if (cap.querySelector(".tick")) s.rest += 1;
+    else s.line += 1;
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+});
+const reap = (p) => p.evaluate(() => {
+  const s = window.__zpad;
+  s.on = false;
+  return { frames: s.frames, off: s.off, air: s.air, line: s.line, rest: s.rest, first: s.first };
+});
+const sayWatch = (w) => w.off + " of " + w.frames + " frames carried disabled (" + (w.first || "none")
+  + "), phases air " + w.air + " line " + w.line + " rest " + w.rest;
 const waitRound = async (p) => {
   const before = await p.evaluate(() => document.querySelectorAll("#pips i.gone, #pips i.save").length);
   await p.waitForFunction((n) => document.querySelectorAll("#pips i.gone, #pips i.save").length > n, before, { timeout: ROUND_MS });
@@ -176,8 +209,9 @@ try {
     for (; tries < PRESS_TRIES && !hit; tries += 1) {
       const t0 = Date.now();
       const f = await frame(p, rects);
-      shutter = Date.now() - t0;
-      rest = f.lum; restMarks = f.ms;
+      /* 손 안 댄 판을 찍는 것은 첫 시도뿐이다. 놓친 누름도 이제 선호를 옮기므로, 두 번째 창의 판때기는
+         이미 한쪽이 서 있는 판이고 아무도 안 누른 대기 상태의 기준선이 아니다. */
+      if (!tries) { shutter = Date.now() - t0; rest = f.lum; restMarks = f.ms; }
       await press(p);
       hit = await took(p);
       if (!hit) await waitRound(p);
@@ -262,9 +296,9 @@ try {
      빠지면 그 자리가 배경으로 남고 남은 둘이 넓어진다. 문법 다섯 중 창 열림은 hand-gate가 같은 패드에서
      이미 재므로 여기에 두 번 세우지 않는다.
      판을 잠그고 잰다. 구가 굴러가면 두 프레임 사이에 공과 자막이 바뀌어, 센 화소가 판때기가 아니라 그
-     판의 것이 된다. 잠긴 판에서 패드는 비활성으로 흐려지지만 선호 표기는 그대로 칠해진다. hud.css에서
-     .zone.pref>svg가 .zone:disabled svg 뒤에 서서 같은 특이도로 이기기 때문이다. 선호를 옮기는 것은
-     pointerup이고 그 자리에는 창 관문이 없으므로, 잠긴 판에서도 사람 손가락과 같은 길로 옮겨 간다. */
+     판의 것이 된다. 잠긴 판에서 패드는 흐려지지만 선호 표기는 그대로 칠해진다. hud.css에서
+     .zone.pref>svg가 .zone:not(.live) svg 뒤에 서서 같은 특이도로 이기기 때문이다. 선호를 옮기는 것은
+     pointerdown이고 그 자리에는 창 관문이 없으므로, 잠긴 판에서도 사람 손가락과 같은 길로 옮겨 간다. */
   {
     const { ctx, p } = await start(BASE);
     await settled(p);
@@ -461,6 +495,86 @@ try {
     await ctx.close();
   }
 
+  /* 입력 문법 셋. 위의 축들은 판때기의 칠을 재므로 누름이 무엇을 뜻하는지가 어긋나도 초록이 난다.
+     여기서 재는 것은 칠이 아니라 한 번의 누름이 한 뜻을 갖는가다. 방향 선택은 판이 사는 동안 언제든
+     바뀌므로 창은 판정을 받는 구간일 뿐이고, 창 밖의 누름도 방향이다. */
+  {
+    const { ctx, p } = await start(BASE);
+    await settled(p);
+    await watch(p);
+    const capOf = () => p.evaluate(() => document.getElementById("caption").textContent.trim());
+    const pressedOn = (ms, dive) => ms.length === 3 && ms.every((m) => m.pressed === String(m.dive === dive));
+    const prefOf = (ms) => { const m = ms.find((x) => x.pref); return m ? m.dive : null; };
+    // 손가락. 좌표로 눌러야 히트테스트를 지난다. 뗌은 따로 보내 누름 하나만 읽는다.
+    const fingerDown = async (dive) => {
+      const box = await p.locator('.zone[data-dive="' + dive + '"]').boundingBox();
+      await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await p.mouse.down();
+    };
+
+    /* 하나. 방향키는 창 밖에서도 선호를 옮긴다. 이 구의 판정은 이미 굴러갔으므로 __lastInput은 그대로여야
+       하고 눌린 표시만 옮겨 가야 한다. 창이 닫힌 뒤에 눌러야 창 밖이다. */
+    await shut(p);
+    const flew = await p.evaluate(() => window.__lastInput);
+    const keyBefore = await marks(p);
+    await p.keyboard.press("ArrowRight");
+    await p.waitForFunction(() => document.querySelector('.zone[data-dive="1"]').getAttribute("aria-pressed") === "true",
+      null, { timeout: SKIP_MS }).catch(() => {});
+    const keyAfter = await marks(p);
+    const keyInput = await p.evaluate(() => window.__lastInput);
+    check("ux:an-arrow-key-outside-the-window-moves-the-preference",
+      pressedOn(keyBefore, 0) && pressedOn(keyAfter, 1) && prefOf(keyAfter) === 1
+        && keyInput && flew && keyInput.dive === flew.dive && keyInput.errMs === flew.errMs && keyInput.auto === flew.auto,
+      "aria " + keyBefore.map((m) => m.pressed).join("/") + " then " + keyAfter.map((m) => m.pressed).join("/")
+      + ", the flying ball judged " + JSON.stringify(flew) + " then " + JSON.stringify(keyInput));
+
+    /* 둘. 자막 위의 누름 한 번은 넘기기이면서 방향이다. 손가락이 내려간 채로 읽는 이유는 그 둘이 누름과
+       뗌에 나뉘어 있었기 때문이다. 나뉘어 있으면 같은 손짓이 두 뜻을 갖고, 뗌이 안 오는 누름은 방향을
+       잃는다. 자막 한 줄은 제 타이머로 0.85초를 사니 SKIP_MS 안의 걸음은 타이머가 아니라 손가락이다. */
+    await p.waitForFunction(() => {
+      const c = document.getElementById("caption");
+      return Boolean(c.textContent.trim()) && !c.querySelector(".tick");
+    }, null, { timeout: ROUND_MS });
+    const line = await capOf();
+    const capBefore = await marks(p);
+    const t0 = Date.now();
+    await fingerDown(-1);
+    const stepped = await p.waitForFunction((s) => document.getElementById("caption").textContent.trim() !== s,
+      line, { timeout: SKIP_MS }).then(() => true).catch(() => false);
+    const stepMs = Date.now() - t0;
+    const capDown = await marks(p);
+    await p.mouse.up();
+    const capUp = await marks(p);
+    check("ux:a-pad-press-during-a-caption-skips-and-sets-the-direction",
+      stepped && prefOf(capBefore) !== -1 && pressedOn(capDown, -1),
+      "the line stepped " + (stepped ? "in " + stepMs + "ms" : "not inside " + SKIP_MS + "ms")
+      + ", preference " + JSON.stringify(prefOf(capBefore)) + " with the finger down " + JSON.stringify(prefOf(capDown))
+      + " and after the lift " + JSON.stringify(prefOf(capUp)));
+
+    /* 셋. 어느 마디에도 죽은 단추가 없다. 한 구를 통째로 지난 표본이라야 그 말이 선다. 마디는 자막으로
+       가른다. 빈 자막은 비행, .tick은 쉬는 참, 나머지는 글자가 선 마디다. */
+    await waitRound(p);
+    const seen = await reap(p);
+    check("ux:no-pad-is-ever-disabled",
+      seen.off === 0 && seen.frames > 0 && seen.air > 0 && seen.line > 0 && seen.rest > 0, sayWatch(seen));
+
+    /* 대조군. 0을 재는 축은 대조군이 양수를 내야 설계다. 비행 중에 disabled를 도로 심으면 그 프레임이
+       잡혀야 하고, 심기 전후의 깨끗한 프레임도 같은 표본에 있어야 심은 것이 잡힌 것으로 읽힌다. */
+    await watch(p);
+    await shut(p);
+    const planted = await p.evaluate((ms) => new Promise((done) => {
+      const zs = [...document.querySelectorAll(".zone")];
+      for (const z of zs) z.setAttribute("disabled", "");
+      setTimeout(() => { for (const z of zs) z.removeAttribute("disabled"); done(true); }, ms);
+    }), PLANT_MS);
+    const hurt = await reap(p);
+    const healed = await p.evaluate(() => document.querySelectorAll(".zone[disabled]").length);
+    check("control:a-planted-disabled-reddens-the-never-disabled-axis",
+      planted === true && hurt.off > 0 && hurt.frames > hurt.off && healed === 0,
+      "planting disabled for " + PLANT_MS + "ms caught " + hurt.off + " of " + hurt.frames
+      + " frames on " + (hurt.first || "none") + ", pulled back to " + healed + " dead pads");
+    await ctx.close();
+  }
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   /* 못 잰 축을 빨간 줄로 남기는 것과 그 줄이 실제로 다 나왔는지는 다른 주장이다. 뒤엣것을 여기서 센다. */
   const drawn = notes.length + fails.length;

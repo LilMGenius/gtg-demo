@@ -95,9 +95,9 @@ async function snap(page, id, sel) {
 }
 
 const padOpen = (page) => page.waitForFunction(
-  () => document.querySelectorAll(".zone:not([disabled])").length === 3, null, { timeout: STEP_MS });
+  () => document.querySelectorAll(".zone.live").length === 3, null, { timeout: STEP_MS });
 const padShut = (page) => page.waitForFunction(
-  () => Array.from(document.querySelectorAll(".zone")).every((b) => b.disabled), null, { timeout: STEP_MS });
+  () => Array.from(document.querySelectorAll(".zone")).every((b) => !b.classList.contains("live")), null, { timeout: STEP_MS });
 /* 창이 닫힌 것을 기다리는 자리. waitForSelector는 기본이 보일 때까지라 숨은 요소에 물으면 영영 안 온다.
    실측으로 훈련장을 닫고 26초를 기다리다 죽었다. 숨은 것은 보이기가 아니라 속성으로 묻는다. */
 /* 창이 닫히면 HUD 기둥이 0.24초 동안 제자리로 미끄러져 돌아온다. 그 사이에 누르면 아직 화면 밖인
@@ -309,8 +309,8 @@ async function ballsLeg(page) {
     }
     if (i === 1) {
       /* 창이 닫힌 뒤에 선호를 옮긴다. 방향은 차기 전에만 바꾸는 것이 아니라 판이 살아 있는 동안
-         언제든 바뀌어야 한다는 파운더 지적의 자리다. 비활성 버튼은 click의 활성 검사에서 멈추므로
-         좌표로 실제 포인터를 보낸다. 크롬은 비활성 버튼에도 pointerdown과 pointerup을 그대로 보낸다. */
+         언제든 바뀌어야 한다는 파운더 지적의 자리다. 판때기는 이제 안 잠기지만 손가락과 같은 길로 눌러야 하므로
+         좌표로 실제 포인터를 보낸다. 방향은 pointerdown에서 서고 뗌은 아무 일도 안 한다. */
       await padShut(page);
       const flying = await page.evaluate(() => window.__lastInput);
       const box = await page.locator(".zone[data-dive='1']").boundingBox();
@@ -319,7 +319,7 @@ async function ballsLeg(page) {
       await page.mouse.up();
       mid = {
         flying,
-        shut: await page.evaluate(() => Array.from(document.querySelectorAll(".zone")).every((b) => b.disabled)),
+        shut: await page.evaluate(() => Array.from(document.querySelectorAll(".zone")).every((b) => !b.classList.contains("live"))),
         held: await page.evaluate(() => window.__lastInput),
         marks: await marks(page)
       };

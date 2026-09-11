@@ -396,8 +396,11 @@ function formChip() {
   box.setAttribute('title', name);
 }
 
+/* 창은 판정을 받는 구간이지 방향을 고르는 구간이 아니다. 단추를 disabled로 잠그면 그 둘이 한 속성에 묶여,
+   읽어 주는 자와 탭 이동에는 죽은 단추라고 말하면서 손가락의 누름은 그대로 받아 선호를 옮겼다. 열림은
+   클래스가 들고 disabled는 어느 마디에도 안 붙는다. 흐림은 hud.css의 .zone:not(.live) svg가 그대로 그린다. */
 function setPad(on) {
-  for (const b of document.querySelectorAll('.zone')) b.disabled = !on;
+  for (const b of document.querySelectorAll('.zone')) b.classList.toggle('live', on);
 }
 
 function markDive(dive, bot) {
@@ -578,11 +581,20 @@ function commit(dive) {
   stage.play(shot, input, result, () => rollCaptions(result));
 }
 
-// 패드를 누른 순간 다음 무입력 구에도 남을 선호를 저장한다.
+/* 패드 누름 한 번은 언제나 이 방향이라는 뜻이다. 창 안이면 그 뜻이 이 구의 입력이기도 해서 판정까지 굴리고,
+   창 밖이면 다음 구부터 설 선호만 옮긴다. 자막 위의 방향 누름은 넘기기이면서 방향이다. 한 누름이 둘 다 하는
+   것이 맞는 이유는, 자막을 접으려고 누르는 손과 방향을 바꾸려고 그 칸을 누르는 손이 같은 손짓이어서다.
+   나누면 방향을 바꾸려던 누름이 넘기기로만 먹히고 방향은 다음 창까지 안 선다.
+   봇 모드 관문은 창 밖에만 선다. 봇이 대신 고르는 동안에는 선호를 안 건드리고, 창 안에서 사람이 누른 구는
+   그 손이 가져간다. */
 function chooseDive(dive) {
-  if (state.phase !== 'wait') return;
-  setPref(dive);
-  commit(dive);
+  if (state.phase === 'wait') {
+    setPref(dive);
+    commit(dive);
+    return;
+  }
+  if (!state.auto) setPref(dive);
+  if (state.phase === 'caption' && state.skip) state.skip();
 }
 
 /* 방향 선택은 판이 사는 동안 언제든 바뀐다. 킥 앞에만 열어 두면 막는 중에 마음이 바뀐 사람이 다음 창까지
@@ -2388,16 +2400,12 @@ function closeShop() {
 }
 
 for (const b of document.querySelectorAll('.zone')) {
-  b.onpointerdown = () => {
-    if (state.phase === 'caption') return state.skip && state.skip();
-    chooseDive(Number(b.dataset.dive));
-  };
-  /* 누름이 끝난 자리가 다음 구의 선호다. 창 안에서는 chooseDive가 같은 값을 이미 세워 두므로 이 줄이
-     실제로 움직이는 것은 창이 닫혀 있을 때뿐이고, 그때 흐린 화살표를 눌러도 표시가 바로 옮겨 간다. 누른
-     순간이 아니라 손가락이 올라오는 순간을 읽는 이유는, 창 안에서는 누른 시각이 곧 입력이라 pointerdown이
-     판정을 굴려야 하지만 창 밖에는 잴 시각이 없어서다. 비활성 버튼에도 pointerdown과 pointerup은 그대로
-     오고 click과 mousedown만 안 온다(실측). 봇 모드는 봇이 대신 고르므로 그대로 둔다. */
-  b.onpointerup = () => { if (!state.auto) setPref(Number(b.dataset.dive)); };
+  /* 방향은 누르는 순간에 정해진다. 창 안에서는 누른 시각이 곧 입력이라 pointerdown이 판정을 굴려야 하고,
+     창 밖의 같은 누름도 같은 순간에 방향을 세워야 한 손짓이 한 뜻을 갖는다. 예전에는 창 밖의 선호가
+     pointerup에 달려 있어서, 누르고 끄는 손가락은 방향을 못 옮기고 자막 위의 누름은 넘기기와 방향이
+     따로 놀았다. 비활성 단추에도 pointerdown과 pointerup은 그대로 오고 click과 mousedown만 안 온다(실측).
+     지금은 어느 마디에서도 단추를 안 잠그므로 그 사정에 기대지 않는다. */
+  b.onpointerdown = () => chooseDive(Number(b.dataset.dive));
 }
 const autoBtn = el('auto');
 autoBtn.classList.toggle('on', state.auto);
@@ -2526,10 +2534,11 @@ el('out').onpointerdown = () => {
   el('out').classList.toggle('on', advance > 0);
 };
 addEventListener('keydown', (e) => {
-  if (state.phase === 'caption' && state.skip) return state.skip();
-  if (e.key === 'ArrowLeft') chooseDive(-1);
-  if (e.key === 'ArrowRight') chooseDive(1);
-  if (e.key === 'ArrowUp' || e.key === ' ') chooseDive(0);
+  // 방향키는 손가락과 같은 문법을 따른다. 창 안이면 판정을 굴리고, 창 밖이면 선호만 옮기고 자막이 서 있으면 같이 넘긴다.
+  if (e.key === 'ArrowLeft') return chooseDive(-1);
+  if (e.key === 'ArrowRight') return chooseDive(1);
+  if (e.key === 'ArrowUp' || e.key === ' ') return chooseDive(0);
+  if (state.phase === 'caption' && state.skip) state.skip();
 });
 
 markDive(state.pref, false);

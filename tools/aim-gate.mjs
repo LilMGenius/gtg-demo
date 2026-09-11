@@ -47,9 +47,9 @@ try {
       await p.click("#go", { force: true });
       await p.waitForTimeout(1400);
       const at = async (n) => p.waitForFunction((m) => window.__frames() >= m, n, { timeout: 20000 });
-      // 다이빙은 대기 상태에서만 먹는다. 잠으로 그 순간을 맞추려 하면 그날의 부하가 맞추고,
-      // 안 맞은 날은 키가 조용히 무시되어 키퍼가 가운데 선 채로 측정된다.
-      await p.waitForSelector(".zone:not([disabled])", { timeout: 15000 });
+      // 이 구를 굴리는 다이빙은 대기 상태에서만 먹는다. 창 밖의 방향키는 선호만 옮기고 그 구는 가운데
+      // 선 채로 지나가므로, 잠으로 그 순간을 맞추려 하면 그날의 부하가 대신 맞춘다.
+      await p.waitForSelector(".zone.live", { timeout: 15000 });
       await p.keyboard.press("ArrowLeft");
       // 다이빙은 대기창이 열린 순간이 아니라 런업과 비행의 앞부분이 지난 뒤에 시작한다.
       // 프레임 수로 끊으면 그 전에 사건을 걸어 키퍼가 가운데 선 채로 채취된다. 실측으로

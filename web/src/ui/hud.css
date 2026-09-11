@@ -299,9 +299,11 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 .zone:active svg{color:#ffd83d;background:#2a3520;
   transform:rotate(var(--tw)) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 /* 12% 흰색은 판때기가 어두워지면서 글리프가 통째로 사라졌다. 대기 상태도 화살표는
-   읽혀야 하고, 꺼졌다는 신호는 밝기 차이로 충분하다. */
-.zone:disabled svg{color:#f6efdc5c}
-.zone:disabled{cursor:default}
+   읽혀야 하고, 꺼졌다는 신호는 밝기 차이로 충분하다. 흐림이 :disabled가 아니라 클래스에 붙는 이유는
+   이 단추가 죽은 적이 없기 때문이다. 창이 닫힌 것은 이 구의 판정을 더 안 받는다는 뜻이고, 방향은
+   그동안에도 이 단추로 바뀐다. 특이도는 전과 같은 (0,2,1)이라 아래의 .zone.pref>svg가 순서로 이긴다.
+   커서를 default로 죽이던 줄은 같이 걷었다. 눌리는 단추가 안 눌리는 얼굴을 할 이유가 없다. */
+.zone:not(.live) svg{color:#f6efdc5c}
 .zone.pref>svg{color:#0d110c;background:#ffd83d;box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel)}
 .zone .bot{position:absolute;right:var(--gap-2);bottom:calc(var(--gap-2) + env(safe-area-inset-bottom));
   width:var(--fs-title);height:var(--fs-title);display:none;place-items:center;
