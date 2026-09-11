@@ -133,6 +133,14 @@ async function hold(page) {
   return ms;
 }
 
+/* 마지막 단의 그림은 brightness(0)에서 제 색으로 0.22초에 걸쳐 돌아온다. 그 도중에 찍으면 다 열린
+   카드가 어두운 판으로 남아, 아무도 본 적 없는 그림이 연출의 증거가 된다. 실측으로 긴 누름 직후에
+   찍은 넉 장이 전부 그 중간 프레임이었다. 필터가 none으로 앉은 뒤에 찍는다. */
+const lit = (page) => page.waitForFunction(() => {
+  const img = document.querySelector("#pull .now img");
+  return Boolean(img) && getComputedStyle(img).filter === "none";
+}, null, { timeout: STEP_MS, polling: "raf" });
+
 const revealAt = (page) => page.evaluate(() => {
   const box = document.getElementById("pull");
   const now = box.querySelector(".now");
@@ -147,6 +155,8 @@ const revealAt = (page) => page.evaluate(() => {
     name: nameEl ? nameEl.textContent : "",
     rows: box.querySelectorAll(".now .stats span").length,
     seal: Boolean(now && now.querySelector(".seal")),
+    // 그림에 걸린 필터. 단이 올라도 이 값이 안 앉으면 화면은 아직 지난 단의 밝기다.
+    dim: (function () { const i = box.querySelector(".now img"); return i ? getComputedStyle(i).filter : ""; }()),
     r: window.__reveal()
   };
 });
@@ -206,6 +216,7 @@ async function revealLeg(page) {
   const shotAt = await revealAt(page);
   await snap(page, "04-reveal-stage1-card", "#pull .now");
   const held = await hold(page);
+  await lit(page).catch(() => {});
   const opened = await revealAt(page);
   await snap(page, "05-reveal-end");
   await snap(page, "05-reveal-end-card", "#pull .now");
@@ -217,6 +228,7 @@ async function revealLeg(page) {
   await snap(page, "06-kicker-sealed");
   await snap(page, "06-kicker-sealed-card", "#pull .now");
   const heldK = await hold(page);
+  await lit(page).catch(() => {});
   const allK = await revealAt(page);
   await snap(page, "07-kickers-all");
   put("revealKickers", { sealed: kick, held: heldK, opened: allK });
