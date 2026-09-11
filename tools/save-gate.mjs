@@ -210,6 +210,59 @@ try {
     && half.rk.length === 1 && half.fk[0] === half.rk[0],
     "stamped 1 with the rapport already at " + FACE_FIX.city + ":" + seatNow + ", so rapport stayed on "
     + half.rapWho + " and the follow arrived at " + JSON.stringify(half.fk) + " which is " + half.who);
+  /* 같은 저장의 글. 팔로우와 달리 (도시, 번호)가 키가 아니라 기록 안에 칸으로 박혀 있고, 피드의 선팔
+     버튼이 그 칸을 그대로 whoKey에 넘긴다(web/src/main.mjs folBtn). 댓글 한 장과 사진 한 장을 그 시절
+     번호에 앉히고 다시 읽는다. 묻는 것은 여기서도 번호가 아니라 이름이다. */
+  const seatPosts = async (stamp) => {
+    await p.evaluate(([f, g, v]) => {
+      const s = JSON.parse(localStorage.getItem(window.__saveKey()));
+      const old = f.city + ":" + f.was;
+      // 판 2로 찍힌 저장은 라포와 사회가 이미 지금 자리에 앉아 있고 글만 옛 자리에 남아 있다.
+      const held = v === null ? old : f.city + ":" + f.now;
+      if (v === null) delete s.faces; else s.faces = v;
+      s.rapport = { [held]: f.n };
+      s.social = { follows: { [held]: g.back }, dm: { [held]: { at: g.at } } };
+      s.posts = [
+        { n: f.name, c: false, g: 0, t: "cm", lb: 0, ct: f.city, l: 1,
+          cm: { city: f.city, passer: f.was, tier: 3, who: f.name, text: "x" } },
+        { n: f.name, c: false, g: 0, t: "ph", lb: 0, ct: f.city, l: 1,
+          ph: { city: f.city, passer: f.was, tier: 3, h: 186, w: 80, look: {} } }
+      ];
+      localStorage.setItem(window.__saveKey(), JSON.stringify(s));
+    }, [Object.assign({ now: seatNow }, FACE_FIX), SOCIAL_FIX, stamp]);
+    await p.reload({ waitUntil: "load" });
+    await p.waitForTimeout(900);
+    const got = await p.evaluate(() => ({ posts: window.__posts(), social: window.__social(), rap: window.__rapport() }));
+    const list = Array.isArray(got.posts) ? got.posts : [];
+    const cm = (list.find((x) => x && x.cm) || {}).cm || null;
+    const ph = (list.find((x) => x && x.ph) || {}).ph || null;
+    const nameAt = (i) => (Number.isFinite(i) && i >= 0 ? (passerAt(FACE_FIX.city, i) || {}).name : null);
+    const oneSeat = (m) => { const k = Object.keys(m || {}); return k.length === 1 ? Number(k[0].split(":")[1]) : -1; };
+    const cmAt = cm ? Math.floor(Number(cm.passer)) : -1;
+    const phAt = ph ? Math.floor(Number(ph.passer)) : -1;
+    const rapSeat = oneSeat(got.rap);
+    const folSeat = oneSeat(got.social && got.social.follows);
+    return { cmAt, phAt, cmWho: nameAt(cmAt), phWho: nameAt(phAt), printed: cm ? cm.who : null,
+      rapSeat, folSeat, rapWho: nameAt(rapSeat), folWho: nameAt(folSeat) };
+  };
+  const carriedPosts = await seatPosts(null);
+  check("save:a-reordered-face-table-keeps-an-old-post-on-the-same-person",
+    carriedPosts.cmWho === FACE_FIX.name && carriedPosts.phWho === FACE_FIX.name
+    && carriedPosts.cmAt === carriedPosts.phAt && carriedPosts.printed === FACE_FIX.name,
+    "wrote a comment post and a photo post on " + FACE_FIX.city + ":" + FACE_FIX.was + ", the seat "
+    + FACE_FIX.name + " held in the old table, and read back the comment at " + carriedPosts.cmAt
+    + " and the photo at " + carriedPosts.phAt + " which is " + carriedPosts.cmWho
+    + ", under the card name " + carriedPosts.printed);
+  /* 판 2로 찍힌 저장. 라포와 팔로우는 이미 옮겨졌고 글만 옛 자리에 남은 세대다. 앞의 두 걸음을 다시
+     밟으면 한 번 옮긴 키가 또 움직인다. 넷이 한 사람 위에 서야 통과다. */
+  const lastLeg = await seatPosts(2);
+  check("save:a-save-stamped-before-the-posts-step-moves-only-what-is-left",
+    lastLeg.rapWho === FACE_FIX.name && lastLeg.folWho === FACE_FIX.name
+    && lastLeg.rapSeat === lastLeg.folSeat && lastLeg.cmWho === FACE_FIX.name
+    && lastLeg.phWho === FACE_FIX.name && lastLeg.cmAt === lastLeg.rapSeat,
+    "stamped 2 with rapport and the follow already at " + FACE_FIX.city + ":" + seatNow
+    + ", so they stayed on " + lastLeg.rapWho + " and " + lastLeg.folWho + " and the posts arrived at "
+    + lastLeg.cmAt + "/" + lastLeg.phAt + " which is " + lastLeg.cmWho);
   /* 심은 대조군. 이동표를 안 읽는 판을 라우팅한다. 서버가 no-store라 새로 읽어 간다.
      같은 저장이 옛 자리에 그대로 남고 그 자리가 이제 다른 사람이어야, 위 축이 이동표를 재고 있는 것이다. */
   const face = readFileSync(FACE_SRC, "utf8");
@@ -221,6 +274,7 @@ try {
       contentType: "text/javascript; charset=utf-8", body: face.replace(hits[0], "const row = null;") }));
     const flat = await seat();
     const flatBoth = await seatBoth(null);
+    const flatPosts = await seatPosts(null);
     await p.unroute("**/web/src/state/passer.mjs");
     check("control:an-identity-map-leaves-the-rapport-on-someone-else",
       flat.at === FACE_FIX.was && flat.who !== FACE_FIX.name,
@@ -230,6 +284,11 @@ try {
       flatBoth.at === FACE_FIX.was && flatBoth.who !== FACE_FIX.name,
       "identity left the follow at " + FACE_FIX.city + ":" + flatBoth.at + ", which is " + flatBoth.who
       + " and not the name the fixture wrote");
+    check("control:an-identity-map-leaves-the-post-on-someone-else",
+      flatPosts.cmAt === FACE_FIX.was && flatPosts.phAt === FACE_FIX.was
+      && flatPosts.cmWho !== FACE_FIX.name,
+      "identity left the post at " + FACE_FIX.city + ":" + flatPosts.cmAt + ", which is "
+      + flatPosts.cmWho + " and not " + FACE_FIX.name);
   }
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
 

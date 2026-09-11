@@ -1,7 +1,7 @@
 // 아웃문그램의 사회. 글은 벽에 붙는 종이가 아니라 누가 보고 반응하는 자리다.
 // 좋아요와 댓글은 그 구가 만들고, 팔로우는 사람이 건다. 셋 다 판정식 밖이고 팔로워 축에만 붙는다.
 
-import { FACES_V_SOCIAL, remapFaceKeys } from './passer.mjs';
+import { FACES_V_SOCIAL, FACES_V_POSTS, movedFace, remapFaceKeys } from './passer.mjs';
 
 // 한 글에 붙는 좋아요. 화제가 클수록, 사람이 많은 동네일수록 많이 붙는다.
 // 팔로워 증가분만 쓰면 초반 한 자리 수에서 0이 되어, 아무도 안 본 글이 계정을 채운다.
@@ -54,6 +54,33 @@ export function migrateSocial(social, from) {
   if (!social || typeof social !== 'object') return social;
   if (Number(from) >= FACES_V_SOCIAL) return social;
   return Object.assign({}, social, { follows: remapFaceKeys(social.follows), dm: remapFaceKeys(social.dm) });
+}
+
+/* 얼굴표가 움직이기 전에 쓰인 저장의 글. 팔로우와 달리 (도시, 번호)가 키가 아니라 기록 안에 칸으로 들어 있다.
+   피드의 선팔 버튼이 그 칸을 그대로 whoKey에 넘기므로, 안 옮기면 옛 글 아래 버튼이 지금 그 자리에 앉은
+   딴 사람을 건다. 카드에 박힌 이름은 글을 쓴 날의 문자열이라 같이 안 움직인다. 그래서 이름과 버튼이
+   서로 다른 사람을 가리키고, 화면만 보는 사람은 그 어긋남을 알 길이 없다.
+   글의 모양은 계기가 갖고 있지만 키를 만드는 규칙은 이 모듈이 갖고 있다. 옮기는 자리는 규칙 쪽이다.
+   댓글과 사진과 셀카가 같은 칸을 쓴다. 셀카의 칸은 지금 화면이 안 읽지만 같은 날 같은 손이 쓴 같은 칸이고,
+   하나를 빼 두면 그 하나는 판번호가 올라간 뒤에 다시 옮길 길이 없다. 값은 안 보고 번호만 옮긴다. */
+export function migratePosts(posts, from) {
+  if (!Array.isArray(posts)) return posts;
+  if (Number(from) >= FACES_V_POSTS) return posts;
+  return posts.map((post) => {
+    if (!post || typeof post !== 'object') return post;
+    let out = post;
+    for (const slot of ['cm', 'ph', 'sf']) {
+      const rec = out[slot];
+      if (!rec || typeof rec !== 'object') continue;
+      const was = Math.floor(Number(rec.passer));
+      if (!Number.isFinite(was)) continue;
+      const now = movedFace(rec.city, was);
+      if (now === was) continue;
+      if (out === post) out = Object.assign({}, post);
+      out[slot] = Object.assign({}, rec, { passer: now });
+    }
+    return out;
+  });
 }
 
 // 저장에서 읽는다. 아는 모양만 받는다. 0은 선팔, 1은 맞팔이다.
