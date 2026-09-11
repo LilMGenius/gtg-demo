@@ -100,6 +100,14 @@ const padShut = (page) => page.waitForFunction(
   () => Array.from(document.querySelectorAll(".zone")).every((b) => b.disabled), null, { timeout: STEP_MS });
 /* 창이 닫힌 것을 기다리는 자리. waitForSelector는 기본이 보일 때까지라 숨은 요소에 물으면 영영 안 온다.
    실측으로 훈련장을 닫고 26초를 기다리다 죽었다. 숨은 것은 보이기가 아니라 속성으로 묻는다. */
+/* 창이 닫히면 HUD 기둥이 0.24초 동안 제자리로 미끄러져 돌아온다. 그 사이에 누르면 아직 화면 밖인
+   자리를 누르게 된다. 그려진 사각형이 창 안에 들어설 때까지 기다린다. */
+const settle = (page, sel) => page.waitForFunction((x) => {
+  const el = document.querySelector(x);
+  if (!el) return false;
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight;
+}, sel, { timeout: STEP_MS });
 const gone = (page, id) => page.waitForFunction((x) => document.getElementById(x).hidden, id, { timeout: STEP_MS });
 const pipCount = (page) => page.evaluate(() => document.querySelectorAll("#pips i.gone, #pips i.save").length);
 const ballDone = (page, before) => page.waitForFunction(
@@ -173,12 +181,15 @@ async function titleLeg(page) {
   await snap(page, "02-signup-form", "#gate");
   await page.click("#aup");
   await page.click("#go", { force: true });
-  await page.waitForTimeout(400);
-  put("guest", await page.evaluate(() => Object.keys(localStorage).sort()));
 }
 
 async function revealLeg(page) {
-  await page.waitForSelector("#pull .now", { timeout: STEP_MS });
+  /* 판이 뜨는 순간을 프레임 단위로 잡는다. 첫 단은 0.3초만 서 있어서 한 박자라도 늦으면 사다리가
+     혼자 한 단을 올리고, 그 뒤의 누름은 0단이 아니라 1단에서 시작한다. */
+  await page.waitForFunction(() => {
+    const p = document.getElementById("pull");
+    return Boolean(p && !p.hidden && p.querySelector(".now"));
+  }, null, { timeout: STEP_MS, polling: "raf" });
   /* 누른 순간의 단을 브라우저 안에서 잡아 둔다. 밖에서 누르기 전에 읽고 누른 뒤에 또 읽으면 그 사이
      자동 사다리가 한 단을 올려, 누름이 올린 것인지 사다리가 올린 것인지를 이 축이 못 가른다. */
   await page.evaluate(() => {
@@ -458,6 +469,7 @@ const spinAt = (page) => page.evaluate(() => {
 const TABS = ["pull", "glove", "boot", "kit", "sock", "frame", "city", "hair", "ink", "bot", "buff"];
 
 async function shopLeg(page) {
+  await settle(page, "#shopBtn");
   await page.click("#shopBtn");
   await page.waitForSelector("#shop:not([hidden])", { timeout: STEP_MS });
   await page.waitForTimeout(400);
@@ -549,8 +561,11 @@ async function tryOnLeg(page, buy) {
 }
 
 async function rosterLeg(page) {
-  await page.click("#shopBtn", { force: true });
+  /* 창이 열려 있는 동안 그 창을 연 버튼은 화면 밖으로 미끄러져 나가 있다. 실측으로 상점을 연 뒤
+     #shopBtn을 누르려다 outside of the viewport로 죽었다. 닫는 것은 언제나 창 자신의 닫기다. */
+  await page.click("#shop .close", { force: true });
   await gone(page, "shop");
+  await settle(page, "#rosterBtn");
   await page.click("#rosterBtn", { force: true });
   await page.waitForSelector("#roster:not([hidden])", { timeout: STEP_MS });
   await page.waitForTimeout(600);
@@ -563,8 +578,9 @@ async function rosterLeg(page) {
   }));
   await snap(page, "22-roster");
   for (let i = 0; i < 4; i += 1) await snap(page, "22-roster-face-" + i, "#roster img:nth-of-type(" + (i + 1) + ")");
-  await page.click("#rosterBtn", { force: true });
+  await page.click("#roster .close", { force: true });
   await gone(page, "roster");
+  await settle(page, "#meBtn");
 }
 
 const meAt = (page) => page.evaluate(() => {
@@ -611,8 +627,9 @@ async function meLeg(page) {
   }
   put("me", panes);
   put("fontsMe", await fontsAt(page));
-  await page.click("#meBtn", { force: true });
+  await page.click("#me .close", { force: true });
   await gone(page, "me");
+  await settle(page, "#wikiBtn");
 }
 
 const wikiAt = (page) => page.evaluate(() => {
@@ -657,7 +674,7 @@ async function wikiLeg(page) {
   const after = await wikiAt(page);
   await snap(page, "28-wiki-scrolled");
   put("wiki", { cats, wheel: { before, after } });
-  await page.click("#wikiBtn", { force: true });
+  await page.click("#wiki .close", { force: true });
   await gone(page, "wiki");
 }
 
@@ -713,6 +730,7 @@ try {
   } else {
     await botLeg(page);
   }
+  put("guest", await page.evaluate(() => Object.keys(localStorage).sort()));
   put("chrome", await chromeAt(page));
   put("fontsEnd", await fontsAt(page));
   put("end", await page.evaluate(() => ({
