@@ -1243,24 +1243,37 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #pull .now .foot > b,#pull .now u{opacity:0;transition:opacity .18s ease-out}
 #pull .now[data-stage="3"] .foot > b,#pull .now[data-stage="4"] .foot > b,
 #pull .now[data-stage="3"] u,#pull .now[data-stage="4"] u{opacity:1}
-/* 이름과 능력치는 그림 위라 배경이 필요하다. 아래에서 올라오는 그늘 한 겹이면 어떤 그림 위에서도
-   읽히고, 아래에 붙여 두었으므로 능력치가 서면 그만큼 위로 자란다. */
-#pull .now .foot{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:28px 12px 12px;
-  background:linear-gradient(#0000,#060803e8 34%)}
+/* 이름과 능력치는 구운 그림 위에 선다. 그늘 한 겹으로는 글자 뒤에 무엇이 오는지를 카드가 아니라
+   그림이 정하고, 그 그늘은 이름이 앉는 자리에서 아직 투명하다. 실측으로 1280에서 이름이 키퍼의
+   가슴을 가로지르고 그 옆에 장갑이 섰다. 불투명한 판 한 장을 깔고 위에 선 하나를 그으면 어떤 그림
+   위에서도 같은 바탕이고, 아래에 붙여 두었으므로 능력치가 서면 그만큼 위로 자란다.
+   판의 색은 카드 바탕(--panel)이 아니라 이 화면이 이미 쓰는 그늘이다. 카드 바탕은 뒷면 무늬와
+   채널 차가 18뿐이라 그 색으로 깔면 열린 카드의 아래쪽이 덮인 카드와 같은 그림으로 읽힌다.
+   실측으로 봉인과 열림이 갈리는 화소가 61%에서 13%로 떨어져, 얼굴을 가렸는지 묻는 자가 죽었다. */
+#pull .now .foot{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:var(--gap-2) 12px 12px;
+  border-top:var(--line) solid var(--edge);background:#060803}
 #pull .now .foot > b{display:block;font-family:var(--body);font-size:var(--fs-num);font-weight:400;
   color:var(--ink);text-align:center;line-height:1.25}
 /* 명성. 별 대신 숫자를 크게 세우면 다섯과 아홉이 한눈에 갈린다. */
 #pull .now u{position:absolute;top:12px;left:14px;z-index:2;text-decoration:none;
   font-family:var(--body);font-size:var(--fs-body);font-weight:400;color:var(--dim)}
-/* 4 능력치 다섯 줄. 마지막 단에만 선다. 앞 단부터 자리를 차지하면 카드가 처음부터 명세서다. */
-#pull .now .stats{display:none;gap:var(--gap-1);margin-top:var(--gap-2)}
+/* 4 능력치 다섯 줄. 마지막 단에만 선다. 앞 단부터 자리를 차지하면 카드가 처음부터 명세서다.
+   이름표와 값은 두 칸짜리 표 하나에 같이 선다. 줄마다 양 끝으로 밀면 이름표가 카드 왼쪽 끝에
+   값이 오른쪽 끝에 붙어, 실측으로 1280에서 둘 사이가 211px이라 값 하나를 읽는 데 눈이 사람의
+   몸을 건넌다. 칸은 내용 폭이고 표는 가운데에 서므로 다섯 줄이 한 덩어리로 앉는다.
+   줄이 제 칸을 따로 잡지 않고 부모의 칸을 물려받아야, 이름표 길이가 달라도 값이 한 줄로 모인다. */
+#pull .now .stats{display:none;grid-template-columns:max-content max-content;justify-content:center;
+  gap:0 var(--gap-2);margin-top:var(--gap-2)}
 #pull .now[data-stage="4"] .stats{display:grid}
-#pull .now .stats span{display:flex;align-items:baseline;justify-content:space-between;
-  gap:var(--gap-2);line-height:1.15}
-#pull .now .stats i{font-style:normal;font-size:var(--fs-body);color:var(--dim)}
-#pull .now .stats b{font-family:var(--body);font-size:var(--fs-num);font-weight:400;color:var(--ink)}
+#pull .now .stats span{display:grid;grid-column:1/-1;grid-template-columns:subgrid;
+  align-items:baseline;line-height:1.15}
+#pull .now .stats i{font-style:normal;font-size:var(--fs-body);color:var(--dim);text-align:right}
+#pull .now .stats b{font-family:var(--body);font-size:var(--fs-num);font-weight:400;color:var(--ink);
+  text-align:right}
 /* 명성 9 이상. 마흔여섯 중 여덟이라 자주 안 오므로, 올 때는 판 전체가 달라야 한다. */
 #pull .now.rare{border-color:#ffd83d;background:#3a3312;box-shadow:10px 12px 0 var(--edge), 0 0 0 6px #ffd83d3d}
+/* 판은 등급을 안 가리고 같은 그늘이다. 금색은 테와 글자가 들고 있으므로, 판 위의 선만 금색으로 받는다. */
+#pull .now.rare .foot{border-top-color:#ffd83d}
 #pull .now.rare .foot > b,#pull .now.rare u,#pull .now.rare .stats b{color:#ffd83d}
 /* 이미 나온 카드가 쌓이는 줄. 아래에 눕혀 두면 몇 장을 열었는지가 세지 않아도 보인다.
    34는 첫 칩이 앉을 자리를 미리 잡아 두는 자다. 실측으로 이 수를 0으로 두면 열한 장 회차의
@@ -1292,8 +1305,13 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 @media (max-height:480px){
   #pull{gap:var(--gap-1)}
   #pull .now{height:min(70vh,420px)}
-  #pull .now .foot{padding:12px 10px 8px}
+  /* 판이 얼굴 아래에 들어가야 하므로 이름 위 여백과 수치 크기를 여기서 또 내린다. 실측으로 카드가 252일 때
+     그림의 위 45%가 얼굴이라 판에 남는 자리가 135px인데, 위 폭의 값 크기 그대로면 판이 152px이다.
+     줄 수는 그대로 다섯이고 줄이는 것은 글자와 여백이다. 그림을 줄이면 파는 물건이 줄어든다. */
+  #pull .now .foot{padding:var(--gap-1) 10px 8px}
   #pull .now .stats{margin-top:var(--gap-1)}
+  #pull .now .stats span{line-height:1.1}
+  #pull .now .stats b{font-size:var(--fs-body)}
   #pull .done i{min-width:52px;height:24px;padding:0 6px}
   /* 넘기는 한 마디는 위 오른쪽으로 간다. 아래는 칩 줄이 두 줄로 접히는 자리라 글자가 깔린다. */
   #pull .tap{align-items:flex-start;justify-content:flex-end;padding:6px 12px 0 0}
