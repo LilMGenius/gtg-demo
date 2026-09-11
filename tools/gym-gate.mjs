@@ -220,6 +220,50 @@ try {
   check("control:hiding-the-cue-reddens-the-resting-gym", !rested(blinded) && !allowed(blinded) && rested(lit) && allowed(lit),
     "planted " + saidCue(blinded) + " / " + saidClose(blinded) + " | restored " + saidCue(lit) + " / " + saidClose(lit));
   await roll.close();
+  /* 살아 있는 크기 변화. 위의 두 문맥은 좁은 화면으로 부팅해서 그릴 때 한 번 센 값을 보는데, 사람이
+     창을 열어 둔 채로 화면을 줄이면 아무도 다시 안 센다. 1280x720에서 훈련장을 열면 기둥이 화면 안에
+     들어와 자국이 꺼져 있고, 거기서 740x360으로 줄이면 기둥이 접힘을 넘는다. 굴리지도 다시 그리지도
+     않는다. 겹을 걷어 빨갛게 만드는 대조군을 여기에는 못 심는다. 관찰자를 밖에서 끊을 손잡이가 없다.
+     그래서 앞뒤 한 쌍으로 대신한다. 줄이기 전의 꺼짐과 줄인 뒤의 켜짐을 같이 적고, 그 사이에 굴림
+     사건이 하나도 안 났다는 것과 창이 다시 안 그려졌다는 것을 같이 적는다. 심은 것이 아니라 앞뒤
+     한 쌍이라 이름을 instrument로 적는다. */
+  const live = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  const lp = await live.newPage();
+  lp.on("pageerror", (e) => errs.push(String(e)));
+  lp.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+  await bootOn(lp, "?seed=20&preset=maxed,veteran");
+  await lp.mouse.move(2, 2);
+  /* 굴림 사건을 여기서 센다. 자국이 켜진 이유가 크기 변화인지 굴림인지를 이 수 하나가 가른다.
+     닫기에 표를 하나 남기는 것은 다시 그림을 잡기 위해서다. 다시 그리면 innerHTML이 갈려 표가 사라진다. */
+  await lp.evaluate(() => {
+    const g = document.getElementById("gym");
+    g.dataset.gateScrolls = "0";
+    g.addEventListener("scroll", () => { g.dataset.gateScrolls = String(Number(g.dataset.gateScrolls) + 1); });
+    g.querySelector(".close").dataset.gateMark = "1";
+  });
+  await lp.waitForTimeout(150);
+  const roomy = await lp.evaluate(column);
+  await lp.setViewportSize({ width: 740, height: 360 });
+  /* 관찰자는 다음 프레임에 깬다. 정해진 시간을 기다리면 느린 기계에서 아직 안 깬 것을 없는 것으로
+     읽으므로, 프레임마다 자국을 보고 켜지는 순간 끝낸다. 안 켜지면 짧게 포기하고 그대로 잰다. */
+  const woke = await lp.waitForFunction(() => {
+    const s = document.getElementById("gym").querySelector(":scope > .cue.down");
+    return Boolean(s) && s.getBoundingClientRect().height > 0 && Number(getComputedStyle(s).opacity) > 0.5;
+  }, null, { polling: "raf", timeout: 1500 }).then(() => true).catch(() => false);
+  const shrunk = await lp.evaluate(column);
+  const trace = await lp.evaluate(() => {
+    const g = document.getElementById("gym");
+    const c = g.querySelector(".close");
+    return { scrolls: Number(g.dataset.gateScrolls), redrawn: !(c && c.dataset.gateMark === "1") };
+  });
+  await live.close();
+  check("gym:a-resize-onto-a-short-viewport-relights-the-cue", shrunk.rolls && shrunk.cue && shrunk.top === 0,
+    "1280x720 " + saidCue(roomy) + " -> 740x360 " + saidCue(shrunk) + ", "
+    + (woke ? "lit inside the raf wait" : "still dark after 1500ms") + ", " + saidClose(shrunk));
+  check("instrument:the-cue-was-off-before-the-resize-and-nothing-scrolled-or-redrew",
+    !roomy.cue && !roomy.rolls && trace.scrolls === 0 && !trace.redrawn,
+    "before " + saidCue(roomy) + " | after " + saidCue(shrunk) + ", scroll events " + trace.scrolls
+    + ", panel " + (trace.redrawn ? "was redrawn" : "was not redrawn"));
   // 음성 대조군. 위 여백을 도로 걷으면 제목이 띠 밑으로 들어가야 한다.
   // 이게 없으면 위 축의 녹색은 판정식이 아무것도 안 재는 경우와 구분되지 않는다.
   const bald = await mp.addStyleTag({ content: "#gym{padding-top:0}" });
