@@ -942,8 +942,9 @@ try {
     };
     im.src = "data:image/png;base64," + s;
   }), [png, pts, want, tol]);
-  // 한 폭에서 한 벌. 폭을 바꾸고 카드가 마지막 단에 가만히 선 뒤에 재고 찍는다.
-  const plateAt = async (w, h) => {
+  /* 폭을 바꾸고 카드가 마지막 단에 가만히 설 때까지. 아래 두 자가 같은 폭 쌍을 재므로,
+     기다림이 한 자리에 있어야 한쪽만 덜 기다린 채 재는 일이 없다. */
+  const settleAt = async (w, h) => {
     await p.setViewportSize({ width: w, height: h });
     await p.waitForTimeout(300);
     await p.waitForFunction(() => {
@@ -951,6 +952,10 @@ try {
       return Boolean(n) && n.dataset.stage === String(4)
         && !n.getAnimations({ subtree: true }).some((a) => a.playState === "running");
     }, null, { timeout: 8000, polling: "raf" }).catch(() => {});
+  };
+  // 한 폭에서 한 벌. 폭을 바꾸고 카드가 마지막 단에 가만히 선 뒤에 재고 찍는다.
+  const plateAt = async (w, h) => {
+    await settleAt(w, h);
     const geo = await plateGeo(HEAD_SHARE, PLATE_STEP);
     if (!geo) return null;
     await plateInk(true);
@@ -985,7 +990,71 @@ try {
     check("pullshow:a-stat-value-stands-beside-its-label", false, "unmeasured: no single-card round opened");
     check("pullshow:the-plate-leaves-the-face-clear", false, "unmeasured: no single-card round opened");
     check("control:a-transparent-plate-reddens-the-name-axis", false, "unmeasured: no single-card round opened");
+    check("ux:the-advance-label-stands-in-the-same-corner-at-both-viewports", false, "unmeasured: no single-card round opened");
+    check("control:a-bottom-anchor-at-740-reddens-the-corner-axis", false, "unmeasured: no single-card round opened");
   } else {
+    /* 넘기는 한 마디가 두 폭에서 같은 귀에 서는가. 버튼은 판 전체를 덮는 투명 상자라 상자를 재면
+       늘 화면 전체가 나오므로, 글자가 실제로 그려진 자리는 텍스트 노드를 Range로 감싸 얻는다.
+       재는 것은 오른쪽 위 귀에서의 거리 둘이고, 두 폭이 그 둘을 같은 값으로 맞춰야 한 자리다.
+       자리만으로는 모자란다. 글자 한가운데를 elementFromPoint로 찍어 .tap이 잡혀야 그 글자가
+       누름을 받는 판 위에 선 것이고, 오른쪽 기둥 판때기가 잡히면 넘기려는 손이 다른 창을 연다. */
+    const LABEL_TOL = 2;
+    // 오른쪽 기둥. 창이 열린 회차에서는 96px 밀려 나므로 밀린 자리와 제자리 둘 다에서 안 겹쳐야 한다.
+    const HUD_KEYS = ["mute", "wikiBtn", "gymBtn", "rosterBtn", "gramBtn", "shopBtn"];
+    const labelGeo = () => p.evaluate((ids) => {
+      const box = document.getElementById("pull");
+      const tap = box ? box.querySelector(".tap") : null;
+      if (!box || box.hidden || !tap) return null;
+      const node = [...tap.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
+      if (!node) return null;
+      const rg = document.createRange();
+      rg.selectNodeContents(node);
+      const r = rg.getBoundingClientRect();
+      if (!(r.width > 0) || !(r.height > 0)) return null;
+      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      const clash = ids.filter((id) => {
+        const e = document.getElementById(id);
+        if (!e) return false;
+        const q = e.getBoundingClientRect();
+        return !(r.right <= q.x || r.x >= q.right || r.bottom <= q.y || r.y >= q.bottom);
+      });
+      const cls = hit && typeof hit.className === "string" && hit.className.trim();
+      return { vw: innerWidth, vh: innerHeight, text: node.textContent.trim(),
+        x: Math.round(r.x), y: Math.round(r.y),
+        w: Math.round(r.width), h: Math.round(r.height),
+        right: Math.round(innerWidth - r.right), top: Math.round(r.y), onTap: hit === tap,
+        hit: hit ? hit.tagName.toLowerCase() + (hit.id ? "#" + hit.id : "")
+          + (cls ? "." + cls.split(" ")[0] : "") : "none",
+        clash: clash };
+    }, HUD_KEYS);
+    const labelAt = async (w, h) => {
+      await settleAt(w, h);
+      return labelGeo();
+    };
+    const labelSay = (x) => (!x ? "unmeasured"
+      : x.vw + "x" + x.vh + " " + x.text + " " + x.w + "x" + x.h + " at " + x.x + "," + x.y
+      + ", " + x.right + "px from the right edge and " + x.top + "px from the top, centre hits "
+      + x.hit + (x.clash.length ? ", over " + x.clash.join("+") : ", clear of the right column"));
+    const labelPair = (m, n) => labelSay(m) + " | " + labelSay(n);
+    const sameCorner = (m, n) => Boolean(m) && Boolean(n)
+      && Math.abs(m.right - n.right) <= LABEL_TOL && Math.abs(m.top - n.top) <= LABEL_TOL
+      && m.onTap && n.onTap && m.clash.length === 0 && n.clash.length === 0;
+    const cornerWide = await labelAt(1280, 720);
+    const cornerTight = await labelAt(740, 360);
+    check("ux:the-advance-label-stands-in-the-same-corner-at-both-viewports",
+      sameCorner(cornerWide, cornerTight), labelPair(cornerWide, cornerTight));
+    /* 대조군. 좁은 폭에서만 글자를 아래로 붙이면 두 폭의 귀가 갈려 위 축이 빨개져야 하고, 걷으면
+       도로 한 귀로 돌아와야 한다. 한쪽만 보면 늘 초록인 자와 실제로 재는 자를 못 가른다. */
+    const bend = await p.addStyleTag({ content: "@media (max-height:480px){#pull .tap{align-items:flex-end}}" });
+    const bentTight = await labelAt(740, 360);
+    const bentWide = await labelAt(1280, 720);
+    await bend.evaluate((e) => e.remove());
+    const backWide = await labelAt(1280, 720);
+    const backTight = await labelAt(740, 360);
+    check("control:a-bottom-anchor-at-740-reddens-the-corner-axis",
+      sameCorner(bentWide, bentTight) === false && sameCorner(backWide, backTight) === true,
+      "planted " + labelPair(bentWide, bentTight) + "; removed " + labelPair(backWide, backTight));
+
     const wide = await plateAt(1280, 720);
     const tight = await plateAt(740, 360);
     const plateSay = (x) => (x ? x.vw + "x" + x.vh : "unmeasured");

@@ -1316,16 +1316,23 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
   to{transform:none;opacity:1}
 }
 #pull .done i.just{animation:pullSettle .24s ease-out}
-/* 누름을 받는 자리. 판 전체를 덮되 보이는 것은 아래쪽 한 마디뿐이다.
+/* 누름을 받는 자리. 판 전체를 덮되 보이는 것은 오른쪽 위 한 마디뿐이다.
    div에 핸들러를 걸면 화면에는 눌러도 된다는 신호가 안 남고 키보드로는 아예 못 닿는다.
-   카드 위에 놓이므로 배경은 없고, 버튼은 글꼴을 물려받지 않으니 여기서 다시 준다. */
-#pull .tap{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;
-  padding-bottom:22px;background:none;border:0;cursor:pointer;font:inherit;
-  font-size:var(--fs-body);font-weight:700;color:var(--dim)}
+   카드 위에 놓이므로 배경은 없고, 버튼은 글꼴을 물려받지 않으니 여기서 다시 준다.
+   글자가 서는 귀는 두 폭에서 같은 하나다. 아래 가운데에 두면 세로가 짧은 화면에서 칩 줄이 두 줄로
+   접혀 글자를 깔고, 그 폭에서만 위로 올리면 1280에서 아래를 배운 손이 740에서 그 자리를 못 찾는다.
+   오른쪽 끝이 아니라 116px 안쪽인 것은 그 바깥이 창을 여는 오른쪽 기둥이기 때문이다. 기둥의 왼쪽
+   끝은 도움말 판때기라 --pad-r에 58과 판때기 46을 더한 자리이고, 실측으로 1280과 740 모두
+   오른쪽에서 121px이다. 12를 더 띄우면 토큰 하나로 두 폭 다 기둥을 11px 비껴 선다. 끝에 붙이면
+   1280에서 소리 판때기를 27px, 740에서 22px 물어 넘기려는 손이 소리를 끈다.
+   창이 열린 회차는 기둥이 96px 더 밀려 나므로 같은 자리가 그만큼 더 넉넉하다. */
+#pull .tap{position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:flex-end;
+  padding:var(--gap-2) calc(var(--pad-r) + 116px) 0 0;background:none;border:0;cursor:pointer;
+  font:inherit;font-size:var(--fs-body);font-weight:700;color:var(--dim)}
 #pull .tap:focus-visible{outline:2px solid var(--dim);outline-offset:-6px}
-/* 세로가 짧은 가로 모바일. 카드와 이미 나온 줄과 넘기는 한 마디가 한 화면에 다 서야 한다.
-   측정: 740x360에서 줄이기 전 넘기는 한 마디가 두 줄로 접힌 칩 줄에 깔렸고, 능력치 다섯 줄이
-   카드의 3분의 2를 먹어 얼굴이 손가락 두 마디로 남았다. 칩과 여백을 줄여 카드에 돌려준다. */
+/* 세로가 짧은 가로 모바일. 카드와 이미 나온 줄이 한 화면에 다 서야 한다.
+   측정: 740x360에서 줄이기 전 능력치 다섯 줄이 카드의 3분의 2를 먹어 얼굴이 손가락 두 마디로
+   남았다. 칩과 여백을 줄여 카드에 돌려준다. */
 @media (max-height:480px){
   #pull{gap:var(--gap-1)}
   #pull .now{height:min(70vh,420px)}
@@ -1337,8 +1344,6 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
   #pull .now .stats span{line-height:1.1}
   #pull .now .stats b{font-size:var(--fs-body)}
   #pull .done i{min-width:52px;height:24px;padding:0 6px}
-  /* 넘기는 한 마디는 위 오른쪽으로 간다. 아래는 칩 줄이 두 줄로 접히는 자리라 글자가 깔린다. */
-  #pull .tap{align-items:flex-start;justify-content:flex-end;padding:6px 12px 0 0}
   /* 확률 표는 위로 편다. 아래로 펴면 마지막 등급 줄이 화면 밖으로 나간다. */
   #shop .odds em{top:auto;bottom:calc(100% + var(--gap-1))}
 }
