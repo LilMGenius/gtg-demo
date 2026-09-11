@@ -2094,7 +2094,7 @@ const TOUCHED = new Set(['contact']);
     }
     /* 뜨는 몸은 골반 위를 올린다. 골반 마디(hip)를 올리면 다리가 같이 올라가 몸의 최저점이
        그만큼 오르고, 접지 보정(keeper.position.y += hover - footY)이 루트를 그만큼 내려
-       화면에서는 아무 일도 안 일어난다. 척추 마디는 최저점이 아니라 발은 땅에 남고 상체만 오른다.
+       화면에서는 아무 일도 안 일어난다. spine 마디는 최저점이 아니라 발은 땅에 남고 상체만 오른다.
        위상 0에서 값이 0이라 걷기가 시작하는 프레임에 몸이 튀지 않는다. */
     keeper.userData.joints.spine.position.y = back && back.r >= 1
       ? BOB_Y * (0.5 - 0.5 * Math.cos(2 * back.phase)) : 0;
