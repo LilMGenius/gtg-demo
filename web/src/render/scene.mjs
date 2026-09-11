@@ -2095,9 +2095,14 @@ const TOUCHED = new Set(['contact']);
     /* 뜨는 몸은 골반 위를 올린다. 골반 마디(hip)를 올리면 다리가 같이 올라가 몸의 최저점이
        그만큼 오르고, 접지 보정(keeper.position.y += hover - footY)이 루트를 그만큼 내려
        화면에서는 아무 일도 안 일어난다. spine 마디는 최저점이 아니라 발은 땅에 남고 상체만 오른다.
-       위상 0에서 값이 0이라 걷기가 시작하는 프레임에 몸이 튀지 않는다. */
+       마루가 어디 서는지는 다리가 정한다. walkPose가 hipL을 sin(ph)로 hipR을 sin(ph+파이)로
+       흔들어 두 다리는 위상 0과 파이에서 겹치고 그 사이에서 가장 벌어진다. 겹치는 순간은 땅을
+       딛고 있는 다리가 몸 아래 곧게 선 순간이라 그때 몸이 가장 높고, 벌어진 순간이 가장 낮다.
+       그래서 cos 앞의 부호는 더하기다. 빼기로 두면 마루가 거꾸로 가장 벌어진 위상에 서서, 두
+       다리를 벌린 채로 몸이 뜬다. 대신 이 꼴은 위상 0에서 가장 크므로 첫 사분면만 비례로 열어
+       걷기가 시작하는 프레임에 몸이 튀지 않는다. */
     keeper.userData.joints.spine.position.y = back && back.r >= 1
-      ? BOB_Y * (0.5 - 0.5 * Math.cos(2 * back.phase)) : 0;
+      ? BOB_Y * (0.5 + 0.5 * Math.cos(2 * back.phase)) * Math.min(1, back.phase / (Math.PI / 2)) : 0;
     drive('keeper', kp, kRate);
     // 예비는 느리게 잡혀야 버틴 것으로 보이고, 임팩트는 한 프레임에 가까워야 터진 것으로 보인다.
     drive('kicker', kk, kkId === POSES.strike ? 0.62 : (kkId === POSES.follow ? 0.24 : (kkId === POSES.plant ? 0.16 : (kkId === POSES.cheer ? 0.30 : 0.10))));
