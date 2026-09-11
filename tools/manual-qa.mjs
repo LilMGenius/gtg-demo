@@ -141,6 +141,25 @@ const lit = (page) => page.waitForFunction(() => {
   return Boolean(img) && getComputedStyle(img).filter === "none";
 }, null, { timeout: STEP_MS, polling: "raf" });
 
+/* 카드가 다 앉은 뒤에 찍는다. 그림 필터만 기다리면 단마다 다시 도는 0.16초 pullDeal 합성이 아직 돌아,
+   다 열린 카드가 배경 위에 반투명하게 얹힌 채로 남는다. 실측으로 05-reveal-end-desk의 판이 (12,11,6)이었고
+   가라앉은 값은 (6,8,3)이다. 도는 것이 없는지 묻는 이 모양의 주인은 tools/pullshow-gate.mjs의 plateAt이고,
+   여기서는 그것을 그대로 가져다 #pull 아래에 건다.
+   mode "all"은 #pull 아래 전부를 묻는다. 마지막 단과 봉인 단은 도는 것이 잠깐 없는 자리가 있어서 거기서 풀린다.
+   mode "card"는 판과 카드가 제 몸에 건 합성만 묻는다. 등급 단의 빛은 그 단 자체라 --beam-ms가 단 길이와 같고,
+   빛이 꺼지기를 기다리면 그 단이 이미 지나간 뒤에 찍는다. 같은 이유로 pullshow-gate.mjs는 1단을 아예 안 찍는다.
+   기다린 뒤에 프레임 둘을 더 센다. 시간이 아니라 프레임으로 세야 바쁜 기계에서도 같은 수의 그림이 지나간다. */
+const calm = async (page, mode) => {
+  await page.waitForFunction((m) => {
+    const box = document.getElementById("pull");
+    if (!box) return false;
+    if (m === "all") return box.getAnimations({ subtree: true }).length === 0;
+    const now = box.querySelector(".now");
+    return box.getAnimations().length === 0 && (!now || now.getAnimations().length === 0);
+  }, mode, { timeout: STEP_MS, polling: "raf" }).catch(() => {});
+  await page.evaluate(() => new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res))));
+};
+
 const revealAt = (page) => page.evaluate(() => {
   const box = document.getElementById("pull");
   const now = box.querySelector(".now");
@@ -212,11 +231,13 @@ async function revealLeg(page) {
   await page.click("#pull", { force: true });
   const tapped = await revealAt(page);
   const pre = await page.evaluate(() => window.__qaTapAt);
+  await calm(page, "card");
   await snap(page, "04-reveal-stage1");
   const shotAt = await revealAt(page);
   await snap(page, "04-reveal-stage1-card", "#pull .now");
   const held = await hold(page);
   await lit(page).catch(() => {});
+  await calm(page, "all");
   const opened = await revealAt(page);
   await snap(page, "05-reveal-end");
   await snap(page, "05-reveal-end-card", "#pull .now");
@@ -224,11 +245,13 @@ async function revealLeg(page) {
   await page.click("#pull", { force: true });
   await page.waitForFunction(() => window.__reveal().drawn > 1, null, { timeout: STEP_MS });
   await page.waitForTimeout(200);
+  await calm(page, "all");
   const kick = await revealAt(page);
   await snap(page, "06-kicker-sealed");
   await snap(page, "06-kicker-sealed-card", "#pull .now");
   const heldK = await hold(page);
   await lit(page).catch(() => {});
+  await calm(page, "all");
   const allK = await revealAt(page);
   await snap(page, "07-kickers-all");
   put("revealKickers", { sealed: kick, held: heldK, opened: allK });
