@@ -119,6 +119,108 @@ try {
     });
   }), [a, c, PIXEL_TOL]);
 
+  /* 표본을 위치가 아니라 재질로 고른다. 판 위 띠를 상자째 세면 그 띠의 대부분이 봉인이든 열림이든
+     같은 카드 바탕이라, 안 갈리는 것이 당연한 화소가 분모에 앉는다. 실측으로 띠 기준 값이 보통
+     카드에서 24.7과 23.9, 희귀 카드에서 55.6과 57.5였다. 둘을 가른 32점은 봉인이 아니라 금테가
+     띠를 칠했다는 사실이라, 위치로 고르면 등급이 값을 정하고 재질로 고르면 초상이 정한다.
+     재질은 열린 단의 색이 카드 바탕에서 문턱만큼 벗어난 화소다. 그 집합이 분모면 남는 물음은
+     하나, 봉인이 그 화소를 덮었는가다. */
+  const inked = async (a, c, skin) => {
+    if (!skin) return null;
+    return p.evaluate(([x, y, hi, hue, tol, pad]) => new Promise((res) => {
+      const load = (v) => new Promise((ok) => { const im = new Image(); im.onload = () => ok(im); im.src = "data:image/png;base64," + v; });
+      Promise.all([load(x), load(y)]).then(([A, B]) => {
+        if (A.width !== B.width || A.height !== B.height) return res(null);
+        const cv = document.createElement("canvas");
+        cv.width = A.width; cv.height = A.height;
+        const g = cv.getContext("2d");
+        g.drawImage(A, 0, 0);
+        const da = g.getImageData(0, 0, A.width, A.height).data;
+        g.clearRect(0, 0, A.width, A.height);
+        g.drawImage(B, 0, 0);
+        const db = g.getImageData(0, 0, A.width, A.height).data;
+        const m = hue.match(/[0-9.]+/g) || [];
+        const bg = [Number(m[0]) || 0, Number(m[1]) || 0, Number(m[2]) || 0];
+        const rows = Math.max(0, Math.min(A.height, Math.round(A.height * hi)));
+        const x0 = Math.round(A.width * pad[0]), y0 = Math.round(A.height * pad[1]);
+        let band = 0, ink = 0, hit = 0;
+        for (let ry = y0; ry < rows; ry += 1) {
+          for (let rx = x0; rx < A.width - x0; rx += 1) {
+            const i = (ry * A.width + rx) * 4;
+            band += 1;
+            if (Math.max(Math.abs(db[i] - bg[0]), Math.abs(db[i + 1] - bg[1]),
+              Math.abs(db[i + 2] - bg[2])) <= tol) continue;
+            ink += 1;
+            if (Math.abs(da[i] - db[i]) >= tol || Math.abs(da[i + 1] - db[i + 1]) >= tol
+              || Math.abs(da[i + 2] - db[i + 2]) >= tol) hit += 1;
+          }
+        }
+        res({ band: band, ink: ink, hit: hit, part: ink ? hit / ink : -1 });
+      });
+    }), [a, c, skin.cut, skin.bg, PIXEL_TOL, skin.pad]);
+  };
+
+  /* 같은 재질 표본 위에서 읽은 색과 밝기. 카드를 통째로 평균 내면 판과 테와 바탕이 분모를 채워
+     초상의 색이 묽어진다. 마스크는 열린 단이 칠한 자리이고, 재는 것은 그 자리에 선 다른 단의 색이다. */
+  const toneOn = async (png, open, skin) => {
+    if (!skin) return null;
+    return p.evaluate(([x, y, hi, hue, tol, pad]) => new Promise((res) => {
+      const load = (v) => new Promise((ok) => { const im = new Image(); im.onload = () => ok(im); im.src = "data:image/png;base64," + v; });
+      Promise.all([load(x), load(y)]).then(([A, B]) => {
+        if (A.width !== B.width || A.height !== B.height) return res(null);
+        const cv = document.createElement("canvas");
+        cv.width = A.width; cv.height = A.height;
+        const g = cv.getContext("2d");
+        g.drawImage(A, 0, 0);
+        const da = g.getImageData(0, 0, A.width, A.height).data;
+        g.clearRect(0, 0, A.width, A.height);
+        g.drawImage(B, 0, 0);
+        const db = g.getImageData(0, 0, A.width, A.height).data;
+        const m = hue.match(/[0-9.]+/g) || [];
+        const bg = [Number(m[0]) || 0, Number(m[1]) || 0, Number(m[2]) || 0];
+        const rows = Math.max(0, Math.min(A.height, Math.round(A.height * hi)));
+        const x0 = Math.round(A.width * pad[0]), y0 = Math.round(A.height * pad[1]);
+        let n = 0, r = 0, gg = 0, bb = 0, sat = 0;
+        for (let ry = y0; ry < rows; ry += 1) {
+          for (let rx = x0; rx < A.width - x0; rx += 1) {
+            const i = (ry * A.width + rx) * 4;
+            if (Math.max(Math.abs(db[i] - bg[0]), Math.abs(db[i + 1] - bg[1]),
+              Math.abs(db[i + 2] - bg[2])) <= tol) continue;
+            n += 1;
+            r += da[i]; gg += da[i + 1]; bb += da[i + 2];
+            sat += Math.max(da[i], da[i + 1], da[i + 2]) - Math.min(da[i], da[i + 1], da[i + 2]);
+          }
+        }
+        res(n ? { n: n, sat: sat / n, lum: (r * 0.2126 + gg * 0.7152 + bb * 0.0722) / n }
+          : { n: 0, sat: -1, lum: -1 });
+      });
+    }), [png, open, skin.cut, skin.bg, PIXEL_TOL, skin.pad]);
+  };
+
+  /* 판의 윗선과 카드 바탕. 판은 마지막 단에만 서므로 그 단을 찍은 그 자리에서 같이 묻는다.
+     화소 줄이 아니라 카드 상자에 대한 비율로 들고 있어야 창 크기나 화소 배율이 달라져도 같은 선이고,
+     기울어 선 카드라 상자는 회전을 감싼 곧은 상자다. 사진이 그 상자이므로 비율이 사진의 줄이 된다. */
+  const plateCut = () => p.evaluate((at) => {
+    const now = document.querySelector("#pull .now");
+    const foot = now ? now.querySelector(".foot") : null;
+    if (!now || !foot || Number(now.dataset.stage) !== at) return null;
+    const cs = getComputedStyle(now);
+    const M = cs.transform === "none" ? new DOMMatrixReadOnly() : new DOMMatrixReadOnly(cs.transform);
+    const q = now.getBoundingClientRect();
+    const f = foot.getBoundingClientRect();
+    if (!(q.width > 0) || !(q.height > 0)) return null;
+    /* 기울어 선 카드를 곧은 상자로 찍으므로 사진의 네 귀에는 카드 밖이 들어오고, 테두리는
+       카드 표면이 아니라 액자다. 둘 다 열린 단에서 바탕과 다르고 봉인 단에서도 그대로라,
+       안 갈리는 것이 당연한 화소가 다시 분모에 앉는다. 실측으로 희귀 카드의 표본 26023 중
+       5천 남짃가 그것이었고, 값이 보통 94.6에 희귀 73.7로 갈렸다. 회전이 낸 쎐기의 폭은
+       카드 길이 곱하기 sin이라, 그만큼과 선 굵기만큼 안으로 물리면 표본이 봉인이 덮는 면 안에 남는다. */
+    const tilt = Math.abs(M.b);
+    const line = parseFloat(cs.borderLeftWidth) || 0;
+    return { cut: (f.top - q.top) / q.height, bg: cs.backgroundColor,
+      pad: [(now.offsetHeight * tilt + line + 1) / q.width,
+        (now.offsetWidth * tilt + line + 1) / q.height] };
+  }, STAGES - 1);
+
   // 지금 서 있는 카드가 어느 단에 있고 무엇을 들고 있는가. 걷는 동안 이 한 판독만 쓴다.
   const read = () => p.evaluate(() => {
     const box = document.getElementById("pull");
@@ -222,9 +324,11 @@ try {
     } catch (e) { return null; }
     let png = null;
     try { png = (await card.screenshot()).toString("base64"); } catch (e) { return null; }
+    /* 판의 윗선은 마지막 단에만 있다. 찍은 그 자리에서 묻지 않으면 나중에 물을 카드가 없다. */
+    const skin = at.stage === STAGES - 1 ? await plateCut() : null;
     const after = await read();
     if (after.stage !== at.stage || after.card !== at.card) return { card: at.card, stage: at.stage, png: null };
-    return { card: at.card, stage: at.stage, png: png, name: after.name, rare: after.rare };
+    return { card: at.card, stage: at.stage, png: png, name: after.name, rare: after.rare, skin: skin };
   };
 
   // 찍은 장을 카드 이름 아래 모은다. 뽑은 순서대로 서므로 아래 축이 고르는 표본이 회차 순서를 따른다.
@@ -233,6 +337,7 @@ try {
     let one = pix.find((x) => x.name === s.name);
     if (!one) { one = { name: s.name, rare: s.rare, f: {} }; pix.push(one); }
     one.f[s.stage] = s.png;
+    if (s.skin) one.skin = s.skin;
     return true;
   };
 
@@ -513,21 +618,27 @@ try {
     sealed ? sealed.name : "no card yielded stage 0 and stage 4 over " + pix.length + " cards shot");
   if (sealed) {
     const gap = await apart(sealed.f[0], sealed.f[4]);
-    check("pullshow:the-sealed-stage-does-not-show-the-face", gap >= FACE_AREA,
-      (gap * 100).toFixed(1) + "% of the card changed between sealed and open, floor "
-      + (FACE_AREA * 100) + "%");
+    const ink = await inked(sealed.f[0], sealed.f[4], sealed.skin);
+    check("pullshow:the-sealed-stage-does-not-show-the-face",
+      Boolean(ink) && ink.ink > 0 && ink.part >= FACE_AREA,
+      (!ink || ink.ink === 0 ? "unmeasured, the open stage inked nothing above the plate"
+        : (ink.part * 100).toFixed(1) + "% of the " + ink.ink
+        + " ink pixels the open portrait paints changed between sealed and open, floor "
+        + (FACE_AREA * 100) + "%; the old whole-card ruler read " + (gap * 100).toFixed(1) + "%"));
   }
   // 실루엣은 등급 테두리가 없는 카드에서 잰다. 금테가 붙은 카드는 그 테만으로 채도가 선다.
   const grey = pix.find((c) => !c.rare && c.f[2] && c.f[4]);
   check("instrument:a-plain-card-was-caught-in-silhouette-and-open", Boolean(grey),
     grey ? grey.name : "no plain card yielded stage 2 and stage 4 over " + pix.length + " cards shot");
   if (grey) {
-    const dim = await tone(grey.f[2]);
-    const lit = await tone(grey.f[4]);
+    const dim = await toneOn(grey.f[2], grey.f[4], grey.skin);
+    const lit = await toneOn(grey.f[4], grey.f[4], grey.skin);
     check("pullshow:the-silhouette-stage-has-no-colour",
-      dim.sat <= lit.sat * GREY_RATIO && dim.lum < lit.lum,
-      "saturation " + dim.sat.toFixed(1) + " of " + lit.sat.toFixed(1) + ", luminance "
-      + dim.lum.toFixed(1) + " of " + lit.lum.toFixed(1));
+      Boolean(dim) && Boolean(lit) && dim.n > 0 && dim.sat <= lit.sat * GREY_RATIO && dim.lum < lit.lum,
+      (!dim || !lit || dim.n === 0 ? "unmeasured, the open stage inked nothing above the plate"
+        : "saturation " + dim.sat.toFixed(1) + " of " + lit.sat.toFixed(1) + ", luminance "
+        + dim.lum.toFixed(1) + " of " + lit.lum.toFixed(1) + ", over " + dim.n
+        + " ink pixels the open portrait paints"));
   }
   const late = cards.filter((c) => c.rows[3] !== undefined && c.rows[4] !== undefined);
   check("pullshow:the-stat-rows-stand-only-at-the-last-stage",
