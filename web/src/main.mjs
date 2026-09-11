@@ -396,11 +396,19 @@ function formChip() {
   box.setAttribute('title', name);
 }
 
+/* 묶음 이름 둘. 판이 사는 동안 방향은 언제든 바뀌므로 단추 하나하나는 늘 같은 뜻이고, 갈리는 것은
+   이 누름이 판정을 받느냐다. 그 하나를 묶음 이름이 말한다. */
+const PAD_OPEN = '다이빙 방향, 판정 창 열림';
+const PAD_SHUT = '다이빙 방향, 판정 창 닫힘';
+
 /* 창은 판정을 받는 구간이지 방향을 고르는 구간이 아니다. 단추를 disabled로 잠그면 그 둘이 한 속성에 묶여,
    읽어 주는 자와 탭 이동에는 죽은 단추라고 말하면서 손가락의 누름은 그대로 받아 선호를 옮겼다. 열림은
    클래스가 들고 disabled는 어느 마디에도 안 붙는다. 흐림은 hud.css의 .zone:not(.live) svg가 그대로 그린다. */
 function setPad(on) {
   for (const b of document.querySelectorAll('.zone')) b.classList.toggle('live', on);
+  /* 창이 열렸다는 것은 흐림으로만 말했다. 읽어 주는 자에게는 지금 누름이 판정을 받는지 안 받는지가
+     안 들린다. 묶음 이름이 그 둘을 가른다. */
+  el('pad').setAttribute('aria-label', on ? PAD_OPEN : PAD_SHUT);
 }
 
 function markDive(dive, bot) {
@@ -2406,6 +2414,14 @@ for (const b of document.querySelectorAll('.zone')) {
      따로 놀았다. 비활성 단추에도 pointerdown과 pointerup은 그대로 오고 click과 mousedown만 안 온다(실측).
      지금은 어느 마디에서도 단추를 안 잠그므로 그 사정에 기대지 않는다. */
   b.onpointerdown = () => chooseDive(Number(b.dataset.dive));
+  /* 손가락 말고 자판으로 고르는 길이다. 초점이 선 단추에서 Enter는 click으로 오는데 그 자리에는 click을
+     받는 자가 없고, space는 창 전체가 받아 가운데로 읽었다. 두 키를 같은 chooseDive로 보내면 초점이 선
+     판이 곧 그 방향이다. 기본 동작은 막는다. 안 막으면 space가 화면을 한 칸 내린다. */
+  b.onkeydown = (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    chooseDive(Number(b.dataset.dive));
+  };
 }
 const autoBtn = el('auto');
 autoBtn.classList.toggle('on', state.auto);
@@ -2534,6 +2550,9 @@ el('out').onpointerdown = () => {
   el('out').classList.toggle('on', advance > 0);
 };
 addEventListener('keydown', (e) => {
+  /* 판이 이미 삼킨 키는 여기서 두 번 읽지 않는다. space를 그냥 두면 초점이 선 판을 눌러도 가운데가
+     들어가고, Enter를 그냥 두면 자막 한 줄이 두 칸 넘어간다. 방향키는 초점과 상관없이 그대로 흐른다. */
+  if ((e.key === ' ' || e.key === 'Enter') && e.target.closest && e.target.closest('.zone')) return;
   // 방향키는 손가락과 같은 문법을 따른다. 창 안이면 판정을 굴리고, 창 밖이면 선호만 옮기고 자막이 서 있으면 같이 넘긴다.
   if (e.key === 'ArrowLeft') return chooseDive(-1);
   if (e.key === 'ArrowRight') return chooseDive(1);
