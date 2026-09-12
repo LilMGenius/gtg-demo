@@ -64,7 +64,8 @@ const BODIES = [GATE_BODY,
 // 그 한 벌에서 난 초록은 게임이 만드는 어떤 몸도 안 지킨다. 손으로 남긴 수라 소스가 움직이면 먼저 어긋난다.
 const HOLDS_GATE_BODY = BAND_H[0] <= GATE_BODY.height && GATE_BODY.height <= BAND_H[1]
   && BAND_W[0] <= GATE_BODY.weight && GATE_BODY.weight <= BAND_W[1];
-// 봉투를 도는 선반. 머리와 어깨가 칸 밖으로 나간 회귀가 이 칸에서 났고, 겨냥이 목 관절이다.
+// 세로 절과 깃 대조군이 이 이름에 걸리는 선반. 머리와 어깨가 칸 밖으로 나간 회귀가 이 칸에서
+// 났고, 겨냥이 목 관절이다. 봉투는 여섯 선반이 다 돈다.
 const WIDE_SHELF = "pads";
 const ENVELOPE = "roster " + SIZED.length + " of " + CREW.length + " entries "
   + bandOf("height", null).join("..") + "cm " + bandOf("weight", null).join("..") + "kg, chain rng "
@@ -272,48 +273,51 @@ try {
           x0: x0 / x.w, x1: (x1 + 1) / x.w, y0: y0 / x.h, y1: (y1 + 1) / x.h }
           : { n: 0, x: -1, y: -1, x0: -1, x1: 2, y0: -1, y1: 2 };
       };
-      /* 무게중심만 체격을 돈다. 등급끼리 형태가 다른가와 무엇이든 칠했는가는 한 벌에서 답이 나오고,
-         물건이 칸 안에 앉았는가는 겨냥이 몸을 타므로 체격마다 답이 다르다. 도는 선반은 유니폼
-         하나다. 여섯 선반을 다 돌리면 굽는 장이 다섯 배가 되어 이 자가 제 시한 안에서 죽는다. */
+      /* 세 축이 다 봉투를 돈다. 굽는 장이 다섯 배가 되면 이 자가 제 시한 안에서 죽는다고 앞선
+         회차가 적었지만 재지는 않았다. 실측으로 혼자 돌 때 19.51초에서 20.36초이고, 시한은 180초다.
+         등급끼리 형태가 다른가와 무엇이든 칠했는가도 체격마다 답이 갈린다. 실측으로 머리 칸의
+         가장 마른 등급이 188/84에서 1365인데 165/65에서 1096이고, 유니폼 칸의 최악 쌍이 188/84에서
+         0.664인데 165/96에서 0.765다. 게이트 몸 한 벌은 어느 축에서도 최악의 귀퉁이가 아니다. */
       const per = [];
       let ms = null;
-      for (const k of (s.tab === wide ? bodies : [bodies[0]])) {
+      for (const k of bodies) {
         const one = [];
         for (const n of ranks) one.push(await mask(bake(n, k)));
         if (!ms) ms = one;
-        per.push({ body: k.height + "/" + k.weight, mid: one.map(midOf) });
+        const pairs = [];
+        for (let i = 0; i < one.length; i++) for (let j = i + 1; j < one.length; j++) pairs.push({ n: ranks[i] + "-" + ranks[j], v: iou(one[i], one[j]) });
+        per.push({ body: k.height + "/" + k.weight, mid: one.map(midOf), pairs,
+          cover: one.map((x) => x.reduce((a, b) => a + b, 0)) });
       }
       /* 심는 대조군은 겨냥을 내려 깃을 칸 위로 밀어낸 장이다. 유니폼 칸에서 게이트 몸 한 벌만 굽는다.
          깃이 칸을 벗어난다는 것은 한 벌에서 이미 판가름 나고, 다섯 벌로 늘리면 굽는 장만 다섯 배가 된다.
          아래 머리 자가 옛 고정 보정을 되심는 것과 같은 자리다. */
       const plant = s.tab === wide ? midOf(await mask(bake(ranks[0], bodies[0], drop))) : null;
       const twice = await mask(bake(ranks[ranks.length - 1], bodies[0]));
-      const pairs = [];
-      for (let i = 0; i < ms.length; i++) for (let j = i + 1; j < ms.length; j++) pairs.push({ n: ranks[i] + "-" + ranks[j], v: iou(ms[i], ms[j]) });
-      out.push({ tab: s.tab, cover: ms.map((x) => x.reduce((a, b) => a + b, 0)), pairs, per, plant, control: iou(ms[ms.length - 1], twice) });
+      out.push({ tab: s.tab, per, plant, control: iou(ms[ms.length - 1], twice) });
     }
     return out;
   }, [BODIES, WIDE_SHELF, PADS_DROP]);
   check("instrument:some-shelf-declares-a-shape", shapes.length > 0, shapes.map((s) => s.tab).join(", "));
-  /* 봉투를 도는 선반은 이름 하나로 고른다. 그 이름이 어긋나면 여섯 선반이 다 한 벌로 접히고,
-     아래 무게중심 축은 게이트 몸 한 벌만 재고도 초록을 낸다. 접힌 표본은 메시지의 몸 목록에만
-     남아서, 그 줄을 세지 않으면 다섯 벌을 잰 초록과 구별이 안 된다. 그래서 봉투를 돈 선반이
-     하나인지를 잰 표본에서 되읽고, 그 이름이 장비표가 든 선반 목록에 있는지를 같이 묻는다.
-     장비표에 묻는 까닭은 그것이 걷은 표본과 다른 곳에서 오기 때문이다. 이 파일의 겨냥표는
-     선반 이름을 손으로 들고 있어서, gear.mjs가 그 칸 이름을 바꿔도 여기 적힌 이름으로 다섯 벌을
-     계속 걷는다. 그때 폭은 멀쩡하고 이름만 게임에 없다. 화면 탭 목록은 이 물음에 못 쓴다.
-     탭은 kit과 glove로 서고 겨냥표는 pads와 grip으로 서서, 두 이름공간이 애초에 다르다. */
-  // 선반 이름의 원장은 gear.mjs다. 겨냥표가 손으로 든 이름을 그 원장에 대조한다.
+  /* 여섯 선반이 다 봉투를 돈다. 표본이 접혔는지는 걷어 온 표본에서 되읽는다. 폭이 접힌 선반은
+     굽기만 하고 판정에서 빠질 수 있고, 그때 메시지의 몸 목록에만 흔적이 남아서 그 줄을 세지
+     않으면 다섯 벌을 잰 초록과 구별이 안 된다. 이름도 같이 묻는다. 이 파일의 겨냥표는 선반
+     이름을 손으로 들고 있어서, gear.mjs가 칸 이름을 바꿔도 여기 적힌 이름으로 계속 걷는다.
+     그때 폭은 멀쩡하고 이름만 게임에 없다. 장비표에 묻는 까닭은 그것이 걷은 표본과 다른 곳에서
+     오기 때문이다. 화면 탭 목록은 이 물음에 못 쓴다. 탭은 kit과 glove로 서고 겨냥표는 pads와
+     grip으로 서서, 두 이름공간이 애초에 다르다. */
+  // 선반 이름의 원장은 gear.mjs다. 겨냥표가 손으로 든 이름 여섯을 그 원장에 대조한다.
   const GEAR_SHELVES = await p.evaluate(async () => {
     const g = await import("/web/src/state/gear.mjs");
     return Object.keys(g.SKINS);
   });
-  const wideShelves = shapes.filter((s) => s.per.length === BODIES.length);
-  check("instrument:one-shelf-walked-the-whole-envelope",
-    wideShelves.length === 1 && wideShelves[0].tab === WIDE_SHELF && GEAR_SHELVES.indexOf(WIDE_SHELF) >= 0,
-    "wide " + WIDE_SHELF + (GEAR_SHELVES.indexOf(WIDE_SHELF) >= 0 ? " in the gear table" : " not in the gear table")
-    + ", walked the envelope " + (wideShelves.map((s) => s.tab).join(" ") || "none") + ", samples "
-    + shapes.map((s) => s.tab + " " + s.per.length).join(" ") + " of " + BODIES.length + " bodies");
+  const walked = shapes.filter((s) => s.per.length === BODIES.length);
+  const named = shapes.filter((s) => GEAR_SHELVES.indexOf(s.tab) >= 0);
+  check("instrument:every-shelf-walked-the-whole-envelope",
+    shapes.length > 0 && walked.length === shapes.length && named.length === shapes.length,
+    "walked the envelope " + (walked.map((s) => s.tab).join(" ") || "none") + ", samples "
+    + shapes.map((s) => s.tab + " " + s.per.length).join(" ") + " of " + BODIES.length + " bodies, "
+    + named.length + " of " + shapes.length + " names in the gear table");
   // 가운데 60퍼센트. 겨냥이 어긋나면 물건이 변으로 밀리고, 그때 칸에 담기는 것은 물건이 아니라
   // 그 옆에 붙은 몸이다. 축구화 칸이 정강이만 담고 있던 것을 아무 축도 못 봤다.
   /* 상한은 그대로 0.2에서 0.8이고 달라진 것은 표본이다. 축 이름은 선반마다 하나로 남긴다.
@@ -344,14 +348,37 @@ try {
   const sayClip = (q) => q.x.toFixed(3) + " collar " + q.y0.toFixed(3) + " sides "
     + q.x0.toFixed(3) + ".." + q.x1.toFixed(3) + " hem " + q.y1.toFixed(3);
   for (const s of shapes) {
-    // 0.75. 두 등급이 칠해진 자리의 4분의 3을 공유하면 사람은 같은 물건에 색만 바꾼 것으로 읽는다.
-    // 지금 최악 쌍이 머리 0.67 축구화 0.71이라 통과용으로 맞춘 수가 아니고, 형태가 무너지는 날 먼저 운다.
-    const shared = s.pairs.filter((x) => x.v > 0.75);
-    check("thumb:" + s.tab + ":ranks-do-not-share-one-shape", shared.length === 0,
-      shared.map((x) => x.n + " " + x.v.toFixed(3)).join(", ") || "worst pair " + Math.max(...s.pairs.map((x) => x.v)).toFixed(3));
-    // 1000화소. 굽는 칸의 1퍼센트쯤이다. 이 아래로 내려간 등급은 껍데기가 몸 안으로 들어가
-    // 그 값을 치른 사람만 맨몸이 된다. 실제로 높이를 줄여 짧은 머리를 만들다 이 값이 227까지 내려갔다.
-    check("thumb:" + s.tab + ":every-rank-paints-something", s.cover.every((n) => n >= 1000), s.cover.join(", "));
+    /* 0.75. 두 등급이 칠해진 자리의 4분의 3을 공유하면 사람은 같은 물건에 색만 바꾼 것으로 읽는다.
+       판정은 다섯 벌의 모든 쌍이다. 실측으로 표본을 봉투로 넓히자 유니폼 1-3 쌍이 165/96에서
+       0.765로 상한을 넘었고, 같은 쌍이 게이트 몸에서는 0.664다. 한 벌만 읽던 자리가 그 수를 못 봤다.
+       나머지 선반의 최악 쌍은 장갑 0.736, 양말 0.735, 축구화 0.696, 문신 0.484, 머리 0.479다. */
+    const twins = [];
+    let twinWorst = null;
+    for (const row of s.per) for (const x of row.pairs) {
+      if (x.v > 0.75) twins.push(row.body + " " + x.n + " " + x.v.toFixed(3));
+      if (!twinWorst || x.v > twinWorst.v) twinWorst = { v: x.v, at: row.body + " " + x.n };
+    }
+    check("thumb:" + s.tab + ":ranks-do-not-share-one-shape",
+      s.per.length === BODIES.length && twins.length === 0,
+      s.per.length + " of " + BODIES.length + " bodies, "
+      + (twins.length ? "sharing at " + twins.join(", ") + "; " : "")
+      + "worst pair " + twinWorst.v.toFixed(3) + " at " + twinWorst.at);
+    /* 1000화소. 굽는 칸의 1퍼센트쯤이다. 이 아래로 내려간 등급은 껍데기가 몸 안으로 들어가
+       그 값을 치른 사람만 맨몸이 된다. 실제로 높이를 줄여 짧은 머리를 만들다 이 값이 227까지 내려갔다.
+       판정은 다섯 벌 전부다. 실측으로 가장 마른 장이 머리 1등급 165/65의 1096이고 게이트 몸의
+       같은 등급은 1365라, 이 축이 지키는 자리도 게이트 몸이 아니다. */
+    const starved = [];
+    let leanest = null;
+    for (const row of s.per) row.cover.forEach((n, i) => {
+      if (n < 1000) starved.push(row.body + " rank " + i + " " + n);
+      if (!leanest || n < leanest.n) leanest = { n, at: row.body + " rank " + i };
+    });
+    check("thumb:" + s.tab + ":every-rank-paints-something",
+      s.per.length === BODIES.length && starved.length === 0,
+      s.per.length + " of " + BODIES.length + " bodies, "
+      + (starved.length ? "under the floor at " + starved.join(", ") + "; " : "")
+      + "thinnest " + leanest.n + " at " + leanest.at + ", "
+      + s.per.map((row) => row.body + " " + row.cover.join("/")).join(", "));
     const CLIP = s.tab === WIDE_SHELF;
     const inFrame = CLIP ? clipIn : midIn;
     const gapOf = CLIP ? clipGap : midGap;
@@ -364,10 +391,10 @@ try {
         if (!tight || gapOf(q) < tight.gap) tight = { gap: gapOf(q), at: row.body + " rank " + n, q };
       });
     }
-    /* 잰 벌 수가 술어에 든다. 봉투를 도는 선반은 다섯 벌이고 나머지는 한 벌이라, 표본이 접히면
-       메시지가 아니라 판정이 먼저 답한다. 머리와 어깨 축이 저마다 제 표본 폭을 같이 보는 것과
-       같은 자리다. 이름 자체가 어긋나 선반이 하나도 안 도는 경우는 위의 계기가 잡는다. */
-    const wantBodies = s.tab === WIDE_SHELF ? BODIES.length : 1;
+    /* 잰 벌 수가 술어에 든다. 여섯 선반이 다 다섯 벌이라, 표본이 접히면 메시지가 아니라 판정이
+       먼저 답한다. 위의 두 축도 같은 수를 본다. 이름 자체가 어긋나 선반이 하나도 안 도는
+       경우는 위의 계기가 잡는다. */
+    const wantBodies = BODIES.length;
     check("thumb:" + s.tab + (CLIP ? ":the-shirt-keeps-its-collar-and-both-sides-in-frame" : ":the-goods-sit-inside-the-frame"),
       s.per.length === wantBodies && s.per.every((row) => row.mid.every(inFrame)),
       s.per.length + " of " + wantBodies + " bodies, "
