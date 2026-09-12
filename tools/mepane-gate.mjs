@@ -440,7 +440,9 @@ try {
      기준은 같은 판에서 아이콘만 빼고 그 자리에서 다시 잰다. 수로만 적어 두면 안쪽 여백이 바뀐
      날 이 자가 규칙이 아니라 옛 수를 지킨다. 86b8818이 빈 span으로 세웠던 26px은 그 다시 잰
      수가 그날의 띠와 같은 띠인지를 한 번 더 묻는 자리라 따로 둔다.
-     한 줄의 높이도 같은 칸의 머리글에서 꺼낸다. 24를 적으면 본문 크기가 움직인 날 어긋난다. */
+     한 줄의 높이도 같은 칸의 note에서 꺼낸다. 머리 카드가 이 칸에서 나갔으므로 그 note는 띠
+     제 몸이고, .note.dim은 색과 정렬만 덮으므로 줄 높이는 머리가 서 있던 날과 같은 수다.
+     24를 적으면 본문 크기가 움직인 날 어긋난다. */
   const ZERO_STRIP = 26;
   const mark = await fresh.evaluate(() => {
     const pane = document.querySelector("#me .pane");
@@ -448,7 +450,7 @@ try {
     const g = strip ? strip.querySelector("svg") : null;
     if (!strip || !g) return null;
     const box = g.getBoundingClientRect();
-    const row = pane.querySelector(".note:not(.dim)");
+    const row = pane.querySelector(".note");
     const held = Math.round(strip.getBoundingClientRect().height);
     // 빼고 다시 잰다. display:none은 흐름에서 통째로 빠지므로 빈 span이 서 있던 그 띠와 같다.
     g.style.display = "none";
@@ -460,6 +462,46 @@ try {
       said: g.textContent.trim().length, held, bare,
       back: Math.round(strip.getBoundingClientRect().height) };
   });
+  /* 라벨 둘. 아이콘을 띠 안에 세운 뒤에도 그 위에는 머리 카드가 남아, 파운더가 본 것은 빈 상자
+     위에 선 '아는 얼굴'과 '라포'였다. 규칙이 받는 것은 빈 채로 두기와 아이콘 둘뿐이라 라벨은 어느
+     쪽도 아니고, 위의 탭이 이미 '아는 얼굴'이라 셀 것이 없는 칸에서 같은 말이 두 번 선다.
+     위의 자는 문장으로 끝나는 마디만 세므로 낱말 둘은 그 그물을 그냥 지나갔다. 실측으로 4c20979의
+     칸에서 마디 둘이 서 있었고 그 자는 초록이었다. 그래서 이 자는 문장이 아니라 자리를 잰다.
+     띠 밖에 카드가 하나도 없는가, 칸의 글자가 한 자도 없는가. 아이콘은 제 글자가 없으므로
+     글자 0을 요구해도 살아 있다. */
+  const labelRead = () => {
+    const pane = document.querySelector("#me .pane");
+    if (!pane) return null;
+    const notes = [...pane.querySelectorAll(".note")];
+    const kept = notes.filter((e) => !e.classList.contains("dim"));
+    const said = pane.textContent.replace(/\s+/g, "");
+    return { notes: notes.length, kept: kept.length, heads: kept.map((e) => e.textContent.trim()),
+      chars: [...said].length, said };
+  };
+  const labelOk = (r) => Boolean(r) && r.kept === 0 && r.chars === 0;
+  const label = await fresh.evaluate(labelRead);
+  check("mepane:an-empty-people-pane-carries-no-label", labelOk(label),
+    label ? label.notes + " note cards in the pane, " + label.kept + " outside the dim strip "
+      + JSON.stringify(label.heads) + ", " + label.chars + " non-space chars " + JSON.stringify(label.said)
+      : "no pane on a fresh account");
+  /* 대조군. 머리 카드를 그대로 둔 사본은 이 자에서 빨개져야 한다. 위의 축만 두면 칸을 통째로 안
+     그린 날에도 초록이 나고, 4c20979의 바이트가 왜 빨간지를 이 계기가 스스로 못 말한다.
+     심는 것은 그 판이 세우던 머리 카드 한 장이고, 재고 나서 그 자리에서 걷는다. 걷은 뒤에 다시
+     초록이 나는 것까지 같이 잰다. 사본이 남아 있으면 다음 축이 남의 카드를 세게 된다. */
+  const HEAD_COPY = '<div class="note" id="mepHeadCopy"><b>아는 얼굴</b><i>라포</i></div>';
+  await fresh.evaluate((html) => {
+    const pane = document.querySelector("#me .pane");
+    if (pane) pane.insertAdjacentHTML("afterbegin", html);
+  }, HEAD_COPY);
+  const planted = await fresh.evaluate(labelRead);
+  await fresh.evaluate(() => { const e = document.getElementById("mepHeadCopy"); if (e) e.remove(); });
+  const pulled = await fresh.evaluate(labelRead);
+  check("control:a-planted-head-card-turns-the-label-axis-red",
+    Boolean(planted) && !labelOk(planted) && labelOk(pulled),
+    planted ? "planted -> " + planted.kept + " cards outside the strip " + JSON.stringify(planted.heads)
+      + " and " + planted.chars + " chars " + JSON.stringify(planted.said) + ", axis red " + String(!labelOk(planted))
+      + "; pulled -> " + (pulled ? pulled.kept + " cards " + pulled.chars + " chars, axis green " + String(labelOk(pulled)) : "no pane")
+      : "no pane to plant into");
   await fresh.close();
   const zeroSaid = zero ? zero.said.filter((s) => ZERO_END.test(s)) : [];
   const zeroOk = Boolean(zero) && zero.strip && zero.met === 0 && zero.chars === 0

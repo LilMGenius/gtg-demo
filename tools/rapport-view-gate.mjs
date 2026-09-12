@@ -54,7 +54,8 @@ async function run(fixture) {
       const bText = (n) => (n.querySelector('b') ? n.querySelector('b').textContent : '');
       const head = kids.findIndex((n) => bText(n) === a.HEAD);
       const rec = kids.findIndex((n) => bText(n) === a.RECORD);
-      const slice = head < 0 ? [] : kids.slice(head + 1, rec < 0 ? kids.length : rec);
+      // 머리 카드는 셀 줄이 있을 때만 선다. 빈 칸에는 머리가 없으므로 첫 자식부터가 그 칸의 내용이다.
+      const slice = kids.slice(head < 0 ? 0 : head + 1, rec < 0 ? kids.length : rec);
       const rows = slice.filter((n) => n.querySelector('b'));
       const dim = slice.filter((n) => n.className.includes('dim')).map((n) => n.textContent);
       const rect = (n) => { const r = n.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom) }; };
@@ -112,13 +113,16 @@ const main = await run(FIX);
 const ctrl = await run({});
 
 /* 대조군: 같은 주입 경로, 라포만 비운다. 표본 0으로 통과하는 축을 막는다.
-   빈 상태를 알리던 문장은 지워졌고 빈 줄 하나가 그 자리다. 그래서 묻는 것은 넷이다.
-   머리글이 눈에 들어와 있는가, 줄이 하나도 없는가, 빈 줄이 하나 서 있는가, 그 줄이 정말 빈가.
+   빈 상태를 알리던 문장은 지워졌고 빈 줄 하나가 그 자리다. 머리 카드도 줄과 함께 나갔다.
+   위의 탭이 이미 '아는 얼굴'이라, 셀 것이 없는 칸에서 머리는 같은 말을 한 번 더 하고 빈 상자
+   위에 라벨 둘만 남긴다. 그래서 묻는 것은 넷이다.
+   머리글이 없는가, 줄이 하나도 없는가, 빈 줄이 하나 서 있는가, 그 줄이 정말 빈가.
    마지막 하나가 지워진 문장을 안 적고도 문장이 되돌아온 날을 잡는다. */
 check('ctrl:empty-rapport-note-only',
-  ctrl.shot.headSeen && ctrl.shot.rows.length === 0 && ctrl.shot.dim.length === 1
+  !ctrl.shot.headPresent && ctrl.shot.rows.length === 0 && ctrl.shot.dim.length === 1
   && ctrl.shot.dim.every((t) => t.trim() === ''),
-  'rows=' + ctrl.shot.rows.length + ' dim=' + ctrl.shot.dim.length + ' text=' + JSON.stringify(ctrl.shot.dim.join('')));
+  'head=' + ctrl.shot.headPresent + ' rows=' + ctrl.shot.rows.length + ' dim=' + ctrl.shot.dim.length
+  + ' text=' + JSON.stringify(ctrl.shot.dim.join('')));
 check('view:head-note-present', main.shot.headSeen && main.shot.headSub === SUB,
   'head=' + JSON.stringify(main.shot.headSub) + ' seen=' + main.shot.headSeen);
 
