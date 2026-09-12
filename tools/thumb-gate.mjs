@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { chromium } from "playwright";
+import { KEEPERS, KICKERS } from "../src/roster.mjs";
 
 // 상품이 그림으로 서는지 재는 자.
 // 글자만 있는 선반은 목록이지 진열이 아니다. 파는 것이 겉모습인데 그 겉모습을 안 보여 주면
@@ -28,6 +30,43 @@ t.unref();
 
 const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
+
+/* 재는 몸은 게임이 만드는 몸이어야 한다. 유니폼 축들이 여태 키 188 몸무게 84 한 벌만 구웠고,
+   한 벌에서 초록인 것은 그 한 벌에서 초록이라는 말뿐이다. 유니폼 칸의 겨냥은 목 관절을 타서
+   체격이 갈리면 프레임 안의 자리도 같이 갈린다. 실측: 상품 무게중심 y가 이 벌에서 0.73인데
+   키 205 몸무게 58에서 0.815로 상한 0.8을 넘었고, 198/74에서 남은 여유가 0.023이었다.
+   그래서 체격을 이 파일에 안 적고 만드는 자리에서 읽는다. 무작위로 태어나는 키퍼의 폭은
+   src/chain.mjs의 두 줄이 정하고, 명단에 적힌 몸은 src/roster.mjs가 줄마다 들고 있다.
+   둘을 합친 봉투의 네 귀퉁이가 표본이다. 여기 상수로 베끼면 폭이 넓어진 날 넓어진 자리만
+   조용히 안 재고 초록이 난다.
+   표본 범위: 봉투 네 귀퉁이와 게이트 몸 188/84, 다섯 벌이다. 188/84를 남기는 까닭은 앞선
+   회차의 수와 견줄 자리가 하나는 있어야 하기 때문이다. 성장 칸은 안 돈다. 키와 몸무게는
+   태어날 때 받고 레벨을 안 타며, 굽는 자가 읽는 것도 그 둘뿐이다. */
+const CHAIN = readFileSync(new URL("../src/chain.mjs", import.meta.url), "utf8");
+const CREW = KICKERS.concat(KEEPERS);
+const SIZED = CREW.filter((r) => Number.isFinite(r.height) && Number.isFinite(r.weight));
+// 178 + Math.floor(rng() * 21)은 178에서 198까지다. 상한은 밑값 더하기 폭 빼기 하나다.
+const rollOf = (hit) => (hit ? [Number(hit[1]), Number(hit[1]) + Number(hit[2]) - 1] : null);
+const ROLL_H = rollOf(CHAIN.match(/const height = (\d+) \+ Math\.floor\(rng\(\) \* (\d+)\)/));
+const ROLL_W = rollOf(CHAIN.match(/const weight = (\d+) \+ Math\.floor\(rng\(\) \* (\d+)\)/));
+const bandOf = (key, roll) => [
+  Math.min.apply(null, SIZED.map((r) => r[key]).concat(roll || [])),
+  Math.max.apply(null, SIZED.map((r) => r[key]).concat(roll || []))
+];
+const BAND_H = bandOf("height", ROLL_H);
+const BAND_W = bandOf("weight", ROLL_W);
+// 여태 재 온 한 벌. 봉투의 귀퉁이가 아니라 옛 표본이라 맨 앞에 남긴다.
+const GATE_BODY = { height: 188, weight: 84 };
+const BODIES = [GATE_BODY,
+  { height: BAND_H[0], weight: BAND_W[0] }, { height: BAND_H[0], weight: BAND_W[1] },
+  { height: BAND_H[1], weight: BAND_W[0] }, { height: BAND_H[1], weight: BAND_W[1] }];
+// 봉투를 도는 선반. 머리와 어깨가 칸 밖으로 나간 회귀가 이 칸에서 났고, 겨냥이 목 관절이다.
+const WIDE_SHELF = "pads";
+const ENVELOPE = "roster " + SIZED.length + " of " + CREW.length + " entries "
+  + bandOf("height", null).join("..") + "cm " + bandOf("weight", null).join("..") + "kg, chain rng "
+  + (ROLL_H ? ROLL_H.join("..") : "unread") + "cm " + (ROLL_W ? ROLL_W.join("..") : "unread")
+  + "kg, envelope " + BAND_H.join("..") + "cm " + BAND_W.join("..") + "kg, bodies "
+  + BODIES.map((k) => k.height + "/" + k.weight).join(" ");
 
 let b;
 try {
@@ -140,6 +179,12 @@ try {
     (blankRatio * 100).toFixed(1) + "% painted on an empty box, floor " + (SHOT_INK * 100).toFixed(0) + "%");
   await p.evaluate(() => { const q = document.getElementById("inkProbe"); if (q) q.remove(); });
 
+  /* 재는 몸을 먼저 찍어 둔다. 아래 세 축이 이 다섯 벌을 돌고, 봉투가 좁아지거나 명단 한 줄이
+     몸을 안 들고 있으면 여기서 먼저 빨개진다. 그러면 아래의 초록은 좁아진 봉투의 초록이다. */
+  check("instrument:the-body-envelope-came-from-the-game",
+    Boolean(ROLL_H) && Boolean(ROLL_W) && SIZED.length === CREW.length && BODIES.length === 5
+    && BAND_H[0] < BAND_H[1] && BAND_W[0] < BAND_W[1], ENVELOPE);
+
   // 이름이 형태를 말하는 선반들. 머리는 깎아준 머리와 투블럭과 기른 머리와 모히칸이고,
   // 축구화는 실내화와 닳은 축구화와 스터드 여섯 개와 스파이크다.
   // 위의 축은 그림 파일이 다른가만 보므로 색 한 값만 바꿔도 통과한다. 두 선반 다
@@ -150,10 +195,9 @@ try {
   //
   // 어느 선반을 재는지는 데이터가 정한다. 등급 줄이 cut을 들고 있으면 그 선반은
   // 형태를 판다고 스스로 선언한 것이다. 새 선반에 cut을 붙이면 이 자가 따라온다.
-  const shapes = await p.evaluate(async () => {
+  const shapes = await p.evaluate(async ([bodies, wide]) => {
     const m = await import("/web/src/render/thumb.mjs");
     const g = await import("/web/src/state/gear.mjs");
-    const k = { height: 188, weight: 84 };
     // 어느 등급의 색도 아니고 살색과도 먼 값이라 이 색이 찍힌 자리는 머리 껍데기뿐이다.
     const MARK = 0xff00ff;
     const mask = (url) => new Promise((res) => {
@@ -191,23 +235,32 @@ try {
     ].filter((s) => s.rows.every((r, i) => (g.SKINS[s.field] ? g.skinAt(s.field, i, 0).cut : r.cut)));
     const out = [];
     for (const s of TABLE) {
-      const bake = (n) => { const look = g.lookOf({ [s.field]: n }); look[s.look] = MARK; return m.thumbURL(s.tab, k, look); };
+      const bake = (n, k) => { const look = g.lookOf({ [s.field]: n }); look[s.look] = MARK; return m.thumbURL(s.tab, k, look); };
       const ranks = s.rows.map((r, i) => i);
-      const ms = [];
-      for (const n of ranks) ms.push(await mask(bake(n)));
-      const twice = await mask(bake(ranks[ranks.length - 1]));
-      const pairs = [];
-      for (let i = 0; i < ms.length; i++) for (let j = i + 1; j < ms.length; j++) pairs.push({ n: ranks[i] + "-" + ranks[j], v: iou(ms[i], ms[j]) });
       // 무게중심. 물건이 칸 구석에 걸쳐 있으면 화소 수는 넉넉해도 사람은 잘린 물건을 본다.
-      const mid = ms.map((x) => {
+      const midOf = (x) => {
         let sx = 0, sy = 0, n = 0;
         for (let i = 0; i < x.length; i++) if (x[i]) { sx += i % x.w; sy += Math.floor(i / x.w); n++; }
         return n ? { x: sx / n / x.w, y: sy / n / x.h } : { x: -1, y: -1 };
-      });
-      out.push({ tab: s.tab, cover: ms.map((x) => x.reduce((a, b) => a + b, 0)), pairs, mid, control: iou(ms[ms.length - 1], twice) });
+      };
+      /* 무게중심만 체격을 돈다. 등급끼리 형태가 다른가와 무엇이든 칠했는가는 한 벌에서 답이 나오고,
+         물건이 칸 안에 앉았는가는 겨냥이 몸을 타므로 체격마다 답이 다르다. 도는 선반은 유니폼
+         하나다. 여섯 선반을 다 돌리면 굽는 장이 다섯 배가 되어 이 자가 제 시한 안에서 죽는다. */
+      const per = [];
+      let ms = null;
+      for (const k of (s.tab === wide ? bodies : [bodies[0]])) {
+        const one = [];
+        for (const n of ranks) one.push(await mask(bake(n, k)));
+        if (!ms) ms = one;
+        per.push({ body: k.height + "/" + k.weight, mid: one.map(midOf) });
+      }
+      const twice = await mask(bake(ranks[ranks.length - 1], bodies[0]));
+      const pairs = [];
+      for (let i = 0; i < ms.length; i++) for (let j = i + 1; j < ms.length; j++) pairs.push({ n: ranks[i] + "-" + ranks[j], v: iou(ms[i], ms[j]) });
+      out.push({ tab: s.tab, cover: ms.map((x) => x.reduce((a, b) => a + b, 0)), pairs, per, control: iou(ms[ms.length - 1], twice) });
     }
     return out;
-  });
+  }, [BODIES, WIDE_SHELF]);
   check("instrument:some-shelf-declares-a-shape", shapes.length > 0, shapes.map((s) => s.tab).join(", "));
   for (const s of shapes) {
     // 0.75. 두 등급이 칠해진 자리의 4분의 3을 공유하면 사람은 같은 물건에 색만 바꾼 것으로 읽는다.
@@ -220,9 +273,30 @@ try {
     check("thumb:" + s.tab + ":every-rank-paints-something", s.cover.every((n) => n >= 1000), s.cover.join(", "));
     // 가운데 60퍼센트. 겨냥이 어긋나면 물건이 변으로 밀리고, 그때 칸에 담기는 것은 물건이 아니라
     // 그 옆에 붙은 몸이다. 축구화 칸이 정강이만 담고 있던 것을 아무 축도 못 봤다.
-    const off = s.mid.filter((m) => m.x < 0.2 || m.x > 0.8 || m.y < 0.2 || m.y > 0.8);
-    check("thumb:" + s.tab + ":the-goods-sit-inside-the-frame", off.length === 0,
-      s.mid.map((m) => m.x.toFixed(2) + "/" + m.y.toFixed(2)).join(" "));
+    /* 상한은 그대로 0.2에서 0.8이고 달라진 것은 표본이다. 축 이름은 선반마다 하나로 남긴다.
+       체격마다 축을 세우면 어느 이름이 상품을 지키는 이름인지 읽는 사람이 골라야 하고,
+       그 고르는 일은 아무도 안 한다. 판정은 그 선반이 잰 체격 전부이고, 메시지가 몸별 수를 든다. */
+    /* 상한을 두 번 적지 않는다. 술어와 여유가 같은 수를 봐야 하고, 두 자리로 적으면 그 여유가
+       안 읽힌다. 실측으로 200/65 1등급이 0.80으로 찍혔는데 세 자리로는 0.799였다. 반올림한
+       한 자리 뒤에 남은 여유가 0.001인지 0.005인지가 이 축이 답해야 하는 것이다. */
+    const LOW = 0.2;
+    const HIGH = 0.8;
+    const inFrame = (q) => q.x >= LOW && q.x <= HIGH && q.y >= LOW && q.y <= HIGH;
+    const sayMid = (q) => q.x.toFixed(3) + "/" + q.y.toFixed(3);
+    const gapOf = (q) => Math.min(q.x - LOW, HIGH - q.x, q.y - LOW, HIGH - q.y);
+    const off = [];
+    let tight = null;
+    for (const row of s.per) {
+      row.mid.forEach((q, n) => {
+        if (!inFrame(q)) off.push(row.body + " rank " + n + " " + sayMid(q));
+        if (!tight || gapOf(q) < tight.gap) tight = { gap: gapOf(q), at: row.body + " rank " + n, q };
+      });
+    }
+    check("thumb:" + s.tab + ":the-goods-sit-inside-the-frame",
+      s.per.every((row) => row.mid.every(inFrame)),
+      (off.length ? "outside at " + off.join(", ") + "; all " : "")
+      + s.per.map((row) => row.body + " " + row.mid.map(sayMid).join(" ")).join(", ")
+      + ", tightest " + tight.gap.toFixed(3) + " from the edge at " + tight.at + " " + sayMid(tight.q));
     check("control:" + s.tab + ":the-same-cut-paints-the-same-pixels", s.control > 0.999, s.control.toFixed(4));
   }
 
@@ -238,51 +312,75 @@ try {
      어깨를 따로 묻는 이유는 그것이 옛 고정 보정이 지키려던 값이기 때문이다. 머리만 묻는 자는
      겨냥을 위로 올리는 어떤 회귀에도 초록을 낸다. */
   // 심는 대조군. 이 자리로 겨냥을 되돌리면 기본 등급의 머리가 칸 밖으로 나가야 한다.
+  /* 체격도 표본이다. 아래 두 축이 재던 몸은 188/84 하나였는데 게임은 그보다 넓은 몸을 만든다.
+     BODIES가 소스에서 끌어온 봉투의 네 귀퉁이와 그 게이트 몸이고, 판정은 다섯 벌 전부다. */
   const OLD_PADS_AIM = { part: "torso", lift: 0.3 };
-  const heads = await p.evaluate(async (old) => {
+  const heads = await p.evaluate(async ([old, bodies]) => {
     const m = await import("/web/src/render/thumb.mjs");
     const g = await import("/web/src/state/gear.mjs");
-    const k = { height: 188, weight: 84 };
     const read = (tag, len, hb) => ({ tag, len,
       top: hb.y - hb.ry, bot: hb.y + hb.ry, left: hb.x - hb.rx, right: hb.x + hb.rx,
       eyes: hb.eyes.map((e) => ({ x: e.x, y: e.y })) });
-    const out = { live: [], was: [], arm: [],
+    const out = { by: [], was: [],
       shelf: { ranks: g.KITS.length, per: g.KITS.map((_, r) => g.skinsAt("pads", r).length) } };
-    for (let rank = 0; rank < g.KITS.length; rank += 1) {
-      for (let skin = 0; skin < g.skinsAt("pads", rank).length; skin += 1) {
-        const look = g.lookOf({ pads: rank, padsSkin: skin });
-        const tag = rank + ":" + skin;
-        const len = g.skinAt("pads", rank, skin).cut.len;
-        out.live.push(read(tag, len, m.headBox("pads", k, look)));
-        out.was.push(read(tag, len, m.headBox("pads", k, look, old)));
-        const ab = m.armBox("pads", k, look);
-        out.arm.push({ tag, len, y0: ab ? ab.y0 : 1, parts: ab ? ab.parts : 0 });
+    for (let at = 0; at < bodies.length; at += 1) {
+      const k = { height: bodies[at].height, weight: bodies[at].weight };
+      const row = { body: k.height + "/" + k.weight, live: [], arm: [] };
+      for (let rank = 0; rank < g.KITS.length; rank += 1) {
+        for (let skin = 0; skin < g.skinsAt("pads", rank).length; skin += 1) {
+          const look = g.lookOf({ pads: rank, padsSkin: skin });
+          const tag = rank + ":" + skin;
+          const len = g.skinAt("pads", rank, skin).cut.len;
+          row.live.push(read(tag, len, m.headBox("pads", k, look)));
+          const ab = m.armBox("pads", k, look);
+          row.arm.push({ tag, len, y0: ab ? ab.y0 : 1, parts: ab ? ab.parts : 0 });
+          // 심는 대조군은 게이트 몸 한 벌에서만 굽는다. 옛 겨냥이 머리를 잃는다는 것은 한 벌에서
+          // 이미 판가름 나고, 다섯 벌로 늘리면 굽는 장만 다섯 배가 된다.
+          if (at === 0) out.was.push(read(tag, len, m.headBox("pads", k, look, old)));
+        }
       }
+      out.by.push(row);
     }
     return out;
-  }, OLD_PADS_AIM);
+  }, [OLD_PADS_AIM, BODIES]);
   const headIn = (r) => r.top >= 0 && r.bot <= 1 && r.left >= 0 && r.right <= 1;
   const eyesIn = (r) => r.eyes.length === 2 && r.eyes.every((e) => e.x >= 0 && e.x <= 1 && e.y >= 0 && e.y <= 1);
   const sayHead = (r) => r.tag + " len " + r.len + " box " + r.top.toFixed(3) + ".." + r.bot.toFixed(3)
     + " eyes " + (r.eyes.length ? r.eyes.map((e) => e.y.toFixed(3)).join("/") : "none");
   const looks = heads.shelf.per.reduce((a, c) => a + c, 0);
-  const lost = heads.live.filter((r) => !headIn(r) || !eyesIn(r));
+  const spread = heads.by.length * looks;
+  const whole = (row) => row.live.length === looks && row.arm.length === looks;
+  const lost = [];
+  for (const row of heads.by) for (const r of row.live) if (!headIn(r) || !eyesIn(r)) lost.push(row.body + " " + sayHead(r));
+  const cut = [];
+  for (const row of heads.by) for (const r of row.arm) if (!(r.y0 >= 0)) cut.push(row.body + " " + r.tag + " len " + r.len + " shoulder top " + r.y0.toFixed(3));
   check("instrument:every-kit-look-returned-a-head-box",
-    heads.live.length === looks && heads.live.every((r) => r.bot > r.top) && heads.arm.every((r) => r.parts >= 1),
-    heads.live.length + " of " + looks + " looks measured, shoulder box over "
-    + heads.arm.map((r) => r.parts).join("/") + " meshes");
-  check("thumb:every-kit-look-keeps-its-head-in-frame", heads.live.length === looks && lost.length === 0,
-    lost.length ? lost.map(sayHead).join(", ")
-      : heads.shelf.ranks + " grades over " + heads.shelf.per.join("/") + " variants, box "
-        + Math.min.apply(null, heads.live.map((r) => r.top)).toFixed(3) + ".."
-        + Math.max.apply(null, heads.live.map((r) => r.bot)).toFixed(3)
-        + " with both eyes inside on all " + heads.live.length + ", longest shirt "
-        + Math.max.apply(null, heads.live.map((r) => r.len)));
-  const cut = heads.arm.filter((r) => !(r.y0 >= 0));
-  check("thumb:every-kit-look-keeps-its-shoulders-in-frame", heads.arm.length === looks && cut.length === 0,
-    cut.length ? cut.map((r) => r.tag + " len " + r.len + " shoulder top " + r.y0.toFixed(3)).join(", ")
-      : "shoulder box top " + Math.min.apply(null, heads.arm.map((r) => r.y0)).toFixed(3)
-        + " at the highest, inside the frame on all " + heads.arm.length);
+    heads.by.length === BODIES.length && heads.by.every((row) => whole(row)
+      && row.live.every((r) => r.bot > r.top) && row.arm.every((r) => r.parts >= 1)),
+    heads.by.length + " bodies by " + looks + " looks measured, shoulder box over "
+    + heads.by.map((row) => row.arm.map((r) => r.parts).join("/")).join(" and ") + " meshes");
+  check("thumb:every-kit-look-keeps-its-head-in-frame",
+    heads.by.length === BODIES.length && heads.by.every((row) => whole(row)
+      && row.live.every((r) => headIn(r) && eyesIn(r))),
+    lost.length ? lost.join(", ")
+      : heads.shelf.ranks + " grades over " + heads.shelf.per.join("/") + " variants on "
+        + heads.by.length + " bodies, box "
+        + heads.by.map((row) => row.body + " " + Math.min.apply(null, row.live.map((r) => r.top)).toFixed(3)
+          + ".." + Math.max.apply(null, row.live.map((r) => r.bot)).toFixed(3)).join(", ")
+        + ", both eyes inside on all " + spread + ", longest shirt "
+        + Math.max.apply(null, heads.by[0].live.map((r) => r.len)));
+  /* 이름이 술어와 같은 것을 말해야 한다. armBox가 돌려주는 것은 삼각근과 위팔의 상자이고 이 축이
+     보는 것은 그 상자의 위끝 하나뿐이라, 지키는 것은 어깨선이 칸 위로 안 잘리는 것이다.
+     삼각근 아래의 팔은 448x205 머리어깨 칸에서 구조상 칸 밖이다. 실측으로 그 상자 밑끝이
+     1.085에서 1.713 사이라 이 커밋 앞에서도 뒤에서도 팔을 통째로 담은 장은 한 장도 없다.
+     그래서 어깨를 통째로 담았다고 읽히는 옛 이름은 이 술어가 한 번도 잰 적 없는 것을 약속했다. */
+  check("thumb:every-kit-look-keeps-its-shoulder-line-in-frame",
+    heads.by.length === BODIES.length && heads.by.every((row) => row.arm.length === looks
+      && row.arm.every((r) => r.y0 >= 0)),
+    cut.length ? cut.join(", ")
+      : "shoulder line top " + heads.by.map((row) => row.body + " "
+        + Math.min.apply(null, row.arm.map((r) => r.y0)).toFixed(3)).join(", ")
+        + " at the highest, inside the frame on all " + spread);
   const wasLost = heads.was.filter((r) => !headIn(r) || !eyesIn(r));
   const wasBase = heads.was.find((r) => r.tag === "0:0");
   check("control:the-old-fixed-lift-loses-the-base-kit-head",
@@ -332,10 +430,9 @@ try {
   const SKIN_PAD = 6;
   // 심는 대조군. 이 거리로 붙으면 띠가 카드를 삼켜 위의 축이 빨개져야 한다.
   const NEAR_INK_DIST = 0.28;
-  const fills = await p.evaluate(async ([delta, old, pad, nearDist]) => {
+  const fills = await p.evaluate(async ([delta, old, pad, nearDist, k]) => {
     const m = await import("/web/src/render/thumb.mjs");
     const g = await import("/web/src/state/gear.mjs");
-    const k = { height: 188, weight: 84 };
     const read = (src) => new Promise((res) => {
       const im = new Image();
       im.onload = () => {
@@ -428,7 +525,7 @@ try {
     const one = m.thumbURL("ink", k, g.lookOf({ ink: 0 }));
     const two = m.thumbURL("ink", k, g.lookOf({ ink: 0 }));
     return { live, was, near, base: { same: one === two, len: one.length } };
-  }, [FILL_DELTA, OLD_INK_AIM, SKIN_PAD, NEAR_INK_DIST]);
+  }, [FILL_DELTA, OLD_INK_AIM, SKIN_PAD, NEAR_INK_DIST, GATE_BODY]);
   const pct = (x) => (x * 100).toFixed(1) + "%";
   const paid = fills.live.sold.slice(1);
   /* 자의 바닥. 위의 모든 수는 맨살 장 하나와 견준 차이라, 그 장이 구울 때마다 흔들리면
@@ -463,15 +560,14 @@ try {
 
   // 대조군. 같은 등급을 두 번 구우면 같은 그림이어야 한다. 매번 달라지면 위의 다름은
   // 상품의 차이가 아니라 굽는 잡음이고, 그 축은 아무것도 증명하지 않는다.
-  const twice = await p.evaluate(async () => {
+  const twice = await p.evaluate(async (k) => {
     const m = await import("/web/src/render/thumb.mjs");
     const g = await import("/web/src/state/gear.mjs");
-    const k = { height: 188, weight: 84 };
     const a = m.thumbURL("grip", k, g.lookOf({ grip: 1 }));
     const c = m.thumbURL("grip", k, g.lookOf({ grip: 1 }));
     const d = m.thumbURL("grip", k, g.lookOf({ grip: 3 }));
     return { same: a === c, differs: a !== d, len: a.length };
-  });
+  }, GATE_BODY);
   check("control:the-same-item-bakes-the-same-picture", twice.same, String(twice.same) + " over " + twice.len + " chars");
   check("control:a-different-item-bakes-a-different-picture", twice.differs, String(twice.differs));
 
@@ -699,7 +795,7 @@ try {
   /* 대조군. 굽는 자가 없는 종류는 호버해도 정지 그림이 그대로 서야 한다. startSpin은 그런
      종류에서 먼저 돌아 나가는데, 숨기는 규칙이 그 앞에 서면 캔버스도 그림도 없는 빈 칸이 남는다.
      그 칸은 호버해야만 비므로 위의 잉크 축이 영원히 못 본다. */
-  const dead = await p.evaluate(async () => {
+  const dead = await p.evaluate(async (k) => {
     const m = await import("/web/src/render/thumb.mjs");
     const rack = document.querySelector("#shop .rack");
     const card = document.createElement("div");
@@ -715,14 +811,14 @@ try {
     await new Promise((res) => { im.onload = res; im.onerror = res; im.src = document.querySelector("#shop .rack .card .shot img").getAttribute("src"); shot.appendChild(im); });
     await new Promise((res) => requestAnimationFrame(res));
     const rest = +im.getBoundingClientRect().height.toFixed(2);
-    m.startSpin(shot, "nosuchkind", { height: 188, weight: 84 }, {});
+    m.startSpin(shot, "nosuchkind", k, {});
     await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
     const cs = getComputedStyle(im);
     const out = { rest, h: +im.getBoundingClientRect().height.toFixed(2), vis: cs.display + "/" + cs.visibility, canvas: Boolean(shot.querySelector("canvas")) };
     m.stopSpin();
     card.remove();
     return out;
-  });
+  }, GATE_BODY);
   check("control:a-kind-with-no-render-keeps-its-still",
     dead.vis === "block/visible" && dead.h > 0 && Math.abs(dead.h - dead.rest) <= 1 && !dead.canvas,
     "still " + dead.vis + " " + dead.h + "px, rested " + dead.rest + "px, canvas " + (dead.canvas ? "moved in" : "stayed out"));
