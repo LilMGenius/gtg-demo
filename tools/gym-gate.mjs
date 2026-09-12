@@ -183,6 +183,54 @@ try {
   const saidCue = (c) => "scrollTop " + c.top + ", " + (c.rolls ? "rolls " + c.over + "px past the fold" : "does not roll")
     + ", cue " + (c.cue ? "on" : "off") + " " + c.cueH + "px";
   const col = await mp.evaluate(column);
+  /* 얕은 굴림. 감춘 띠가 그늘 높이보다 얇은 화면이 이 게이트에 하나도 없었다. 위의 축들은 54px을
+     감추는 740x360에서만 초록이었고, 그 사이 구간은 아무도 안 쟀다. 실측 740x400에서 이 창은 14px을
+     감춘 채 닫기를 접힘 밖 2.45px에 세웠고 그늘은 꺼져 있었다. 그늘 높이는 CSS 한 곳에 있으므로
+     여기 상수로 안 적고 같은 클래스를 단 상자를 하나 세워 그려진 값을 받는다. */
+  const lipOf = () => ({
+    probe: (() => {
+      const e = document.createElement("div");
+      e.className = "cue down";
+      e.style.visibility = "hidden";
+      document.getElementById("gym").append(e);
+      const h = e.getBoundingClientRect().height;
+      e.remove();
+      return Math.round(h * 100) / 100;
+    })()
+  });
+  const shallow = await b.newContext({ viewport: { width: 740, height: 400 }, deviceScaleFactor: 2 });
+  const sp = await shallow.newPage();
+  sp.on("pageerror", (e) => errs.push(String(e)));
+  sp.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+  await bootOn(sp, "?seed=20&preset=maxed,veteran");
+  await sp.mouse.move(2, 2);
+  await sp.waitForTimeout(150);
+  const lip = (await sp.evaluate(lipOf)).probe;
+  const thin = await sp.evaluate(column);
+  /* 굴린 뒤의 닫기. 얕은 띠에서도 사람이 나갈 길이 있다는 것을 이 한 줄이 잰다. */
+  await sp.evaluate(() => { const g = document.getElementById("gym"); g.scrollTop = g.scrollHeight; });
+  await sp.waitForTimeout(200);
+  const thinEnd = await sp.evaluate(column);
+  const band = (c) => c.rolls && c.over > 0 && c.over <= lip;
+  const fitted = (c) => band(c) && c.cue && Math.abs(c.cueH - Math.round(c.over)) <= 1;
+  const saidFit = (c) => "hides " + c.over + "px of a " + lip + "px shade, cue "
+    + (c.cue ? "on" : "off") + " " + c.cueH + "px against " + Math.round(c.over) + "px";
+  check("gym:a-shallow-roll-still-lights-a-fitted-cue", fitted(thin) && reach(thinEnd),
+    saidFit(thin) + ", at rest " + saidClose(thin) + " | after the roll " + saidClose(thinEnd));
+  /* 음성 대조군. 그늘을 26px로 되돌려 붙이면 그 겹이 감춘 14px보다 두꺼워진다. 그려진 높이로 묻는
+     판정식은 그때 빨개져야 하고, 안 빨개지면 위 축의 초록은 높이를 아예 안 읽는 경우와 같다. */
+  await sp.evaluate(() => { const g = document.getElementById("gym"); g.scrollTop = 0; });
+  await sp.waitForTimeout(200);
+  const thick = await sp.addStyleTag({ content: "#gym > .cue.down{height:26px !important}" });
+  await sp.waitForTimeout(150);
+  const thickened = await sp.evaluate(column);
+  await thick.evaluate((n) => n.remove());
+  await sp.waitForTimeout(150);
+  const thinAgain = await sp.evaluate(column);
+  check("control:a-shade-thicker-than-the-band-reddens-the-fitted-cue",
+    band(thickened) && !fitted(thickened) && fitted(thinAgain),
+    "planted " + saidFit(thickened) + " | restored " + saidFit(thinAgain));
+  await shallow.close();
   /* 두 번째 740. 씨앗과 순서는 위와 같고 주입만 다르다. 성장 칸이 전부 상한이면 환전 줄이 한 칸 더
      붙어 기둥이 화면보다 길어지고, 그때부터 이 창이 제 스크롤로 받는다. 이 게이트는 그 상태를 한 번도
      안 세웠다. 위의 두 축은 안 구르는 화면에서만 초록이었고, 사람이 닫기에 닿으려면 반드시 지나야

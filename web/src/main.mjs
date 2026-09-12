@@ -1178,10 +1178,13 @@ function openGram() {
    그때는 구르는 것을 밖에서 받는다. 안 받으면 첫 자식인 제목 줄을 재게 되어 넘침이 늘 0이고
    신호가 영영 안 켜진다. 신호는 감싼 상자의 자식에서만 찾는다. 창을 상자로 넘기면 그 안에
    칸의 신호가 같이 들어 있어, 안 좁히면 창의 신호 대신 칸의 것을 두 번 켠다.
-   문턱은 그늘 자신의 높이다. 감춘 것이 그늘보다 얇으면 그 겹은 알리는 것보다 더 많이 가린다.
-   실측으로 1280x720의 창은 닫기 버튼 아래 16px만 감췄는데, 거기에 26px 그늘을 켜면 버튼만
-   흐려지고 아래에 더 있다는 뜻은 거짓이 된다. 높이를 여기 상수로 안 적고 그려진 값을 읽는 것은
-   그 수가 CSS 한 곳에만 있어야 하기 때문이다. */
+   그늘은 감춘 것보다 더 많이 가리지 않는다. 감춘 것이 그늘의 높이보다 얇으면 그 높이를 감춘
+   만큼으로 줄여서 켠다. 26px을 그대로 켜면 그 겹이 감춘 것보다 두꺼워 버튼만 흐려지고, 그렇다고
+   안 켜면 아래에 더 있다는 말이 화면에 한 군데도 안 남는다. 실측으로 740x400의 훈련장은 14px을
+   감춘 채 닫기 버튼을 접힘 밖 2.45px에 세우고, 1280x720의 내 정보는 16px을 감춘다. 둘 다 신호가
+   꺼져 있었다. 높이를 여기 상수로 안 적고 그려진 값을 읽는 것은 그 수가 CSS 한 곳에만 있어야
+   하기 때문이다. 읽기 전에 붙여 둔 높이를 먼저 걷는다. 안 걷으면 줄여 둔 값을 상한으로 되읽어
+   한 번 줄어든 그늘이 다시 안 큰다. */
 function scrollCue(wrap, roll) {
   if (!wrap) return;
   const body = roll || wrap.querySelector(':scope > :not(.cue)');
@@ -1190,9 +1193,12 @@ function scrollCue(wrap, roll) {
   const at = body.scrollTop;
   const down = wrap.querySelector(':scope > .cue.down');
   const up = wrap.querySelector(':scope > .cue.up');
+  if (down) down.style.height = '';
+  if (up) up.style.height = '';
   const lip = Math.max(down ? down.offsetHeight : 0, up ? up.offsetHeight : 0);
-  if (down) down.style.opacity = over > lip && at < over - 1 ? '1' : '0';
-  if (up) up.style.opacity = over > lip && at > 1 ? '1' : '0';
+  const fit = over > 0 && over <= lip ? over + 'px' : '';
+  if (down) { down.style.height = fit; down.style.opacity = at < over - 1 ? '1' : '0'; }
+  if (up) { up.style.height = fit; up.style.opacity = over > 0 && at > 1 ? '1' : '0'; }
 }
 
 /* 내 정보 창의 신호 둘. 칸이 구르는 화면과 창이 구르는 화면이 갈리므로 둘을 같이 다시 센다.
