@@ -207,7 +207,12 @@ try {
   //
   // 어느 선반을 재는지는 데이터가 정한다. 등급 줄이 cut을 들고 있으면 그 선반은
   // 형태를 판다고 스스로 선언한 것이다. 새 선반에 cut을 붙이면 이 자가 따라온다.
-  const shapes = await p.evaluate(async ([bodies, wide]) => {
+  /* 심는 대조군의 겨냥. lift는 겨냥점을 세로로 옮기는 값이라, 내리면 사람이 칸에서 위로 오른다.
+     -0.5는 깃이 칸 위 변에 닿는 자리다. 실측으로 상의가 칠한 첫 줄이 게이트 몸에서
+     -0.2에 0.259, -0.3에 0.151, -0.4에 0.039, -0.5에 0.000이다. 다섯 벌이 모두 -0.5에서 0.000이고
+     한 칸 앞인 -0.4까지는 다섯 벌 다 초록이라, 이 값은 문턱을 스치는 자리가 아니다. */
+  const PADS_DROP = { lift: -0.5 };
+  const shapes = await p.evaluate(async ([bodies, wide, drop]) => {
     const m = await import("/web/src/render/thumb.mjs");
     const g = await import("/web/src/state/gear.mjs");
     // 어느 등급의 색도 아니고 살색과도 먼 값이라 이 색이 찍힌 자리는 머리 껍데기뿐이다.
@@ -247,13 +252,25 @@ try {
     ].filter((s) => s.rows.every((r, i) => (g.SKINS[s.field] ? g.skinAt(s.field, i, 0).cut : r.cut)));
     const out = [];
     for (const s of TABLE) {
-      const bake = (n, k) => { const look = g.lookOf({ [s.field]: n }); look[s.look] = MARK; return m.thumbURL(s.tab, k, look); };
+      const bake = (n, k, over) => { const look = g.lookOf({ [s.field]: n }); look[s.look] = MARK; return m.thumbURL(s.tab, k, look, over); };
       const ranks = s.rows.map((r, i) => i);
-      // 무게중심. 물건이 칸 구석에 걸쳐 있으면 화소 수는 넉넉해도 사람은 잘린 물건을 본다.
+      // 무게중심과 칠해진 자리의 상자. 물건이 칸 구석에 걸쳐 있으면 화소 수는 넉넉해도 사람은 잘린 물건을 본다.
       const midOf = (x) => {
-        let sx = 0, sy = 0, n = 0;
-        for (let i = 0; i < x.length; i++) if (x[i]) { sx += i % x.w; sy += Math.floor(i / x.w); n++; }
-        return n ? { x: sx / n / x.w, y: sy / n / x.h } : { x: -1, y: -1 };
+        let sx = 0, sy = 0, n = 0, x0 = x.w, x1 = -1, y0 = x.h, y1 = -1;
+        for (let i = 0; i < x.length; i++) if (x[i]) {
+          const cx = i % x.w, cy = Math.floor(i / x.w);
+          sx += cx; sy += cy; n++;
+          if (cx < x0) x0 = cx;
+          if (cx > x1) x1 = cx;
+          if (cy < y0) y0 = cy;
+          if (cy > y1) y1 = cy;
+        }
+        /* 상자는 화소 경계를 분수로 옮긴다. x0과 y0은 첫 칸의 자리라 변에 닿으면 0이고, x1과 y1은
+           끝 칸의 다음 자리라 변에 닿으면 1이다. 그래서 변에서 잘린 것이 0과 1로만 읽힌다.
+           칠한 자리가 없으면 무게중심도 상자도 없다. 어느 술어에도 안 드는 값으로 돌려준다. */
+        return n ? { n, x: sx / n / x.w, y: sy / n / x.h,
+          x0: x0 / x.w, x1: (x1 + 1) / x.w, y0: y0 / x.h, y1: (y1 + 1) / x.h }
+          : { n: 0, x: -1, y: -1, x0: -1, x1: 2, y0: -1, y1: 2 };
       };
       /* 무게중심만 체격을 돈다. 등급끼리 형태가 다른가와 무엇이든 칠했는가는 한 벌에서 답이 나오고,
          물건이 칸 안에 앉았는가는 겨냥이 몸을 타므로 체격마다 답이 다르다. 도는 선반은 유니폼
@@ -266,13 +283,17 @@ try {
         if (!ms) ms = one;
         per.push({ body: k.height + "/" + k.weight, mid: one.map(midOf) });
       }
+      /* 심는 대조군은 겨냥을 내려 깃을 칸 위로 밀어낸 장이다. 유니폼 칸에서 게이트 몸 한 벌만 굽는다.
+         깃이 칸을 벗어난다는 것은 한 벌에서 이미 판가름 나고, 다섯 벌로 늘리면 굽는 장만 다섯 배가 된다.
+         아래 머리 자가 옛 고정 보정을 되심는 것과 같은 자리다. */
+      const plant = s.tab === wide ? midOf(await mask(bake(ranks[0], bodies[0], drop))) : null;
       const twice = await mask(bake(ranks[ranks.length - 1], bodies[0]));
       const pairs = [];
       for (let i = 0; i < ms.length; i++) for (let j = i + 1; j < ms.length; j++) pairs.push({ n: ranks[i] + "-" + ranks[j], v: iou(ms[i], ms[j]) });
-      out.push({ tab: s.tab, cover: ms.map((x) => x.reduce((a, b) => a + b, 0)), pairs, per, control: iou(ms[ms.length - 1], twice) });
+      out.push({ tab: s.tab, cover: ms.map((x) => x.reduce((a, b) => a + b, 0)), pairs, per, plant, control: iou(ms[ms.length - 1], twice) });
     }
     return out;
-  }, [BODIES, WIDE_SHELF]);
+  }, [BODIES, WIDE_SHELF, PADS_DROP]);
   check("instrument:some-shelf-declares-a-shape", shapes.length > 0, shapes.map((s) => s.tab).join(", "));
   /* 봉투를 도는 선반은 이름 하나로 고른다. 그 이름이 어긋나면 여섯 선반이 다 한 벌로 접히고,
      아래 무게중심 축은 게이트 몸 한 벌만 재고도 초록을 낸다. 접힌 표본은 메시지의 몸 목록에만
@@ -293,6 +314,35 @@ try {
     "wide " + WIDE_SHELF + (GEAR_SHELVES.indexOf(WIDE_SHELF) >= 0 ? " in the gear table" : " not in the gear table")
     + ", walked the envelope " + (wideShelves.map((s) => s.tab).join(" ") || "none") + ", samples "
     + shapes.map((s) => s.tab + " " + s.per.length).join(" ") + " of " + BODIES.length + " bodies");
+  // 가운데 60퍼센트. 겨냥이 어긋나면 물건이 변으로 밀리고, 그때 칸에 담기는 것은 물건이 아니라
+  // 그 옆에 붙은 몸이다. 축구화 칸이 정강이만 담고 있던 것을 아무 축도 못 봤다.
+  /* 상한은 그대로 0.2에서 0.8이고 달라진 것은 표본이다. 축 이름은 선반마다 하나로 남긴다.
+     체격마다 축을 세우면 어느 이름이 상품을 지키는 이름인지 읽는 사람이 골라야 하고,
+     그 고르는 일은 아무도 안 한다. 판정은 그 선반이 잰 체격 전부이고, 메시지가 몸별 수를 든다. */
+  /* 상한을 두 번 적지 않는다. 술어와 여유가 같은 수를 봐야 하고, 두 자리로 적으면 그 여유가
+     안 읽힌다. 실측으로 200/65 1등급이 0.80으로 찍혔는데 세 자리로는 0.798이었다. 반올림한
+     한 자리 뒤에 남은 여유가 0.001인지 0.005인지가 이 축이 답해야 하는 것이다. */
+  const LOW = 0.2;
+  const HIGH = 0.8;
+  const midIn = (q) => q.x >= LOW && q.x <= HIGH && q.y >= LOW && q.y <= HIGH;
+  const midGap = (q) => Math.min(q.x - LOW, HIGH - q.x, q.y - LOW, HIGH - q.y);
+  const sayMid = (q) => q.x.toFixed(3) + "/" + q.y.toFixed(3);
+  /* 유니폼 칸만 세로를 다르게 읽는다. 84a5b84에서 이 칸의 겨냥이 목 관절로 올라간 뒤로 상의의
+     아래끝은 어느 체격 어느 등급에서도 448x205 칸 밖이다. 기장이 0.74에서 1.34까지인데 칸이
+     머리와 어깨만 담으므로 밑단은 설계상 안 담긴다. 실측으로 다섯 체격 스무 장 전부 칠해진
+     아래끝이 1.000이고, kit-dist.txt의 거리 훑기가 1.7에서 3.4까지 그 값을 못 움직였다.
+     그래서 세로 무게중심이 재던 것은 상품이 칸에 담겼는가가 아니라 칸이 몸의 어디를 잘랐는가다.
+     실측: 200/65 1등급이 0.798로 상한에서 0.002 남았고, 그 0.002는 칸 높이 205의 한 줄이다.
+     옳게 구운 칸에서도 빨개질 수 있는 자리라 세로 절을 갈아낸다. 바뀌는 것은 재는 성질이고
+     문턱은 아니다. 새 절은 깃이 칸 안에 있고 상의가 좌우로 안 잘렸는가다. 칠해진 상자의 x0이
+     0보다 크고 x1이 1보다 작고 첫 줄 y0이 0보다 큰가를 묻는다. 밑단이 아래 변에서 잘리는 것은
+     예상된 값이라 y1은 안 묻는다. 가로 무게중심은 그대로 든다. 그 절은 겨냥이 옆으로 밀리는
+     회귀를 재고, 실측으로 이 칸에서 0.508에서 0.554 사이라 여유가 살아 있다.
+     첫 줄의 여유는 실측으로 200/65 2등급의 0.215가 가장 작다. */
+  const clipIn = (q) => q.x >= LOW && q.x <= HIGH && q.x0 > 0 && q.x1 < 1 && q.y0 > 0;
+  const clipGap = (q) => Math.min(q.x - LOW, HIGH - q.x, q.x0, 1 - q.x1, q.y0);
+  const sayClip = (q) => q.x.toFixed(3) + " collar " + q.y0.toFixed(3) + " sides "
+    + q.x0.toFixed(3) + ".." + q.x1.toFixed(3) + " hem " + q.y1.toFixed(3);
   for (const s of shapes) {
     // 0.75. 두 등급이 칠해진 자리의 4분의 3을 공유하면 사람은 같은 물건에 색만 바꾼 것으로 읽는다.
     // 지금 최악 쌍이 머리 0.67 축구화 0.71이라 통과용으로 맞춘 수가 아니고, 형태가 무너지는 날 먼저 운다.
@@ -302,24 +352,15 @@ try {
     // 1000화소. 굽는 칸의 1퍼센트쯤이다. 이 아래로 내려간 등급은 껍데기가 몸 안으로 들어가
     // 그 값을 치른 사람만 맨몸이 된다. 실제로 높이를 줄여 짧은 머리를 만들다 이 값이 227까지 내려갔다.
     check("thumb:" + s.tab + ":every-rank-paints-something", s.cover.every((n) => n >= 1000), s.cover.join(", "));
-    // 가운데 60퍼센트. 겨냥이 어긋나면 물건이 변으로 밀리고, 그때 칸에 담기는 것은 물건이 아니라
-    // 그 옆에 붙은 몸이다. 축구화 칸이 정강이만 담고 있던 것을 아무 축도 못 봤다.
-    /* 상한은 그대로 0.2에서 0.8이고 달라진 것은 표본이다. 축 이름은 선반마다 하나로 남긴다.
-       체격마다 축을 세우면 어느 이름이 상품을 지키는 이름인지 읽는 사람이 골라야 하고,
-       그 고르는 일은 아무도 안 한다. 판정은 그 선반이 잰 체격 전부이고, 메시지가 몸별 수를 든다. */
-    /* 상한을 두 번 적지 않는다. 술어와 여유가 같은 수를 봐야 하고, 두 자리로 적으면 그 여유가
-       안 읽힌다. 실측으로 200/65 1등급이 0.80으로 찍혔는데 세 자리로는 0.798이었다. 반올림한
-       한 자리 뒤에 남은 여유가 0.001인지 0.005인지가 이 축이 답해야 하는 것이다. */
-    const LOW = 0.2;
-    const HIGH = 0.8;
-    const inFrame = (q) => q.x >= LOW && q.x <= HIGH && q.y >= LOW && q.y <= HIGH;
-    const sayMid = (q) => q.x.toFixed(3) + "/" + q.y.toFixed(3);
-    const gapOf = (q) => Math.min(q.x - LOW, HIGH - q.x, q.y - LOW, HIGH - q.y);
+    const CLIP = s.tab === WIDE_SHELF;
+    const inFrame = CLIP ? clipIn : midIn;
+    const gapOf = CLIP ? clipGap : midGap;
+    const say = CLIP ? sayClip : sayMid;
     const off = [];
     let tight = null;
     for (const row of s.per) {
       row.mid.forEach((q, n) => {
-        if (!inFrame(q)) off.push(row.body + " rank " + n + " " + sayMid(q));
+        if (!inFrame(q)) off.push(row.body + " rank " + n + " " + say(q));
         if (!tight || gapOf(q) < tight.gap) tight = { gap: gapOf(q), at: row.body + " rank " + n, q };
       });
     }
@@ -327,14 +368,27 @@ try {
        메시지가 아니라 판정이 먼저 답한다. 머리와 어깨 축이 저마다 제 표본 폭을 같이 보는 것과
        같은 자리다. 이름 자체가 어긋나 선반이 하나도 안 도는 경우는 위의 계기가 잡는다. */
     const wantBodies = s.tab === WIDE_SHELF ? BODIES.length : 1;
-    check("thumb:" + s.tab + ":the-goods-sit-inside-the-frame",
+    check("thumb:" + s.tab + (CLIP ? ":the-shirt-keeps-its-collar-and-both-sides-in-frame" : ":the-goods-sit-inside-the-frame"),
       s.per.length === wantBodies && s.per.every((row) => row.mid.every(inFrame)),
       s.per.length + " of " + wantBodies + " bodies, "
       + (off.length ? "outside at " + off.join(", ") + "; all " : "")
-      + s.per.map((row) => row.body + " " + row.mid.map(sayMid).join(" ")).join(", ")
-      + ", tightest " + tight.gap.toFixed(3) + " from the edge at " + tight.at + " " + sayMid(tight.q));
+      + s.per.map((row) => row.body + " " + row.mid.map(say).join(" ")).join(", ")
+      + ", tightest " + tight.gap.toFixed(3) + " from the edge at " + tight.at + " " + say(tight.q));
     check("control:" + s.tab + ":the-same-cut-paints-the-same-pixels", s.control > 0.999, s.control.toFixed(4));
   }
+  /* 심는 대조군. 위의 세로 절이 정말 무엇을 재는지는 그 절을 빨간 편으로 밀 수 있는 장이
+     있는가로만 답한다. 90fb31d가 봉투 계기에서 걷어낸 결함이 그것이다. 다섯 칸 리터럴을 훑는
+     술어는 소스가 어떻게 움직여도 못 틀렸다. 그래서 겨냥을 내려 깃을 칸 위로 밀어낸 장을 굽고,
+     이 술어가 그 장에서 지는지 본다. 상의가 여전히 수천 화소를 칠하는지도 같이 묻는다. 빈 장은
+     어느 절로도 지므로 빈 장으로 난 빨강은 깃을 잰 적이 없다. 유니폼 칸을 아예 안 걷은 날은
+     이 자가 먼저 운다. */
+  const wideKit = shapes.find((x) => x.tab === WIDE_SHELF);
+  const plantSay = wideKit && wideKit.plant ? sayClip(wideKit.plant) + " on " + wideKit.plant.n + " marked pixels" : "nothing baked";
+  check("control:" + WIDE_SHELF + ":a-dropped-aim-clips-the-collar-off-the-top",
+    Boolean(wideKit) && Boolean(wideKit.plant) && wideKit.plant.n > 0
+    && wideKit.plant.y0 === 0 && !clipIn(wideKit.plant),
+    "the planted aim lift " + PADS_DROP.lift + " reads " + plantSay + ", the shipped aim reads "
+    + (wideKit ? sayClip(wideKit.per[0].mid[0]) + " at " + wideKit.per[0].body + " rank 0" : "no kit shelf"));
 
   /* 유니폼 칸의 머리. 위의 네 축은 상의가 칸을 채우는지만 묻고, 그 상의를 입은 사람의 머리가
      칸에 있는지는 안 묻는다. 그래서 시작 상의 카드가 얼굴 없이 팔린 채로 넷 다 초록이었다.
