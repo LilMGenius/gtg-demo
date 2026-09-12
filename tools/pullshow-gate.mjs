@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { pressOpen, tapClose } from "./draw.mjs";
 
 /* 개봉 연출의 자. 뽑은 열 장이 상점 카드 안 58x34 칩으로 1.3초에 스쳐 지나갔고, 그 다음 판은
    한 장을 한 번에 뒤집어 등급과 얼굴과 이름과 능력치가 같은 프레임에 왔다. 이 장르에서 뽑는 순간은
@@ -53,9 +54,6 @@ const LADDER = Array.from({ length: STAGES }, (v, i) => i).join(",");
 const WANT = [0, 2, STAGES - 1];
 // 묶음 회차에서 안 연 채 남길 장수. 탭 축이 열 것이 없으면 그 축은 아무것도 안 잰다.
 const SPARE = 2;
-/* 길게 누름이 남은 것을 여는 것을 기다리는 상한. 제품 문턱이 0.45초라 여섯 배가 넘고,
-   문턱이 아니라 상한이므로 초록 회차에서는 0.5초 언저리에 풀린다. */
-const PRESS_MS = 3000;
 // 낱장 회차 상한. 좁은 창을 놓치면 다음 회차가 새로 열고, 여섯이면 화소 넷을 다 받고도 남는다.
 const SOLO_CAP = 6;
 // 창 하나를 기다리는 상한. 희귀 카드가 마지막 단까지 2.1초라 그보다 넉넉하다.
@@ -346,28 +344,16 @@ try {
     && pix.some((c) => c.rare && c.f[4]) && pix.some((c) => !c.rare && c.f[4]);
 
   /* 닫힌 판은 누를 자리가 없다. 빨간 자에서 한 번 더 누르면 거기서 오류로 끝나 결과 줄이 아예 안 남고,
-     무엇이 빨간지 못 읽는다. 누른 것과 누를 자리가 없던 것을 가르므로 축도 그 둘을 안 섞는다. */
-  const tap = async () => {
-    if (await p.evaluate(() => document.getElementById("pull").hidden)) return false;
-    await p.click("#pull", { force: true });
-    return true;
-  };
+     무엇이 빨간지 못 읽는다. 누른 것과 누를 자리가 없던 것을 가르는 것까지 draw.mjs의 tapClose가
+     들고 있으므로, 여기서는 그 손에 이 판의 이름만 붙인다. */
+  const tap = () => tapClose(p);
 
   /* 길게 누른다. 손가락이 내려가 있는 동안 남은 것이 전부 열리는 물건이라 누름과 뗌을 따로 보내고,
-     열린 것을 보고 뗀다. 뗌이 뒤따라 보내는 누름은 제품이 삼키므로 여기서 다시 안 센다. */
-  const press = async () => {
-    if (await p.evaluate(() => document.getElementById("pull").hidden)) return false;
-    const spot = await p.locator("#pull .tap").boundingBox();
-    if (!spot) return false;
-    await p.mouse.move(spot.x + spot.width / 2, spot.y + spot.height / 2);
-    await p.mouse.down();
-    await p.waitForFunction((last) => {
-      const r = window.__reveal();
-      return r.drawn > 0 && r.shown === r.drawn && r.stage === last;
-    }, STAGES - 1, { timeout: PRESS_MS, polling: "raf" }).catch(() => {});
-    await p.mouse.up();
-    return true;
-  };
+     열린 것을 보고 뗀다. 뗌이 뒤따라 보내는 누름은 제품이 삼키므로 여기서 다시 안 센다.
+     그 손과 기다리는 상한의 임자는 draw.mjs의 pressOpen이고, 그 파일이 든 마지막 단 번호는
+     여기 STAGES - 1과 같은 4다. 아래 축들이 이 손을 재는 중간에 부르므로, 판을 통째로 걷는
+     clearDraw가 아니라 낱낱의 손을 쓴다. */
+  const press = () => pressOpen(p);
 
   /* 화면을 닫는다. 다 안 열린 회차는 길게 눌러 전부 열고 그 다음 누름이 닫는다. 짧은 누름은 한 단만
      올리므로 누름 수만 세어 닫으려 들면 열한 장짜리 회차가 영영 안 닫히고, 다음 회차가 선반에 못 닿는다. */

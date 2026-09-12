@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { PULL_BULK, pullYield } from "../src/roster.mjs";
+import { STAGE_LAST } from "./draw.mjs";
 
 // 뽑기 연출의 자. 열 장이 한 번에 결과 문자열로 뜨면 뽑은 것이 아니라 통보받은 것이다.
 //
@@ -10,8 +11,6 @@ import { PULL_BULK, pullYield } from "../src/roster.mjs";
 // 그 대조군이 없으면 이 연출은 결과를 늦추는 장치와 구분되지 않는다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const LINE = String.fromCharCode(10);
-// 카드가 지나는 다섯 단의 마지막 번호. 길이는 제품의 STAGE_MS가 정하고 이 자는 그 수를 마주 든다.
-const STAGE_LAST = 4;
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();
 
@@ -96,7 +95,11 @@ try {
   /* 길게 누르면 남은 것이 한 번에 열린다. 손가락이 아직 내려가 있는 동안 열려야 하므로 누름과 뗌을
      따로 보내고 뗌 이전의 상태를 읽는다. 뗌에서야 열리면 그것은 짧은 누름과 같은 물건이다.
      문턱은 제품이 들고 오고 이 자는 그 수를 마주 든다. 뗌이 뒤따라 보내는 누름은 제품이 삼켜야 하므로
-     떼고 나서도 화면이 서 있는지 같이 읽는다. */
+     떼고 나서도 화면이 서 있는지 같이 읽는다.
+     이 손은 draw.mjs의 pressOpen으로 안 바꾼다. 그것은 돌아오기 전에 손을 떼므로 이 축의 증거인
+     손이 내려가 있는 동안의 상태를 아무에게도 안 남기고, 상한도 제품이 말한 문턱에서 뽑는 여기와
+     달리 제 상수에서 뽑는다. 재는 물건을 계기가 빌려 쓰면 그 축은 제 자신을 재게 된다.
+     사본으로 남는 것은 이 손뿐이고, 마지막 단 번호는 그 파일에서 받는다. */
   const longMs = await p.evaluate(() => Number(window.__reveal().long) || 0);
   check("instrument:the-product-carries-its-own-long-press-threshold", longMs > 0, longMs + "ms");
   const spot = await p.locator("#pull .tap").boundingBox();
