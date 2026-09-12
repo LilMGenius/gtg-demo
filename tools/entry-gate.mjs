@@ -206,7 +206,7 @@ try {
   check("ux:the-condition-change-is-announced-once", steps.every((s) => s.ok), saySteps(steps));
   /* 대조군. 살아 있다는 표시를 떼면 이 축이 빨개져야 한다. 안 그러면 이 축은 자리가 있다는 것만 재고 있다. */
   const pulled = await p.evaluate(() => {
-    const n = document.querySelector("#top [aria-live]");
+    const n = document.querySelector("#pad [aria-live]");
     if (!n) return false;
     n.dataset.was = n.getAttribute("aria-live");
     n.removeAttribute("aria-live");
@@ -218,7 +218,7 @@ try {
   const pulledHeard = await reap();
   const pulledName = await chipName();
   await p.evaluate(() => {
-    const n = document.querySelector("#top [data-was]");
+    const n = document.querySelector("#pad [data-was]");
     if (!n) return;
     n.setAttribute("aria-live", n.dataset.was);
     delete n.dataset.was;
@@ -304,6 +304,58 @@ try {
   check("control:a-planted-46px-hole-reddens-the-rhythm-axis",
     afterGap.ok === false && backGap.ok === beat.ok,
     "planted band " + afterGap.lo + " to " + afterGap.hi + ", holes " + afterGap.holes.length + ", restored to " + backGap.ok);
+
+  /* 한 판이 바뀌는 순간은 한 번만 말한다. 컨디션은 nextSet이 적고 창은 그 호출 안의 nextShot이 적어
+     두 말이 같은 호출에 들어온다. 살아 있는 자리가 둘이면 읽어 주는 자가 하나를 버릴 수 있고, 버려지는
+     쪽이 컨디션이다. 위의 축은 __lockRound 아래에서 __form만 몰아 이 경계를 못 본다.
+     창이 열린 자리에서 출발하면 열림은 안 바뀐 말이 되어 아무 말도 안 나가므로, 한 구를 닫아 창을
+     내리고 잰다. 세는 것은 콜백이 아니라 기록이다. 한 호출 안의 두 번 쓰기는 콜백 하나로 묶여 온다. */
+  await shut();
+  await p.evaluate(() => window.__resumeRound());
+  await p.waitForFunction(() => document.querySelectorAll(".zone.live").length === 3, null, { timeout: 20000 });
+  await p.click('.zone[data-dive="0"]', { force: true });
+  await p.waitForFunction(() => document.querySelectorAll(".zone.live").length === 0, null, { timeout: 20000 });
+  await p.evaluate(() => window.__lockRound());
+  await p.evaluate(() => window.__form(0.9));
+  await p.waitForTimeout(160);
+  const bnd = await p.evaluate(() => {
+    const live = [...document.querySelectorAll("[aria-live]")];
+    const out = { regions: live.length, writes: [], before: "", after: "", pad: "" };
+    if (!live.length) return out;
+    out.before = document.getElementById("form").getAttribute("aria-label") || "";
+    let afterTask = false;
+    const mos = live.map((node) => {
+      const id = node.id || node.className || "live";
+      const mo = new MutationObserver((recs) => {
+        for (const r of recs) {
+          const t = r.addedNodes && r.addedNodes.length
+            ? String(r.addedNodes[0].textContent).trim() : node.textContent.trim();
+          out.writes.push({ id, text: t, afterTask });
+        }
+      });
+      mo.observe(node, { childList: true, characterData: true, subtree: true });
+      return mo;
+    });
+    setTimeout(() => { afterTask = true; }, 0);
+    window.__resumeRound();
+    return new Promise((res) => setTimeout(() => {
+      for (const mo of mos) mo.disconnect();
+      out.after = document.getElementById("form").getAttribute("aria-label") || "";
+      out.pad = document.getElementById("pad").getAttribute("aria-label") || "";
+      res(out);
+    }, 400));
+  });
+  await p.evaluate(() => window.__lockRound());
+  const bndTurn = bnd.before !== bnd.after;
+  const bndWant = bndTurn ? bnd.after + ", " + bnd.pad : bnd.pad;
+  check("ux:a-set-boundary-announces-once",
+    bnd.regions === 1 && bnd.writes.length === 1 && bnd.writes[0].afterTask === false
+      && bnd.writes[0].text === bndWant,
+    bnd.regions + " region, " + bnd.writes.length + " write "
+    + bnd.writes.map((w) => w.id + " " + JSON.stringify(w.text)).join(" ")
+    + " want " + JSON.stringify(bndWant)
+    + " across the chip " + JSON.stringify(bnd.before) + " -> " + JSON.stringify(bnd.after)
+    + " and the pad " + JSON.stringify(bnd.pad));
 
   // 누름을 받는 것은 button이어야 한다. 글자 조각에 붙은 핸들러는 누를 수 있다는 신호를 화면에 안 낸다.
   const handlers = await p.evaluate(() => { const bad = []; for (const el of document.querySelectorAll("#hud *")) { if (!el.onclick && !el.onpointerdown) continue; if (el.tagName !== "BUTTON") bad.push((el.id || el.className || el.tagName) + ":" + el.tagName.toLowerCase()); } return bad; });

@@ -648,7 +648,9 @@ try {
     /* 이름이 바뀌는 것과 그것이 들리는 것은 다른 주장이다. 묶음 이름은 초점이 들어올 때 다시 읽히므로,
        초점을 판에 세운 채로 창이 열리고 닫히는 동안은 아무 말도 안 난다. 그 사이를 메우는 것은 살아 있는
        자리 한 줄이고, 그 줄이 묶음 이름과 같은 말을 들어야 눈과 귀가 안 갈린다. 바뀐 수까지 세는 것은
-       같은 말을 프레임마다 다시 적으면 한 구에 여러 번 울리기 때문이다. */
+       같은 말을 프레임마다 다시 적으면 한 구에 여러 번 울리기 때문이다.
+       자리가 HUD에 하나라, 한 판이 바뀜는 자리에서는 이 줄에 컨디션이 업혀 오고 창의 말은 뒤에 선다. 그래서 이 축은
+       줄이 그 말로 끝나는지를 보고, 줄 전체가 그 말과 같은지는 안 본다. */
     const padSay = () => p.evaluate(() => {
       const g = document.getElementById("pad");
       const n = g.querySelector("[aria-live]") || document.querySelector("[aria-live]");
@@ -684,7 +686,7 @@ try {
     const heard = [...new Set(said.seen)];
     check("ux:the-window-state-is-announced-when-it-changes",
       sayOpen.found && sayOpen.live === "polite" && (sayOpen.inside || sayOpen.ref)
-        && sayOpen.text === nameOpen.label && sayShut.text === nameShut.label
+        && sayOpen.text.endsWith(nameOpen.label) && sayShut.text.endsWith(nameShut.label)
         && sayOpen.text !== sayShut.text && said.changes === 1 && heard.length === 2,
       "aria-live " + JSON.stringify(sayOpen.live) + " carried by the group " + (sayOpen.inside || sayOpen.ref)
       + ", open said " + JSON.stringify(sayOpen.text) + " against the group name " + JSON.stringify(nameOpen.label)
