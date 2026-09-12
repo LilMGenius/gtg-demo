@@ -236,12 +236,24 @@ try {
 
   if (maxNoise >= BAR_NOISE) { console.log("INSTRUMENT DEAD: noise floor"); process.exit(1); }
   if (idle.n > 0) { console.log("INSTRUMENT DEAD: control impact lit"); process.exit(1); }
-  if (minPeak < BAR_PEAK) fail += 1;
-  if (minLate < BAR_LATE) fail += 1;
-  if (maxStall >= BAR_STALL) fail += 1;
-  if (minCam < BAR_CAM) fail += 1;
-  if (minSquash < BAR_SQUASH) fail += 1;
-  if (errs.length) fail += 1;
+  /* 요약 여덟 줄은 초록이든 빨갛든 같은 모양이라 어느 줄도 자기 판정을 말하지 않는다.
+     러너는 FAIL이나 BAD를 든 줄만 인용하고 없으면 끝 네 줄을 옮긴다(run-gates 118).
+     그래서 쓸기에서 이 자가 빨간불이면 squash, noise, control, errors 넷만 인용됐고,
+     실측 2026-09-12 02:10에 그 네 줄이 전부 초록인 채로 impact FAIL이 적혔다. 단독은 PASS였다.
+     바마다 자기 판정을 한 줄로 말하면 빨간 바가 그 줄에 FAIL을 들고 있어 러너가 집어 간다.
+     위 여덟 줄은 그대로 두고, 같은 수를 같은 BAR_*에 대고 한 번 더 읽는 것이다. */
+  const notes = [];
+  const fails = [];
+  const bar = (axis, ok, d) => (ok ? notes : fails).push(axis + " " + d);
+  bar("impact:peak", minPeak >= BAR_PEAK, minPeak + "px (bar " + BAR_PEAK + ")");
+  bar("impact:late", minLate >= BAR_LATE, minLate + "px (bar " + BAR_LATE + ")");
+  bar("impact:stall", maxStall < BAR_STALL, maxStall.toFixed(3) + " (bar <" + BAR_STALL + ")");
+  bar("impact:cam", minCam >= BAR_CAM, minCam.toFixed(4) + " (bar " + BAR_CAM + ")");
+  bar("impact:squash", minSquash >= BAR_SQUASH, minSquash.toFixed(3) + " (bar " + BAR_SQUASH + ")");
+  bar("impact:errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
+  for (const x of notes) console.log("  ok   " + x);
+  for (const x of fails) console.log("  FAIL " + x);
+  fail = fails.length;
   console.log(fail ? "FAIL" : "PASS");
 } finally {
   if (br) await br.close();
