@@ -327,6 +327,132 @@ try {
   check("instrument:the-table-holds-the-planted-rows", Boolean(tb) && tb.rows >= ledger.n,
     tb ? tb.rows + " rows against " + ledger.n + " in the ledger" : "no table");
 
+  /* 접힘 안. 표가 진짜 표로 서 있다는 것과 사람이 그 표를 본다는 것은 다르다. 이 창을 여는 이유가
+     누구한테 약한지인데, 최근 열 판이 그 답 위에 서면 굴리기 전 화면에는 최근 목록만 남는다.
+     실측 1280x720에서 상대 전적 머리가 접힘 아래 135px, 표의 첫 줄이 214px에 섰다.
+     접힘은 구르는 상자 둘 중 먼저 자르는 자리다. 넓은 화면에서는 칸이 구르고 좁은 화면에서는
+     창이 구르므로, 한쪽만 재면 다른 화면에서 이 자가 화면 밖을 접힘으로 읽는다. */
+  const foldRead = () => p.evaluate(() => {
+    const box = document.getElementById("me");
+    const pane = box ? box.querySelector(".pane") : null;
+    if (!pane) return null;
+    const bTxt = (n) => { const b = n.querySelector("b"); return b ? b.textContent.trim() : ""; };
+    const kids = [...pane.children];
+    const R = (n) => {
+      if (!n) return null;
+      const r = n.getBoundingClientRect();
+      return { top: Math.round(r.top), bottom: Math.round(r.bottom) };
+    };
+    const table = pane.querySelector("table");
+    const rows = table ? [...table.querySelectorAll("tbody tr")] : [];
+    const pr = pane.getBoundingClientRect();
+    const br = box.getBoundingClientRect();
+    const paneFold = Math.round(pr.top + pane.clientHeight);
+    const panelFold = Math.round(Math.min(br.top + box.clientHeight, window.innerHeight));
+    return {
+      order: kids.map((n) => bTxt(n) || (n.tagName === "TABLE" ? "table" : String(n.className))).join(" > "),
+      fold: Math.min(paneFold, panelFold, Math.round(window.innerHeight)),
+      head: R(kids.find((n) => bTxt(n) === "상대 전적") || null),
+      row1: R(rows[0] || null),
+      rows: rows.length,
+      spans: pane.querySelectorAll(".log span").length,
+      paneOver: Math.round(pane.scrollHeight - pane.clientHeight),
+      panelOver: Math.round(box.scrollHeight - box.clientHeight)
+    };
+  });
+  // 쉬는 자리에서 잰다. 굴려 둔 창에서 재면 이 자가 가장 나쁜 자리를 안 보고 지나간다.
+  const foldRest = async () => {
+    await p.click('#me .tab[data-tab="log"]', { force: true });
+    await p.waitForTimeout(260);
+    await p.evaluate(() => {
+      const box = document.getElementById("me");
+      const pane = box.querySelector(".pane");
+      for (const e of [pane, box]) { e.scrollTop = 0; e.dispatchEvent(new Event("scroll")); }
+    });
+    await p.waitForTimeout(150);
+    return foldRead();
+  };
+  const foldIn = (f) => Boolean(f) && Boolean(f.row1) && f.rows > 0 && f.row1.bottom <= f.fold;
+  const foldSaid = (f) => (f
+    ? f.order + ", fold " + f.fold + ", head " + (f.head ? f.head.top + ".." + f.head.bottom : "none")
+      + ", first of " + f.rows + " rows " + (f.row1 ? f.row1.top + ".." + f.row1.bottom : "none")
+      + " = " + (f.row1 ? f.row1.bottom - f.fold : "?") + "px past the fold, pane hides "
+      + f.paneOver + "px and the panel " + f.panelOver + "px"
+    : "no pane");
+  const foldWide = await foldRest();
+  /* 음성 대조군. 최근 머리와 그 격자를 칸의 맨 앞으로 되돌려 놓는다. 그러면 결함이 섰던 배치가
+     그대로 다시 서고, 위 판정식은 빨개져야 한다. 되돌리기는 제품이 제 손으로 다시 그리게 맡긴다.
+     손으로 옮긴 것을 손으로 되돌리면 되돌렸다는 주장을 이 자가 잰 적이 없다. */
+  const foldPlant = await p.evaluate(() => {
+    const pane = document.querySelector("#me .pane");
+    if (!pane) return false;
+    const bTxt = (n) => { const b = n.querySelector("b"); return b ? b.textContent.trim() : ""; };
+    const kids = [...pane.children];
+    const at = kids.findIndex((n) => bTxt(n) === "최근");
+    if (at < 0 || !kids[at + 1]) return false;
+    pane.insertBefore(kids[at + 1], pane.firstChild);
+    pane.insertBefore(kids[at], pane.firstChild);
+    return true;
+  });
+  await p.waitForTimeout(150);
+  const foldBack = await foldRead();
+  await p.click('#me .tab[data-tab="stat"]', { force: true });
+  await p.waitForTimeout(220);
+  const foldAgain = await foldRest();
+  /* 최근 목록은 이제 접힘 아래다. 거기 있는 것과 닿는 것은 다르므로 열 판을 하나씩 불러 그때
+     구르는 상자 안에 들어오는지 본다. 한 자리에서 셋이 같이 보이는지는 줄 높이가 늘면 깨지는
+     우연이고, 끝까지 굴린 한 장면만 보면 상자보다 긴 격자가 반쯤 걸린 채 빨개진다. */
+  const foldReach = await p.evaluate(() => {
+    const box = document.getElementById("me");
+    const pane = box ? box.querySelector(".pane") : null;
+    const grid = pane ? pane.querySelector(".log") : null;
+    if (!grid) return null;
+    const seat = () => {
+      const pr = pane.getBoundingClientRect();
+      const br = box.getBoundingClientRect();
+      return {
+        low: Math.min(Math.round(pr.top + pane.clientHeight),
+          Math.round(Math.min(br.top + box.clientHeight, window.innerHeight))),
+        high: Math.max(Math.round(pr.top), Math.round(Math.max(br.top, 0)))
+      };
+    };
+    for (const e of [pane, box]) { e.scrollTop = e.scrollHeight; e.dispatchEvent(new Event("scroll")); }
+    const end = seat();
+    const gr = grid.getBoundingClientRect();
+    const spans = [...grid.querySelectorAll("span")];
+    const reached = spans.filter((e) => {
+      e.scrollIntoView({ block: "center" });
+      const s = seat();
+      const r = e.getBoundingClientRect();
+      return Math.round(r.top) >= s.high - 1 && Math.round(r.bottom) <= s.low + 1;
+    }).length;
+    return { spans: spans.length, reached,
+      end: { top: Math.round(gr.top), bottom: Math.round(gr.bottom), high: end.high, low: end.low } };
+  });
+  /* 같은 물음을 좁은 화면에도 던진다. 거기서 구르는 것은 칸이 아니라 창이라 접힘이 다른 자리에 서고,
+     실측으로 첫 줄이 51px 남는다. 그 수는 적고 판정은 넓은 화면에만 건다. 좁은 화면까지 담으려면
+     열 판을 줄이거나 글자를 줄여야 하고, 둘 다 이 창의 규칙이 이미 정한 것이다. */
+  await p.setViewportSize({ width: 740, height: 360 });
+  await p.waitForTimeout(450);
+  const foldNarrow = await foldRest();
+  await p.setViewportSize({ width: 1280, height: 720 });
+  await p.waitForTimeout(450);
+  await foldRest();
+  check("mepane:the-head-to-head-table-stands-inside-the-resting-fold", foldIn(foldWide),
+    "1280x720 " + foldSaid(foldWide) + " | 740x360 " + foldSaid(foldNarrow) + ", where the first row stands "
+    + (foldIn(foldNarrow) ? "inside" : "outside") + " the fold and carries no assertion");
+  check("control:the-old-block-order-reddens-the-resting-fold-axis",
+    foldPlant && !foldIn(foldBack) && foldIn(foldAgain),
+    (foldPlant ? "planted " + foldSaid(foldBack) : "the recent block never moved")
+    + " | the product redrew to " + foldSaid(foldAgain));
+  check("mepane:the-recent-rounds-stay-reachable-after-the-roll",
+    Boolean(foldReach) && foldReach.spans === 10 && foldReach.reached === foldReach.spans,
+    foldReach
+      ? foldReach.reached + " of " + foldReach.spans + " recent rounds come inside the rolling box when called"
+        + ", and at max scroll the grid stands " + foldReach.end.top + ".." + foldReach.end.bottom
+        + " inside " + foldReach.end.high + ".." + foldReach.end.low
+      : "no recent grid in the record pane");
+
   // 첫 단. 초상과 이름과 레벨은 늘 서 있고 컨디션은 값이 있을 때만 선다.
   /* 잘라 낸 초상은 정사각이다. 상자를 안 받은 img는 제 칸을 채우고 늘어나므로, 정사각인지를
      묻는 것이 크기 상수를 여기 다시 적지 않고 규칙이 걸렸는지 묻는 방법이다.
