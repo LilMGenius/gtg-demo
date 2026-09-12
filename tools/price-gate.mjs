@@ -20,7 +20,12 @@ const HAN_ONE = String.fromCharCode(0xD55C);
 // 값과 값을 잇는 자리에 쓰인 구분 기호. 화면에서는 목록 기호로 읽혀 두 값이 한 항목처럼 붙고,
 // 파운더가 이것을 불렛포인트라 부르며 두 번 짚었다. 가운뎃점, 불릿, 그리고 em 대시 무리다.
 const BULLETS = [0x00B7, 0x2022, 0x2014, 0x2013, 0x2015].map((c) => String.fromCharCode(c));
-const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
+// 러너는 이 수를 소스에서 읽어 30초를 얹은 값을 자기 상한으로 쓴다(run-gates 31). 여유는 여기서만 생긴다.
+// 628a4df의 쓸기에서 이 자가 151.5초에 잘렸다. 크롬이 38에서 50개, CPU가 69에서 76퍼센트였고,
+// 그 회차는 매달린 것이 아니라 부하 때문에 느려진 것이었다. 단독은 43.3초라 150000은 부하가
+// 걸린 자기 회차보다 1.5초 짧았던 수다. 단독의 두 배인 87초는 그 151.5초에 닿지도 못하므로
+// 300000을 쓴다. 단독의 일곱 배이고, 이미 선 이웃들(ballsize 300초, walkback 420초, decal 540초) 안이다.
+const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 300000);
 t.unref();
 
 const fails = [], notes = [];
