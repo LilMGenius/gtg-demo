@@ -880,14 +880,78 @@ try {
   /* 대조군. 구르는 상자만 신호를 켠다. 좁은 화면에서는 창이 구르고 칸은 안 구르며,
      넓은 화면에서는 그 반대다. 한쪽만 재면 늘 켜 둔 신호 둘로도 위의 축이 통과한다. */
   const narrowSplit = Boolean(narrowPane) && Boolean(narrowPane.down) && narrowPane.down.op === 0 && panelSeated;
+  /* 넓은 화면의 창은 안 구른다가 아니라 얇게 구른다. 실측 1280x720에서 이 창은 16px을 감추고,
+     그만큼으로 줄어든 그늘이 켜진다. 꺼짐을 그대로 기대하면 이 대조군이 그 신호를 결함으로 읽는다.
+     그래서 꺼짐이 아니라 구르는 상자만 켠다로 묻는다. 창이 안 구르면 꺼짐이고, 구르면 켜짐이다. */
+  const litRight = (c) => Boolean(c) && (c.over > 1
+    ? Boolean(c.down) && c.down.op === 1
+    : !c.down || c.down.op === 0);
   const wideSplit = Boolean(wideSeen.panel) && Boolean(wideSeen.pane) && Boolean(wideSeen.pane.down)
-    && wideSeen.pane.down.op === 1 && (!wideSeen.panel.down || wideSeen.panel.down.op === 0);
+    && wideSeen.pane.down.op === 1 && litRight(wideSeen.panel);
   check("control:only-the-scrolling-box-cues-at-740x360", narrowSplit && wideSplit,
     "740x360 pane cue " + (narrowPane && narrowPane.down ? narrowPane.down.op : "none")
     + " panel cue " + (narrow && narrow.down ? narrow.down.op : "none")
     + ", 1280x720 pane cue " + (wideSeen.pane && wideSeen.pane.down ? wideSeen.pane.down.op : "none")
     + " panel cue " + (wideSeen.panel && wideSeen.panel.down ? wideSeen.panel.down.op : "none")
     + " over " + (wideSeen.panel ? wideSeen.panel.over : "?"));
+  /* 얕은 굴림. 감춘 띠가 그늘 높이보다 얇은 자리를 이 게이트가 한 번도 안 쟀다. 위의 축들은 647px을
+     감추는 740x360과 안 구르는 넓은 화면 둘만 보는데, 실측 1280x720에서 이 창은 16px을 감춘 채
+     닫기를 접힘 밖 8.93px에 세웠다. 그늘 높이는 CSS 한 곳에 있으므로 여기 상수로 안 적고 같은
+     클래스를 단 상자를 하나 세워 그려진 값을 받는다. */
+  await p.setViewportSize({ width: 1280, height: 720 });
+  await p.waitForTimeout(450);
+  await panelScrollTo(0);
+  await p.waitForTimeout(150);
+  const paneLip = await p.evaluate(() => {
+    const e = document.createElement("div");
+    e.className = "cue down";
+    e.style.visibility = "hidden";
+    document.getElementById("me").append(e);
+    const h = e.getBoundingClientRect().height;
+    e.remove();
+    return Math.round(h * 100) / 100;
+  });
+  const shutSeen = () => p.evaluate(() => {
+    const r2 = (n) => Math.round(n * 100) / 100;
+    const e = document.querySelector("#me > .close");
+    if (!e) return null;
+    const r = e.getBoundingClientRect();
+    const mid = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+    return { bottom: r2(r.bottom), spare: r2(innerHeight - r.bottom),
+      hit: mid ? mid.tagName + "." + String(mid.className) : "none" };
+  });
+  const thin = await panelCue();
+  const thinShut = await shutSeen();
+  await panelScrollTo(-1);
+  await p.waitForTimeout(200);
+  const thinEnd = await panelCue();
+  const thinEndShut = await shutSeen();
+  const band = (c) => Boolean(c) && c.over > 0 && c.over <= paneLip;
+  const fits = (c) => band(c) && Boolean(c.down) && c.down.op === 1
+    && Math.abs(c.down.h - Math.round(c.over)) <= 1;
+  const reachable = (s) => Boolean(s) && s.spare >= 0 && s.hit === "BUTTON.close";
+  const saidFit = (c) => (c ? "hides " + c.over + "px of a " + paneLip + "px shade, cue "
+    + (c.down ? c.down.op + " " + c.down.h + "px against " + Math.round(c.over) + "px" : "none") : "no panel");
+  const saidShut = (s) => (s ? "close bottom " + s.bottom + ", spare " + s.spare + "px, hit " + s.hit : "no close");
+  check("mepane:a-shallow-roll-still-lights-a-fitted-cue",
+    fits(thin) && !reachable(thinShut) && reachable(thinEndShut),
+    saidFit(thin) + ", at rest " + saidShut(thinShut)
+    + " | after the roll at " + (thinEnd ? thinEnd.at : "?") + " " + saidShut(thinEndShut));
+  /* 음성 대조군. 그늘을 26px로 되돌려 붙이면 그 겹이 감춘 16px보다 두꺼워진다. 그려진 높이로 묻는
+     판정식은 그때 빨개져야 하고, 안 빨개지면 위 축의 초록은 높이를 아예 안 읽는 경우와 같다. */
+  await panelScrollTo(0);
+  await p.waitForTimeout(150);
+  const thickPlant = await p.addStyleTag({ content: "#me > .cue.down{height:26px !important}" });
+  await p.waitForTimeout(150);
+  const thickened = await panelCue();
+  await thickPlant.evaluate((n) => n.remove());
+  await p.waitForTimeout(150);
+  const thinAgain = await panelCue();
+  check("control:a-shade-thicker-than-the-band-reddens-the-fitted-cue",
+    band(thickened) && !fits(thickened) && fits(thinAgain),
+    "planted " + saidFit(thickened) + " | restored " + saidFit(thinAgain));
+  await p.setViewportSize({ width: 740, height: 360 });
+  await p.waitForTimeout(450);
 
   /* 6.5 (b). 창은 inset:0으로 화면을 덮고 첫 단은 그 창의 맨 위다. 세로 360px에서는 그 맨 위가
      재화 띠와 같은 자리라, 실측으로 초상과 이름이 띠 아래끝 66.2px보다 61.8px 위에서 시작해

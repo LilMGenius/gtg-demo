@@ -394,7 +394,8 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
    그때 이 겹은 더 있다는 뜻을 잃는다. 전환을 안 거는 이유는 이 겹의 상태가 계기가 읽는 값이고,
    흐르는 중간값은 잰 값이 아니기 때문이다. 내 정보의 전적 칸도 1280x720에서 243px 자리에 700px을
    담아 상대 전적 표가 통째로 접힘 아래 있었다. 그래서 창 이름이 아니라 클래스에 건다.
-   따로 적으면 한쪽만 고친 날 둘이 갈린다. */
+   따로 적으면 한쪽만 고친 날 둘이 갈린다.
+   26px은 그늘의 상한이다. 감춘 것이 그보다 얇으면 감춘 만큼으로 줄여 켜는 일은 main.mjs가 한다. */
 .cue{position:absolute;left:0;right:0;height:26px;pointer-events:none;opacity:0}
 .cue.down{bottom:0;background:linear-gradient(to top,#080b07f2,#080b0700)}
 .cue.up{top:0;background:linear-gradient(to bottom,#080b07f2,#080b0700)}
