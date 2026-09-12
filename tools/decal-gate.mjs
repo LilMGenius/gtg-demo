@@ -42,7 +42,16 @@ const PRE = 42;     // 방향키를 누르고 사건을 걸 때까지. 0.7초 �
 const POST = 150;   // 사건이 끝나고 흙이 남을 때까지. 2.5초 자리다.
 const CAM = 6;      // 카메라 복귀를 되묻는 간격. 0.1초 자리다.
 // 프레임으로 세는 자는 바쁜 기계에서 벽시계가 늘어난다. 여기서 죽으면 그 늘어남이 다시 판정에 섞인다.
-const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 540000);
+// 러너는 이 수를 소스에서 읽어 30초를 얹은 값을 자기 상한으로 쓴다(run-gates 31). 여유는 여기에서만 생긴다.
+// 696dc04부터 한 실행이 붓을 막은 바퀴까지 두 바퀴를 돈다. dc3963e의 쓸기에서 174.2초였고,
+// 게이트 하나와 나란히 돌면 270초다. 전의 540000은 그 부하 회차의 두 배에 닿지 못한다.
+// price가 150000으로 자기 부하 회차 151.5초에 잘린 자리가 바로 그 폭이다(f71012d).
+// 그래서 부하 270초의 세 배를 넘는 수를 쓴다. 부하의 3.3배, 단독 174초의 5.2배이고
+// 이미 선 이웃 중 가장 큰 수다(pose, repeat 900초. aim과 facevis가 600초). 새 수를 만들지 않는다.
+// T0는 이 수와 같은 것을 잰다. 끝맺는 줄 앞에서 걸린 초를 찍어, 다음 사람이 이 회차가 상한에
+// 얼마나 붙었는지를 쓸기 요약 없이 자기 출력에서 읽는다.
+const T0 = Date.now();
+const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 900000);
 t.unref();
 
 /* 프레임으로 기다린다. 벽시계로 기다리면 부하가 걸린 기계에서 세계가 덜 간 채로 다음 줄이 실행된다.
@@ -276,6 +285,9 @@ try {
   if (live.ctrl.length !== 0) broke.push("control");
   if (live.res.length < BAR) broke.push("live");
   if (nom.res.length >= BAR) broke.push("nomark");
+  // 걸린 초는 끝맺는 줄보다 앞에 찍는다. 러너는 마지막 비어 있지 않은 줄을 이 게이트가 사람에게
+  // 하는 말로 읽으므로(run-gates 111), 뒤에 찍으면 쓸기 요약이 판정 대신 초를 말한다.
+  console.log("ELAPSED " + ((Date.now() - T0) / 1000).toFixed(1) + "s");
   console.log("CLUSTERS " + live.res.length + "  NOMARK " + nom.res.length + "  CONTROL " + live.ctrl.length + "  BAR " + BAR + "  " + (broke.length ? "FAIL " + broke.join(",") : "PASS"));
   if (broke.length) process.exitCode = 1;
 } finally {
