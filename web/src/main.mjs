@@ -408,7 +408,13 @@ function setPad(on) {
   for (const b of document.querySelectorAll('.zone')) b.classList.toggle('live', on);
   /* 창이 열렸다는 것은 흐림으로만 말했다. 읽어 주는 자에게는 지금 누름이 판정을 받는지 안 받는지가
      안 들린다. 묶음 이름이 그 둘을 가른다. */
-  el('pad').setAttribute('aria-label', on ? PAD_OPEN : PAD_SHUT);
+  const name = on ? PAD_OPEN : PAD_SHUT;
+  el('pad').setAttribute('aria-label', name);
+  /* 이름이 바뀌는 것은 물어봐야 들린다. 묶음 이름은 초점이 들어올 때 다시 읽히므로, 판에 초점을 세운
+     채로 창이 열리고 닫히는 동안은 조용하다. 같은 말을 살아 있는 자리에 적어야 그때 들린다. 같은 말을
+     다시 적으면 한 번 더 울리므로 바뀔 때만 적는다. */
+  const padSay = el('padSay');
+  if (padSay.textContent !== name) padSay.textContent = name;
 }
 
 function markDive(dive, bot) {

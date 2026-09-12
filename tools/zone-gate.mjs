@@ -51,7 +51,7 @@ const SEEN_SHARE = 0.12;
    정수로 끊기는 offset과 소수로 오는 상자를 같이 품는다. */
 const TILE_TOL = 2;
 /* 길이 어느 쪽으로 갈라져도 판정 줄 수는 이만큼이다. 줄 수를 세는 축 자신은 빼고 센 값이다. */
-const ROWS = 31;
+const ROWS = 32;
 /* 봇이 갈린 구를 안 내주면 그 뒤 축들은 잴 기회가 없다. 그때 줄을 통째로 빼면 못 잰 축이 통과한 축으로
    읽히고 판정 수만 조용히 줄어든다. 못 쟀다고 적어 빨간 줄로 남긴다. */
 const unmeasured = (names, why) => { for (const n of names) check(n, false, "unmeasured: " + why); };
@@ -645,6 +645,51 @@ try {
       "role " + JSON.stringify(labelShut.role) + ", open " + JSON.stringify(labelOpen.label)
       + " with " + labelOpen.live + " live pads, shut " + JSON.stringify(labelShut.label)
       + " with " + labelShut.live);
+    /* 이름이 바뀌는 것과 그것이 들리는 것은 다른 주장이다. 묶음 이름은 초점이 들어올 때 다시 읽히므로,
+       초점을 판에 세운 채로 창이 열리고 닫히는 동안은 아무 말도 안 난다. 그 사이를 메우는 것은 살아 있는
+       자리 한 줄이고, 그 줄이 묶음 이름과 같은 말을 들어야 눈과 귀가 안 갈린다. 바뀐 수까지 세는 것은
+       같은 말을 프레임마다 다시 적으면 한 구에 여러 번 울리기 때문이다. */
+    const padSay = () => p.evaluate(() => {
+      const g = document.getElementById("pad");
+      const n = g.querySelector("[aria-live]") || document.querySelector("[aria-live]");
+      if (!n) return { found: false, live: null, inside: false, ref: false, text: null };
+      const by = (g.getAttribute("aria-describedby") || "") + " " + (g.getAttribute("aria-labelledby") || "");
+      return { found: true, live: n.getAttribute("aria-live"), inside: g.contains(n),
+        ref: Boolean(n.id) && by.split(" ").includes(n.id), text: n.textContent.trim() };
+    });
+    const watchSay = () => p.evaluate(() => {
+      const n = document.querySelector("#pad [aria-live]");
+      window.__zsay = null;
+      if (!n) return false;
+      const s = { seen: [n.textContent.trim()], changes: 0, mo: null };
+      s.mo = new MutationObserver(() => { s.changes += 1; s.seen.push(n.textContent.trim()); });
+      s.mo.observe(n, { childList: true, characterData: true, subtree: true });
+      window.__zsay = s;
+      return true;
+    });
+    const reapSay = () => p.evaluate(() => {
+      const s = window.__zsay;
+      if (!s) return { seen: [], changes: -1 };
+      s.mo.disconnect();
+      return { seen: s.seen, changes: s.changes };
+    });
+    await waitRound(p);
+    const sayOpen = await padSay();
+    const nameOpen = await padRole();
+    await watchSay();
+    await shut(p);
+    const said = await reapSay();
+    const sayShut = await padSay();
+    const nameShut = await padRole();
+    const heard = [...new Set(said.seen)];
+    check("ux:the-window-state-is-announced-when-it-changes",
+      sayOpen.found && sayOpen.live === "polite" && (sayOpen.inside || sayOpen.ref)
+        && sayOpen.text === nameOpen.label && sayShut.text === nameShut.label
+        && sayOpen.text !== sayShut.text && said.changes === 1 && heard.length === 2,
+      "aria-live " + JSON.stringify(sayOpen.live) + " carried by the group " + (sayOpen.inside || sayOpen.ref)
+      + ", open said " + JSON.stringify(sayOpen.text) + " against the group name " + JSON.stringify(nameOpen.label)
+      + ", shut said " + JSON.stringify(sayShut.text) + " against " + JSON.stringify(nameShut.label)
+      + ", " + said.changes + " change across the round through " + JSON.stringify(said.seen));
     await ctx.close();
   }
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
