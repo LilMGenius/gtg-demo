@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { pinClock } from "./clock.mjs";
 
 // 소리 게이트. 귀 대신 파형을 잰다.
 // 선언값을 안 읽는다. sfx.mjs가 실제로 렌더한 샘플만 본다.
@@ -8,6 +9,16 @@ import { chromium } from "playwright";
 // 셋 다 예상대로 나와야 이 계측기가 무엇을 보고 있다고 말할 수 있다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const URL = "http://127.0.0.1:10310/web/index.html?preset=veteran";
+const STEP = 1 / 60;
+// 무음을 재는 창. 1/60 시계에서 960프레임은 세계시각 16초다.
+const GAP_FRAMES = 960;
+// 창이 열리기까지 걸어둘 프레임. 0.9초와 1.4초를 프레임으로 옮긴 값이다.
+const GAP_WARM = 54;
+const GAP_SETTLE = 84;
+// 표본 범위: 씨드를 안 주면 main.mjs가 Date.now()로 판을 뽑아 회차마다 다른 경기를 잰다.
+// 그러면 시계를 못 박아도 두 회차의 수가 다르고, 그 차이를 부하로 읽을 길이 없다.
+// 집의 씨드를 그대로 써서 한 판을 고정한다. 축의 주장은 그 판에서 부르는 일이 끊기지 않는가다.
+const GAP_URL = URL + "&seed=20";
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();
 
@@ -436,17 +447,41 @@ try {
      사건을 전부 채워도 공을 다시 세우는 몇 초가 비어 있으면 무음으로 신고된다.
 
      마스터를 탭해 렌더된 피크로 재려 했지만 이 기계에는 도는 오디오 시계가 없다.
-     위 절의 계기 축이 그것을 재고 있다. 대신 발화 시각을 센다. 판정이 소리를 부를 때마다
-     발화 기록에 이름과 performance.now()가 쌓이고, 그 시계는 오디오와 무관하게 돈다.
+     위 절의 계기 축이 그것을 재고 있다. 대신 발화의 프레임을 센다. 판정이 소리를 부를 때마다
+     발화 기록에 이름이 쌓이고, 그 자리의 세계 프레임을 같이 적는다.
      주장이 한 칸 약해진다. 부른 것과 들린 것은 다른 명제다. 들리는지는 오프라인 축들이
      답하고, 여기가 답할 것은 플레이가 도는 동안 부르는 일이 끊기지 않는가다. */
+  // 간격이 재려는 것은 세계의 조용함이고, 세계는 벽시계가 아니라 프레임으로 간다.
+  // 벽시계로 재면 기계가 바쁜 날 프레임이 덜 지나가고, 같은 프레임 수가 더 긴 초로 읽힌다.
+  // 실측: 부하가 걸린 쓸기에서 4.02초, 같은 판을 혼자 돌리면 2.2초였고 바는 4초다.
+  // 바를 넘은 것은 자가 무언가를 잰 것이 아니라 기계가 바빴던 것이고,
+  // 조용한 기계에서 두 번 초록인 것도 그래서 안정의 증거가 아니다.
+  // 그래서 세계시계를 1/60로 못 박고(clock.mjs pinClock) 발화마다 그 자리의 프레임을 적는다.
   const gapCtx = await b.newContext();
+  await pinClock(gapCtx, STEP);
   // 발화 기록은 페이지가 스스로 안 켠다. 배열이 있으면 그때만 쌓는다.
-  await gapCtx.addInitScript(() => { window.__sfxLog = []; });
+  // 제품은 이름과 벽시계만 쌓는다. 제품을 고치지 않고 쌓는 자리만 감싸 프레임을 같이 적는다.
+  // 판정이 소리를 부르는 그 프레임 안에서 쌓이므로, 쌓는 시점의 프레임이 곧 발화의 프레임이다.
+  await gapCtx.addInitScript(() => {
+    const log = [];
+    log.push = function (e) {
+      const f = window.__frames ? window.__frames() : 0;
+      return Array.prototype.push.call(this, [e[0], e[1], e[2], f]);
+    };
+    window.__sfxLog = log;
+  });
   const gp = await gapCtx.newPage();
   gp.on("pageerror", (e) => errs.push(String(e)));
-  await gp.goto(URL, { waitUntil: "load" });
-  await gp.waitForTimeout(900);
+  await gp.goto(GAP_URL, { waitUntil: "load" });
+  // 창까지 가는 길도 프레임으로 센다. 잠으로 기다리면 바쁜 기계에서 프레임이 덜 지나가고,
+  // 창이 열리는 순간의 세계가 회차마다 달라져서 간격이 부하를 다시 읽는다.
+  const waitFrames = async (n) => {
+    await gp.waitForFunction(() => typeof window.__frames === "function", null, { timeout: 30000 });
+    const from = await gp.evaluate(() => window.__frames());
+    await gp.waitForFunction(([f, k]) => window.__frames() - f >= k, [from, n], { timeout: 90000 });
+  };
+  await gp.waitForSelector("#go", { timeout: 15000 });
+  await waitFrames(GAP_WARM);
   await gp.evaluate(() => {
     const g = document.querySelector("#go");
     const r = g.getBoundingClientRect();
@@ -454,22 +489,24 @@ try {
     g.dispatchEvent(new PointerEvent("pointerdown", o));
     g.dispatchEvent(new MouseEvent("click", o));
   });
-  await gp.waitForTimeout(1400);
+  await waitFrames(GAP_SETTLE);
   await gp.evaluate(() => { window.__sfxLog.length = 0; });
   await gp.keyboard.press("ArrowLeft");
-  await gp.waitForTimeout(16000);
+  await waitFrames(GAP_FRAMES);
   const gapRead = await gp.evaluate(() => {
     const bs = window.__sfxLog;
-    if (bs.length < 2) return { fires: bs.length, gap: 0 };
-    let gap = 0;
-    let prev = bs[0][2];
-    for (const [, , t] of bs) { const d = (t - prev) / 1000; if (d > gap) gap = d; prev = t; }
-    return { fires: bs.length, gap: Number(gap.toFixed(2)) };
+    if (bs.length < 2) return { fires: bs.length, frames: 0 };
+    let frames = 0;
+    let prev = bs[0][3];
+    for (const e of bs) { const d = e[3] - prev; if (d > frames) frames = d; prev = e[3]; }
+    return { fires: bs.length, frames };
   });
+  // 프레임으로 센 간격을 세계시각의 초로 되돌린다. 바의 뜻은 그대로 세계시각 4초다.
+  const gapSec = Number((gapRead.frames * STEP).toFixed(2));
   // 발화가 둘 미만이면 간격이라는 값 자체가 없다. 통과도 실패도 아니고 표본이 없는 것이다.
   check("instrument:play-fired-enough-sounds-to-have-a-gap", gapRead.fires >= 2, gapRead.fires + " fires");
-  check("live:play-never-goes-quiet-for-more-than-four-seconds", gapRead.fires >= 2 && gapRead.gap <= 4,
-    gapRead.gap + "s over " + gapRead.fires + " fires");
+  check("live:play-never-goes-quiet-for-more-than-four-seconds", gapRead.fires >= 2 && gapSec <= 4,
+    gapSec + "s over " + gapRead.fires + " fires, " + gapRead.frames + " frames");
 
   // 발화마다 그래프를 새로 세우고 아무도 안 끊으면 마스터에 노드가 쌓인다.
   // 방치형이라 탭을 하루 켜두는 게 정상 사용이다. 6만 개까지 밀었을 때
