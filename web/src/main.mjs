@@ -1322,8 +1322,11 @@ function rapportRows() {
      안내 문장이든 명사구 한 줄이든 글자는 셋째 것이라 여기 안 선다. 둘 중 아이콘을 세운다.
      빈 띠 하나는 화면이 덜 그려진 것으로 읽혔고, 실루엣 하나면 이 자리에 설 것이 사람이라는
      것이 글자 없이 선다. 띠의 높이는 그대로 둔다. 아이콘이 띠를 밀면 빈 칸을 채운 일이
-     아래 칸을 다 내리는 일이 된다. */
-  if (!keys.length) return head + '<div class="note dim">' + IC_NOFACE + '</div>';
+     아래 칸을 다 내리는 일이 된다.
+     머리 카드는 줄과 함께 나간다. 아이콘을 띠에 세운 뒤에도 파운더가 본 것은 빈 상자 위에 선
+     라벨 둘이었다. 위의 탭이 이미 아는 얼굴이라, 셀 것이 없는 칸에서 머리는 같은 말을 한 번 더
+     하고 글자만 둘 남긴다. 머리는 줄을 세는 자리이므로 셀 줄이 있는 아래에만 선다. */
+  if (!keys.length) return '<div class="note dim">' + IC_NOFACE + '</div>';
   // 많이 마주친 순. 같으면 키 순이라 같은 동네가 흩어지지 않는다.
   keys.sort((a, b) => (state.rapport[b] - state.rapport[a]) || a.localeCompare(b));
   const rows = keys.map((key) => {
