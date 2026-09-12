@@ -161,6 +161,74 @@ try {
     nameless.join(", ") || said.join(" | "));
   check("entry:the-condition-slot-paints-an-icon-in-every-band", blank.length === 0,
     blank.length ? "no ink in " + blank.join(",") + " | " + said.join(" | ") : said.join(" | "));
+  /* 이름이 바뀌는 것과 그것이 들리는 것은 다른 주장이다. 이 칩은 초점을 안 받는 그림이라 이름이
+     바뀌어도 물어볼 자가 없고, 판이 바뀌며 혼자 바뀐 이름은 아무 데도 안 간다. 살아 있는 자리 한 줄이
+     그 사이를 메우고, 그 줄이 칩 이름과 같은 말을 들어야 눈과 귀가 안 갈린다. 같은 밴드를 다시 넣어도
+     한 번만 울려야 한다. 같은 말을 다시 적으면 두 번 울리기 때문이다.
+     자리는 [aria-live]로만 찾는다. 칩 안이든 밖이든 어디에 두어도 되고, 표시를 떼면 못 찾는다. */
+  const arm = () => p.evaluate(() => {
+    const live = [...document.querySelectorAll("[aria-live]")];
+    const recs = live.map((n, i) => ({ id: n.id || n.className || ("live" + i),
+      live: n.getAttribute("aria-live"), changes: 0, text: n.textContent.trim() }));
+    const mos = live.map((n, i) => {
+      const mo = new MutationObserver(() => { recs[i].changes += 1; recs[i].text = n.textContent.trim(); });
+      mo.observe(n, { childList: true, characterData: true, subtree: true });
+      return mo;
+    });
+    window.__entrySay = { recs, mos };
+    return recs.length;
+  });
+  const reap = () => p.evaluate(() => {
+    const s = window.__entrySay;
+    if (!s) return [];
+    for (const mo of s.mos) mo.disconnect();
+    window.__entrySay = null;
+    return s.recs;
+  });
+  const chipName = () => p.evaluate(() => document.getElementById("form").getAttribute("aria-label") || "");
+  // 0에서 출발한다. 앞의 셋은 이름이 바뀌는 걸음이고, 마지막 0.2는 같은 보통이라 조용해야 한다.
+  const SAY = [["good", 0.9, 1], ["bad", -0.9, 1], ["mid", 0, 1], ["mid-again", 0.2, 0]];
+  const steps = [];
+  for (const [tag, v, want] of SAY) {
+    const armed = await arm();
+    await p.evaluate((x) => window.__form(x), v);
+    await p.waitForTimeout(160);
+    const heard = await reap();
+    const name = await chipName();
+    const moved = heard.filter((r) => r.changes > 0);
+    steps.push({ tag, want, name, armed, moved,
+      ok: armed > 0 && moved.length === want
+        && moved.every((r) => r.changes === 1 && r.live === "polite" && r.text === name) });
+  }
+  const saySteps = (ss) => ss.map((s) => s.tag + " " + JSON.stringify(s.name) + " "
+    + (s.moved.length ? s.moved.map((r) => r.id + " x" + r.changes + " " + JSON.stringify(r.text)).join(" ") : "silent")
+    + " want " + s.want).join(" | ");
+  check("ux:the-condition-change-is-announced-once", steps.every((s) => s.ok), saySteps(steps));
+  /* 대조군. 살아 있다는 표시를 떼면 이 축이 빨개져야 한다. 안 그러면 이 축은 자리가 있다는 것만 재고 있다. */
+  const pulled = await p.evaluate(() => {
+    const n = document.querySelector("#top [aria-live]");
+    if (!n) return false;
+    n.dataset.was = n.getAttribute("aria-live");
+    n.removeAttribute("aria-live");
+    return true;
+  });
+  await arm();
+  await p.evaluate(() => window.__form(0.9));
+  await p.waitForTimeout(160);
+  const pulledHeard = await reap();
+  const pulledName = await chipName();
+  await p.evaluate(() => {
+    const n = document.querySelector("#top [data-was]");
+    if (!n) return;
+    n.setAttribute("aria-live", n.dataset.was);
+    delete n.dataset.was;
+  });
+  await p.evaluate(() => window.__form(0));
+  const pulledMoved = pulledHeard.filter((r) => r.changes > 0);
+  check("control:pulling-the-live-attribute-reddens-the-announce-axis",
+    pulled && pulledMoved.length === 0,
+    "planted " + pulled + ", chip " + JSON.stringify(pulledName) + " -> "
+    + (pulledMoved.length ? pulledMoved.map((r) => r.id + " x" + r.changes).join(" ") : "silent"));
 
   /* 재화 띠의 일반 앱 UX 문법 둘. 도메인 축과 달리 게임을 몰라도 잡히는 자리다.
      하나. 한 표기가 한 자리에서만 선다. 칩 셋은 같은 종류의 칸이므로 같은 글꼴 토큰과 같은 자릿점과

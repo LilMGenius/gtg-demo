@@ -394,6 +394,11 @@ function formChip() {
   const name = '컨디션 ' + (up ? '좋음' : dn ? '나쁨' : '보통');
   box.setAttribute('aria-label', name);
   box.setAttribute('title', name);
+  /* 이름이 바뀌는 것은 물어봐야 들린다. 이 칩은 초점을 안 받는 자리라 그 물음이 아예 안 오고, 판이
+     바뀌며 혼자 바뀐 이름은 아무에게도 안 간다. 같은 말을 살아 있는 자리에 적어야 그때 들린다. 같은
+     말을 다시 적으면 한 번 더 울리므로 바뀔 때만 적는다. */
+  const formSay = el('formSay');
+  if (formSay.textContent !== name) formSay.textContent = name;
 }
 
 /* 묶음 이름 둘. 판이 사는 동안 방향은 언제든 바뀌므로 단추 하나하나는 늘 같은 뜻이고, 갈리는 것은
