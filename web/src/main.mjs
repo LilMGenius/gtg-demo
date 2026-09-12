@@ -379,6 +379,29 @@ function aura() {
   box.hidden = rows.length === 0;
 }
 
+/* 이름이 바뀌는 것은 물어봐야 들린다. 칩은 초점을 안 받는 자리라 그 물음이 아예 안 오고, 묶음 이름은
+   초점이 들어올 때 다시 읽히므로 판에 초점을 세운 채로 창이 열리고 닫히는 동안은 조용하다. 같은 말을
+   살아 있는 자리에 적어야 그때 들린다. 같은 말을 다시 적으면 한 번 더 울리므로 바뀔 때만 적는다.
+   자리는 하나만 둔다. 판이 바뀌는 순간 컨디션과 창이 한 호출 안에서 차례로 적히는데, 살아 있는 자리가
+   둘이면 읽어 주는 자가 그 둘을 한 번에 받아 하나를 버릴 수 있고, 버려지는 쪽이 컨디션이다. 한 번에
+   들어온 말은 그 말들이 이미 쓰는 쉼표로 이어 한 줄로 적는다. 무엇을 두고 하는 말인지는 첫 낱말이
+   들고 있어서, 같은 것을 두고 새 말이 오면 앞의 말을 밀어낸다. */
+const SAY_JOIN = ', ';
+const saidBy = new Map();
+let sayQueue = [];
+function hudSay(line) {
+  const who = line.split(' ')[0];
+  if (saidBy.get(who) === line) return;
+  saidBy.set(who, line);
+  sayQueue.push(line);
+  if (sayQueue.length === 1) queueMicrotask(saySpill);
+}
+function saySpill() {
+  const line = sayQueue.join(SAY_JOIN);
+  sayQueue = [];
+  el('padSay').textContent = line;
+}
+
 /* 컨디션의 유일한 자리. 0.4는 화살표를 세우는 문턱이고, 이 값을 읽는 곳이 여기 하나뿐이라
    두 자리가 다른 수를 쓸 일이 없다. */
 function formChip() {
@@ -394,11 +417,7 @@ function formChip() {
   const name = '컨디션 ' + (up ? '좋음' : dn ? '나쁨' : '보통');
   box.setAttribute('aria-label', name);
   box.setAttribute('title', name);
-  /* 이름이 바뀌는 것은 물어봐야 들린다. 이 칩은 초점을 안 받는 자리라 그 물음이 아예 안 오고, 판이
-     바뀌며 혼자 바뀐 이름은 아무에게도 안 간다. 같은 말을 살아 있는 자리에 적어야 그때 들린다. 같은
-     말을 다시 적으면 한 번 더 울리므로 바뀔 때만 적는다. */
-  const formSay = el('formSay');
-  if (formSay.textContent !== name) formSay.textContent = name;
+  hudSay(name);
 }
 
 /* 묶음 이름 둘. 판이 사는 동안 방향은 언제든 바뀌므로 단추 하나하나는 늘 같은 뜻이고, 갈리는 것은
@@ -415,11 +434,7 @@ function setPad(on) {
      안 들린다. 묶음 이름이 그 둘을 가른다. */
   const name = on ? PAD_OPEN : PAD_SHUT;
   el('pad').setAttribute('aria-label', name);
-  /* 이름이 바뀌는 것은 물어봐야 들린다. 묶음 이름은 초점이 들어올 때 다시 읽히므로, 판에 초점을 세운
-     채로 창이 열리고 닫히는 동안은 조용하다. 같은 말을 살아 있는 자리에 적어야 그때 들린다. 같은 말을
-     다시 적으면 한 번 더 울리므로 바뀔 때만 적는다. */
-  const padSay = el('padSay');
-  if (padSay.textContent !== name) padSay.textContent = name;
+  hudSay(name);
 }
 
 function markDive(dive, bot) {
