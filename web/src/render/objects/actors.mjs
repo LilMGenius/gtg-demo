@@ -652,8 +652,15 @@ function buildBody(o) {
     // 어깨 삼각근 구가 반지름 1.45라, 그 안에 넣으면 스펀지를 사도 화면이 그대로다.
     // 구 위로 올려 얹어야 어깨선이 각지고 넓어진 것이 보인다.
     if (kc.pad) {
+      /* 폭을 팔 반지름으로만 잡으면 그 폭이 키만 따라간다. 품은 몸무게가 정하므로, 짧고 무거운 몸은
+         상의가 옆으로 가장 넓어지는 자리에서 스펀지가 가장 작다. 실측 165/96에서 1등급과 3등급이 칠한
+         자리의 0.765를 공유해 상한 0.75를 넘었고, 같은 쌍이 188/84에서 0.655였다. 그래서 폭에 몸통 품을 싣는다.
+         깊이는 안 싣는다. 어깨에 박힌 스펀지는 옆으로 넓지 앞뒤로 두껍지 않고, 깊이를 같이 키우면
+         상자 뒷모서리가 위로 올라와 어깨선이 칸 위 변에 닿는다. 실측으로 그때 어깨 상자 위끝의 여유가
+         0.112에서 0.047로 줄었다. */
       const th = o.armR * 1.1 * kc.pad;
-      const pad = new THREE.Mesh(new THREE.BoxGeometry(o.armR * 2.7, th, o.armR * 2.7), flat(o.shirt));
+      const wide = o.armR * 1.9 + o.torsoR * kc.girth * 0.9;
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(wide, th, o.armR * 2.7), flat(o.shirt));
       pad.name = tag;
       jitterMesh(pad, 0.015, side < 0 ? 27 : 28);
       pad.position.set(side * o.armR * 0.45, o.armR * 1.15 + th * 0.3, 0);
