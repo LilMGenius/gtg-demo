@@ -710,8 +710,8 @@ try {
     stuck.slice(0, 3).join(", ") || (fitted
       ? fitted + " of three panes fit at 1280x720 and none paints a cue"
       : "no pane fits at 1280x720 for this account, hidden px " + overTally.join(" ")));
-  /* 넓은 화면에서 창이 든 신호. 여기서는 칸이 구르므로 창의 신호는 꺼져 있어야 한다.
-     아래 좁은 화면 대조군이 이 값을 그대로 읽는다. */
+  /* 넓은 화면에서 창과 칸이 든 신호. 아래 대조군이 이 값을 그대로 읽어 상자마다 자기 띠에 대고 묻는다.
+     감춘 띠가 있는 상자는 신호가 켜져 있어야 하고, 다 들어간 상자는 꺼져 있어야 한다. */
   await p.click('#me .tab[data-tab="log"]', { force: true });
   await p.waitForTimeout(240);
   const wideSeen = { panel: await panelCue(), pane: await paneCue() };
@@ -929,6 +929,7 @@ try {
   const band = (c) => Boolean(c) && c.over > 0 && c.over <= paneLip;
   const fits = (c) => band(c) && Boolean(c.down) && c.down.op === 1
     && Math.abs(c.down.h - Math.round(c.over)) <= 1;
+  // 바닥은 닫기 자신의 밑변이 화면 안에 있는가와 그 자리를 짚는 검사다. gym의 8px은 gym 자기 바닥이고, 이 창의 실측 여유가 7.07px이라 두 수를 하나로 안 합친다.
   const reachable = (s) => Boolean(s) && s.spare >= 0 && s.hit === "BUTTON.close";
   const saidFit = (c) => (c ? "hides " + c.over + "px of a " + paneLip + "px shade, cue "
     + (c.down ? c.down.op + " " + c.down.h + "px against " + Math.round(c.over) + "px" : "none") : "no panel");
