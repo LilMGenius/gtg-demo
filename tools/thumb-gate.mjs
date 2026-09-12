@@ -226,6 +226,71 @@ try {
     check("control:" + s.tab + ":the-same-cut-paints-the-same-pixels", s.control > 0.999, s.control.toFixed(4));
   }
 
+  /* 유니폼 칸의 머리. 위의 네 축은 상의가 칸을 채우는지만 묻고, 그 상의를 입은 사람의 머리가
+     칸에 있는지는 안 묻는다. 그래서 시작 상의 카드가 얼굴 없이 팔린 채로 넷 다 초록이었다.
+     실측: 등급 0 변형 0에서 머리 중심이 프레임 위 -0.112에 섰고 눈 둘이 통째로 칸 밖인데,
+     그 장이 칠한 상의 화소는 12667개라 잉크 축도 모양 축도 통과했다. 파운더가 그 칸을 보고
+     그로테스크하다고 짚었다. 카드 넷 가운데 얼굴이 없는 것은 값이 0인 기본 등급 하나였다.
+     자리는 계기가 준다. headBox가 머리 상자와 눈을, armBox가 어깨 상자를 그림 몫으로
+     돌려주므로 겨냥 상수를 이 파일로 옮겨 적지 않는다.
+     표본은 등급 넷에 변형 셋이다. 등급만 돌면 기장을 들고 있는 것이 변형이라 가장 긴 상의인
+     기장 1.34가 표본에서 빠지고, 하필 그 한 장이 가장 나쁜 장이다.
+     어깨를 따로 묻는 이유는 그것이 옛 고정 보정이 지키려던 값이기 때문이다. 머리만 묻는 자는
+     겨냥을 위로 올리는 어떤 회귀에도 초록을 낸다. */
+  // 심는 대조군. 이 자리로 겨냥을 되돌리면 기본 등급의 머리가 칸 밖으로 나가야 한다.
+  const OLD_PADS_AIM = { part: "torso", lift: 0.3 };
+  const heads = await p.evaluate(async (old) => {
+    const m = await import("/web/src/render/thumb.mjs");
+    const g = await import("/web/src/state/gear.mjs");
+    const k = { height: 188, weight: 84 };
+    const read = (tag, len, hb) => ({ tag, len,
+      top: hb.y - hb.ry, bot: hb.y + hb.ry, left: hb.x - hb.rx, right: hb.x + hb.rx,
+      eyes: hb.eyes.map((e) => ({ x: e.x, y: e.y })) });
+    const out = { live: [], was: [], arm: [],
+      shelf: { ranks: g.KITS.length, per: g.KITS.map((_, r) => g.skinsAt("pads", r).length) } };
+    for (let rank = 0; rank < g.KITS.length; rank += 1) {
+      for (let skin = 0; skin < g.skinsAt("pads", rank).length; skin += 1) {
+        const look = g.lookOf({ pads: rank, padsSkin: skin });
+        const tag = rank + ":" + skin;
+        const len = g.skinAt("pads", rank, skin).cut.len;
+        out.live.push(read(tag, len, m.headBox("pads", k, look)));
+        out.was.push(read(tag, len, m.headBox("pads", k, look, old)));
+        const ab = m.armBox("pads", k, look);
+        out.arm.push({ tag, len, y0: ab ? ab.y0 : 1, parts: ab ? ab.parts : 0 });
+      }
+    }
+    return out;
+  }, OLD_PADS_AIM);
+  const headIn = (r) => r.top >= 0 && r.bot <= 1 && r.left >= 0 && r.right <= 1;
+  const eyesIn = (r) => r.eyes.length === 2 && r.eyes.every((e) => e.x >= 0 && e.x <= 1 && e.y >= 0 && e.y <= 1);
+  const sayHead = (r) => r.tag + " len " + r.len + " box " + r.top.toFixed(3) + ".." + r.bot.toFixed(3)
+    + " eyes " + (r.eyes.length ? r.eyes.map((e) => e.y.toFixed(3)).join("/") : "none");
+  const looks = heads.shelf.per.reduce((a, c) => a + c, 0);
+  const lost = heads.live.filter((r) => !headIn(r) || !eyesIn(r));
+  check("instrument:every-kit-look-returned-a-head-box",
+    heads.live.length === looks && heads.live.every((r) => r.bot > r.top) && heads.arm.every((r) => r.parts >= 1),
+    heads.live.length + " of " + looks + " looks measured, shoulder box over "
+    + heads.arm.map((r) => r.parts).join("/") + " meshes");
+  check("thumb:every-kit-look-keeps-its-head-in-frame", heads.live.length === looks && lost.length === 0,
+    lost.length ? lost.map(sayHead).join(", ")
+      : heads.shelf.ranks + " grades over " + heads.shelf.per.join("/") + " variants, box "
+        + Math.min.apply(null, heads.live.map((r) => r.top)).toFixed(3) + ".."
+        + Math.max.apply(null, heads.live.map((r) => r.bot)).toFixed(3)
+        + " with both eyes inside on all " + heads.live.length + ", longest shirt "
+        + Math.max.apply(null, heads.live.map((r) => r.len)));
+  const cut = heads.arm.filter((r) => !(r.y0 >= 0));
+  check("thumb:every-kit-look-keeps-its-shoulders-in-frame", heads.arm.length === looks && cut.length === 0,
+    cut.length ? cut.map((r) => r.tag + " len " + r.len + " shoulder top " + r.y0.toFixed(3)).join(", ")
+      : "shoulder box top " + Math.min.apply(null, heads.arm.map((r) => r.y0)).toFixed(3)
+        + " at the highest, inside the frame on all " + heads.arm.length);
+  const wasLost = heads.was.filter((r) => !headIn(r) || !eyesIn(r));
+  const wasBase = heads.was.find((r) => r.tag === "0:0");
+  check("control:the-old-fixed-lift-loses-the-base-kit-head",
+    Boolean(wasBase) && !(headIn(wasBase) && eyesIn(wasBase)) && wasLost.length > 0,
+    "the planted aim part torso lift 0.3 reads " + (wasBase ? sayHead(wasBase) : "no base kit")
+    + " and loses the head on " + wasLost.length + " of " + heads.was.length + " looks ("
+    + wasLost.map((r) => r.tag).join(" ") + ")");
+
   /* 타투 칸이 파는 것은 팔이 아니라 팔에 새긴 그림이다. 위의 축들은 등급끼리 다른가와
      무엇이든 칠해졌는가만 묻고, 그 그림이 칸에서 얼마를 차지하는지는 안 묻는다. 그래서
      무늬가 칸 위쪽 귀퉁이에 손톱만 하게 걸리고 나머지를 소매와 유니폼이 먹은 채로
