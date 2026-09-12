@@ -2,6 +2,7 @@ import { chromium } from "playwright";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { pressOpen } from "./draw.mjs";
 
 /* 사람이 겪는 첫 판 한 바퀴를 그대로 돌며 표면마다 그림과 수치를 남기는 드라이버다.
    게이트가 아니라서 판정을 안 내린다. 무엇을 눌렀고 그때 화면에 무엇이 있었는지만 적고,
@@ -23,8 +24,6 @@ const WATCH_MS = 520000;
 const STEP_MS = 26000;
 // 전사 한 장의 한 변 상한. 여러 장이 실린 요청은 2000을 넘는 변 하나로 세션이 죽으므로 그 아래서 자른다.
 const MAX_SIDE = 1600;
-// 카드가 지나는 마지막 단. 길이는 제품의 STAGE_MS가 정하고 계기는 그 수를 마주 든다.
-const STAGE_LAST = 4;
 // 한 판은 다섯 구다. 판정이 세는 수와 같은 수를 세야 판이 끝난 자리에서 그림을 찍는다.
 const BALLS = 5;
 // 걸음 한 장을 찾으려고 훑는 횟수와 간격. 24 x 90ms면 막고 돌아오는 2초 남짓을 덮는다.
@@ -115,22 +114,13 @@ const ballDone = (page, before) => page.waitForFunction(
 const marks = (page) => page.evaluate(
   () => Array.from(document.querySelectorAll(".zone")).map((b) => b.getAttribute("aria-pressed")).join("/"));
 
-/* 붙들어 남은 것을 한 번에 여는 손. 짧은 누름은 한 단만 올리므로 열한 장을 그것으로 끝내려면 쉰다섯 번을
-   눌러야 한다. 손가락이 내려가 있는 동안 열리는 물건이라 누름과 뗌을 따로 보내고, 열린 것을 보고 뗀다.
-   붙든 시간을 같이 돌려주는 것은 제품 문턱 0.45초를 넘겨서 열린 것인지가 그 수로만 보이기 때문이다. */
+/* 붙들어 남은 것을 한 번에 여는 손. 그 손의 임자는 draw.mjs의 pressOpen이고, 여기서 감싸는 것은
+   붙든 시간뿐이다. 제품 문턱 0.45초를 넘겨서 열린 것인지가 그 수로만 보인다.
+   누를 자리가 없으면 pressOpen이 거짓을 돌려주므로, 그 자리는 수 대신 null로 남는다. */
 async function hold(page) {
-  const box = await page.locator("#pull .tap").boundingBox().catch(() => null);
-  if (!box) return null;
   const t0 = Date.now();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.waitForFunction((last) => {
-    const r = window.__reveal();
-    return r.drawn > 0 && r.shown === r.drawn && r.stage === last;
-  }, STAGE_LAST, { timeout: STEP_MS, polling: "raf" }).catch(() => {});
-  const ms = Date.now() - t0;
-  await page.mouse.up();
-  return ms;
+  if (!(await pressOpen(page))) return null;
+  return Date.now() - t0;
 }
 
 /* 마지막 단의 그림은 brightness(0)에서 제 색으로 0.22초에 걸쳐 돌아온다. 그 도중에 찍으면 다 열린
