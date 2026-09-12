@@ -1882,7 +1882,9 @@ function bindSpec(box) {
    갈리는 것을 버티려고 모듈에 서 있고, 손을 떼는 순간 회전을 멈출 일도 손가락만 받을 일도 없다.
    한 자리에 담으면 한쪽의 규칙이 다른 쪽으로 새어 나간다. 도는 칸이 하나뿐이라 여기도 모듈이 든다. */
 let holdTimer = 0;
-let holdSpun = false;
+// 삼킬 표시는 참이 아니라 붙들린 카드를 든다. 참이면 어느 카드의 click이 그것을 걷는지가 안 적혀
+// 있어서, 걸쳐 볼 것이 없어 click을 안 듣는 카드를 붙들면 표시가 눌림 뒤에 그대로 남는다.
+let holdSpun = null;
 function holdDrop() {
   if (holdTimer) clearTimeout(holdTimer);
   holdTimer = 0;
@@ -1890,13 +1892,13 @@ function holdDrop() {
 /* 카드에 긴 누름을 건다. 손가락만 받아서 마우스의 호버는 그대로 두고, 값 버튼에서 시작한 누름은
    그 버튼 것이라 안 받는다. 효과 칸을 채우는 눌림은 bindSpec이 따로 듣고 있어서 여기서 안 덮인다.
    누름마다 앞의 예약과 표시를 먼저 걷는다. 안 걷으면 회전만 열고 카드 밖으로 나간 손의 표시가
-   남아서 다음 누름의 걸쳐 보기가 대신 삼켜진다. */
+   남아서, 그 카드를 다시 누를 때 걸쳐 보기가 대신 삼켜진다. */
 function bindHold(card, run) {
   card.addEventListener('pointerdown', (e) => {
     holdDrop();
-    holdSpun = false;
+    holdSpun = null;
     if (e.pointerType !== 'touch' || e.target.closest('.buy')) return;
-    holdTimer = setTimeout(() => { holdTimer = 0; holdSpun = true; run(); }, LONG_MS);
+    holdTimer = setTimeout(() => { holdTimer = 0; holdSpun = card; run(); }, LONG_MS);
   });
   card.addEventListener('pointerup', (e) => {
     holdDrop();
@@ -1904,9 +1906,20 @@ function bindHold(card, run) {
   });
   card.addEventListener('pointercancel', (e) => {
     holdDrop();
-    holdSpun = false;
+    holdSpun = null;
     if (e.pointerType === 'touch') stopSpin();
   });
+  /* 긴 누름이 회전을 연 손의 click은 붙들린 그 카드가 삼킨다. 안 삼키면 돌려 보려고 붙든 손이
+     떼는 순간 걸쳐 보기로 넘어가서, 터치에는 회전만 보는 길이 다시 없어진다. 걸쳐 볼 것이 있는
+     카드의 onclick에서만 걷으면 봇 선반이나 이미 가진 등급처럼 click을 안 듣는 카드가 표시를
+     남기고, 뒤에 오는 click 하나가 엉뚱한 카드에서 대신 삼켜진다. 내려가는 길에서 잡는 것은
+     변형 조각이 자기 click을 세워 막아서 올라오는 길에는 그 눌림이 카드까지 안 오기 때문이다. */
+  card.addEventListener('click', (e) => {
+    if (holdSpun !== card) return;
+    holdSpun = null;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+  }, true);
 }
 
 function bindGear(box) {
@@ -1938,9 +1951,6 @@ function bindGear(box) {
     if (rank > state.gear[s.field]) {
       card.onclick = (e) => {
         if (e.target.closest('.buy')) return;
-        // 긴 누름이 회전을 연 손의 click은 여기서 삼킨다. 안 삼키면 돌려 보려고 붙든 손이 떼는
-        // 순간 걸쳐 보기로 넘어가서, 터치에는 회전만 보는 길이 다시 없어진다.
-        if (holdSpun) { holdSpun = false; return; }
         if (fitting[s.field] === rank) delete fitting[s.field];
         else fitting[s.field] = rank;
         stopSpin();

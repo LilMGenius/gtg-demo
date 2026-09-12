@@ -208,6 +208,23 @@ try {
     await tp.waitForTimeout(300);
     return { spot, held, saw, after: await feel(n) };
   };
+  // 카드 한 장의 걸침과 그 카드가 걸쳐 볼 것을 들었는지, 청구서 줄 수까지 한 번에 읽는다.
+  const wear = (n) => tp.evaluate((k) => {
+    const c = [...document.querySelectorAll("#shop .rack .card")][k];
+    return { fit: Boolean(c && c.classList.contains("fit")), offer: typeof (c && c.onclick) === "function",
+      label: c ? ((c.querySelector(".buy") || {}).textContent || "").trim() : "",
+      tried: document.querySelectorAll("#shop .fitting .tried i[data-off]").length };
+  }, n);
+  // 계기가 카드를 두드리는 손. 위쪽 절반의 tap과 같은 element.click()이라 pointerdown이 안 난다.
+  const poke = (n) => tp.evaluate((k) => { const c = [...document.querySelectorAll("#shop .rack .card")][k]; if (c) c.click(); }, n);
+  // 걸쳐 본 것을 전부 벗기고 선반을 다시 그린다. 앞의 축이 남긴 걸침 위에서 재면 첫 누름이
+  // 거는 것이 아니라 벗기는 것이 되고, 앞의 대조군이 부순 카드도 그대로 남는다.
+  const unwear = async () => {
+    await ttab("glove");
+    await tp.waitForTimeout(420);
+    await tp.evaluate(() => { const s = document.querySelector("#shop .strip"); if (s && !s.disabled) s.click(); });
+    await tp.waitForTimeout(380);
+  };
 
   const CARD = 3, PLANT = 2, MUTE = 1;
   const long = await hold(CARD, LONG + 100);
@@ -256,6 +273,66 @@ try {
     "shop:a-long-press-on-a-card-spins-it-on-touch would read canvas " + mute.at.spin
     + ", lit " + mute.at.lit + ", turned " + mute.turn + ", lag " + mute.saw.lag
     + ", seen in " + mute.saw.seen + " of " + mute.saw.frames + " frames over " + mute.held + "ms held");
+
+  /* 걸쳐 볼 것이 없는 카드를 붙든 손. 봇 선반과 이미 가진 등급은 click을 안 듣는 카드라, 삼킬
+     표시를 걸쳐 볼 것이 있는 카드의 onclick에서만 걷으면 그 표시가 눌림 뒤에 그대로 남는다.
+     손가락은 다음 누름이 표시를 먼저 걷어 가서 그 자리를 못 짚는다. 계기가 쓰는 element.click()은
+     pointerdown을 안 내므로 남은 표시를 그대로 만나고, 첫 누름 하나를 그 자리에서 잃는다.
+     붙드는 것은 장갑 선반의 첫 칸, 지금 끼고 있는 등급이다. 값 버튼이 착용이라 걸쳐 볼 것이 없고
+     그래서 그 카드에는 onclick이 안 걸린다. 어느 칸인지는 번호를 적는 대신 화면에서 찾는다.
+     적어 두면 선반이 한 줄 늘어난 날 이 축이 엉뚱한 카드를 붙들고도 초록을 낸다. */
+  await unwear();
+  const WORN = await tp.evaluate(() => [...document.querySelectorAll("#shop .rack .card")]
+    .findIndex((c) => c.classList.contains("gear") && typeof c.onclick !== "function"));
+  const wornHold = await hold(WORN, LONG + 100);
+  const wornRead = await wear(WORN);
+  const tryBefore = await wear(CARD);
+  await poke(CARD);
+  await tp.waitForTimeout(450);
+  const tryAfter = await wear(CARD);
+  check("instrument:the-held-card-had-nothing-to-try-on",
+    WORN >= 0 && wornRead.offer === false && Boolean(wornHold.spot && wornHold.spot.inside)
+    && wornHold.at.spin && wornHold.saw.lag >= LONG && wornHold.after.tried === 0,
+    "card " + WORN + " " + JSON.stringify(wornRead.label) + ", onclick " + wornRead.offer
+    + ", inside " + (wornHold.spot ? wornHold.spot.inside : null) + ", canvas " + wornHold.at.spin
+    + ", the spin began " + wornHold.saw.lag + "ms after the finger landed against a " + LONG
+    + "ms threshold, rows " + wornHold.after.tried);
+  check("shop:a-hold-on-a-card-with-nothing-to-try-swallows-only-its-own-click",
+    tryBefore.offer === true && tryBefore.fit === false && tryAfter.fit === true && tryAfter.tried === 1,
+    "held card " + WORN + " " + JSON.stringify(wornRead.label) + ", then one element.click() on card "
+    + CARD + " read fit " + tryBefore.fit + " then " + tryAfter.fit + ", rows " + tryBefore.tried
+    + " then " + tryAfter.tried);
+
+  /* 심은 대조군. 삼킬 표시를 모듈 한 칸에 두고 걸쳐 볼 것이 있는 카드의 onclick에서만 걷는
+     사본이다. 그 표시는 화면 안쪽 모듈에 살아서 계기가 못 만지므로, 같은 모양을 이 자리에서
+     다시 짓고 붙드는 카드와 두드리는 카드에 물린다. 회전은 진짜 카드가 그대로 돌리고 사본은
+     표시만 세우므로, 갈리는 것은 표시를 어디서 걷느냐 하나다. 안 빨개지면 위의 축은 삼킴의
+     자리가 아니라 시간이 흐른 것을 재고 있다. */
+  await unwear();
+  await tp.evaluate(([h, o, ms]) => {
+    const cards = [...document.querySelectorAll("#shop .rack .card")];
+    const held = cards[h], other = cards[o];
+    let mark = false;
+    let timer = 0;
+    held.addEventListener("pointerdown", (e) => {
+      if (timer) clearTimeout(timer);
+      mark = false;
+      if (e.pointerType !== "touch") return;
+      timer = setTimeout(() => { timer = 0; mark = true; }, ms);
+    });
+    held.addEventListener("pointerup", () => { if (timer) clearTimeout(timer); timer = 0; });
+    const real = other.onclick;
+    other.onclick = (e) => { if (mark) { mark = false; return; } if (real) real(e); };
+  }, [WORN, CARD, LONG]);
+  const plantHold = await hold(WORN, LONG + 100);
+  const plantBefore = await wear(CARD);
+  await poke(CARD);
+  await tp.waitForTimeout(450);
+  const plantAfter = await wear(CARD);
+  check("control:a-mark-consumed-only-in-onclick-goes-red", plantAfter.fit === false,
+    "shop:a-hold-on-a-card-with-nothing-to-try-swallows-only-its-own-click would read fit "
+    + plantBefore.fit + " then " + plantAfter.fit + ", rows " + plantBefore.tried + " then "
+    + plantAfter.tried + ", with the planted hold spinning at " + plantHold.saw.lag + "ms");
 
   /* 대조군. 마우스는 손을 올린 그 자리에서 그대로 돈다. 터치를 가르는 줄이 호버까지 같이
      잘라 내면 여기가 빨개지고, 고친 것이 한쪽 손을 고치면서 다른 손을 부순 것이 된다. */
