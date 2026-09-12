@@ -405,13 +405,17 @@ try {
   /* 체격도 표본이다. 아래 두 축이 재던 몸은 188/84 하나였는데 게임은 그보다 넓은 몸을 만든다.
      BODIES가 소스에서 끌어온 봉투의 네 귀퉁이와 그 게이트 몸이고, 판정은 다섯 벌 전부다. */
   const OLD_PADS_AIM = { part: "torso", lift: 0.3 };
-  const heads = await p.evaluate(async ([old, bodies]) => {
+  /* 아래 바닥 자가 심는 겨냥. 부위는 파는 그대로 목이고 lift 한 칸만 흐른 값이다. 위의 자가 옛
+     겨냥을 통째로 되심는 것과 달라야 한다. 실제로 나는 회귀는 부위가 바뀌는 것이 아니라 상수
+     하나가 조용히 흐르는 것이고, 아래 자가 재는 띠도 그 흐름이다. */
+  const HEAD_DROP = { lift: 0.3 };
+  const heads = await p.evaluate(async ([old, bodies, drop]) => {
     const m = await import("/web/src/render/thumb.mjs");
     const g = await import("/web/src/state/gear.mjs");
     const read = (tag, len, hb) => ({ tag, len,
       top: hb.y - hb.ry, bot: hb.y + hb.ry, left: hb.x - hb.rx, right: hb.x + hb.rx,
       eyes: hb.eyes.map((e) => ({ x: e.x, y: e.y })) });
-    const out = { by: [], was: [],
+    const out = { by: [], was: [], down: [],
       shelf: { ranks: g.KITS.length, per: g.KITS.map((_, r) => g.skinsAt("pads", r).length) } };
     for (let at = 0; at < bodies.length; at += 1) {
       const k = { height: bodies[at].height, weight: bodies[at].weight };
@@ -427,12 +431,13 @@ try {
           // 심는 대조군은 게이트 몸 한 벌에서만 굽는다. 옛 겨냥이 머리를 잃는다는 것은 한 벌에서
           // 이미 판가름 나고, 다섯 벌로 늘리면 굽는 장만 다섯 배가 된다.
           if (at === 0) out.was.push(read(tag, len, m.headBox("pads", k, look, old)));
+          if (at === 0) out.down.push(read(tag, len, m.headBox("pads", k, look, drop)));
         }
       }
       out.by.push(row);
     }
     return out;
-  }, [OLD_PADS_AIM, BODIES]);
+  }, [OLD_PADS_AIM, BODIES, HEAD_DROP]);
   const headIn = (r) => r.top >= 0 && r.bot <= 1 && r.left >= 0 && r.right <= 1;
   const eyesIn = (r) => r.eyes.length === 2 && r.eyes.every((e) => e.x >= 0 && e.x <= 1 && e.y >= 0 && e.y <= 1);
   const sayHead = (r) => r.tag + " len " + r.len + " box " + r.top.toFixed(3) + ".." + r.bot.toFixed(3)
@@ -459,6 +464,61 @@ try {
           + ".." + Math.max.apply(null, row.live.map((r) => r.bot)).toFixed(3)).join(", ")
         + ", both eyes inside on all " + spread + ", longest shirt "
         + Math.max.apply(null, heads.by[0].live.map((r) => r.len)));
+
+  /* 머리가 칸 밑으로 가라앉는 쪽은 여태 어느 축도 안 읽었다. 위 축은 머리 상자가 칸을 벗어나는
+     자리만 묻고, 유니폼 축은 깃이 칸 위로 잘리는 자리만 묻는다. 그래서 겨냥이 내려앉아 사람이
+     통째로 칸 밑으로 미끄러지는 동안 둘 다 초록이다. 실측: 0등급 장에 over lift +0.2를 주면 깃이 0.659에서
+     0.688로 내려앉는데 머리 밑끝은 0.715라 아직 칸 안이고, 머리가 칸을 벗어나는 자리는 +0.5의
+     1.005다. 그 사이 세 칸이 아무 축에도 안 걸렸다.
+     바닥은 실측의 잔여로 정한다. 다섯 벌 열두 장에서 파는 바이트의 머리 밑끝이 가장 낮은 자리가
+     0.517이고(188/84가 0.516, 165 두 벌이 0.513, 200 두 벌이 0.517), 겨냥을 흘리면 +0.1에 0.617,
+     +0.2에 0.715, +0.3에 0.813이다. 파는 0.517과 +0.2의 0.715의 가운데가 0.616이고, 바닥은 그 값을
+     백분위로 올린 0.62다. 올리는 까닭은 여유 하나다. 0.616으로 박으면 파는 바이트에 0.099만 남아
+     0.1을 못 채운다. 0.62에서 파는 여유가 0.103이고 +0.2가 0.095 넘어 예순 장 전부 빨개진다.
+     밑끝은 lift 한 칸에 0.098씩 움직이는 직선이라, 0.2 폭의 가운데는 구조상 +0.1 자리에 앉는다.
+     그래서 이 바닥이 가르는 것은 +0.2부터이고 +0.1은 0.003 남기고 지나간다. 이 축이 약속하는 것도
+     그 +0.2다. 바닥을 1.0으로 두는 갈래는 없다. 그 수는 위 축이 이미 묻는 값이라, 그러면 이 자는
+     아무것도 새로 안 잰다.
+     깃과 밑단을 밑끝 옆에 같이 찍는다. 머리 밑끝만 찍으면 그 아래 상의가 어디 있는지 읽는 사람이
+     다른 줄에서 찾아야 한다. 그 두 수는 위의 유니폼 표본이 이미 잰 값이라 여기서 다시 안 굽는다. */
+  const HEAD_FLOOR = 0.62;
+  const HEAD_FLOOR_FROM = "midpoint of the shipped 0.517 and the +0.2 drift 0.715, raised to clear 0.1";
+  const shirtAt = (body) => {
+    const row = wideKit ? wideKit.per.find((x) => x.body === body) : null;
+    if (!row) return "shirt unread";
+    const ends = (k) => Math.min.apply(null, row.mid.map((q) => q[k])).toFixed(3)
+      + ".." + Math.max.apply(null, row.mid.map((q) => q[k])).toFixed(3);
+    return "collar " + ends("y0") + " hem " + ends("y1");
+  };
+  const chinOf = (row) => Math.max.apply(null, row.live.map((r) => r.bot));
+  const sank = [];
+  for (const row of heads.by) for (const r of row.live) {
+    if (!(r.bot <= HEAD_FLOOR)) sank.push(row.body + " " + sayHead(r) + " " + shirtAt(row.body));
+  }
+  const lowChin = heads.by.length ? Math.max.apply(null, heads.by.map(chinOf)) : 2;
+  check("thumb:" + WIDE_SHELF + ":the-head-keeps-a-floor-below-it",
+    heads.by.length === BODIES.length && heads.by.every((row) => whole(row)
+      && row.live.every((r) => r.bot <= HEAD_FLOOR)),
+    (sank.length ? "through the floor " + HEAD_FLOOR + " at " + sank.join(", ") + "; all "
+      : "floor " + HEAD_FLOOR + ", " + HEAD_FLOOR_FROM + ", ")
+    + heads.by.map((row) => row.body + " chin " + chinOf(row).toFixed(3) + " " + shirtAt(row.body)).join(", ")
+    + ", lowest chin " + lowChin.toFixed(3) + " with " + (HEAD_FLOOR - lowChin).toFixed(3)
+    + " left on all " + spread + " looks");
+  /* 심는 대조군. 위 바닥이 정말 무엇을 재는지는 그 술어를 빨간 편으로 밀 수 있는 장이 있는가로만
+     답한다. 겨냥을 한 칸 흘린 장을 굽고 이 자가 그 장에서 지는지 본다. 같은 장에서 위 프레임 축이
+     초록인지도 같이 묻는다. 둘이 같이 참이어야 이 바닥이 새로 여는 띠가 있다는 말이 되고, 프레임
+     축이 같이 빨개지는 장으로 난 초록은 이미 재던 것을 두 번 적은 것이다. 상자가 제대로 굽혔는지는
+     그 프레임 절이 같이 답한다. 눈 둘까지 칸에 든 장이라 빈 상자로 난 빨강이 아니다.
+     게이트 몸 한 벌에서만 굽는다. 밑끝이 바닥을 지난다는 것은 한 벌에서 이미 판가름 나고,
+     다섯 벌로 늘리면 굽는 장만 다섯 배가 된다. */
+  const sunk = heads.down.filter((r) => r.bot > HEAD_FLOOR);
+  const stillIn = heads.down.filter((r) => headIn(r) && eyesIn(r));
+  check("control:" + WIDE_SHELF + ":a-drifting-aim-sinks-the-head-inside-the-frame",
+    heads.down.length === looks && stillIn.length === looks && sunk.length > 0,
+    "the planted aim lift " + HEAD_DROP.lift + " reads "
+    + (heads.down.length ? sayHead(heads.down[0]) : "no planted look") + " and sinks through the floor "
+    + HEAD_FLOOR + " on " + sunk.length + " of " + heads.down.length + " looks, inside the frame on "
+    + stillIn.length + ", so the frame axis above keeps its green exactly where this floor reds");
   /* 이름이 술어와 같은 것을 말해야 한다. armBox가 돌려주는 것은 삼각근과 위팔의 상자이고 이 축이
      보는 것은 그 상자의 위끝 하나뿐이라, 지키는 것은 어깨선이 칸 위로 안 잘리는 것이다.
      삼각근 아래의 팔은 448x205 머리어깨 칸에서 구조상 칸 밖이다. 실측으로 그 상자 밑끝이
