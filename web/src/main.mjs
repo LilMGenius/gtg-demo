@@ -384,22 +384,21 @@ function aura() {
    살아 있는 자리에 적어야 그때 들린다. 같은 말을 다시 적으면 한 번 더 울리므로 바뀔 때만 적는다.
    자리는 하나만 둔다. 판이 바뀌는 순간 컨디션과 창이 한 호출 안에서 차례로 적히는데, 살아 있는 자리가
    둘이면 읽어 주는 자가 그 둘을 한 번에 받아 하나를 버릴 수 있고, 버려지는 쪽이 컨디션이다. 한 번에
-   들어온 말은 그 말들이 이미 쓰는 쉼표로 이어 한 줄로 적는다. 무엇을 두고 하는 말인지는 첫 낱말이
-   들고 있어서, 같은 것을 두고 새 말이 오면 앞의 말을 밀어낸다. */
+   들어온 말은 그 말들이 이미 쓰는 쉼표로 이어 한 줄로 적는다. 무엇을 두고 하는 말인지는 부르는 자리에서
+   따로 받는다. 같은 것을 두고 새 말이 오면 앞의 말을 밀어낸다. */
 const SAY_JOIN = ', ';
 const saidBy = new Map();
 let sayQueue = [];
-function hudSay(line) {
-  const who = line.split(' ')[0];
-  if (saidBy.get(who) === line) return;
-  saidBy.set(who, line);
-  const at = sayQueue.findIndex((q) => q.split(' ')[0] === who);
-  if (at >= 0) { sayQueue[at] = line; return; }
-  sayQueue.push(line);
+function hudSay(subject, line) {
+  if (saidBy.get(subject) === line) return;
+  saidBy.set(subject, line);
+  const at = sayQueue.findIndex((q) => q.subject === subject);
+  if (at >= 0) { sayQueue[at].line = line; return; }
+  sayQueue.push({ subject, line });
   if (sayQueue.length === 1) queueMicrotask(saySpill);
 }
 function saySpill() {
-  const line = sayQueue.join(SAY_JOIN);
+  const line = sayQueue.map((q) => q.line).join(SAY_JOIN);
   sayQueue = [];
   el('padSay').textContent = line;
 }
@@ -419,7 +418,7 @@ function formChip() {
   const name = '컨디션 ' + (up ? '좋음' : dn ? '나쁨' : '보통');
   box.setAttribute('aria-label', name);
   box.setAttribute('title', name);
-  hudSay(name);
+  hudSay('form', name);
 }
 
 /* 묶음 이름 둘. 판이 사는 동안 방향은 언제든 바뀌므로 단추 하나하나는 늘 같은 뜻이고, 갈리는 것은
@@ -436,7 +435,7 @@ function setPad(on) {
      안 들린다. 묶음 이름이 그 둘을 가른다. */
   const name = on ? PAD_OPEN : PAD_SHUT;
   el('pad').setAttribute('aria-label', name);
-  hudSay(name);
+  hudSay('pad', name);
 }
 
 function markDive(dive, bot) {
