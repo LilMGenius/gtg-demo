@@ -444,7 +444,7 @@ try {
      제 몸이고, .note.dim은 색과 정렬만 덮으므로 줄 높이는 머리가 서 있던 날과 같은 수다.
      24를 적으면 본문 크기가 움직인 날 어긋난다. */
   const ZERO_STRIP = 26;
-  const mark = await fresh.evaluate(() => {
+  const markRead = () => {
     const pane = document.querySelector("#me .pane");
     const strip = pane ? pane.querySelector(".note.dim") : null;
     const g = strip ? strip.querySelector("svg") : null;
@@ -461,7 +461,8 @@ try {
       ink: g.querySelectorAll("rect,circle,path,polygon").length,
       said: g.textContent.trim().length, held, bare,
       back: Math.round(strip.getBoundingClientRect().height) };
-  });
+  };
+  const mark = await fresh.evaluate(markRead);
   /* 라벨 둘. 아이콘을 띠 안에 세운 뒤에도 그 위에는 머리 카드가 남아, 파운더가 본 것은 빈 상자
      위에 선 '아는 얼굴'과 '라포'였다. 규칙이 받는 것은 빈 채로 두기와 아이콘 둘뿐이라 라벨은 어느
      쪽도 아니고, 위의 탭이 이미 '아는 얼굴'이라 셀 것이 없는 칸에서 같은 말이 두 번 선다.
@@ -502,25 +503,46 @@ try {
       + " and " + planted.chars + " chars " + JSON.stringify(planted.said) + ", axis red " + String(!labelOk(planted))
       + "; pulled -> " + (pulled ? pulled.kept + " cards " + pulled.chars + " chars, axis green " + String(labelOk(pulled)) : "no pane")
       : "no pane to plant into");
+  /* 좁은 화면에서 한 번 더. 위의 두 수는 1280x720 하나에서 나왔는데, 이 칸의 글자는
+     clamp(15px,1.4vw,18px)이라 740px에서 15px로 바닥을 친다. 한 줄이 24px에서 20px로 내려오고
+     아이콘은 20px 고정이라, 아이콘이 한 줄을 안 넘는다는 위의 요구가 여유 4px에서 0px이 된다.
+     0px은 통과지만 그 다음 한 걸음이 음수이고, 안 재면 이 자는 제일 좁은 자리를 안 본 채 초록을 낸다.
+     화면 크기는 이 자가 아래에서 쓰는 740x360 그대로다. 재고 나서 넓은 화면으로 돌려놓는다.
+     뒤에 읽기가 하나 붙는 날 그 읽기가 좁은 화면의 수를 넓은 화면의 수로 적게 된다. */
+  const ZERO_NARROW = { width: 740, height: 360 };
+  await fresh.setViewportSize(ZERO_NARROW);
+  await fresh.waitForTimeout(360);
+  const zeroNarrow = await fresh.evaluate(zeroRead);
+  const markNarrow = await fresh.evaluate(markRead);
+  await fresh.setViewportSize({ width: 1280, height: 720 });
+  await fresh.waitForTimeout(240);
   await fresh.close();
-  const zeroSaid = zero ? zero.said.filter((s) => ZERO_END.test(s)) : [];
-  const zeroOk = Boolean(zero) && zero.strip && zero.met === 0 && zero.chars === 0
-    && zero.alien.length === 0 && zeroSaid.length === 0;
-  check("mepane:an-empty-people-pane-stays-empty-or-carries-an-icon", zeroOk,
-    zero ? "the dim strip " + (zero.strip ? "stands " + zero.stripH + "px" : "is gone")
-      + " holding " + zero.chars + " chars " + JSON.stringify(zero.text) + " and " + zero.icons
-      + " icons, " + zero.alien.length + " text-bearing children " + JSON.stringify(zero.alien)
-      + ", " + zeroSaid.length + " of " + zero.said.length + " text runs in the pane end a sentence "
-      + JSON.stringify(zeroSaid) + ", cards " + zero.met + ", rapport keys cleared " + carried
-      : "no pane on a fresh account");
-  const markOk = Boolean(mark) && mark.ink > 0 && mark.said === 0 && mark.h > 0 && mark.h <= mark.row
-    && mark.held === mark.bare && mark.bare === ZERO_STRIP && mark.back === mark.held;
-  check("mepane:the-empty-people-pane-icon-is-a-silhouette-of-fixed-size", markOk,
-    mark ? "the silhouette draws " + mark.ink + " shapes and " + mark.said + " chars at "
-      + mark.w + "x" + mark.h + "px inside a " + mark.row + "px note row, and the strip stands "
-      + mark.held + "px with it, " + mark.bare + "px with it pulled and " + mark.back
-      + "px back, against the " + ZERO_STRIP + "px 86b8818 left"
-      : "no svg in the empty people pane");
+  /* 두 화면을 한 축으로 접는다. 화면마다 축 이름을 세우면 같은 규칙이 둘이 되고, 한쪽만 빨개진 날
+     어느 쪽이 규칙이었는지가 사라진다. 판정은 두 화면에서 다 참인 것이고, 적는 것은 화면마다의 실측이다. */
+  const ZERO_SEEN = [{ at: "1280x720", r: zero, m: mark },
+    { at: ZERO_NARROW.width + "x" + ZERO_NARROW.height, r: zeroNarrow, m: markNarrow }];
+  const zeroSaidOf = (r) => (r ? r.said.filter((s) => ZERO_END.test(s)) : []);
+  const zeroFine = (r) => Boolean(r) && r.strip && r.met === 0 && r.chars === 0
+    && r.alien.length === 0 && zeroSaidOf(r).length === 0;
+  const zeroTell = (at, r) => at + " " + (r ? "the dim strip "
+    + (r.strip ? "stands " + r.stripH + "px" : "is gone")
+    + " holding " + r.chars + " chars " + JSON.stringify(r.text) + " and " + r.icons
+    + " icons, " + r.alien.length + " text-bearing children " + JSON.stringify(r.alien)
+    + ", " + zeroSaidOf(r).length + " of " + r.said.length + " text runs in the pane end a sentence "
+    + JSON.stringify(zeroSaidOf(r)) + ", cards " + r.met : "no pane on a fresh account");
+  check("mepane:an-empty-people-pane-stays-empty-or-carries-an-icon",
+    ZERO_SEEN.every((s) => zeroFine(s.r)),
+    ZERO_SEEN.map((s) => zeroTell(s.at, s.r)).join(" | ") + ", rapport keys cleared " + carried);
+  const markFine = (m) => Boolean(m) && m.ink > 0 && m.said === 0 && m.h > 0 && m.h <= m.row
+    && m.held === m.bare && m.bare === ZERO_STRIP && m.back === m.held;
+  const markTell = (at, m) => at + " " + (m ? "the silhouette draws " + m.ink + " shapes and "
+    + m.said + " chars at " + m.w + "x" + m.h + "px inside a " + m.row + "px note row with "
+    + (m.row - m.h) + "px to spare, and the strip stands " + m.held + "px with it, " + m.bare
+    + "px with it pulled and " + m.back + "px back" : "no svg in the empty people pane");
+  check("mepane:the-empty-people-pane-icon-is-a-silhouette-of-fixed-size",
+    ZERO_SEEN.every((s) => markFine(s.m)),
+    ZERO_SEEN.map((s) => markTell(s.at, s.m)).join(" | ") + ", against the " + ZERO_STRIP
+    + "px 86b8818 left");
 
   // 대조군. 닫고 다시 열면 능력치 칸으로 돌아온다. 안 돌아오면 다음에 연 사람이 탭을 눌러야 한다.
   await p.evaluate(() => { window.__me(false); window.__me(true); });
