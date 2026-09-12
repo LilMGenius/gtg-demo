@@ -1294,8 +1294,11 @@ function recordRows() {
     ? '<table><thead><tr><th></th><th>이름</th><th>막은</th><th>먹힌</th></tr></thead><tbody>'
       + rows + '</tbody></table>'
     : '<div class="note dim"><span></span></div>';
-  return '<div class="note"><b>최근</b></div>' + recent
-    + '<div class="note"><b>상대 전적</b><i>막은 수 - 먹힌 수</i></div>' + table;
+  /* 표가 먼저 선다. 이 칸을 여는 이유가 누구한테 약한지라, 그 답이 굴리기 전에 서야 한다. 실측
+     1280x720에서 칸이 접히는 자리가 243px인데, 최근 열 판이 위에 서면 표의 첫 줄이 접힘 아래
+     214px에 선다. 최근은 그 답을 받치는 줄이라 아래로 내려가고, 아래끝 그늘이 거기 더 있다고 말한다. */
+  return '<div class="note"><b>상대 전적</b><i>막은 수 - 먹힌 수</i></div>' + table
+    + '<div class="note"><b>최근</b></div>' + recent;
 }
 
 // 만남 버튼 글자. 문은 판정이 열고, 값을 어떻게 보여 줄지는 화면이 정한다.
