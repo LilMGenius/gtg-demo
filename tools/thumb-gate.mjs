@@ -60,13 +60,19 @@ const GATE_BODY = { height: 188, weight: 84 };
 const BODIES = [GATE_BODY,
   { height: BAND_H[0], weight: BAND_W[0] }, { height: BAND_H[0], weight: BAND_W[1] },
   { height: BAND_H[1], weight: BAND_W[0] }, { height: BAND_H[1], weight: BAND_W[1] }];
+// 봉투가 게이트 몸을 담는지. 담지 않으면 다섯 표본 가운데 한 벌이 게임이 안 만드는 몸이고,
+// 그 한 벌에서 난 초록은 게임이 만드는 어떤 몸도 안 지킨다. 손으로 남긴 수라 소스가 움직이면 먼저 어긋난다.
+const HOLDS_GATE_BODY = BAND_H[0] <= GATE_BODY.height && GATE_BODY.height <= BAND_H[1]
+  && BAND_W[0] <= GATE_BODY.weight && GATE_BODY.weight <= BAND_W[1];
 // 봉투를 도는 선반. 머리와 어깨가 칸 밖으로 나간 회귀가 이 칸에서 났고, 겨냥이 목 관절이다.
 const WIDE_SHELF = "pads";
 const ENVELOPE = "roster " + SIZED.length + " of " + CREW.length + " entries "
   + bandOf("height", null).join("..") + "cm " + bandOf("weight", null).join("..") + "kg, chain rng "
   + (ROLL_H ? ROLL_H.join("..") : "unread") + "cm " + (ROLL_W ? ROLL_W.join("..") : "unread")
   + "kg, envelope " + BAND_H.join("..") + "cm " + BAND_W.join("..") + "kg, bodies "
-  + BODIES.map((k) => k.height + "/" + k.weight).join(" ");
+  + BODIES.map((k) => k.height + "/" + k.weight).join(" ")
+  + ", gate body " + GATE_BODY.height + "/" + GATE_BODY.weight
+  + (HOLDS_GATE_BODY ? " inside" : " outside") + " the envelope";
 
 let b;
 try {
@@ -179,10 +185,16 @@ try {
     (blankRatio * 100).toFixed(1) + "% painted on an empty box, floor " + (SHOT_INK * 100).toFixed(0) + "%");
   await p.evaluate(() => { const q = document.getElementById("inkProbe"); if (q) q.remove(); });
 
-  /* 재는 몸을 먼저 찍어 둔다. 아래 세 축이 이 다섯 벌을 돌고, 봉투가 좁아지거나 명단 한 줄이
-     몸을 안 들고 있으면 여기서 먼저 빨개진다. 그러면 아래의 초록은 좁아진 봉투의 초록이다. */
+  /* 재는 몸을 먼저 찍어 둔다. 아래 세 축이 이 다섯 벌을 돌고, 명단 한 줄이 몸을 안 들고 있거나
+     src/chain.mjs의 두 줄을 못 읽거나 봉투가 게이트 몸 188/84를 놓치면 여기서 먼저 빨개진다.
+     그러면 아래의 초록은 좁아진 봉투의 초록이다.
+     봉투가 그 한 벌을 담는지 묻는 까닭은 다섯 표본 가운데 그것만 소스에서 안 끌어온 수이기
+     때문이다. 앞선 회차와 견줄 자리로 손으로 남긴 수라, 명단이나 rng가 움직여 봉투가 그 수를
+     벗어나면 게임이 안 만드는 몸 한 벌을 계속 재면서 초록이 난다.
+     표본 수를 세는 술어는 이 자리에 못 쓴다. BODIES가 다섯 칸 리터럴이라 그 수는 소스가
+     어떻게 움직여도 다섯이고, 못 틀리는 술어는 재는 자리를 차지한 채 아무것도 안 잰다. */
   check("instrument:the-body-envelope-came-from-the-game",
-    Boolean(ROLL_H) && Boolean(ROLL_W) && SIZED.length === CREW.length && BODIES.length === 5
+    Boolean(ROLL_H) && Boolean(ROLL_W) && SIZED.length === CREW.length && HOLDS_GATE_BODY
     && BAND_H[0] < BAND_H[1] && BAND_W[0] < BAND_W[1], ENVELOPE);
 
   // 이름이 형태를 말하는 선반들. 머리는 깎아준 머리와 투블럭과 기른 머리와 모히칸이고,
@@ -262,6 +274,25 @@ try {
     return out;
   }, [BODIES, WIDE_SHELF]);
   check("instrument:some-shelf-declares-a-shape", shapes.length > 0, shapes.map((s) => s.tab).join(", "));
+  /* 봉투를 도는 선반은 이름 하나로 고른다. 그 이름이 어긋나면 여섯 선반이 다 한 벌로 접히고,
+     아래 무게중심 축은 게이트 몸 한 벌만 재고도 초록을 낸다. 접힌 표본은 메시지의 몸 목록에만
+     남아서, 그 줄을 세지 않으면 다섯 벌을 잰 초록과 구별이 안 된다. 그래서 봉투를 돈 선반이
+     하나인지를 잰 표본에서 되읽고, 그 이름이 장비표가 든 선반 목록에 있는지를 같이 묻는다.
+     장비표에 묻는 까닭은 그것이 걷은 표본과 다른 곳에서 오기 때문이다. 이 파일의 겨냥표는
+     선반 이름을 손으로 들고 있어서, gear.mjs가 그 칸 이름을 바꿔도 여기 적힌 이름으로 다섯 벌을
+     계속 걷는다. 그때 폭은 멀쩡하고 이름만 게임에 없다. 화면 탭 목록은 이 물음에 못 쓴다.
+     탭은 kit과 glove로 서고 겨냥표는 pads와 grip으로 서서, 두 이름공간이 애초에 다르다. */
+  // 선반 이름의 원장은 gear.mjs다. 겨냥표가 손으로 든 이름을 그 원장에 대조한다.
+  const GEAR_SHELVES = await p.evaluate(async () => {
+    const g = await import("/web/src/state/gear.mjs");
+    return Object.keys(g.SKINS);
+  });
+  const wideShelves = shapes.filter((s) => s.per.length === BODIES.length);
+  check("instrument:one-shelf-walked-the-whole-envelope",
+    wideShelves.length === 1 && wideShelves[0].tab === WIDE_SHELF && GEAR_SHELVES.indexOf(WIDE_SHELF) >= 0,
+    "wide " + WIDE_SHELF + (GEAR_SHELVES.indexOf(WIDE_SHELF) >= 0 ? " in the gear table" : " not in the gear table")
+    + ", walked the envelope " + (wideShelves.map((s) => s.tab).join(" ") || "none") + ", samples "
+    + shapes.map((s) => s.tab + " " + s.per.length).join(" ") + " of " + BODIES.length + " bodies");
   for (const s of shapes) {
     // 0.75. 두 등급이 칠해진 자리의 4분의 3을 공유하면 사람은 같은 물건에 색만 바꾼 것으로 읽는다.
     // 지금 최악 쌍이 머리 0.67 축구화 0.71이라 통과용으로 맞춘 수가 아니고, 형태가 무너지는 날 먼저 운다.
@@ -277,7 +308,7 @@ try {
        체격마다 축을 세우면 어느 이름이 상품을 지키는 이름인지 읽는 사람이 골라야 하고,
        그 고르는 일은 아무도 안 한다. 판정은 그 선반이 잰 체격 전부이고, 메시지가 몸별 수를 든다. */
     /* 상한을 두 번 적지 않는다. 술어와 여유가 같은 수를 봐야 하고, 두 자리로 적으면 그 여유가
-       안 읽힌다. 실측으로 200/65 1등급이 0.80으로 찍혔는데 세 자리로는 0.799였다. 반올림한
+       안 읽힌다. 실측으로 200/65 1등급이 0.80으로 찍혔는데 세 자리로는 0.798이었다. 반올림한
        한 자리 뒤에 남은 여유가 0.001인지 0.005인지가 이 축이 답해야 하는 것이다. */
     const LOW = 0.2;
     const HIGH = 0.8;
@@ -292,9 +323,14 @@ try {
         if (!tight || gapOf(q) < tight.gap) tight = { gap: gapOf(q), at: row.body + " rank " + n, q };
       });
     }
+    /* 잰 벌 수가 술어에 든다. 봉투를 도는 선반은 다섯 벌이고 나머지는 한 벌이라, 표본이 접히면
+       메시지가 아니라 판정이 먼저 답한다. 머리와 어깨 축이 저마다 제 표본 폭을 같이 보는 것과
+       같은 자리다. 이름 자체가 어긋나 선반이 하나도 안 도는 경우는 위의 계기가 잡는다. */
+    const wantBodies = s.tab === WIDE_SHELF ? BODIES.length : 1;
     check("thumb:" + s.tab + ":the-goods-sit-inside-the-frame",
-      s.per.every((row) => row.mid.every(inFrame)),
-      (off.length ? "outside at " + off.join(", ") + "; all " : "")
+      s.per.length === wantBodies && s.per.every((row) => row.mid.every(inFrame)),
+      s.per.length + " of " + wantBodies + " bodies, "
+      + (off.length ? "outside at " + off.join(", ") + "; all " : "")
       + s.per.map((row) => row.body + " " + row.mid.map(sayMid).join(" ")).join(", ")
       + ", tightest " + tight.gap.toFixed(3) + " from the edge at " + tight.at + " " + sayMid(tight.q));
     check("control:" + s.tab + ":the-same-cut-paints-the-same-pixels", s.control > 0.999, s.control.toFixed(4));
