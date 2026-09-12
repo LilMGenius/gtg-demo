@@ -1873,6 +1873,42 @@ function bindSpec(box) {
   }
 }
 
+/* 터치의 긴 누름. 손가락은 카드 위에 머물 수 없어서 호버가 없고, 터치의 pointerenter는 누르는
+   순간에 한 번 오고 마는 것이라 회전을 여는 자리로 못 쓴다. 그 눌림은 시착용이 이미 쓰고 있어서,
+   눌린 채로 흐른 시간으로 둘을 가른다. 짧은 누름은 그대로 걸쳐 보고, 문턱을 넘겨 붙들고 있으면
+   그 카드가 돈다. 문턱은 뽑기 화면과 같은 LONG_MS다. 한 화면에서 긴 누름인 시간이 다른 화면에서
+   아니면 손이 화면마다 다른 규칙을 외워야 한다.
+   예약과 삼킬 표시를 뽑기 화면의 것과 같이 쓰지는 않는다. 그쪽은 판을 다시 그려 버튼이 새 것으로
+   갈리는 것을 버티려고 모듈에 서 있고, 손을 떼는 순간 회전을 멈출 일도 손가락만 받을 일도 없다.
+   한 자리에 담으면 한쪽의 규칙이 다른 쪽으로 새어 나간다. 도는 칸이 하나뿐이라 여기도 모듈이 든다. */
+let holdTimer = 0;
+let holdSpun = false;
+function holdDrop() {
+  if (holdTimer) clearTimeout(holdTimer);
+  holdTimer = 0;
+}
+/* 카드에 긴 누름을 건다. 손가락만 받아서 마우스의 호버는 그대로 두고, 값 버튼에서 시작한 누름은
+   그 버튼 것이라 안 받는다. 효과 칸을 채우는 눌림은 bindSpec이 따로 듣고 있어서 여기서 안 덮인다.
+   누름마다 앞의 예약과 표시를 먼저 걷는다. 안 걷으면 회전만 열고 카드 밖으로 나간 손의 표시가
+   남아서 다음 누름의 걸쳐 보기가 대신 삼켜진다. */
+function bindHold(card, run) {
+  card.addEventListener('pointerdown', (e) => {
+    holdDrop();
+    holdSpun = false;
+    if (e.pointerType !== 'touch' || e.target.closest('.buy')) return;
+    holdTimer = setTimeout(() => { holdTimer = 0; holdSpun = true; run(); }, LONG_MS);
+  });
+  card.addEventListener('pointerup', (e) => {
+    holdDrop();
+    if (e.pointerType === 'touch') stopSpin();
+  });
+  card.addEventListener('pointercancel', (e) => {
+    holdDrop();
+    holdSpun = false;
+    if (e.pointerType === 'touch') stopSpin();
+  });
+}
+
 function bindGear(box) {
   // 파는 물건을 그려서 건다. 등급마다 몸에 걸친 상태를 따로 만들어 굽기 때문에
   // 등급이 색을 안 바꾸면 네 장이 같은 그림이 되고, 그 사실이 화면에서 바로 드러난다.
@@ -1892,14 +1928,19 @@ function bindGear(box) {
     shot.innerHTML = '<img alt="" src="' + url + '">';
     // 썸네일은 이제 변형 조각과 한 상자에 산다. 부모를 그대로 쓰면 카드가 아니라 그 상자에 손이 걸린다.
     const card = shot.closest('.card');
-    card.onpointerenter = () => startSpin(shot, s.field, state.keeper, arg);
-    card.onpointerleave = () => stopSpin();
+    // 마우스는 호버로 돈다. 터치의 pointerenter는 누름 한 번이라 여기서 걸러 내고 긴 누름이 받는다.
+    card.onpointerenter = (e) => { if (e.pointerType === 'touch') return; startSpin(shot, s.field, state.keeper, arg); };
+    card.onpointerleave = () => { holdDrop(); stopSpin(); };
+    bindHold(card, () => startSpin(shot, s.field, state.keeper, arg));
     // 카드를 누르면 산 것이 아니라 걸쳐 본다. 값은 buy 버튼이 따로 받는다.
     // 이미 가진 등급이나 지나간 등급은 걸쳐 볼 것이 없다.
     const rank = g[s.field];
     if (rank > state.gear[s.field]) {
       card.onclick = (e) => {
         if (e.target.closest('.buy')) return;
+        // 긴 누름이 회전을 연 손의 click은 여기서 삼킨다. 안 삼키면 돌려 보려고 붙든 손이 떼는
+        // 순간 걸쳐 보기로 넘어가서, 터치에는 회전만 보는 길이 다시 없어진다.
+        if (holdSpun) { holdSpun = false; return; }
         if (fitting[s.field] === rank) delete fitting[s.field];
         else fitting[s.field] = rank;
         stopSpin();
@@ -2275,7 +2316,7 @@ function botShelf() {
 }
 
 /* 봇과 버프 카드의 그림. 장비와 달리 몸에 걸치는 것이 아니라 등급 하나가 곧 그 그림이라
-   걸친 모습을 지어낼 것이 없다. 걸쳐 보는 것도 없으므로 카드 누름은 효과 칸만 받는다. */
+   걸친 모습을 지어낼 것이 없다. 걸쳐 보는 것도 없으므로 카드 누름은 효과 칸과 긴 누름의 회전만 받는다. */
 function bindShots(box, kind) {
   for (const shot of box.querySelectorAll('.shot[data-kind="' + kind + '"]')) {
     const at = Number(shot.dataset.rank);
@@ -2283,8 +2324,10 @@ function bindShots(box, kind) {
     if (!url) continue;
     shot.innerHTML = '<img alt="" src="' + url + '">';
     const card = shot.closest('.card');
-    card.onpointerenter = () => startSpin(shot, kind, state.keeper, at);
-    card.onpointerleave = () => stopSpin();
+    // 마우스는 호버로 돈다. 터치의 pointerenter는 누름 한 번이라 여기서 걸러 내고 긴 누름이 받는다.
+    card.onpointerenter = (e) => { if (e.pointerType === 'touch') return; startSpin(shot, kind, state.keeper, at); };
+    card.onpointerleave = () => { holdDrop(); stopSpin(); };
+    bindHold(card, () => startSpin(shot, kind, state.keeper, at));
   }
 }
 
