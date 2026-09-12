@@ -393,6 +393,8 @@ function hudSay(line) {
   const who = line.split(' ')[0];
   if (saidBy.get(who) === line) return;
   saidBy.set(who, line);
+  const at = sayQueue.findIndex((q) => q.split(' ')[0] === who);
+  if (at >= 0) { sayQueue[at] = line; return; }
   sayQueue.push(line);
   if (sayQueue.length === 1) queueMicrotask(saySpill);
 }

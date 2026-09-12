@@ -356,6 +356,45 @@ try {
     + " want " + JSON.stringify(bndWant)
     + " across the chip " + JSON.stringify(bnd.before) + " -> " + JSON.stringify(bnd.after)
     + " and the pad " + JSON.stringify(bnd.pad));
+  /* 무엇을 두고 하는 말인지는 첫 낱말이 들고 있어서, 같은 것을 두고 새 말이 오면 앞의 말을 밀어낸다. */
+  await p.evaluate(() => window.__form(0));
+  await p.waitForTimeout(160);
+  const twice = await p.evaluate(() => {
+    const chip = document.getElementById("form");
+    const live = [...document.querySelectorAll("[aria-live]")];
+    const out = { regions: live.length, writes: [], first: "", last: "" };
+    if (!live.length) return out;
+    const mos = live.map((node) => {
+      const id = node.id || node.className || "live";
+      const mo = new MutationObserver((recs) => {
+        for (const r of recs) {
+          const t = r.addedNodes && r.addedNodes.length
+            ? String(r.addedNodes[0].textContent).trim() : node.textContent.trim();
+          out.writes.push({ id, text: t });
+        }
+      });
+      mo.observe(node, { childList: true, characterData: true, subtree: true });
+      return mo;
+    });
+    window.__form(0.9);
+    out.first = chip.getAttribute("aria-label") || "";
+    window.__form(-0.9);
+    out.last = chip.getAttribute("aria-label") || "";
+    return new Promise((res) => setTimeout(() => {
+      for (const mo of mos) mo.disconnect();
+      res(out);
+    }, 400));
+  });
+  const twiceTurn = Boolean(twice.first) && Boolean(twice.last) && twice.first !== twice.last;
+  check("ux:a-newer-line-replaces-its-subject-in-one-task",
+    twice.regions === 1 && twiceTurn && twice.writes.length === 1
+      && twice.writes[0].text === twice.last
+      && twice.writes[0].text.includes(twice.first) === false,
+    twice.regions + " region, " + twice.writes.length + " write "
+    + twice.writes.map((w) => w.id + " " + JSON.stringify(w.text)).join(" ")
+    + " want " + JSON.stringify(twice.last)
+    + " across " + JSON.stringify(twice.first) + " -> " + JSON.stringify(twice.last)
+    + " in one task, two names " + twiceTurn);
 
   // 누름을 받는 것은 button이어야 한다. 글자 조각에 붙은 핸들러는 누를 수 있다는 신호를 화면에 안 낸다.
   const handlers = await p.evaluate(() => { const bad = []; for (const el of document.querySelectorAll("#hud *")) { if (!el.onclick && !el.onpointerdown) continue; if (el.tagName !== "BUTTON") bad.push((el.id || el.className || el.tagName) + ":" + el.tagName.toLowerCase()); } return bad; });
