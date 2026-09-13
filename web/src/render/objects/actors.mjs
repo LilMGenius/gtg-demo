@@ -695,7 +695,14 @@ function buildBody(o) {
         const col = n === 0 ? 0 : (n % 2 === 0 ? 1 : -1);
         const row = n === 0 ? 0 : (n <= 2 ? 1 : -1);
         const pip = new THREE.BoxGeometry(s * 0.2, s * 0.2, s * 0.22);
-        pip.translate(col * s * 0.28, row * s * 0.3, s * 0.3);
+        /* 0.3s는 빨판을 손바닥에 반쯤 묻는 자리다. 손바닥 앞면이 0.25s이고 돌기가 0.22s라
+           0.19s에서 0.41s를 차지해 뒤쪽이 손에 먹혔고, 등급 이름이 파는 그 돌기가 실루엣에는
+           0.16s만 섰다. 0.42s는 돌기가 통째로 손바닥 앞에 서는 자리다. 실측으로 같은 값에서
+           자리만 옮겼더니 2등급과 3등급이 나눠 쓴 자리가 0.708에서 0.660으로 떨어졌다.
+           수로는 못 고친다. col과 row가 n의 홀짝과 n<=2로만 갈려서 다섯을 넘긴 빨판은 같은
+           다섯 자리에 겹쳐 쌓인다. 실측: 돌기를 아예 빼면 이 선반의 최악 쌍이 0.801에서
+           0.853으로 오른다. */
+        pip.translate(col * s * 0.28, row * s * 0.3, s * 0.42);
         hand.push(pip);
       }
       const gv = new THREE.Mesh(mergeGeos(hand), flatMap(o.gloveTone || 0xf2d64b, clothTex()));
