@@ -118,20 +118,27 @@ export const SOCKS = [
 
 /* 양말 변형. girth는 정강이를 감는 두께 배율, guard는 정강이 앞 보호대 두께,
    band는 발목 그립 밴드 두께다. 목이 늘어난 양말은 종아리에 안 붙어 얇게 남는다.
-   세 번째와 네 번째 이름이 보호대와 그립을 말하므로 그 등급의 변형은 전부 그것을 지킨다. */
+   세 번째와 네 번째 이름이 보호대와 그립을 말하므로 그 등급의 변형은 전부 그것을 지킨다.
+   정강이는 길이가 고정된 캡슐이라, 두 등급이 나눠 쓰는 자리가 두 반지름의 비와 거의 같다.
+   실측: 0등급 0.82와 1등급 1.02가 비 0.804인데 나눠 쓴 자리가 0.775였다. 그래서 이웃한 두
+   등급은 girth 비를 0.72 아래로 내려야 하고, 그 일을 girth 말고 할 것이 없다.
+   보호대는 그 비를 못 줄인다. 판의 폭이 legR 1.3으로 박혀 있어 정강이 반지름 legR 0.82 girth보다
+   좁고, guard가 잡는 것은 판의 깊이뿐이라 판이 정강이 윤곽 안에 갇힌다. 실측으로 보호대가
+   제 겉모습 화소의 6에서 13퍼센트만 들었다. 발목 밴드는 다르다. 반지름이 legR 1.15 band라
+   정강이보다 굵어 22에서 48퍼센트를 든다. 그래서 2등급은 girth가 세우고 3등급은 밴드가 세운다. */
 export const SOCK_SKINS = [
-  [{ name: '늘어난 흰 양말', tone: 0x63d3e8, cut: { girth: 0.78, guard: 0, band: 0 } },
-   { name: '짝짝이 양말', tone: 0xd863b0, cut: { girth: 0.74, guard: 0, band: 0 } },
-   { name: '구멍 난 양말', tone: 0xcfd8c8, cut: { girth: 0.82, guard: 0, band: 0 } }],
+  [{ name: '늘어난 흰 양말', tone: 0x63d3e8, cut: { girth: 0.66, guard: 0, band: 0 } },
+   { name: '짝짝이 양말', tone: 0xd863b0, cut: { girth: 0.7, guard: 0, band: 0 } },
+   { name: '구멍 난 양말', tone: 0xcfd8c8, cut: { girth: 0.62, guard: 0, band: 0 } }],
   [{ name: '노란 스타킹', tone: 0xe8d463, cut: { girth: 1.06, guard: 0, band: 0 } },
    { name: '검은 스타킹', tone: 0x22242a, cut: { girth: 1.1, guard: 0, band: 0 } },
    { name: '줄무늬 스타킹', tone: 0x2f8f7a, cut: { girth: 1.02, guard: 0, band: 0 } }],
-  [{ name: '붉은 보호대', tone: 0xe86363, cut: { girth: 1.2, guard: 1.5, band: 0 } },
-   { name: '검은 보호대', tone: 0x2a2c32, cut: { girth: 1.24, guard: 1.7, band: 0 } },
-   { name: '흰 보호대', tone: 0xe4e4dc, cut: { girth: 1.16, guard: 1.35, band: 0 } }],
-  [{ name: '흰 그립 양말', tone: 0xf2f2f2, cut: { girth: 0.92, guard: 0, band: 1.3 } },
-   { name: '검은 그립 양말', tone: 0x1e2024, cut: { girth: 0.88, guard: 0, band: 1.45 } },
-   { name: '주황 그립 양말', tone: 0xe08a2f, cut: { girth: 0.96, guard: 0, band: 1.2 } }]
+  [{ name: '붉은 보호대', tone: 0xe86363, cut: { girth: 1.38, guard: 1.5, band: 0 } },
+   { name: '검은 보호대', tone: 0x2a2c32, cut: { girth: 1.44, guard: 1.7, band: 0 } },
+   { name: '흰 보호대', tone: 0xe4e4dc, cut: { girth: 1.32, guard: 1.35, band: 0 } }],
+  [{ name: '흰 그립 양말', tone: 0xf2f2f2, cut: { girth: 0.86, guard: 0, band: 1.45 } },
+   { name: '검은 그립 양말', tone: 0x1e2024, cut: { girth: 0.82, guard: 0, band: 1.6 } },
+   { name: '주황 그립 양말', tone: 0xe08a2f, cut: { girth: 0.9, guard: 0, band: 1.35 } }]
 ];
 
 export const MAX_SOCK = SOCKS.length - 1;
