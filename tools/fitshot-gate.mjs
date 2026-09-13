@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { chromium } from "playwright";
+import { KEEPERS, KICKERS } from "../src/roster.mjs";
 
 // 시착실 미리보기의 자. 이 칸이 답하는 질문은 걸친 뒤의 내가 어떻게 보이는가인데,
 // 겨냥이 몸통이면 카메라는 허리를 보고 머리는 프레임 위로 밀려 나간다.
@@ -46,6 +48,47 @@ const TIGHTER = 0.85;
 const DIFF = 24;
 // 미리보기 칸의 바탕색. 구운 그림은 투명 배경이라 화면이 실제로 보여 주는 것은 이 색 위에 얹힌 사람이다.
 const CARD_BG = [0x12, 0x18, 0x0f];
+/* 유니폼 선반이 파는 치수는 기장이다. 열두 벌의 기장 배율이 0.74에서 1.34까지 갈리는데,
+   선반 카드에서는 그 치수가 구조상 안 읽힌다. 카드는 448x205 머리어깨 조각이고 그 겨냥이 목을 타므로,
+   기장이 늘면 목도 같이 올라가 카드 안의 그림이 거의 제자리에 남는다(실측: 카드에서 가장 긴 벌과 가장 짧은 벌의
+   밑단 차이가 다섯 벌 전부 0.000이고, 겨냥 거리를 1.7에서 2.1까지 밀어도 게이트 몸에서 0.005다).
+   파는 치수가 화면에서 읽히는 자리는 시착실 온몸 그림뿐이고, 그것이 이 파일이 재는 그림이다.
+   그런데 긴 벌이 아래로 더 내려오는가를 여태 어느 축도 안 물었다. 위의 축들은 잘렸는가와 프레임을 채우는가만
+   묻고, 그 둘은 열두 벌이 전부 같은 기장이어도 초록이다. */
+// 재는 몸은 게임이 만드는 몸의 봉투다. tools/thumb-gate.mjs가 쓰는 유도를 같은 소스에서 같은 방식으로 끌어온다.
+// 위의 BODIES는 이 자의 다른 축이 쓰는 두 극단이라 섞지 않는다. 봉투를 손으로 베끼면 폭이 넓어진 날
+// 넓어진 자리만 조용히 안 재고 초록이 난다.
+const CHAIN = readFileSync(new URL("../src/chain.mjs", import.meta.url), "utf8");
+const SIZED = KICKERS.concat(KEEPERS).filter((r) => Number.isFinite(r.height) && Number.isFinite(r.weight));
+// 178 + Math.floor(rng() * 21)은 178에서 198까지다. 상한은 밑값 더하기 폭 빼기 하나다.
+const rollOf = (hit) => (hit ? [Number(hit[1]), Number(hit[1]) + Number(hit[2]) - 1] : null);
+const ROLL_H = rollOf(CHAIN.match(/const height = (\d+) \+ Math\.floor\(rng\(\) \* (\d+)\)/));
+const ROLL_W = rollOf(CHAIN.match(/const weight = (\d+) \+ Math\.floor\(rng\(\) \* (\d+)\)/));
+const bandOf = (key, roll) => [
+  Math.min.apply(null, SIZED.map((r) => r[key]).concat(roll || [])),
+  Math.max.apply(null, SIZED.map((r) => r[key]).concat(roll || []))
+];
+const BAND_H = bandOf("height", ROLL_H);
+const BAND_W = bandOf("weight", ROLL_W);
+// 여태 재 온 한 벌. 봉투의 귀퉁이가 아니라 옛 표본이라 맨 앞에 남긴다.
+const KIT_BODY = { height: 188, weight: 84 };
+const KIT_BODIES = [KIT_BODY,
+  { height: BAND_H[0], weight: BAND_W[0] }, { height: BAND_H[0], weight: BAND_W[1] },
+  { height: BAND_H[1], weight: BAND_W[0] }, { height: BAND_H[1], weight: BAND_W[1] }];
+/* 셔츠만 남기는 표식. 굽기 전에 상의 색을 이 색으로 갈면 마스크에 드는 것이 셔츠와 어깨 스펀지뿐이고,
+   양말과 반바지는 무슨 색이어도 안 걸린다. 밑단에서 색이 겹치는 문제가 이 한 수로 사라진다.
+   색과 술어는 tools/thumb-gate.mjs가 쓰는 그대로다. 1.9배는 가장 보라에 가까운 상품(143,79,209)이
+   안 걸리는 값이고, 색조로 고르므로 빛이 안 닿는 면에서 표식이 어두워져도 그 비율이 살아 있다. */
+const KIT_MARK = 0xff00ff;
+/* 기장이 이 폭 이하로 갈리는 쌍은 안 묻는다. 그 폭에서는 품과 어깨 스펀지가 밑단을 한 행 움직인다.
+   실측: 165/65에서 기장 1.06이 250행, 1.10이 249행이고 두 기장의 차가 정확히 0.04다. 품이 0.94에서
+   0.84로 줄고 스펀지가 0에서 1.9로 들어간 쌍이라, 그 한 행은 기장이 아니라 그 둘이 만든 것이다. */
+const LEN_GUARD = 0.04;
+/* 밑단 폭의 바닥. 가장 긴 벌과 가장 짧은 벌의 밑단 차이고, 실측은 188/84 0.185, 165/65 0.163,
+   165/96 0.183, 200/65 0.185, 200/96 0.205다. 가장 좁은 것이 0.163이고 그 절반이 0.0815라,
+   바닥은 소수 둘째 자리로 내린 0.08이다. 내리는 까닭은 바닥이 절반 위로 올라가면 안 되기 때문이다.
+   아래 심는 대조군이 이 바닥을 매 판 다시 재서 같은 줄에 찍는다. 주석에만 사는 수는 다음 랩이 손으로 다시 유도한다. */
+const HEM_FLOOR = 0.08;
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 240000);
 t.unref();
@@ -162,6 +205,94 @@ try {
   const clean = rows.find((r) => !r.dead);
   const marked = clean ? await measure(p, clean.src, MARK) : null;
   const live = rows.filter((r) => !r.dead);
+  /* 기장 표본. 열두 벌을 다섯 벌의 몸에 걸쳐 온몸 그림을 굽고, 셔츠 마스크의 가장 낮은 행을 밑단으로 읽는다.
+     화면의 시착실 칸을 클릭으로 밟지 않고 굽는 자를 직접 부른다. 칸은 한 번에 한 벌만 걸고, 이미 가진 등급을
+     밟으면 아무 일도 안 일어나므로 열두 벌이 한 판에서 안 걸린다.
+     몸은 이 판에 심긴 몸을 안 쓴다. 위 고리와 천장 절이 __setBody로 몸을 갈아 놓으므로, 키퍼 객체에 키와
+     몸무게를 직접 얹어 이 절이 어느 순서에 놓여도 같은 다섯 벌을 재게 한다.
+     상의 말고 걸친 것은 이 판이 걸친 그대로 둔다. 열두 벌이 전부 같은 나머지를 쓰므로 견줄 수 있고,
+     그 나머지에 표식 색과 부딪히는 것이 있는지는 표식 없는 장이 답한다. */
+  const kit = await p.evaluate(async ([bodies, mark, flat]) => {
+    const m = await import("/web/src/render/thumb.mjs");
+    const g = await import("/web/src/state/gear.mjs");
+    const hemOf = (url) => new Promise((res) => {
+      const im = new Image();
+      im.onload = () => {
+        const cv = document.createElement("canvas");
+        cv.width = im.width;
+        cv.height = im.height;
+        const c = cv.getContext("2d");
+        c.drawImage(im, 0, 0);
+        const d = c.getImageData(0, 0, im.width, im.height).data;
+        let px = 0, low = -1, high = -1;
+        for (let y = 0; y < im.height; y += 1) {
+          for (let x = 0; x < im.width; x += 1) {
+            const i = (y * im.width + x) * 4;
+            const r = d[i], g2 = d[i + 1], bl = d[i + 2];
+            if (!(r > g2 * 1.9 && bl > g2 * 1.9 && r > 40 && bl > 40 && d[i + 3] > 16)) continue;
+            px += 1;
+            low = y;
+            if (high < 0) high = y;
+          }
+        }
+        // 밑단은 행 번호 더하기 하나를 세로로 나눈 몫이다. 아래 변에서 잘린 셔츠가 정확히 1.000으로 읽힌다.
+        res({ w: im.width, h: im.height, px, row: low,
+          hem: low < 0 ? -1 : (low + 1) / im.height, collar: high < 0 ? -1 : high / im.height });
+      };
+      im.onerror = () => res({ w: 0, h: 0, px: -1, row: -1, hem: -1, collar: -1 });
+      im.src = url;
+    });
+    const who = window.__keeperStats();
+    const worn = window.__gear();
+    const shelf = [];
+    for (let rank = 0; rank < g.KITS.length; rank += 1) {
+      for (let skin = 0; skin < g.skinsAt("pads", rank).length; skin += 1) {
+        shelf.push({ tag: rank + ":" + skin, rank, skin, len: g.skinAt("pads", rank, skin).cut.len });
+      }
+    }
+    // 기장 하나만 심는다. 품과 스펀지를 그대로 두는 까닭은 대조군이 기장 말고 아무것도 안 갈아야 하기 때문이다.
+    const bake = (k, s, marked, len) => {
+      const look = g.lookOf(Object.assign({}, worn, { pads: s.rank, padsSkin: s.skin }), who.name);
+      if (marked) look.shirt = mark;
+      if (len !== null) look.kitCut = Object.assign({}, look.kitCut, { len });
+      return m.thumbURL("body", k, look);
+    };
+    const out = { shelf, by: [] };
+    for (const at of bodies) {
+      const k = Object.assign({}, who, { height: at.height, weight: at.weight });
+      const row = { body: at.height + "/" + at.weight, live: [], flat: [] };
+      for (const s of shelf) row.live.push(Object.assign({ tag: s.tag, len: s.len }, await hemOf(bake(k, s, true, null))));
+      for (const s of shelf) row.flat.push(Object.assign({ tag: s.tag, len: s.len }, await hemOf(bake(k, s, true, flat))));
+      row.bare = await hemOf(bake(k, shelf[0], false, null));
+      out.by.push(row);
+    }
+    return out;
+  }, [KIT_BODIES, KIT_MARK, 1]);
+  const kitLong = kit.shelf.reduce((a, c) => (c.len > a.len ? c : a), kit.shelf[0]);
+  const kitShort = kit.shelf.reduce((a, c) => (c.len < a.len ? c : a), kit.shelf[0]);
+  const kitOrder = kit.shelf.slice().sort((a, c) => a.len - c.len);
+  const hemAt = (row, key, tag) => row[key].find((r) => r.tag === tag);
+  const spreadOf = (row, key) => hemAt(row, key, kitLong.tag).hem - hemAt(row, key, kitShort.tag).hem;
+  const bandAt = (row, key) => Math.max.apply(null, row[key].map((r) => r.hem)) - Math.min.apply(null, row[key].map((r) => r.hem));
+  /* 쌍으로 묻는다. 순위 상관 하나로 내면 어느 쌍이 뒤집혔는지가 그 수에 안 남아서, 빨개진 날 읽는 사람이
+     열두 벌을 다시 굽는다. */
+  const inverted = [];
+  let asked = 0;
+  for (const row of kit.by) {
+    for (const a of row.live) {
+      for (const c of row.live) {
+        if (!(a.len > c.len + LEN_GUARD)) continue;
+        asked += 1;
+        if (a.hem >= c.hem) continue;
+        inverted.push(row.body + " len " + a.len + " hem " + a.hem.toFixed(3) + " over len " + c.len + " hem " + c.hem.toFixed(3));
+      }
+    }
+  }
+  const tooFlat = kit.by.filter((row) => spreadOf(row, "live") < HEM_FLOOR);
+  const kitBlind = kit.by.filter((row) => row.bare.px !== 0);
+  const kitThin = kit.by.filter((row) => row.live.length !== kit.shelf.length || row.flat.length !== kit.shelf.length
+    || row.live.concat(row.flat).some((r) => !(r.px > 0) || !(r.row >= 0)));
+  const kitBakes = kit.by.length * kit.shelf.length * 2 + kit.by.length;
   await ctx.close();
 
   /* 화면 갈래. 구운 그림이 아니라 그 그림을 거는 칸을 찍는다.
@@ -223,12 +354,37 @@ try {
   check("instrument:every-card-was-drawn-and-shot",
     liveCards.length === VIEWS.length * BODIES.length && liveCards.every((c) => c.all > 0),
     liveCards.map((c) => c.at + " " + c.w + "x" + c.h + " " + c.all + "px").join(", ") || "no cards");
+  /* 셔츠와 양말이 밑단에서 색으로 안 갈리는 문제를 표식이 없앤다. 그 표식이 정말 셔츠만 집는가는 같은 장을
+     상의 색 그대로 한 번 더 구워서 답한다. 그 장에 표식 색 화소가 하나라도 있으면 아래 밑단은 셔츠가 아닌
+     것을 같이 읽고 있고, 그러면 기장과 아무 상관 없는 자리가 밑단으로 찍힌다. */
+  check("instrument:the-kit-hem-mask-catches-only-the-shirt",
+    kit.by.length === KIT_BODIES.length && kit.shelf.length > 1 && kitThin.length === 0 && kitBlind.length === 0,
+    kitThin.length || kitBlind.length
+      ? kitThin.map((row) => row.body + " short of " + kit.shelf.length + " looks")
+        .concat(kitBlind.map((row) => row.body + " " + row.bare.px + "px marked with the shirt tone left real")).join(", ")
+      : kit.by.length + " bodies by " + kit.shelf.length + " looks on the "
+        + kit.by[0].live[0].w + "x" + kit.by[0].live[0].h + " body shot, shirt "
+        + Math.min.apply(null, kit.by.map((row) => Math.min.apply(null, row.live.map((r) => r.px)))) + ".."
+        + Math.max.apply(null, kit.by.map((row) => Math.max.apply(null, row.live.map((r) => r.px))))
+        + "px marked, and " + kit.by.map((row) => row.bare.px).join("/")
+        + "px on the same bake with the shirt tone left real");
 
   /* 대조군. 같은 그림의 위쪽 띠에 40화소를 심고 다시 잰다. 그만큼 정확히 늘어야
      이 자가 그 자리를 보고 있는 것이고, 안 늘면 앞의 초록은 아무것도 못 본 초록이다. */
   check("control:a-planted-mark-in-the-top-band-is-counted",
     Boolean(marked) && marked.top - clean.top === MARK.w * MARK.h,
     marked ? (marked.top - clean.top) + " of " + (MARK.w * MARK.h) + " planted pixels over the top " + marked.topRows + " rows" : "no sample");
+  /* 심는 대조군. 열두 벌의 기장을 전부 1로 갈아 굽고, 아래 폭 술어가 그 장에서 지는지 본다. 품과 스펀지는
+     그대로 두므로 갈린 것이 기장 하나뿐이고, 그래서 이 대조군이 무너뜨리는 것도 기장 하나다.
+     폭이 바닥 아래로 안 내려가면 그 술어는 선반의 기장표를 안 읽는 것이고, 그날 난 초록은 열두 벌이 한 기장이어도
+     났을 초록이다. 실제로 선반 카드에서는 이 대조군과 파는 기장표가 같은 수를 내서 축이 안 선다. */
+  check("control:one-cut-length-for-every-kit-flattens-the-hem",
+    kit.by.length === KIT_BODIES.length && kit.by.every((row) => row.flat.every((r) => r.px > 0))
+      && kit.by.every((row) => spreadOf(row, "flat") < HEM_FLOOR),
+    "the planted cut length 1 on all " + kit.shelf.length + " looks, girth and padding left alone, reads spread "
+    + kit.by.map((row) => row.body + " " + spreadOf(row, "flat").toFixed(3)).join(", ") + " against the floor "
+    + HEM_FLOOR + ", and its whole hem band is " + kit.by.map((row) => bandAt(row, "flat").toFixed(3)).join("/")
+    + " wide against the live " + kit.by.map((row) => bandAt(row, "live").toFixed(3)).join("/"));
 
   const cut = live.concat(tallest).filter((r) => r.top > 0);
   check("fitshot:the-crown-clears-the-top-band", cut.length === 0,
@@ -259,6 +415,18 @@ try {
     + " (" + TIGHTER + " of " + ceiling.dist.toFixed(2) + "), crown " + ceilingRead.crown.toFixed(3)
     + " sole " + ceilingRead.sole.toFixed(3) + ", " + ceilingRead.top + "px in the top band and "
     + ceilingRead.foot + "px in the bottom one");
+  /* 긴 벌이 아래로 더 내려오는가. 선반이 기장으로 파는 열두 벌이 화면에서 그 순서대로 서야 한다.
+     두 절로 묻는다. 앞 절은 순서이고, 뒤 절은 그 순서가 눈에 보일 만큼 벌어졌는가다. 앞 절만 두면 열두 벌이
+     한 행씩 갈리는 그림도 초록이고, 뒤 절만 두면 양 끝 둘만 맞고 가운데가 뒤섞인 그림이 초록이다. */
+  check("fitshot:a-longer-kit-cut-hangs-lower-on-the-body",
+    kit.by.length === KIT_BODIES.length && asked > 0 && inverted.length === 0 && tooFlat.length === 0,
+    (inverted.length ? "inverted " + inverted.join(", ") + "; " : "")
+    + (tooFlat.length ? "under the floor " + HEM_FLOOR + " at "
+      + tooFlat.map((row) => row.body + " " + spreadOf(row, "live").toFixed(3)).join(", ") + "; " : "")
+    + "the hem falls with the cut on all " + asked + " pairs over " + LEN_GUARD + " of cut length apart, spread "
+    + kit.by.map((row) => row.body + " " + spreadOf(row, "live").toFixed(3)).join(", ") + " between "
+    + kitLong.tag + " len " + kitLong.len + " and " + kitShort.tag + " len " + kitShort.len
+    + ", floor " + HEM_FLOOR + " at half the narrowest of those");
   /* 화면 축 하나. 그려진 그림이 칸 안에 들어갔는가. object-fit은 선언만으로는 아무것도 안 하고,
      퍼센트 높이가 안 풀리면 그림이 제 비율로 서서 칸 밖으로 흘러넘친다. 사각형 둘이 그것을 말한다. */
   const spilled = liveCards.filter((c) => c.seat.over.left < -EDGE_SLACK || c.seat.over.top < -EDGE_SLACK
@@ -282,7 +450,19 @@ try {
 
   console.log("표본 범위: 체격 " + BODIES.length + " × 장비 " + TABS.length + "탭 = " + rows.length
     + "장, 여기에 체격마다 가장 높은 머리 등급 한 장씩 " + tallest.length + "장, 그리고 화면에 그려진 칸을 찍은 것이 "
-    + VIEWS.map((v) => v[0] + "x" + v[1]).join("과 ") + " 두 폭 × 체격 " + BODIES.length + " = " + cards.length + "장");
+    + VIEWS.map((v) => v[0] + "x" + v[1]).join("과 ") + " 두 폭 × 체격 " + BODIES.length + " = " + cards.length + "장, 그리고 기장 축이 봉투 " + kit.by.length + "벌에 유니폼 " + kit.shelf.length
+    + "벌을 걸쳐 표식 있는 장과 기장 1로 심은 장으로 두 번 굽고 표식 없는 장을 더한 " + kitBakes + "장");
+  console.log("기장별 밑단: 몸 " + KIT_BODIES.map((k) => k.height + "/" + k.weight).join(" ") + " (봉투 "
+    + BAND_H.join("..") + "cm " + BAND_W.join("..") + "kg, chain rng "
+    + (ROLL_H ? ROLL_H.join("..") : "unread") + "cm " + (ROLL_W ? ROLL_W.join("..") : "unread") + "kg)");
+  console.log("  " + "body".padEnd(8) + kitOrder.map((s) => (s.tag + "/" + s.len).padStart(9)).join("")
+    + "   band   spread");
+  for (const row of kit.by) {
+    console.log("  " + row.body.padEnd(8) + kitOrder.map((s) => hemAt(row, "live", s.tag).hem.toFixed(3).padStart(9)).join("")
+      + "   " + bandAt(row, "live").toFixed(3) + "   " + spreadOf(row, "live").toFixed(3));
+    console.log("  " + "len 1".padEnd(8) + kitOrder.map((s) => hemAt(row, "flat", s.tag).hem.toFixed(3).padStart(9)).join("")
+      + "   " + bandAt(row, "flat").toFixed(3) + "   " + spreadOf(row, "flat").toFixed(3));
+  }
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
   console.log(fails.length ? "fitshot FAIL " + fails.length : "fitshot PASS " + notes.length);
