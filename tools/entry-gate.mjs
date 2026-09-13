@@ -1,4 +1,10 @@
 import { chromium } from "playwright";
+import { createRequire } from "node:module";
+
+// Babel (MIT, https://babeljs.io/docs/babel-parser) already ships in Playwright.
+// Use its function boundaries to attribute regex literal matches, including nested callers.
+const require = createRequire(import.meta.url);
+const { babelParse, traverse } = createRequire(require.resolve("playwright/package.json"))("./lib/transform/babelBundle.js");
 
 // 진입점이 장르 표준을 따르는지 재는 자.
 // 자기 정보는 초상화로 열고, 재화를 누르면 버는 법이 열리고, 상점은 제 버튼을 갖는다.
@@ -8,7 +14,7 @@ import { chromium } from "playwright";
 // 문턱을 지어내지 않는다. 축은 전부 참거짓이다. 무엇이 무엇을 여는가와,
 // 누름을 받는 것이 button 요소인가만 묻는다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
+const BASE = process.env.ENTRY_BASE || "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const LINE = String.fromCharCode(10);
 /* 켜진 프레임과 그림을 끈 프레임의 휘도차를 센다. ui-gate가 아이콘 축에 쓰는 것과 같은 자다.
    화소차 6 미만은 안티에일리어싱 잔파동과 구분되지 않으므로 안 센다. */
@@ -48,6 +54,34 @@ try {
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
   await p.goto(BASE, { waitUntil: "load" });
+  // Read the same source URL as the page, so a served collision control reaches both axes.
+  const sourceResponse = await p.request.get(new URL("src/main.mjs", BASE).href);
+  if (!sourceResponse.ok()) throw new Error("Announcement source HTTP " + sourceResponse.status());
+  const source = await sourceResponse.text();
+  const literals = new Map([...source.matchAll(/\bhudSay\s*\(\s*(['"])([^'"\r\n]*)\1\s*,/g)]
+    .map((m) => [m.index, m[2]]));
+  const subjects = new Map(), invalid = [];
+  let calls = 0;
+  traverse(babelParse(source, "main.mjs", true), {
+    CallExpression(path) {
+      if (path.node.callee.type !== "Identifier" || path.node.callee.name !== "hudSay") return;
+      calls += 1;
+      const subject = literals.get(path.node.start);
+      const fn = path.getFunctionParent();
+      const name = fn?.node.id?.name || fn?.parentPath.node.id?.name || ("anonymous@" + fn?.node.loc.start.line);
+      if (!fn || subject === undefined || !/^[a-z]+$/.test(subject)) {
+        invalid.push(name + ":" + JSON.stringify(subject ?? "nonliteral"));
+        return;
+      }
+      if (!subjects.has(subject)) subjects.set(subject, new Map());
+      subjects.get(subject).set(fn.node.start, name);
+    },
+  });
+  const subjectMap = [...subjects].map(([key, owners]) => key + " -> " + [...owners.values()].join(", ")).join(" | ");
+  check("instrument:announcement-subjects-are-lowercase-literals", calls > 0 && invalid.length === 0,
+    calls + " calls, " + (invalid.join(" | ") || subjectMap));
+  check("instrument:announcement-subjects-have-one-caller", subjects.size > 0 && [...subjects.values()].every((owners) => owners.size === 1),
+    subjectMap || "no subjects");
   await p.waitForSelector("#go", { timeout: 15000 });
   await p.click("#go", { force: true });
   await p.waitForTimeout(1200);
