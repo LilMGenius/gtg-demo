@@ -1336,6 +1336,10 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #pull .tap{position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:flex-end;
   padding:var(--gap-2) calc(var(--pad-r) + 116px) 0 0;background:none;border:0;cursor:pointer;
   font:inherit;font-size:var(--fs-body);font-weight:700;color:var(--dim)}
+/* 뒤 마디. 색은 앞 동사와 같이 두고 굵기와 짙기만 내린다. 색을 또 내리면 까만 봉인 카드 위에서
+   글자가 바탕에 먹혀, 이름을 적어 놓고도 안 읽히는 자리가 된다. 앞 동사와의 사이는 margin이 낸다.
+   글자 사이의 빈칸은 두 flex 칸의 경계에서 접혀 사라지므로 거기에 못 맡긴다. */
+#pull .tap i{font-style:normal;font-weight:400;opacity:.72;margin-left:6px}
 #pull .tap:focus-visible{outline:2px solid var(--dim);outline-offset:-6px}
 /* 세로가 짧은 가로 모바일. 카드와 이미 나온 줄이 한 화면에 다 서야 한다.
    측정: 740x360에서 줄이기 전 능력치 다섯 줄이 카드의 3분의 2를 먹어 얼굴이 손가락 두 마디로

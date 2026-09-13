@@ -978,6 +978,8 @@ try {
     check("control:a-transparent-plate-reddens-the-name-axis", false, "unmeasured: no single-card round opened");
     check("ux:the-advance-label-stands-in-the-same-corner-at-both-viewports", false, "unmeasured: no single-card round opened");
     check("control:a-bottom-anchor-at-740-reddens-the-corner-axis", false, "unmeasured: no single-card round opened");
+    check("ux:the-tap-label-names-the-hold-too", false, "unmeasured: no single-card round opened");
+    check("control:a-label-without-the-hold-clause-reddens-the-hold-axis", false, "unmeasured: no single-card round opened");
   } else {
     /* 넘기는 한 마디가 두 폭에서 같은 귀에 서는가. 버튼은 판 전체를 덮는 투명 상자라 상자를 재면
        늘 화면 전체가 나오므로, 글자가 실제로 그려진 자리는 텍스트 노드를 Range로 감싸 얻는다.
@@ -990,11 +992,12 @@ try {
     const labelGeo = () => p.evaluate((ids) => {
       const box = document.getElementById("pull");
       const tap = box ? box.querySelector(".tap") : null;
-      if (!box || box.hidden || !tap) return null;
-      const node = [...tap.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
-      if (!node) return null;
+      if (!box || box.hidden || !tap || !tap.textContent.trim()) return null;
+      /* 글자가 그려진 자리. 앞 동사의 텍스트 노드만 감싸면 뒤 마디가 붙은 뒤로 오른쪽 끝이 그 마디 폭만큼
+         왼쪽으로 밀리고, 두 폭의 글꼴 크기가 다른 것(1280에서 17.92px, 740에서 15px)이 귀가 갈린 것으로
+         읽힌다. 버튼의 내용을 통째로 감싸야 재는 것이 한 마디가 아니라 사람이 보는 한 줄이다. */
       const rg = document.createRange();
-      rg.selectNodeContents(node);
+      rg.selectNodeContents(tap);
       const r = rg.getBoundingClientRect();
       if (!(r.width > 0) || !(r.height > 0)) return null;
       const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
@@ -1005,10 +1008,13 @@ try {
         return !(r.right <= q.x || r.x >= q.right || r.bottom <= q.y || r.y >= q.bottom);
       });
       const cls = hit && typeof hit.className === "string" && hit.className.trim();
-      return { vw: innerWidth, vh: innerHeight, text: node.textContent.trim(),
+      const pad = getComputedStyle(tap);
+      return { vw: innerWidth, vh: innerHeight, text: tap.textContent.trim(),
+        padR: Math.round(parseFloat(pad.paddingRight)), fs: parseFloat(pad.fontSize),
+        rev: window.__reveal(),
         x: Math.round(r.x), y: Math.round(r.y),
         w: Math.round(r.width), h: Math.round(r.height),
-        right: Math.round(innerWidth - r.right), top: Math.round(r.y), onTap: hit === tap,
+        right: Math.round(innerWidth - r.right), top: Math.round(r.y), onTap: hit === tap || tap.contains(hit),
         hit: hit ? hit.tagName.toLowerCase() + (hit.id ? "#" + hit.id : "")
           + (cls ? "." + cls.split(" ")[0] : "") : "none",
         clash: clash };
@@ -1076,6 +1082,74 @@ try {
       "a transparent plate left " + (bare ? bare.ink.off + " of " + bare.ink.n + " samples off "
         + bare.bg + ", worst channel " + bare.ink.worst : "nothing measured") + "; removing it read "
       + (back ? back.ink.off + " of " + back.ink.n + " off " + back.bg : "nothing measured"));
+
+    /* 넘기는 한 마디가 제가 하는 일을 이름으로 들고 있는가. 짧은 누름은 한 단이고 붙들면 남은 것이 전부
+       열리는데, 화면에 적힌 이름은 앞의 한 단뿐이었다. 봉인 단이 까만 판이라 손은 먼저 두드리고,
+       두드림으로는 다섯 단을 한 장씩 걸어야 해서 급한 사람이 붙드는 길을 영영 못 배운다.
+       한 장짜리 회차는 1.6초에 사다리가 끝나 두 폭을 재는 사이에 상태가 갈리므로 열한 장으로 연다.
+       그 회차는 17.6초를 서 있어 폭을 두 번 바꾸고 대조군을 심고 되돌리고도 남는다. */
+    const HOLD_WORDS = ["길게", "전부"];
+    const namesHold = (x) => Boolean(x) && x.text.startsWith("다음")
+      && HOLD_WORDS.every((w) => x.text.includes(w));
+    /* 글자가 띠 안에 서는가. 오른쪽 끝은 버튼 자신의 padding이 정하므로 그 수를 제품에서 읽어 마주 댄다.
+       116을 이 파일에 적으면 hud.css가 움직인 날 이 자가 초록인 채로 낡는다. 줄이 접히면 높이가 두 줄이
+       되므로 한 줄인 것도 같이 묻는다. 실측 높이는 1280에서 21px, 740에서 18px이다. */
+    const fitsBand = (x) => Boolean(x) && Math.abs(x.right - x.padR) <= 1 && x.x > 0
+      && x.clash.length === 0 && x.h < x.fs * 1.6;
+    const holdSay = (x) => (!x ? "unmeasured"
+      : x.vw + "x" + x.vh + " " + x.text + " " + x.w + "x" + x.h + " at " + x.x + "," + x.y + ", "
+      + x.right + "px from the right edge against a " + x.padR + "px band, "
+      + (x.clash.length ? "over " + x.clash.join("+") : "clear of the right column") + ", "
+      + x.rev.shown + " of " + x.rev.drawn + " open at stage " + x.rev.stage);
+    let wideHold = null, tightHold = null, stripped = null, putBack = null, closing = null;
+    try {
+      await tapClose(p);
+      await p.waitForFunction(() => document.getElementById("pull").hidden, null, { timeout: 8000, polling: 30 });
+      await p.evaluate(() => { const w = window.__wallet(); w.coin = Math.max(w.coin, 20000); });
+      await p.evaluate(() => window.__shop(true));
+      await p.waitForSelector("#shop .buy.pull", { timeout: 8000 });
+      await p.click('#shop .kind[data-kind="town"]', { force: true });
+      await p.waitForTimeout(200);
+      await p.locator("#shop .buy.pull").nth(1).click({ timeout: 6000 });
+      await p.waitForFunction(() => {
+        const e = document.getElementById("pull");
+        return Boolean(e && !e.hidden && e.querySelector(".now") && window.__reveal().drawn > 1);
+      }, null, { timeout: 12000, polling: 30 });
+      /* settleAt은 마지막 단을 기다리는 자라 여기서 못 쓴다. 열한 장 회차는 단이 계속 돌아가므로
+         그 기다림이 8초를 서 있다가 빈손으로 나온다. 폭만 바꾸고 전환이 끝날 만큼만 기다린다. */
+      const holdAt = async (w, h) => {
+        await p.setViewportSize({ width: w, height: h });
+        await p.waitForTimeout(300);
+        return labelGeo();
+      };
+      wideHold = await holdAt(1280, 720);
+      tightHold = await holdAt(740, 360);
+      /* 대조군. 뒤 마디만 걷어내면 위 축이 빨개져야 하고, 도로 붙이면 초록으로 돌아와야 한다.
+         한쪽만 보면 늘 초록인 자와 실제로 글자를 읽는 자를 못 가른다. */
+      const keptHTML = await p.evaluate(() => {
+        const tap = document.querySelector("#pull .tap");
+        const html = tap.innerHTML;
+        tap.innerHTML = "다음";
+        return html;
+      });
+      await p.waitForTimeout(120);
+      stripped = await labelGeo();
+      await p.evaluate((html) => { document.querySelector("#pull .tap").innerHTML = html; }, keptHTML);
+      await p.waitForTimeout(120);
+      putBack = await labelGeo();
+      // 붙들어 전부 연다. 그 자리에서 판을 다시 그리므로 버튼은 닫기 하나만 들고 있어야 한다.
+      await pressOpen(p);
+      await p.waitForTimeout(200);
+      closing = await labelGeo();
+    } catch (e) { closing = null; }
+    check("ux:the-tap-label-names-the-hold-too",
+      namesHold(wideHold) && namesHold(tightHold) && fitsBand(wideHold) && fitsBand(tightHold)
+        && Boolean(closing) && closing.text === "닫기",
+      holdSay(wideHold) + " | " + holdSay(tightHold) + "; after the hold "
+        + (closing ? closing.text + " at stage " + closing.rev.stage : "unmeasured"));
+    check("control:a-label-without-the-hold-clause-reddens-the-hold-axis",
+      namesHold(stripped) === false && namesHold(putBack) === true,
+      "planted " + holdSay(stripped) + "; removed " + holdSay(putBack));
   }
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
