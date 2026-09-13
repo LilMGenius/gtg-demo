@@ -253,8 +253,18 @@ try {
     ].filter((s) => s.rows.every((r, i) => (g.SKINS[s.field] ? g.skinAt(s.field, i, 0).cut : r.cut)));
     const out = [];
     for (const s of TABLE) {
-      const bake = (n, k, over) => { const look = g.lookOf({ [s.field]: n }); look[s.look] = MARK; return m.thumbURL(s.tab, k, look, over); };
+      /* 겉모습은 등급과 변형의 짝이다. 변형 번호를 안 실으면 lookOf가 그 등급의 0번을 집어,
+         이 자는 선반이 파는 열둘 가운데 넷만 굽고 있었다. 형태를 들고 있는 것이 변형 줄의 cut이라
+         안 구운 여덟 장은 어느 형태 축도 본 적이 없다. 실측: 유니폼 3등급 2번 변형(pad 1.9, len 1.10)이
+         다섯 벌 가운데 넷에서 스펀지 윗변을 깃 아래로 떨궜는데, 그 장이 구워진 적이 없어 아무 축도 안 울었다.
+         변형 번호 0을 실은 장은 안 실은 장과 같은 바이트라, 아래 자리 절이 재던 장은 그대로 남는다. */
+      const bake = (n, k, over, v) => { const look = g.lookOf({ [s.field]: n, [s.field + "Skin"]: v || 0 }); look[s.look] = MARK; return m.thumbURL(s.tab, k, look, over); };
       const ranks = s.rows.map((r, i) => i);
+      const looks = [];
+      for (const n of ranks) {
+        const many = g.SKINS[s.field] ? g.skinsAt(s.field, n).length : 1;
+        for (let v = 0; v < many; v += 1) looks.push({ rank: n, skin: v, tag: n + ":" + v });
+      }
       // 무게중심과 칠해진 자리의 상자. 물건이 칸 구석에 걸쳐 있으면 화소 수는 넉넉해도 사람은 잘린 물건을 본다.
       const midOf = (x) => {
         let sx = 0, sy = 0, n = 0, x0 = x.w, x1 = -1, y0 = x.h, y1 = -1;
@@ -274,31 +284,46 @@ try {
           : { n: 0, x: -1, y: -1, x0: -1, x1: 2, y0: -1, y1: 2 };
       };
       /* 세 축이 다 봉투를 돈다. 굽는 장이 다섯 배가 되면 이 자가 제 시한 안에서 죽는다고 앞선
-         회차가 적었지만 재지는 않았다. 실측으로 혼자 돌 때 19.51초에서 20.36초이고, 시한은 180초다.
+         회차가 적었지만 재지는 않았다. 실측으로 혼자 돌 때 19.51초에서 20.36초였다. 겉모습을 다 걷어
+         선반마다 굽는 장이 넷에서 열둘로 늘어난 회차는 굽는 블록이 4.23초, 자 전체가 23.67초이고,
+         시한은 그대로 180초다.
          등급끼리 형태가 다른가와 무엇이든 칠했는가도 체격마다 답이 갈린다. 실측으로 머리 칸의
-         가장 마른 등급이 188/84에서 1365인데 165/65에서 1096이고, 유니폼 칸의 최악 쌍이 188/84에서
-         0.664인데 165/96에서 0.765다. 게이트 몸 한 벌은 어느 축에서도 최악의 귀퉁이가 아니다. */
+         가장 마른 겉모습이 188/84에서 239인데 165/65에서 219이고, 축구화 칸의 최악 쌍이 188/84에서
+         0.781인데 200/65에서 0.795다. 최악의 귀퉁이는 선반마다 축마다 다른 벌에 서고, 한 벌이 그것을
+         다 들고 있지 않다. */
       const per = [];
       let ms = null;
       for (const k of bodies) {
         const one = [];
-        for (const n of ranks) one.push(await mask(bake(n, k)));
+        for (const L of looks) one.push(await mask(bake(L.rank, k, undefined, L.skin)));
         if (!ms) ms = one;
+        /* 쌍은 등급이 다른 겉모습끼리만 센다. 한 등급 안의 변형은 서로 닮는 것이 정상이고,
+           그 둘이 다른 그림인가는 variant-gate가 이미 묻는다. 여기서 같이 세면 정상인 닮음이
+           이 자를 영원히 빨갛게 만든다. */
         const pairs = [];
-        for (let i = 0; i < one.length; i++) for (let j = i + 1; j < one.length; j++) pairs.push({ n: ranks[i] + "-" + ranks[j], v: iou(one[i], one[j]) });
-        per.push({ body: k.height + "/" + k.weight, mid: one.map(midOf), pairs,
+        for (let i = 0; i < one.length; i++) for (let j = i + 1; j < one.length; j++) {
+          if (looks[i].rank === looks[j].rank) continue;
+          pairs.push({ n: looks[i].tag + "-" + looks[j].tag, v: iou(one[i], one[j]) });
+        }
+        /* 자리 절은 등급마다 0번 변형 하나를 그대로 읽는다. 그 절이 재는 것은 겨냥이라 변형을
+           얹어도 답이 안 갈리고, 얹으면 축이 든 등급 번호가 무엇을 가리키는지만 흐려진다. */
+        per.push({ body: k.height + "/" + k.weight,
+          mid: one.filter((x, i) => looks[i].skin === 0).map(midOf), pairs,
           cover: one.map((x) => x.reduce((a, b) => a + b, 0)) });
       }
       /* 심는 대조군은 겨냥을 내려 깃을 칸 위로 밀어낸 장이다. 유니폼 칸에서 게이트 몸 한 벌만 굽는다.
          깃이 칸을 벗어난다는 것은 한 벌에서 이미 판가름 나고, 다섯 벌로 늘리면 굽는 장만 다섯 배가 된다.
          아래 머리 자가 옛 고정 보정을 되심는 것과 같은 자리다. */
       const plant = s.tab === wide ? midOf(await mask(bake(ranks[0], bodies[0], drop))) : null;
-      const twice = await mask(bake(ranks[ranks.length - 1], bodies[0]));
-      out.push({ tab: s.tab, per, plant, control: iou(ms[ms.length - 1], twice) });
+      const lastLook = looks[looks.length - 1];
+      const twice = await mask(bake(lastLook.rank, bodies[0], undefined, lastLook.skin));
+      out.push({ tab: s.tab, looks: looks.map((L) => L.tag), per, plant, control: iou(ms[ms.length - 1], twice) });
     }
     return out;
   }, [BODIES, WIDE_SHELF, PADS_DROP]);
-  check("instrument:some-shelf-declares-a-shape", shapes.length > 0, shapes.map((s) => s.tab).join(", "));
+  // 선반마다 구운 겉모습 수. 변형을 들인 선반이 등급 수만큼만 구워지면 그 수가 여기서 먼저 보인다.
+  check("instrument:some-shelf-declares-a-shape", shapes.length > 0,
+    shapes.map((s) => s.tab + " " + s.looks.length + " looks").join(", "));
   /* 여섯 선반이 다 봉투를 돈다. 표본이 접혔는지는 걷어 온 표본에서 되읽는다. 폭이 접힌 선반은
      굽기만 하고 판정에서 빠질 수 있고, 그때 메시지의 몸 목록에만 흔적이 남아서 그 줄을 세지
      않으면 다섯 벌을 잰 초록과 구별이 안 된다. 이름도 같이 묻는다. 이 파일의 겨냥표는 선반
@@ -349,9 +374,10 @@ try {
     + q.x0.toFixed(3) + ".." + q.x1.toFixed(3) + " hem " + q.y1.toFixed(3);
   for (const s of shapes) {
     /* 0.75. 두 등급이 칠해진 자리의 4분의 3을 공유하면 사람은 같은 물건에 색만 바꾼 것으로 읽는다.
-       판정은 다섯 벌의 모든 쌍이다. 실측으로 표본을 봉투로 넓히자 유니폼 1-3 쌍이 165/96에서
-       0.765로 상한을 넘었고, 같은 쌍이 게이트 몸에서는 0.664다. 한 벌만 읽던 자리가 그 수를 못 봤다.
-       나머지 선반의 최악 쌍은 장갑 0.736, 양말 0.735, 축구화 0.696, 문신 0.484, 머리 0.479다. */
+       판정은 다섯 벌에서 등급이 다른 모든 겉모습 쌍이다. 실측으로 표본을 변형까지 넓히자 다섯 선반이
+       상한을 넘었다. 머리 0:2-2:1이 188/84에서 0.829, 장갑 1:1-2:2가 188/84에서 0.801, 양말 1:1-2:2가
+       200/96에서 0.799, 축구화 2:1-3:2가 200/65에서 0.795, 문신 0:0-1:2가 200/65에서 0.765다.
+       유니폼만 1:2-3:0의 0.749로 남았다. 등급 줄의 0번 변형만 읽던 자리는 이 수를 하나도 못 봤다. */
     const twins = [];
     let twinWorst = null;
     for (const row of s.per) for (const x of row.pairs) {
@@ -363,15 +389,16 @@ try {
       s.per.length + " of " + BODIES.length + " bodies, "
       + (twins.length ? "sharing at " + twins.join(", ") + "; " : "")
       + "worst pair " + twinWorst.v.toFixed(3) + " at " + twinWorst.at);
-    /* 1000화소. 굽는 칸의 1퍼센트쯤이다. 이 아래로 내려간 등급은 껍데기가 몸 안으로 들어가
+    /* 1000화소. 굽는 칸의 1퍼센트쯤이다. 이 아래로 내려간 겉모습은 껍데기가 몸 안으로 들어가
        그 값을 치른 사람만 맨몸이 된다. 실제로 높이를 줄여 짧은 머리를 만들다 이 값이 227까지 내려갔다.
-       판정은 다섯 벌 전부다. 실측으로 가장 마른 장이 머리 1등급 165/65의 1096이고 게이트 몸의
-       같은 등급은 1365라, 이 축이 지키는 자리도 게이트 몸이 아니다. */
+       판정은 다섯 벌의 모든 겉모습이다. 실측으로 가장 마른 장이 머리 1:2로 165/65에서 219이고
+       같은 선반의 1:1이 880이다. 0번 변형만 읽던 자리가 보던 가장 마른 장은 1096이라, 바닥 아래의
+       장 둘이 그 뒤에 서 있었다. */
     const starved = [];
     let leanest = null;
     for (const row of s.per) row.cover.forEach((n, i) => {
-      if (n < 1000) starved.push(row.body + " rank " + i + " " + n);
-      if (!leanest || n < leanest.n) leanest = { n, at: row.body + " rank " + i };
+      if (n < 1000) starved.push(row.body + " " + s.looks[i] + " " + n);
+      if (!leanest || n < leanest.n) leanest = { n, at: row.body + " " + s.looks[i] };
     });
     check("thumb:" + s.tab + ":every-rank-paints-something",
       s.per.length === BODIES.length && starved.length === 0,
