@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { readCloseFloor, closeFloorSaid } from "./close-floor.mjs";
 import { KICKERS, ROLES } from "../src/roster.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 
@@ -1052,15 +1053,18 @@ try {
     e.remove();
     return Math.round(h * 100) / 100;
   });
-  const shutSeen = () => p.evaluate(() => {
+  const shutSeen = async () => {
+    const closeFloor = await readCloseFloor(p, "#me > .close");
+    return p.evaluate((closeFloor) => {
     const r2 = (n) => Math.round(n * 100) / 100;
     const e = document.querySelector("#me > .close");
     if (!e) return null;
     const r = e.getBoundingClientRect();
     const mid = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
-    return { bottom: r2(r.bottom), spare: r2(innerHeight - r.bottom),
+    return { closeFloor, bottom: r2(r.bottom), spare: r2(innerHeight - r.bottom),
       hit: mid ? mid.tagName + "." + String(mid.className) : "none" };
-  });
+    }, closeFloor);
+  };
   const thin = await panelCue();
   const thinShut = await shutSeen();
   await panelScrollTo(-1);
@@ -1070,11 +1074,11 @@ try {
   const band = (c) => Boolean(c) && c.over > 0 && c.over <= paneLip;
   const fits = (c) => band(c) && Boolean(c.down) && c.down.op === 1
     && Math.abs(c.down.h - Math.round(c.over)) <= 1;
-  // 바닥은 닫기 자신의 밑변이 화면 안에 있는가와 그 자리를 짚는 검사다. gym의 8px은 gym 자기 바닥이고, 이 창의 실측 여유가 7.07px이라 두 수를 하나로 안 합친다.
-  const reachable = (s) => Boolean(s) && s.spare >= 0 && s.hit === "BUTTON.close";
+  // Both panes read the button's own rest shadow and pressed geometry.
+  const reachable = (s) => Boolean(s) && s.closeFloor.spare >= s.closeFloor.floor && s.closeFloor.pressedInside && s.hit === "BUTTON.close";
   const saidFit = (c) => (c ? "hides " + c.over + "px of a " + paneLip + "px shade, cue "
     + (c.down ? c.down.op + " " + c.down.h + "px against " + Math.round(c.over) + "px" : "none") : "no panel");
-  const saidShut = (s) => (s ? "close bottom " + s.bottom + ", spare " + s.spare + "px, hit " + s.hit : "no close");
+  const saidShut = (s) => (s ? "close bottom " + s.bottom + ", spare " + s.spare + "px, " + closeFloorSaid(s.closeFloor) + ", hit " + s.hit : "no close");
   check("mepane:a-shallow-roll-still-lights-a-fitted-cue",
     fits(thin) && !reachable(thinShut) && reachable(thinEndShut),
     saidFit(thin) + ", at rest " + saidShut(thinShut)
