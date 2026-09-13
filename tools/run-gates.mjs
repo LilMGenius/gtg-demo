@@ -41,10 +41,14 @@ const capOf = (src) => {
 
 const mode = process.argv[2] || "fast";
 const all = readdirSync("tools").filter((f) => f.endsWith("-gate.mjs")).sort();
+/* 사람이 보는 표면을 재는 ux: 축은 전부 브라우저 게이트 안에 있어 빠른 줄에는 못 서고, 느린 쓸기가
+   알파벳순이라 wiki와 zone의 ux: 판정은 커밋 뒤 한 시간에야 떴다(실측 94개 65분, zone이 마지막).
+   ux: 축을 든 게이트를 앞에 세우면 여섯이 5분 안에 판정을 내고 나머지 순서는 그대로다. */
+const isUx = (src) => src.includes("ux:");
 const picked = all.filter((f) => {
   const slow = isSlow(readFileSync("tools/" + f, "utf8"));
   return mode === "all" || (mode === "slow" ? slow : !slow);
-});
+}).sort((a, b) => Number(isUx(readFileSync("tools/" + b, "utf8"))) - Number(isUx(readFileSync("tools/" + a, "utf8"))));
 
 // 느린 쓸기는 십 분이 넘어 커밋마다 겹칠 수 있다. 락은 이 파일이 소유한다.
 // 훅이 락을 만들고 지우면 두 곳이 같은 상태를 들고 있다가 갈라진다.
