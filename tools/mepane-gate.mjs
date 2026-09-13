@@ -382,8 +382,10 @@ try {
   const foldWide = await foldRest();
   /* 음성 대조군. 최근 머리와 그 격자를 칸의 맨 앞으로 되돌려 놓는다. 그러면 결함이 섰던 배치가
      그대로 다시 서고, 위 판정식은 빨개져야 한다. 되돌리기는 제품이 제 손으로 다시 그리게 맡긴다.
-     손으로 옮긴 것을 손으로 되돌리면 되돌렸다는 주장을 이 자가 잰 적이 없다. */
-  const foldPlant = await p.evaluate(() => {
+     손으로 옮긴 것을 손으로 되돌리면 되돌렸다는 주장을 이 자가 잰 적이 없다.
+     한 벌로 묶는 이유는 두 화면에서 같은 것을 물어야 하기 때문이다. 화면마다 손으로 되풀이하면
+     한쪽만 고친 날 두 화면의 대조군이 갈리고, 그때 어느 쪽이 규칙이었는지가 사라진다. */
+  const foldPlantOnce = () => p.evaluate(() => {
     const pane = document.querySelector("#me .pane");
     if (!pane) return false;
     const bTxt = (n) => { const b = n.querySelector("b"); return b ? b.textContent.trim() : ""; };
@@ -394,11 +396,16 @@ try {
     pane.insertBefore(kids[at], pane.firstChild);
     return true;
   });
-  await p.waitForTimeout(150);
-  const foldBack = await foldRead();
-  await p.click('#me .tab[data-tab="stat"]', { force: true });
-  await p.waitForTimeout(220);
-  const foldAgain = await foldRest();
+  const foldControl = async () => {
+    const planted = await foldPlantOnce();
+    await p.waitForTimeout(150);
+    const back = await foldRead();
+    await p.click('#me .tab[data-tab="stat"]', { force: true });
+    await p.waitForTimeout(220);
+    const again = await foldRest();
+    return { planted: planted, back: back, again: again };
+  };
+  const foldCtlWide = await foldControl();
   /* 최근 목록은 이제 접힘 아래다. 거기 있는 것과 닿는 것은 다르므로 열 판을 하나씩 불러 그때
      구르는 상자 안에 들어오는지 본다. 한 자리에서 셋이 같이 보이는지는 줄 높이가 늘면 깨지는
      우연이고, 끝까지 굴린 한 장면만 보면 상자보다 긴 격자가 반쯤 걸린 채 빨개진다. */
@@ -430,21 +437,29 @@ try {
       end: { top: Math.round(gr.top), bottom: Math.round(gr.bottom), high: end.high, low: end.low } };
   });
   /* 같은 물음을 좁은 화면에도 던진다. 거기서 구르는 것은 칸이 아니라 창이라 접힘이 다른 자리에 서고,
-     실측으로 첫 줄이 51px 남는다. 그 수는 적고 판정은 넓은 화면에만 건다. 좁은 화면까지 담으려면
-     열 판을 줄이거나 글자를 줄여야 하고, 둘 다 이 창의 규칙이 이미 정한 것이다. */
+     실측으로 첫 줄이 접힘 아래 51.3px에 섰다. 판정을 넓은 화면에만 걸어 둔 동안 그 51px은 아무도
+     안 읽었고, 손에 든 화면에서는 이 칸의 답이 여전히 한 번 굴려야 나왔다. hud.css의 세로 짧은
+     블록이 표 위 여백 여섯을 좁혀 첫 줄을 접힘 안 10px으로 올렸으므로, 이제 두 화면에 같이 건다.
+     대조군도 두 화면에서 돈다. 한 화면에서만 심으면 좁은 화면의 초록이 배치 때문인지 그 화면이
+     원래 헐거워서인지가 안 갈린다. */
   await p.setViewportSize({ width: 740, height: 360 });
   await p.waitForTimeout(450);
   const foldNarrow = await foldRest();
+  const foldCtlNarrow = await foldControl();
   await p.setViewportSize({ width: 1280, height: 720 });
   await p.waitForTimeout(450);
   await foldRest();
-  check("mepane:the-head-to-head-table-stands-inside-the-resting-fold", foldIn(foldWide),
-    "1280x720 " + foldSaid(foldWide) + " | 740x360 " + foldSaid(foldNarrow) + ", where the first row stands "
-    + (foldIn(foldNarrow) ? "inside" : "outside") + " the fold and carries no assertion");
+  check("mepane:the-head-to-head-table-stands-inside-the-resting-fold",
+    foldIn(foldWide) && foldIn(foldNarrow),
+    "1280x720 " + foldSaid(foldWide) + " | 740x360 " + foldSaid(foldNarrow));
+  /* 대조군 판정도 두 화면을 한 축으로 접는다. 화면마다 축을 세우면 같은 규칙이 둘이 되고,
+     한쪽만 빨개진 날 어느 쪽이 규칙이었는지가 사라진다. 적는 것은 화면마다의 실측이다. */
+  const ctlRed = (c) => Boolean(c) && c.planted && !foldIn(c.back) && foldIn(c.again);
+  const ctlSaid = (at, c) => at + " " + (c && c.planted ? "planted " + foldSaid(c.back)
+    : "the recent block never moved") + " | the product redrew to " + foldSaid(c ? c.again : null);
   check("control:the-old-block-order-reddens-the-resting-fold-axis",
-    foldPlant && !foldIn(foldBack) && foldIn(foldAgain),
-    (foldPlant ? "planted " + foldSaid(foldBack) : "the recent block never moved")
-    + " | the product redrew to " + foldSaid(foldAgain));
+    ctlRed(foldCtlWide) && ctlRed(foldCtlNarrow),
+    ctlSaid("1280x720", foldCtlWide) + " || " + ctlSaid("740x360", foldCtlNarrow));
   check("mepane:the-recent-rounds-stay-reachable-after-the-roll",
     Boolean(foldReach) && foldReach.spans === 10 && foldReach.reached === foldReach.spans,
     foldReach

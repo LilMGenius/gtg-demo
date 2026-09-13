@@ -808,12 +808,31 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
      창은 inset:0이라 첫 단이 화면 맨 위, 곧 띠와 같은 자리에서 시작해서 실측 740x360에서 초상과 이름이
      띠 아래끝 66.2px보다 61.8px 위에 서고 스폰 칩을 통째로 덮었다. 여기서 첫 단은 실측 71.4px에 서고,
      길어진 만큼은 창이 제 스크롤로 받는다(숨은 높이 436px에서 503px). */
-  #me{padding-top:calc(8px + 55px + var(--lift) + var(--gap-2) + env(safe-area-inset-top))}
-  #me .card{max-height:none}
-  #me .pane{max-height:none}
+  #me{padding-top:calc(8px + 55px + var(--lift) + var(--gap-2) + env(safe-area-inset-top));gap:var(--gap-2)}
+  #me .card{max-height:none;gap:var(--gap-1)}
+  #me .pane{max-height:none;gap:var(--gap-1);padding-top:0}
   /* 걸친 것은 맨 아래로 간다. 창을 연 이유는 탭 안의 답이고 걸친 것은 그 답이 아닌데,
      실측 740x360에서 첫 화면 360px 중 146px을 그 띠가 먹어 탭 내용이 한 줄도 안 보였다. */
   #me .wear{order:1}
+  /* 상대 전적 표의 첫 줄. 표를 칸의 맨 앞에 세운 뒤에도 실측 740x360에서 머리만 접힘 안 25px이고
+     열 이름은 27px 중 16px만 보이고 첫 줄은 접힘 아래 51.3px에 섰다. 이 칸을 여는 이유가 누구한테
+     약한지라, 그 답의 첫 줄이 쉬는 자리에 없으면 창을 연 일이 굴리는 일이 된다.
+     세로 360px에서 쓸 수 있는 것은 표 위의 여백들이다. 하나씩 빼고 잰 몫은 칸 머리를 한 줄로
+     접은 것이 23.3px, 칸 사이 9px에서 4px이 10px, 머리 여백 9/11에서 4/6이 10px, 표 위 9px에서
+     4px과 위 여백 2px에서 0이 7px, 큰 수 띠 여백 5/7에서 2/3이 7px, 단 사이 12px에서 8px이 4px다.
+     합이 61.3px이고 여섯이 다 실린다. 마지막 것을 빼면 남는 자리가 정확히 6px이라, 글자가 한 번
+     움직이면 그대로 접힘 아래다.
+     가장 큰 몫은 칸 머리다. 이름과 단위 설명이 두 줄로 섰는데 단위는 표의 열 이름이 이미 말하므로,
+     좁은 화면에서는 설명을 이름 옆에 붙인다.
+     첫 자식만 고른다. 능력치 칸의 특성 카드도 같은 b와 i를 쓰는데 그 i는 설명 문장이라 한 줄로
+     붙이면 좁은 폭에서 되접혀 오히려 길어진다. 칸 머리는 언제나 그 칸의 첫 자식이다.
+     빈 칸의 dim 띠는 뺀다. 그 띠의 26px과 한 줄 높이는 이 창의 자가 두 화면에서 지키는 수다.
+     탭의 44px 바닥과 재화 띠 아래 첫 단의 자리는 안 건드린다. 실측 여유 5.2px이 그대로 남는다.
+     실측 740x360에서 첫 줄 아래끝이 411.3px에서 350px로 올라와 접힘 360px 위에 10px 남는다.
+     넓은 화면은 이 블록 밖이라 그대로다(실측 1280x720에서 첫 줄이 접힘 안 84.9px). */
+  #me .big span{padding:2px 8px 3px}
+  #me .pane > .note:first-child:not(.dim){padding:4px 12px 6px}
+  #me .pane > .note:first-child:not(.dim) i{display:inline;margin-top:0;margin-left:var(--gap-2)}
 }
 /* 다섯 칸씩 세 줄. 네 칸이면 네 줄이라, 둘째 단이 선 뒤 마지막 줄이 접힘 아래로 내려간다.
    이름과 수를 위아래로 세우면 좁은 칸에서 이름이 안 접힌다. 실측으로 한 칸이 63px, 세 줄이 197px다. */
