@@ -592,6 +592,110 @@ try {
     "the planted aim part torso lift 0.3 reads " + (wasBase ? sayHead(wasBase) : "no base kit")
     + " and loses the head on " + wasLost.length + " of " + heads.was.length + " looks ("
     + wasLost.map((r) => r.tag).join(" ") + ")");
+  /* 빨판은 손바닥 바깥면에 붙어 있다고 파는 물건인데, 그 둘이 떠 있는지는 여태 아무 자도 안 읽었다.
+     f02c218이 빨판 z를 0.3s에서 0.42s로 옮겨 판과 판 사이가 0.06s 벌어졌고, 그 틈은 외곽선이 가려서
+     그림으로는 앉은 것으로 읽힌다. 외곽선을 얇게 하거나 z를 더 올리면 그 틈이 조용히 열린다.
+     빨판 메시는 없다. 손바닥과 엄지와 손목밴드와 빨판 다섯이 mergeGeos로 한 장이 되므로 자리는
+     병합 순서가 준다. 상자 하나가 정점 스물넷이고 앞의 셋이 손바닥과 엄지와 손목밴드라, 빨판은
+     그 뒤로 스물넷씩 놓인다. 정점 수가 (3 더하기 빨판 수) 곱하기 스물넷이 아니면 그 순서가 흐른
+     것이고, 그때 이 자가 재는 것은 빨판이 아니므로 축이 수 대신 그 어긋남으로 먼저 빨개진다.
+     재는 방향은 손바닥 바깥면의 법선이다. 어깨와 팔꿈치가 돌아가 있어서 월드 z를 그대로 쓰면
+     앞면이 앞면이 아니다. 월드 행렬로 옮긴 정점을 그 법선에 사영해 월드 단위로 읽는다.
+     경계는 외곽선이 그 면에서 실제로 밀어 주는 거리다. addOutline은 지오메트리 원점 기준 배율이라
+     펜 굵기가 그대로 서는 자리는 실루엣 끝이고 손바닥 앞면은 그 안쪽이다. 실측: 굵기가 0.028인데
+     그 면에서 밀리는 거리는 0.0066에서 0.0123이다. 굵기를 그대로 경계로 쓰면 실제로 칠해지는 잉크보다
+     세 배 넓은 자리를 허락한다.
+     굵기는 actors.mjs에서 읽는다. 여기 0.028을 베껴 두면 그 줄이 얇아진 날 이 축만 옛 굵기로 초록이
+     난다. 읽은 수가 rig가 쓴 수인지는 살아 있는 외곽선의 scale.z와 맞춰 본다.
+     실측: 정점 흔들림이 0.02라 판과 판 사이의 0.06s(188/84에서 0.0179)는 상자 눈금에서 -0.0192에서
+     0.0004로 닫힌다. 가장 나쁜 자리가 200/65 3:1 두 번째 손의 0.0004이고 그 자리의 경계가 0.0079다.
+     심는 대조군을 같은 축이 든다. 빨판 z를 s 곱하기 0.6으로 옮긴 값을 같은 표본에서 셈해 서른 장이
+     전부 경계를 넘는지 묻는다. 이 조건이 없으면 경계가 넓어져 아무것도 못 가르는 날에도 초록이 난다. */
+  const PLANT_PIP_Z = 0.6;
+  const ACTORS = readFileSync(new URL("../web/src/render/objects/actors.mjs", import.meta.url), "utf8");
+  const oneOf = (re, what) => {
+    const all = ACTORS.match(new RegExp(re.source, "g")) || [];
+    if (all.length !== 1) throw new Error(what + " read " + all.length + " times in actors.mjs, want 1");
+    return Number(ACTORS.match(re)[1]);
+  };
+  const SHELL = oneOf(/addOutline\(gv, ([\d.]+)\);/, "the glove outline width");
+  const PIP_Z = oneOf(/pip\.translate\(col \* s \* [\d.]+, row \* s \* [\d.]+, s \* ([\d.]+)\);/, "the pad z");
+  const GLOVE_SIZE = oneOf(/gloveSize: h \* ([\d.]+),/, "the keeper glove size");
+  const pads = await p.evaluate(async ([bodies, shell, gsize]) => {
+    const T = await import("/web/vendor/three.module.min.js");
+    const A = await import("/web/src/render/objects/actors.mjs");
+    const g = await import("/web/src/state/gear.mjs");
+    const box = new T.BoxGeometry(1, 1, 1).attributes.position.count;
+    // 빨판을 든 장만 고른다. 등급 번호를 여기 적으면 빨판이 다른 등급에도 붙는 날 그 등급이 조용히 빠진다.
+    const looks = [];
+    for (let rank = 0; rank < g.GLOVES.length; rank += 1) {
+      for (let skin = 0; skin < g.skinsAt("grip", rank).length; skin += 1) {
+        if (g.skinAt("grip", rank, skin).cut.pips > 0) looks.push({ rank, skin });
+      }
+    }
+    const out = { box, looks: looks.map((L) => L.rank + ":" + L.skin), rows: [] };
+    for (const k of bodies) {
+      for (const L of looks) {
+        const cut = g.skinAt("grip", L.rank, L.skin).cut;
+        const rig = A.buildKeeper(k.height, k.weight, g.lookOf({ grip: L.rank, gripSkin: L.skin }));
+        rig.updateMatrixWorld(true);
+        const hands = rig.userData.gloves || [];
+        for (let at = 0; at < hands.length; at += 1) {
+          const gv = hands[at];
+          const pos = gv.geometry.attributes.position;
+          const bb = gv.geometry.boundingBox;
+          const ink = gv.children.filter((c) => c.userData && c.userData.isOutline);
+          const nrm = new T.Vector3(0, 0, 1).transformDirection(gv.matrixWorld).normalize();
+          const spot = new T.Vector3();
+          const face = (from, to) => {
+            let hi = -Infinity, lo = Infinity, zhi = -Infinity;
+            for (let i = from; i < to; i += 1) {
+              spot.fromBufferAttribute(pos, i);
+              if (spot.z > zhi) zhi = spot.z;
+              spot.applyMatrix4(gv.matrixWorld);
+              const d = spot.dot(nrm);
+              if (d > hi) hi = d;
+              if (d < lo) lo = d;
+            }
+            return { hi, lo, zhi };
+          };
+          const palm = face(0, box);
+          let back = Infinity;
+          for (let q = 0; q < cut.pips; q += 1) back = Math.min(back, face((3 + q) * box, (4 + q) * box).lo);
+          const sz = ink.length ? ink[0].scale.z : 0;
+          out.rows.push({
+            body: k.height + "/" + k.weight, tag: L.rank + ":" + L.skin, hand: at,
+            verts: pos.count, want: (3 + cut.pips) * box, inks: ink.length, sz,
+            wantSz: 1 + (shell * 2) / Math.max(0.04, bb.max.z - bb.min.z),
+            s: (k.height / 100) * gsize * cut.bulk, stand: back - palm.hi,
+            reach: (palm.zhi - (bb.max.z + bb.min.z) / 2) * (sz - 1)
+          });
+        }
+      }
+    }
+    return out;
+  }, [BODIES, SHELL, GLOVE_SIZE]);
+  const padSay = (r) => r.body + " " + r.tag + " hand " + r.hand + " standoff "
+    + r.stand.toFixed(5) + " of " + r.reach.toFixed(5);
+  const padEnds = (k) => Math.min.apply(null, pads.rows.map((r) => r[k])).toFixed(5)
+    + ".." + Math.max.apply(null, pads.rows.map((r) => r[k])).toFixed(5);
+  const padClear = pads.rows.filter((r) => !(r.stand <= r.reach));
+  const padDrift = pads.rows.filter((r) => r.verts !== r.want || r.inks !== 1
+    || Math.abs(r.sz - r.wantSz) > 1e-9);
+  const padPlant = pads.rows.filter((r) => r.stand + (PLANT_PIP_Z - PIP_Z) * r.s > r.reach);
+  const padTight = pads.rows.reduce((a, c) => (a && a.reach - a.stand <= c.reach - c.stand ? a : c), null);
+  check("thumb:grip:the-suction-pads-sit-on-the-palm",
+    pads.rows.length === BODIES.length * pads.looks.length * 2 && padDrift.length === 0
+      && padClear.length === 0 && padPlant.length === pads.rows.length,
+    padDrift.length ? "the merged glove drifted at " + padDrift.map((r) => r.body + " " + r.tag
+      + " verts " + r.verts + "/" + r.want + " outlines " + r.inks
+      + " scale " + r.sz.toFixed(6) + "/" + r.wantSz.toFixed(6)).join(", ")
+      : padClear.length ? "standing clear of the palm at " + padClear.map(padSay).join(", ")
+        : "pads " + pads.looks.join("/") + " on " + BODIES.length + " bodies stand "
+          + padEnds("stand") + " from the palm face, inside the " + SHELL + " pen that reaches "
+          + padEnds("reach") + " there, tightest " + padSay(padTight) + ", planted z "
+          + PLANT_PIP_Z + " stands clear on " + padPlant.length + " of " + pads.rows.length);
+
 
   /* 타투 칸이 파는 것은 팔이 아니라 팔에 새긴 그림이다. 위의 축들은 등급끼리 다른가와
      무엇이든 칠해졌는가만 묻고, 그 그림이 칸에서 얼마를 차지하는지는 안 묻는다. 그래서
