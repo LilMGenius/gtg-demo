@@ -58,20 +58,25 @@ export const BOOTS = [
    세 번째 등급의 이름이 돌기 수를 대놓고 말하므로 그 수는 이름이 이미 선언한 값이고,
    한 등급의 변형은 그 수를 지킨다. 실내화는 바닥이 평평해 안 산 사람이 흙에서 미끄러지고,
    닳은 축구화는 셋만 남았고, 스파이크는 수보다 길이다.
-   수만 바꾸면 세 개짜리와 여섯 개짜리가 같은 밑창이 되므로 등급 사이는 길이와 굵기까지 갈라 둔다. */
+   수만 바꾸면 세 개짜리와 여섯 개짜리가 같은 밑창이 되므로 등급 사이는 길이와 굵기까지 갈라 둔다.
+   돌기는 x가 legR 0.4 두 줄이고 굵기가 legR 0.2 girth라, 어느 등급이든 밑창 반폭 legR 0.75 wide
+   안에 들어앉는다. 그래서 수는 칠해진 자리를 못 바꾼다. 밑창 밑으로 내려간 길이 pip만 자리를 얻는다.
+   실측으로 돌기를 아예 뺐을 때 제 겉모습에서 빠진 화소가 1등급 0에서 5퍼센트, 2등급 2에서 10퍼센트,
+   3등급 14에서 24퍼센트였다. 1등급과 2등급이 나눠 쓴 자리가 0.796이던 이유가 그것이다.
+   그래서 pip을 등급마다 벌리고 밑창의 넓이도 같이 벌린다. */
 export const BOOT_SKINS = [
-  [{ name: '흰 실내화', tone: 0x2a241c, cut: { sole: 0.7, long: 0.88, wide: 0.92, pips: 0, pip: 0, girth: 1 } },
-   { name: '뒤축 꺾어 신은 실내화', tone: 0x4a4438, cut: { sole: 0.64, long: 0.8, wide: 0.96, pips: 0, pip: 0, girth: 1 } },
-   { name: '남의 실내화', tone: 0x1c2a2a, cut: { sole: 0.76, long: 0.96, wide: 0.86, pips: 0, pip: 0, girth: 1 } }],
-  [{ name: '갈색 조기축구화', tone: 0x4a3b2a, cut: { sole: 1, long: 1, wide: 1, pips: 3, pip: 0.5, girth: 1 } },
-   { name: '검은 조기축구화', tone: 0x22201c, cut: { sole: 1.06, long: 0.96, wide: 1.04, pips: 3, pip: 0.58, girth: 1.1 } },
-   { name: '흰 줄 두 개', tone: 0xd8d2c2, cut: { sole: 0.96, long: 1.06, wide: 0.96, pips: 3, pip: 0.44, girth: 0.9 } }],
-  [{ name: '파란 스터드', tone: 0x1f4f8f, cut: { sole: 1.28, long: 1.08, wide: 1.1, pips: 6, pip: 1.05, girth: 1.2 } },
-   { name: '형광 스터드', tone: 0xb8d92f, cut: { sole: 1.2, long: 1.14, wide: 1.04, pips: 6, pip: 1.15, girth: 1.1 } },
-   { name: '먹색 스터드', tone: 0x1a1c22, cut: { sole: 1.34, long: 1.02, wide: 1.16, pips: 6, pip: 0.95, girth: 1.3 } }],
-  [{ name: '주황 스파이크', tone: 0xd94f2a, cut: { sole: 0.8, long: 1.2, wide: 0.86, pips: 8, pip: 1.9, girth: 0.6 } },
-   { name: '은색 스파이크', tone: 0xc2c6cc, cut: { sole: 0.74, long: 1.28, wide: 0.8, pips: 8, pip: 2.05, girth: 0.54 } },
-   { name: '검은 스파이크', tone: 0x24262c, cut: { sole: 0.86, long: 1.12, wide: 0.92, pips: 8, pip: 1.75, girth: 0.68 } }]
+  [{ name: '흰 실내화', tone: 0x2a241c, cut: { sole: 0.54, long: 0.82, wide: 0.84, pips: 0, pip: 0, girth: 1 } },
+   { name: '뒤축 꺾어 신은 실내화', tone: 0x4a4438, cut: { sole: 0.48, long: 0.76, wide: 0.88, pips: 0, pip: 0, girth: 1 } },
+   { name: '남의 실내화', tone: 0x1c2a2a, cut: { sole: 0.6, long: 0.88, wide: 0.8, pips: 0, pip: 0, girth: 1 } }],
+  [{ name: '갈색 조기축구화', tone: 0x4a3b2a, cut: { sole: 0.94, long: 1.04, wide: 1, pips: 3, pip: 0.5, girth: 1 } },
+   { name: '검은 조기축구화', tone: 0x22201c, cut: { sole: 1, long: 1, wide: 1.04, pips: 3, pip: 0.58, girth: 1.1 } },
+   { name: '흰 줄 두 개', tone: 0xd8d2c2, cut: { sole: 0.9, long: 1.08, wide: 0.96, pips: 3, pip: 0.42, girth: 0.9 } }],
+  [{ name: '파란 스터드', tone: 0x1f4f8f, cut: { sole: 1.4, long: 1.12, wide: 1.2, pips: 6, pip: 1.9, girth: 1.3 } },
+   { name: '형광 스터드', tone: 0xb8d92f, cut: { sole: 1.32, long: 1.18, wide: 1.14, pips: 6, pip: 2.05, girth: 1.2 } },
+   { name: '먹색 스터드', tone: 0x1a1c22, cut: { sole: 1.48, long: 1.06, wide: 1.26, pips: 6, pip: 1.75, girth: 1.4 } }],
+  [{ name: '주황 스파이크', tone: 0xd94f2a, cut: { sole: 0.74, long: 1.26, wide: 0.8, pips: 8, pip: 3.1, girth: 0.54 } },
+   { name: '은색 스파이크', tone: 0xc2c6cc, cut: { sole: 0.68, long: 1.34, wide: 0.74, pips: 8, pip: 3.3, girth: 0.48 } },
+   { name: '검은 스파이크', tone: 0x24262c, cut: { sole: 0.8, long: 1.18, wide: 0.86, pips: 8, pip: 2.9, girth: 0.62 } }]
 ];
 
 export const MAX_STUD = BOOTS.length - 1;
