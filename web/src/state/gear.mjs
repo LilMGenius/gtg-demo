@@ -228,17 +228,25 @@ export const MAX_HAIR = HAIRS.length - 1;
 
    껍데기 반지름이 두개골의 1.05배라, wide와 tall이 1 아래로 내려가면 껍데기가 두개골 안으로
    들어가 그 등급만 대머리가 된다. 짧은 머리는 높이가 아니라 phi로 줄인다.
-   wide는 좌우 배율, tall은 높이 배율, phi는 정수리 반구가 덮는 각의 배율, tilt는 기울기다. */
+   wide는 좌우 배율, tall은 높이 배율, phi는 정수리 반구가 덮는 각의 배율, tilt는 기울기다.
+
+   phi에는 바닥도 천장도 있다. 0.18은 정수리만 남겨 카드에 219화소를 칠했고 thumb의 하한 1000을
+   깼다. 0.62를 넘기면 껍데기가 앞으로 돌아 내려와 눈을 덮어서 카드가 머리가 아니라 알로 읽힌다.
+   그래서 세 등급이 각자 띠를 갖는다. 깎아준 머리는 0.46에서 0.5, 투블럭은 0.31에서 0.35라
+   옆이 드러나고, 기른 머리는 0.54에서 0.58에 서서 길이를 tall로 받는다.
+   이름이 기른 머리라고 말하면 자도 길이를 재야 한다. 그 셋은 칠한 상자의 아래끝이 다섯 체격
+   모두에서 0등급 어느 변형보다 낮다. 이름이 안 든 날인 0등급 변형이 그 자리를 넘어서 있었고,
+   실측으로 그 장과 은발이 칠한 자리의 0.829를 함께 썼다. */
 export const HAIR_SKINS = [
   [{ name: '엄마 손 그대로', tone: 0x2b1d14, cut: { wide: 1, tall: 1.02, phi: 0.46, tilt: 0.09 } },
    { name: '한쪽만 눌린 자국', tone: 0x3b2a1a, cut: { wide: 1.04, tall: 1, phi: 0.5, tilt: -0.14 } },
-   { name: '가위 안 든 날', tone: 0x241a12, cut: { wide: 1.08, tall: 1.08, phi: 0.58, tilt: 0.05 } }],
-  [{ name: '기본 투블럭', tone: 0x1b1410, cut: { wide: 1, tall: 1.03, phi: 0.28, tilt: 0 } },
-   { name: '올백 투블럭', tone: 0x2a2018, cut: { wide: 0.92, tall: 1.12, phi: 0.24, tilt: 0.11 } },
-   { name: '반삭 투블럭', tone: 0x141010, cut: { wide: 1.06, tall: 1, phi: 0.18, tilt: 0 } }],
-  [{ name: '탈색 노랑', tone: 0xd8b45c, cut: { wide: 1.08, tall: 1.22, phi: 0.52, tilt: 0 } },
-   { name: '물 빠진 은발', tone: 0xd6d8d2, cut: { wide: 1.14, tall: 1.16, phi: 0.56, tilt: 0 } },
-   { name: '탈색 실패 주황', tone: 0xd9762f, cut: { wide: 1.02, tall: 1.3, phi: 0.48, tilt: 0.06 } }],
+   { name: '가위 안 든 날', tone: 0x241a12, cut: { wide: 1.06, tall: 1.06, phi: 0.5, tilt: 0.05 } }],
+  [{ name: '기본 투블럭', tone: 0x1b1410, cut: { wide: 1, tall: 1.14, phi: 0.33, tilt: 0 } },
+   { name: '올백 투블럭', tone: 0x2a2018, cut: { wide: 0.94, tall: 1.3, phi: 0.35, tilt: 0.11 } },
+   { name: '반삭 투블럭', tone: 0x141010, cut: { wide: 1.06, tall: 1.06, phi: 0.31, tilt: 0 } }],
+  [{ name: '탈색 노랑', tone: 0xd8b45c, cut: { wide: 1.14, tall: 1.32, phi: 0.56, tilt: 0 } },
+   { name: '물 빠진 은발', tone: 0xd6d8d2, cut: { wide: 1.2, tall: 1.28, phi: 0.58, tilt: 0 } },
+   { name: '탈색 실패 주황', tone: 0xd9762f, cut: { wide: 1.1, tall: 1.4, phi: 0.54, tilt: 0.06 } }],
   [{ name: '빨간 모히칸', tone: 0xc4402c, cut: { wide: 0.34, tall: 1.8, phi: 0.6, tilt: 0 } },
    { name: '파란 모히칸', tone: 0x2f6fd9, cut: { wide: 0.28, tall: 2.1, phi: 0.66, tilt: 0 } },
    { name: '쓰러진 모히칸', tone: 0x8f2fd1, cut: { wide: 0.42, tall: 1.55, phi: 0.56, tilt: 0.24 } }]
