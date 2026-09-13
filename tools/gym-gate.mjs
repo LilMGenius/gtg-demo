@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { readCloseFloor, closeFloorSaid } from "./close-floor.mjs";
 
 // 훈련장 게이트. 성장 칸이 전부 상한에 닿았을 때 훈련이 사표가 되는가.
 // 이 축은 파운더가 먼저 본 결함이다. 만렙에 닿은 저장을 어느 게이트도 입력으로 쓴 적이 없었다.
@@ -144,7 +145,9 @@ try {
      토큰과 실제 잉크 중 아래쪽을 바닥으로 읽는다(실측 740x360: 토큰 63, 상자 65.16, 잉크 67.5).
      F3 6.5가 남긴 잔여물이 이 자리다. 제목 상자가 5.46에 서서 셋째 칩의 가로 312~332를 물었고,
      같은 비교자로 칩 잉크의 18.22퍼센트가 제목과 같이 움직였다. */
-  const column = () => {
+  const column = async (page) => {
+    const closeFloor = await readCloseFloor(page, "#gym > .close");
+    return page.evaluate((closeFloor) => {
     const rnd = (n) => Math.round(n * 100) / 100;
     const g = document.getElementById("gym");
     const strip = document.getElementById("top");
@@ -163,14 +166,15 @@ try {
        높이를 같이 보는 것은 대조군이 겹을 display로 걷어도 붙어 있던 opacity는 1로 남아서다. */
     const sign = g.querySelector(":scope > .cue.down");
     const cueH = sign ? rnd(sign.getBoundingClientRect().height) : 0;
-    return { token: rnd(token), ink: rnd(ink), floor: rnd(Math.max(token, ink)), head: rnd(head.top),
+    return { closeFloor, token: rnd(token), ink: rnd(ink), floor: rnd(Math.max(token, ink)), head: rnd(head.top),
       close: rnd(close.bottom), spare: rnd(innerHeight - close.bottom), ih: innerHeight,
       top: rnd(g.scrollTop), over: rnd(g.scrollHeight - g.clientHeight), rolls: g.scrollHeight > g.clientHeight,
       cue: Boolean(sign) && cueH > 0 && Number(getComputedStyle(sign).opacity) > 0.5, cueH,
       hit: mid ? mid.tagName + "." + String(mid.className) : "none" };
+    }, closeFloor);
   };
   const below = (c) => c.head >= c.floor;
-  const reach = (c) => c.spare >= 8 && c.hit === "BUTTON.close";
+  const reach = (c) => c.closeFloor.spare >= c.closeFloor.floor && c.closeFloor.pressedInside && c.hit === "BUTTON.close";
   /* 쉼 자리의 닫기. 화면 안에 서 있으면 그것으로 끝이고, 접힘 아래로 내려갔다면 굴러간다는 자국이
      켜져 있을 때만 봐준다. 자국이 없으면 나갈 길이 있다는 것을 사람이 알 방법이 없다. */
   const allowed = (c) => reach(c) || (c.rolls && c.cue);
@@ -178,11 +182,11 @@ try {
   const rested = (c) => c.top === 0 && c.cue === c.rolls;
   const saidHead = (c) => "title top " + c.head + " against strip bottom " + c.floor + " (token " + c.token + ", ink " + c.ink + "), "
     + (below(c) ? "clear by " + (c.head - c.floor).toFixed(2) : "under by " + (c.floor - c.head).toFixed(2)) + "px";
-  const saidClose = (c) => "close bottom " + c.close + " of " + c.ih + ", spare " + c.spare + "px of 8, hit " + c.hit
+  const saidClose = (c) => "close bottom " + c.close + " of " + c.ih + ", spare " + c.spare + "px, " + closeFloorSaid(c.closeFloor) + ", hit " + c.hit
     + (reach(c) ? "" : ", below the fold with the cue " + (c.cue ? "on" : "off"));
   const saidCue = (c) => "scrollTop " + c.top + ", " + (c.rolls ? "rolls " + c.over + "px past the fold" : "does not roll")
     + ", cue " + (c.cue ? "on" : "off") + " " + c.cueH + "px";
-  const col = await mp.evaluate(column);
+  const col = await column(mp);
   /* 얕은 굴림. 감춘 띠가 그늘 높이보다 얇은 화면이 이 게이트에 하나도 없었다. 위의 축들은 54px을
      감추는 740x360에서만 초록이었고, 그 사이 구간은 아무도 안 쟀다. 실측 740x400에서 이 창은 14px을
      감춘 채 닫기를 접힘 밖 2.45px에 세웠고 그늘은 꺼져 있었다. 그늘 높이는 CSS 한 곳에 있으므로
@@ -206,11 +210,11 @@ try {
   await sp.mouse.move(2, 2);
   await sp.waitForTimeout(150);
   const lip = (await sp.evaluate(lipOf)).probe;
-  const thin = await sp.evaluate(column);
+  const thin = await column(sp);
   /* 굴린 뒤의 닫기. 얕은 띠에서도 사람이 나갈 길이 있다는 것을 이 한 줄이 잰다. */
   await sp.evaluate(() => { const g = document.getElementById("gym"); g.scrollTop = g.scrollHeight; });
   await sp.waitForTimeout(200);
-  const thinEnd = await sp.evaluate(column);
+  const thinEnd = await column(sp);
   const band = (c) => c.rolls && c.over > 0 && c.over <= lip;
   const fitted = (c) => band(c) && c.cue && Math.abs(c.cueH - Math.round(c.over)) <= 1;
   const saidFit = (c) => "hides " + c.over + "px of a " + lip + "px shade, cue "
@@ -223,10 +227,10 @@ try {
   await sp.waitForTimeout(200);
   const thick = await sp.addStyleTag({ content: "#gym > .cue.down{height:26px !important}" });
   await sp.waitForTimeout(150);
-  const thickened = await sp.evaluate(column);
+  const thickened = await column(sp);
   await thick.evaluate((n) => n.remove());
   await sp.waitForTimeout(150);
-  const thinAgain = await sp.evaluate(column);
+  const thinAgain = await column(sp);
   check("control:a-shade-thicker-than-the-band-reddens-the-fitted-cue",
     band(thickened) && !fitted(thickened) && fitted(thinAgain),
     "planted " + saidFit(thickened) + " | restored " + saidFit(thinAgain));
@@ -242,7 +246,7 @@ try {
   await bootOn(rp, "?seed=20&preset=maxed,veteran");
   await rp.mouse.move(2, 2);
   await rp.waitForTimeout(150);
-  const ceil = await rp.evaluate(column);
+  const ceil = await column(rp);
   if (shot) await rp.screenshot({ path: shot.replace(/\.png$/, "") + "-740-maxed.png" });
   check("gym:the-title-starts-below-the-status-strip-at-740", below(col) && below(ceil), "plain " + saidHead(col) + " | ceiling " + saidHead(ceil));
   // 닫기는 이 창의 유일한 출구다. 띠만큼 기둥을 내리면 아래끝이 화면 밖으로 나갈 수 있으므로, 상자의
@@ -253,7 +257,7 @@ try {
      상한까지 밀어 브라우저가 소수 자리까지 맞추게 둔다. */
   await rp.evaluate(() => { const g = document.getElementById("gym"); g.scrollTop = g.scrollHeight; });
   await rp.waitForTimeout(200);
-  const rolled = await rp.evaluate(column);
+  const rolled = await column(rp);
   check("gym:the-close-button-is-reachable-after-the-roll", reach(rolled), saidClose(rolled) + ", " + saidCue(rolled));
   /* 음성 대조군. 자국 한 겹을 걷으면 쉼 자리의 두 축이 같이 빨개져야 한다. 걷고 곧바로 도로 붙인다.
      이게 없으면 위 두 줄의 초록은 판정식이 아무것도 안 재는 경우와 구분되지 않는다. */
@@ -261,10 +265,10 @@ try {
   await rp.waitForTimeout(200);
   const blind = await rp.addStyleTag({ content: "#gym > .cue.down{display:none}" });
   await rp.waitForTimeout(150);
-  const blinded = await rp.evaluate(column);
+  const blinded = await column(rp);
   await blind.evaluate((n) => n.remove());
   await rp.waitForTimeout(150);
-  const lit = await rp.evaluate(column);
+  const lit = await column(rp);
   check("control:hiding-the-cue-reddens-the-resting-gym", !rested(blinded) && !allowed(blinded) && rested(lit) && allowed(lit),
     "planted " + saidCue(blinded) + " / " + saidClose(blinded) + " | restored " + saidCue(lit) + " / " + saidClose(lit));
   await roll.close();
@@ -290,7 +294,7 @@ try {
     g.querySelector(".close").dataset.gateMark = "1";
   });
   await lp.waitForTimeout(150);
-  const roomy = await lp.evaluate(column);
+  const roomy = await column(lp);
   await lp.setViewportSize({ width: 740, height: 360 });
   /* 관찰자는 다음 프레임에 깬다. 정해진 시간을 기다리면 느린 기계에서 아직 안 깬 것을 없는 것으로
      읽으므로, 프레임마다 자국을 보고 켜지는 순간 끝낸다. 안 켜지면 짧게 포기하고 그대로 잰다. */
@@ -298,7 +302,7 @@ try {
     const s = document.getElementById("gym").querySelector(":scope > .cue.down");
     return Boolean(s) && s.getBoundingClientRect().height > 0 && Number(getComputedStyle(s).opacity) > 0.5;
   }, null, { polling: "raf", timeout: 1500 }).then(() => true).catch(() => false);
-  const shrunk = await lp.evaluate(column);
+  const shrunk = await column(lp);
   const trace = await lp.evaluate(() => {
     const g = document.getElementById("gym");
     const c = g.querySelector(".close");
@@ -316,10 +320,10 @@ try {
   // 이게 없으면 위 축의 녹색은 판정식이 아무것도 안 재는 경우와 구분되지 않는다.
   const bald = await mp.addStyleTag({ content: "#gym{padding-top:0}" });
   await mp.waitForTimeout(150);
-  const plantedTop = await mp.evaluate(column);
+  const plantedTop = await column(mp);
   await bald.evaluate((n) => n.remove());
   await mp.waitForTimeout(150);
-  const restoredTop = await mp.evaluate(column);
+  const restoredTop = await column(mp);
   check("control:stripping-the-top-padding-buries-the-title-under-the-strip", !below(plantedTop) && below(restoredTop),
     "planted " + saidHead(plantedTop) + " | restored " + saidHead(restoredTop));
   if (shot) await mp.screenshot({ path: shot.replace(/\.png$/, "") + "-740.png" });
