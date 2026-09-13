@@ -695,6 +695,154 @@ try {
           + padEnds("stand") + " from the palm face, inside the " + SHELL + " pen that reaches "
           + padEnds("reach") + " there, tightest " + padSay(padTight) + ", planted z "
           + PLANT_PIP_Z + " stands clear on " + padPlant.length + " of " + pads.rows.length);
+  /* 어깨 스펀지는 상의 위로 솟은 어깨로 파는 물건이다. 그 끝이 제가 얹힌 상의 꼭대기보다 위에
+     서는지는 여태 아무 자도 안 읽었다. 878b0f0은 폭만 고쳤고, 세로는 그 회차가 종이에서 진단만
+     해 두고 축으로 안 옮겼다. 옷깃 아래로 내려앉은 스펀지는 상의 실루엣 안에 통째로 들어가고,
+     값을 치른 어깨는 화면에서 몸통과 같은 색 한 덩어리가 된다.
+     그 종이 식은 척추 좌표계의 수다. 스펀지 끝을 torsoLen 0.92 더하기 armR 곱하기 1.15 더하기
+     0.88 pad로 놓고 상의 꼭대기를 torsoLen 더하기 torsoR 곱하기 len으로 놓아 165/96 3:0에서
+     -0.0116을 준다. 화면은 그 좌표계가 아니다. buildKeeper가 짓고 바로 드는 ready 포즈가 척추를
+     rx -0.30으로 숙이고 어깨 관절을 rz -0.78과 0.84로 벌린다. 숙인 몸통은 옷깃을 내리고, 벌어진
+     어깨는 폭이 armR 1.9 더하기 torsoR girth 0.9인 상자의 위 모서리를 들어 올린다. 실측으로 같은
+     자리가 +0.047과 +0.039다. 그래서 이 축은 식이 아니라 rig에서 정점을 월드로 옮겨 읽는다.
+     상의 꼭대기는 옷 자신의 지오메트리다. 외곽선 껍질이 아니다. addOutline(torso, 0.05)이 같은
+     지오메트리를 제 배율로 키운 자식을 달아 두는데, 그 자식의 행렬로 읽으면 옷이 아니라 잉크의
+     꼭대기가 난다. 실측으로 그 껍질이 옷보다 0.046에서 0.055 높고, 껍질까지 세면 예순 줄 가운데
+     다섯이 그 아래로 들어간다(165/96 3:0 둘과 3:2 둘, 200/96 3:2 하나). 껍질은 상의 색이 아니고
+     kit IoU 자의 마스크도 그것을 안 세므로 이 축이 잴 옷은 옷 자신이다. 그 다섯은 그대로 적는다.
+     스펀지는 메시 하나다. 빨판과 달리 병합되지 않아 어깨 관절의 BoxGeometry 자식 하나가 그것이고,
+     하나가 아니면 축이 수 대신 그 어긋남으로 먼저 빨개진다. 폭과 두께와 깊이와 앉은 높이를
+     actors.mjs에서 한 자리씩 읽어 다시 세워 맞춘다. 여기 수를 베껴 두면 그 식이 얇아진 날 이 축만
+     옛 수로 초록이 난다. 자리를 손으로 옮겨 셈한 값이 pad.matrixWorld로 읽은 값과 같은지도 같이
+     묻는다. 그 둘이 같아야 아래의 심기가 rig를 옮긴 것과 같은 말이 된다.
+     경기장 키퍼도 같은 rig다. scene.mjs의 setKeeper가 같은 buildKeeper에 같은 look을 넘기므로 이
+     수는 상점 칸만의 수가 아니다. 다만 재는 자세는 지을 때 드는 ready 한 벌이고, 다이브는 어깨를
+     더 벌린다. 그 자세를 재는 자는 아직 없다. */
+  // 0.013. 살아 있는 예순 줄에서 가장 좁은 여유 0.02735(165/96 3:2 두 번째 어깨)의 절반을 소수
+  // 세 자리로 내린 수다. 통과용으로 고른 수가 아니라 표본이 남긴 수고, 몸이나 등급이 늘면 같이
+  // 다시 난다. 절대 길이라 가장 작은 몸이 가장 좁은 여유를 들고 그 자리에서 읽힌다.
+  const CROWN_FLOOR = 0.013;
+  const CROWN_FLOOR_FROM = "half the tightest live margin 0.02735 at 165/96 3:2 hand 1";
+  /* 심는 대조군은 자리를 제 여유만큼 내린다. 어깨가 벌어져 자리 한 칸이 월드 y로는 0.636과
+     0.551만 내려가므로 내리는 칸은 여유를 그 기울기로 나눈 값이고, 그러면 예순 줄이 전부 옷깃
+     아래 정확히 바닥만큼에 앉아야 한다. 자리를 상수로 미는 심기는 이 일을 못 한다. 실측: 자리를
+     반으로 줄이면 바닥 아래로 아홉 줄뿐이고 그 아홉이 전부 3:0과 3:2다. 자리를 0으로 둬도 2등급
+     서른 줄은 안 운다. 기장이 0.74에서 0.84라 옷깃이 낮고 어깨 관절이 이미 그 위에 있어서다.
+     그래서 심는 값을 상수가 아니라 잰 여유에서 뽑는다. */
+  const PLANT_SEAT = 0.5;
+  const manyOf = (re, what) => {
+    const all = ACTORS.match(new RegExp(re.source, "g")) || [];
+    if (all.length !== 1) throw new Error(what + " read " + all.length + " times in actors.mjs, want 1");
+    return ACTORS.match(re).slice(1).map(Number);
+  };
+  const [ARM_K] = manyOf(/shoulderX: w \* [\d.]+, armR: h \* ([\d.]+),/, "the keeper arm radius");
+  const [TORSO_K] = manyOf(/torsoR: w \* ([\d.]+), torsoLen: h \* [\d.]+,/, "the keeper torso radius");
+  const [W_BASE, W_AT, W_STEP] = manyOf(/const w = ([\d.]+) \+ \(weight - (\d+)\) \* ([\d.]+);/, "the girth from weight");
+  const [PAD_TH_K] = manyOf(/const th = o\.armR \* ([\d.]+) \* kc\.pad;/, "the sponge thickness");
+  const [PAD_LIFT_K, PAD_SEAT_K] = manyOf(/pad\.position\.set\(side \* o\.armR \* [\d.]+, o\.armR \* ([\d.]+) \+ th \* ([\d.]+), 0\);/, "the sponge seat");
+  const [PAD_WIDE_K, PAD_GIRTH_K] = manyOf(/const wide = o\.armR \* ([\d.]+) \+ o\.torsoR \* kc\.girth \* ([\d.]+);/, "the sponge width");
+  const [PAD_DEEP_K] = manyOf(/new THREE\.BoxGeometry\(wide, th, o\.armR \* ([\d.]+)\)/, "the sponge depth");
+  const [TORSO_PEN] = manyOf(/addOutline\(torso, ([\d.]+)\);/, "the torso outline width");
+  const crowns = await p.evaluate(async ([bodies, lit, floor, halfAt]) => {
+    const T = await import("/web/vendor/three.module.min.js");
+    const A = await import("/web/src/render/objects/actors.mjs");
+    const g = await import("/web/src/state/gear.mjs");
+    const box = new T.BoxGeometry(1, 1, 1).attributes.position.count;
+    // 스펀지를 든 장만 고른다. 등급 번호를 여기 적으면 스펀지가 다른 등급에 붙는 날 그 등급이 조용히 빠진다.
+    const looks = [];
+    for (let rank = 0; rank < g.KITS.length; rank += 1) {
+      for (let skin = 0; skin < g.skinsAt("pads", rank).length; skin += 1) {
+        if (g.skinAt("pads", rank, skin).cut.pad > 0) looks.push({ rank, skin });
+      }
+    }
+    const spot = new T.Vector3();
+    // 겉보기 꼭대기는 정점을 하나씩 월드로 옮겨 읽는다. 상자를 든 어깨가 돌아가 있어서 축에 나란한
+    // 바운딩 상자는 제 꼭대기를 실제보다 높게 준다. 자리를 옮긴 셈도 같은 자로 읽어야 견줄 수 있다.
+    const topOf = (mesh, frame, shift) => {
+      const pos = mesh.geometry.attributes.position;
+      let hi = -Infinity;
+      for (let i = 0; i < pos.count; i += 1) {
+        spot.fromBufferAttribute(pos, i);
+        if (shift) spot.add(shift);
+        spot.applyMatrix4(frame);
+        if (spot.y > hi) hi = spot.y;
+      }
+      return hi;
+    };
+    const out = { box, looks: looks.map((L) => L.rank + ":" + L.skin), rows: [] };
+    for (const k of bodies) {
+      for (const L of looks) {
+        const cut = g.skinAt("pads", L.rank, L.skin).cut;
+        const rig = A.buildKeeper(k.height, k.weight, g.lookOf({ pads: L.rank, padsSkin: L.skin }));
+        rig.updateMatrixWorld(true);
+        const torso = rig.userData.torso;
+        const ink = torso.children.filter((c) => c.userData && c.userData.isOutline);
+        const crown = topOf(torso, torso.matrixWorld, null);
+        const h = k.height / 100;
+        const w = lit.wBase + (k.weight - lit.wAt) * lit.wStep;
+        const armR = h * lit.armK;
+        const torsoR = w * lit.torsoK;
+        const th = armR * lit.thK * cut.pad;
+        const arms = rig.userData.arms || [];
+        for (let at = 0; at < arms.length; at += 1) {
+          const sh = arms[at];
+          const boxes = sh.children.filter((c) => c.isMesh && c.geometry.type === "BoxGeometry");
+          const pad = boxes.length === 1 ? boxes[0] : null;
+          const par = pad ? (pad.geometry.parameters || {}) : {};
+          const home = pad ? pad.position : new T.Vector3();
+          const seatTo = (y) => topOf(pad, sh.matrixWorld, new T.Vector3(home.x, y, home.z));
+          const top = pad ? seatTo(home.y) : 0;
+          const fall = pad ? top - seatTo(home.y - 1) : 0;
+          const margin = top - crown;
+          out.rows.push({
+            body: k.height + "/" + k.weight, tag: L.rank + ":" + L.skin, hand: at,
+            boxes: boxes.length, verts: pad ? pad.geometry.attributes.position.count : 0,
+            inks: ink.length,
+            padInks: pad ? pad.children.filter((c) => c.userData && c.userData.isOutline).length : -1,
+            wide: Number(par.width) || 0, high: Number(par.height) || 0, deep: Number(par.depth) || 0,
+            wantWide: armR * lit.wideK + torsoR * cut.girth * lit.girthK,
+            wantHigh: th, wantDeep: armR * lit.deepK,
+            seat: home.y, wantSeat: armR * lit.liftK + th * lit.seatK,
+            crown, pen: ink.length === 1 ? topOf(torso, ink[0].matrixWorld, null) - crown : 0,
+            top, live: pad ? topOf(pad, pad.matrixWorld, null) : 0, fall, margin,
+            sank: pad && fall > 0 ? seatTo(home.y - (margin + floor) / fall) - crown : 0,
+            half: pad ? seatTo(home.y * halfAt) - crown : 0
+          });
+        }
+      }
+    }
+    return out;
+  }, [BODIES, { armK: ARM_K, torsoK: TORSO_K, wBase: W_BASE, wAt: W_AT, wStep: W_STEP, thK: PAD_TH_K,
+    liftK: PAD_LIFT_K, seatK: PAD_SEAT_K, wideK: PAD_WIDE_K, girthK: PAD_GIRTH_K, deepK: PAD_DEEP_K },
+  CROWN_FLOOR, PLANT_SEAT]);
+  const crownSay = (r) => r.body + " " + r.tag + " hand " + r.hand + " clears by " + r.margin.toFixed(5);
+  const crownEnds = (k) => Math.min.apply(null, crowns.rows.map((r) => r[k])).toFixed(5)
+    + ".." + Math.max.apply(null, crowns.rows.map((r) => r[k])).toFixed(5);
+  const crownDrift = crowns.rows.filter((r) => r.boxes !== 1 || r.verts !== crowns.box || r.inks !== 1
+    || r.padInks !== 0 || !(r.fall > 0 && r.fall <= 1) || Math.abs(r.top - r.live) > 1e-9
+    || Math.abs(r.wide - r.wantWide) > 1e-9 || Math.abs(r.high - r.wantHigh) > 1e-9
+    || Math.abs(r.deep - r.wantDeep) > 1e-9 || Math.abs(r.seat - r.wantSeat) > 1e-9);
+  const crownLow = crowns.rows.filter((r) => !(r.margin > CROWN_FLOOR));
+  const crownSank = crowns.rows.filter((r) => Math.abs(r.sank + CROWN_FLOOR) <= 1e-9);
+  const crownHalf = crowns.rows.filter((r) => r.half <= CROWN_FLOOR);
+  const crownInk = crowns.rows.filter((r) => r.margin < r.pen);
+  const crownTight = crowns.rows.reduce((a, c) => (a && a.margin <= c.margin ? a : c), null);
+  check("thumb:pads:the-jersey-sponge-rises-above-the-shirt-crown",
+    crowns.rows.length === BODIES.length * crowns.looks.length * 2 && crownDrift.length === 0
+      && crownLow.length === 0 && crownSank.length === crowns.rows.length,
+    crownDrift.length ? "the shoulder sponge drifted at " + crownDrift.map((r) => r.body + " " + r.tag
+      + " hand " + r.hand + " boxes " + r.boxes + " verts " + r.verts + "/" + crowns.box + " outlines "
+      + r.padInks + "/" + r.inks + " wide " + r.wide.toFixed(6) + "/" + r.wantWide.toFixed(6) + " high "
+      + r.high.toFixed(6) + "/" + r.wantHigh.toFixed(6) + " deep " + r.deep.toFixed(6) + "/"
+      + r.wantDeep.toFixed(6) + " seat " + r.seat.toFixed(6) + "/" + r.wantSeat.toFixed(6) + " fall "
+      + r.fall.toFixed(5) + " world " + r.top.toFixed(6) + "/" + r.live.toFixed(6)).join(", ")
+      : crownLow.length ? "sunk into its own shirt at " + crownLow.map(crownSay).join(", ")
+        : "sponges " + crowns.looks.join("/") + " on " + BODIES.length
+          + " bodies clear the nominal shirt crown by " + crownEnds("margin") + " over the floor "
+          + CROWN_FLOOR + ", " + CROWN_FLOOR_FROM + ", tightest " + crownSay(crownTight) + ", the "
+          + TORSO_PEN + " ink shell stands " + crownEnds("pen") + " proud of that crown and buries "
+          + crownInk.length + " of " + crowns.rows.length + ", the seat dropped by each margin sinks all "
+          + crownSank.length + " to -" + CROWN_FLOOR + " while halving it sinks only " + crownHalf.length);
 
 
   /* 타투 칸이 파는 것은 팔이 아니라 팔에 새긴 그림이다. 위의 축들은 등급끼리 다른가와
