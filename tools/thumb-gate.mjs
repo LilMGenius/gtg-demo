@@ -1166,13 +1166,20 @@ try {
      초록 회차에서 18.2퍼센트, 출발각을 pi 튼 대조군 회차에서 4.5퍼센트로 네 배 갈렸다. 잉크의 정직한
      도약은 3.5퍼센트라, 18.2퍼센트 바닥 앞에서는 그 여섯 배도 초록으로 지나간다. 기계가 바빠 프레임을
      흘리면 같은 방향으로 밀려, 쓸기가 도는 동안 이 자가 가장 너그러워진다.
-     그래서 바닥은 굽는다. 정지 그림이 선 각과 거기서 두 프레임만큼 돌린 각을 각각 한 장씩 구워
-     그 둘의 거리를 바닥으로 쓴다. 부하에도 출발각에도 안 움직이고, 회차마다 같은 수가 나온다.
+     그래서 바닥은 굽는다. 정지 그림이 선 각과, 화면이 첫 프레임에 실제로 그린 각을 각각 한 장씩 구워
+     그 둘의 거리를 바닥으로 쓴다. 그린 각은 도는 칸이 자기 시계로 들고 있는 수라, 기계가 바빠 첫
+     프레임이 늦게 오면 바닥도 같은 만큼 늦은 각에서 구워지고, 주사율이 두 배인 화면에서는 같이 반이 된다.
+     시계에서 뜬 수라 출발각에는 안 움직인다. 각을 튼 회귀는 도약만 커지고 바닥은 쉬는 각에서 구워져
+     그대로라, 자기를 심판할 바닥을 같이 올릴 수 없다.
+     실측: 100밀리초를 심은 대조군 회차에서 잰 각이 0.089에서 0.133라디안으로 가정값 0.0262의 서너 배였고,
+     두 프레임을 박은 바닥은 열 선반 가운데 여덟이 빨개졌다(잉크 34.3퍼센트 대 바닥 15.1퍼센트).
+     잰 각으로 구운 바닥은 같은 회차에서 열이 다 초록이었다(잉크 34.3 대 39.2).
      구운 화소끼리 견준다. 칸을 찍으면 자리와 각이 한 수에 섞여서, 위의 자리 축이 이미 답한 것을 다시 묻게 된다. */
-  /* 한 바퀴가 8초라 60헤르츠 두 프레임은 33.3밀리초, 곧 0.0262라디안이고 1.50도다.
-     사라진 실측 자와 같은 폭이라 초록 회차가 재던 수와 그대로 견줘진다. */
+  /* 가정값. 한 바퀴가 8초라 60헤르츠 두 프레임은 33.3밀리초, 곧 0.0262라디안이고 1.50도다.
+     이 수는 이제 바닥이 아니라 대조군이다. 아래 줄이 잰 각과 이 수를 같이 찍어, 이 기계가 그
+     가정에서 얼마나 갈렸는지가 회차마다 보인다. */
   const TURN_STEP = Math.PI * 2 * ((2 / 60) * 1000) / 8000;
-  const startAt = await p.evaluate(async ([delta, sweep]) => {
+  const startAt = await p.evaluate(async ([delta]) => {
     const m = await import("/web/src/render/thumb.mjs");
     const g = await import("/web/src/state/gear.mjs");
     const read = (src) => new Promise((res) => {
@@ -1215,38 +1222,53 @@ try {
       const shot = card.querySelector(".shot");
       const still = shot.querySelector("img").getAttribute("src");
       const rank = Number(shot.dataset.rank);
-      let turn = null;
+      let bake = null;
       for (const kind of [shot.dataset.kind].concat(Object.keys(g.SKINS))) {
         const y = m.yawOf(kind);
         for (const arg of [g.lookOf(Object.assign({}, gear, { [kind]: rank }), me.name), { rank, skin: 0 }, rank]) {
           let rest = "";
           try { rest = m.thumbURL(kind, me, arg, { yaw: y }); } catch (e) { rest = ""; }
           if (rest !== still) continue;
-          try { turn = m.thumbURL(kind, me, arg, { yaw: y + sweep }); } catch (e) { turn = null; }
+          bake = { kind, arg, y };
           break;
         }
-        if (turn) break;
+        if (bake) break;
       }
+      /* 프레임 간격을 호버 직전에 잰다. 부하도 주사율도 이 한 수에 들어오고, 아래 여유가 여기서 나온다. */
+      const beat = await new Promise((res) => requestAnimationFrame((p1) => requestAnimationFrame((p2) => res(p2 - p1))));
       card.dispatchEvent(new PointerEvent("pointerenter", { bubbles: false }));
       /* 한 프레임 안에 잡는다. 더 늦게 잡으면 도약과 정상 회전이 한 수에 섞인다. */
       await frames(1);
+      /* 그 프레임이 그린 각. 캔버스를 읽기 전에 뜨므로 이 수와 아래 화소는 같은 프레임 몫이다.
+         시계는 도는 칸이 들고 있고 여기서는 읽기만 한다. 밖에서 다시 세면 프레임이 밀린 회차에서 갈린다. */
+      const spin = typeof window.__spinTurn === "function" ? window.__spinTurn() : -1;
       const cv = shot.querySelector("canvas");
       const one = cv ? cv.toDataURL("image/png") : "";
       card.dispatchEvent(new PointerEvent("pointerleave", { bubbles: false }));
       await new Promise((res) => setTimeout(res, 80));
-      if (!one || !turn) { out.push({ tab, jump: -1, step: -1 }); continue; }
+      /* 한 프레임 여유. 잰 각과 구운 각이 같아도 살아 있는 칸과 구운 장의 화소가 완전히 같지는 않고,
+         그 차이는 한 프레임 몫 안이다. 여유도 잰 간격에서 나오니 120헤르츠에서는 같이 반이 된다. */
+      const slack = Math.PI * 2 * beat / 8000;
+      let turn = null;
+      if (bake && spin > 0) {
+        try { turn = m.thumbURL(bake.kind, me, bake.arg, { yaw: bake.y + spin + slack }); } catch (e) { turn = null; }
+      }
+      if (!one || !turn) { out.push({ tab, jump: -1, step: -1, spin, beat }); continue; }
       const a = await read(still);
       const b = await read(one);
       const c = await read(turn);
-      out.push({ tab, jump: gap(a, b), step: gap(a, c) });
+      out.push({ tab, jump: gap(a, b), step: gap(a, c), spin, beat });
     }
     return out;
-  }, [TURN_DELTA, TURN_STEP]);
+  }, [TURN_DELTA]);
   const jumped = startAt.filter((x) => !(x.jump >= 0 && x.step >= 0 && x.jump <= x.step + TURN_SHARE));
+  const beats = startAt.map((x) => x.beat).filter((v) => v > 0).sort((u, v) => u - v);
+  const beat = beats.length ? beats[beats.length >> 1] : -1;
   check("thumb:the-spin-starts-from-the-still", startAt.length > 0 && jumped.length === 0,
-    startAt.map((x) => x.jump < 0 || x.step < 0 ? x.tab + " unmeasured"
+    (startAt.map((x) => x.jump < 0 || x.step < 0 ? x.tab + " unmeasured at " + x.spin.toFixed(4) + "rad"
       : x.tab + " " + (x.jump * 100).toFixed(1) + "% vs floor "
-        + ((x.step + TURN_SHARE) * 100).toFixed(1) + "%").join(", ") || "no shelf was read");
+        + ((x.step + TURN_SHARE) * 100).toFixed(1) + "% at " + x.spin.toFixed(4) + "rad").join(", ") || "no shelf was read")
+    + ", assumed " + TURN_STEP.toFixed(4) + "rad, frames arrive every " + beat.toFixed(1) + "ms");
 
   /* 대조군. 굽는 자가 없는 종류는 호버해도 정지 그림이 그대로 서야 한다. startSpin은 그런
      종류에서 먼저 돌아 나가는데, 숨기는 규칙이 그 앞에 서면 캔버스도 그림도 없는 빈 칸이 남는다.
