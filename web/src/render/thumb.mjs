@@ -408,6 +408,11 @@ let spinning = null;
 /* 지금 도는 칸. stopSpin은 인자를 안 받으므로 표시를 걸어 둔 칸을 여기 들고 있어야
    떠날 때 그 칸의 표시를 벗길 수 있다. 표시가 남으면 그 칸은 정지 그림 없이 빈 상자가 된다. */
 let spinHost = null;
+/* 마지막으로 그린 회전 각. 쉬는 각에서 얼마나 돌았는지를 라디안으로 들고 있다. 재는 자가 첫
+   프레임을 잡는 순간 이 수를 읽어야 그 프레임에 맞춘 바닥을 구울 수 있다. 밖에서 시계를 다시
+   세면 기계가 바쁜 회차에서 프레임이 밀린 만큼 어긋난다. */
+let spinTurn = -1;
+if (typeof window !== "undefined") window.__spinTurn = () => spinTurn;
 
 // 호버에서 천천히 돈다. 정지한 그림은 무엇을 샀는지 한 면만 보여 준다.
 export function startSpin(host, kind, keeper, look) {
@@ -433,7 +438,8 @@ export function startSpin(host, kind, keeper, look) {
   const tick = () => {
     if (!spinning) return;
     // 한 바퀴에 8초. 더 빠르면 물건을 보는 것이 아니라 돌아가는 것을 보게 된다.
-    frame(kind, keeper, look, y0 + ((performance.now() - t0) / 8000) * Math.PI * 2);
+    spinTurn = ((performance.now() - t0) / 8000) * Math.PI * 2;
+    frame(kind, keeper, look, y0 + spinTurn);
     spinning = requestAnimationFrame(tick);
   };
   spinning = requestAnimationFrame(tick);
@@ -442,6 +448,7 @@ export function startSpin(host, kind, keeper, look) {
 export function stopSpin() {
   if (spinning) cancelAnimationFrame(spinning);
   spinning = null;
+  spinTurn = -1;
   if (spinHost) spinHost.classList.remove("spinning");
   spinHost = null;
   if (R && R.domElement.parentNode) R.domElement.parentNode.removeChild(R.domElement);
