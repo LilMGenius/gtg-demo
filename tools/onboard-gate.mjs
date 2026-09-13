@@ -56,10 +56,12 @@ try {
   check("onboard:the-card-that-opened-is-the-one-standing-in-goal", wearing === first.name,
     "card " + first.name + ", in goal " + wearing);
 
-  /* 아직 봉인이다. 이 자리에서 누름이 하는 일은 한 단을 올리는 것이므로 버튼은 다음이라고 적혀 있어야 한다.
-     닫기라고 적어 두면 사람은 그 글자를 읽고 누르고, 자기 키퍼를 못 본 채 화면을 넘긴다. */
+  /* 아직 봉인이다. 이 자리에서 누름이 하는 일은 한 단을 올리는 것이므로 버튼은 다음으로 시작해야 한다.
+     닫기라고 적어 두면 사람은 그 글자를 읽고 누르고, 자기 키퍼를 못 본 채 화면을 넘긴다.
+     뒤에 붙는 마디는 붙들면 전부 열린다는 이름이고 그 마디는 pullshow가 잰다. 글자를 통째로 박아 두면
+     마디의 낱말이 바뀔 때마다 이 자가 빨개져, 이 자가 묻는 것이 앞 동사라는 것이 흐려진다. */
   check("onboard:the-close-button-said-next-while-the-card-was-sealed",
-    first.label === "다음" && first.stage < STAGE_LAST,
+    first.label.startsWith("다음") && first.stage < STAGE_LAST,
     "label " + first.label + ", stage " + first.stage);
 
   /* 봉인된 채로 눌러 본다. 급한 사람의 첫 누름이라 이것이 닫으면 첫 키퍼는 한 번도 안 열린다.
@@ -73,7 +75,7 @@ try {
   }));
   check("onboard:a-tap-on-a-sealed-keeper-opens-it-first",
     sealedTap.open && Boolean(sealedTap.pre) && sealedTap.pre.stage === 0 && sealedTap.r.stage === 1
-      && sealedTap.r.shown === 1 && sealedTap.r.drawn === 1 && sealedTap.label === "다음",
+      && sealedTap.r.shown === 1 && sealedTap.r.drawn === 1 && sealedTap.label.startsWith("다음"),
     "open " + sealedTap.open + ", stage " + (sealedTap.pre ? sealedTap.pre.stage : "none")
       + " to " + sealedTap.r.stage + ", " + sealedTap.r.shown + " of " + sealedTap.r.drawn
       + ", label " + sealedTap.label);
