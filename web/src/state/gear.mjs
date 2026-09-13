@@ -18,20 +18,27 @@ export const GLOVES = [
 /* 장갑 변형. bulk는 손 전체 배율, cuff는 손목밴드 길이 배율, pips는 손바닥 빨판 수다.
    네 번째 등급의 이름이 빨판을 말하므로 그 돌기는 이름이 이미 선언한 것이다.
    목장갑은 얇고 손목이 짧아 손이 드러나고, 고무는 손바닥이 두꺼워지고,
-   송진은 손목까지 감아 올린다. 등급 안에서는 그 성질을 지키면서 색과 두께만 갈린다. */
+   송진은 손목까지 감아 올린다. 등급 안에서는 그 성질을 지키면서 색과 두께만 갈린다.
+   손바닥도 엄지도 손목밴드도 전부 bulk 하나에 곱해지는 값이라, 칠해진 자리가 읽는 것은
+   손 크기 하나다. 실측으로 bulk를 세운 채 cuff만 0.3에서 2.45까지 여덟 배 늘려도 두 장이
+   나눠 쓴 자리가 0.894였고 화소는 14퍼센트만 늘었다. 밴드가 팔뚝보다 얕아 그 각도에서
+   팔이 앞에 서기 때문이다. 그래서 등급 사이는 bulk가 벌린다. 실측: 1등급 1.04와 2등급 1.10이
+   6퍼센트 차이라 188/84에서 칠한 자리의 0.801을 함께 썼다. 경계는 아래 등급의 가장 큰 변형과
+   위 등급의 가장 작은 변형 사이이고, 0.82와 0.98, 1.04와 1.22가 그 자리다. 2등급과 3등급
+   사이만 1.28과 1.36으로 좁은데, 그 자리는 빨판이 든다. */
 export const GLOVE_SKINS = [
-  [{ name: '장터 목장갑', tone: 0xf2d64b, cut: { bulk: 0.88, cuff: 0.62, pips: 0 } },
-   { name: '흙때 낀 목장갑', tone: 0x8f8f5b, cut: { bulk: 0.92, cuff: 0.7, pips: 0 } },
-   { name: '빨아 놓은 흰 목장갑', tone: 0xe8e4d4, cut: { bulk: 0.84, cuff: 0.55, pips: 0 } }],
-  [{ name: '주황 고무코팅', tone: 0xd9552f, cut: { bulk: 1, cuff: 1, pips: 0 } },
-   { name: '파랑 고무코팅', tone: 0x2f6fd9, cut: { bulk: 1.04, cuff: 0.92, pips: 0 } },
-   { name: '초록 고무코팅', tone: 0x2f8f5b, cut: { bulk: 0.96, cuff: 1.12, pips: 0 } }],
-  [{ name: '송진 범벅', tone: 0xbf8a2e, cut: { bulk: 1.14, cuff: 1.55, pips: 0 } },
-   { name: '굳은 송진', tone: 0x8f6a1e, cut: { bulk: 1.2, cuff: 1.72, pips: 0 } },
-   { name: '테이프까지 감은 손', tone: 0xe0dccc, cut: { bulk: 1.1, cuff: 1.4, pips: 0 } }],
-  [{ name: '보라 빨판', tone: 0x8f4fd1, cut: { bulk: 1.22, cuff: 1.9, pips: 5 } },
-   { name: '붉은 빨판', tone: 0xd14f6f, cut: { bulk: 1.26, cuff: 1.75, pips: 5 } },
-   { name: '먹색 빨판', tone: 0x2a2f4f, cut: { bulk: 1.18, cuff: 2.05, pips: 5 } }]
+  [{ name: '장터 목장갑', tone: 0xf2d64b, cut: { bulk: 0.78, cuff: 0.45, pips: 0 } },
+   { name: '흙때 낀 목장갑', tone: 0x8f8f5b, cut: { bulk: 0.82, cuff: 0.55, pips: 0 } },
+   { name: '빨아 놓은 흰 목장갑', tone: 0xe8e4d4, cut: { bulk: 0.76, cuff: 0.38, pips: 0 } }],
+  [{ name: '주황 고무코팅', tone: 0xd9552f, cut: { bulk: 1, cuff: 0.8, pips: 0 } },
+   { name: '파랑 고무코팅', tone: 0x2f6fd9, cut: { bulk: 1.04, cuff: 0.72, pips: 0 } },
+   { name: '초록 고무코팅', tone: 0x2f8f5b, cut: { bulk: 0.98, cuff: 0.9, pips: 0 } }],
+  [{ name: '송진 범벅', tone: 0xbf8a2e, cut: { bulk: 1.24, cuff: 1.55, pips: 0 } },
+   { name: '굳은 송진', tone: 0x8f6a1e, cut: { bulk: 1.28, cuff: 1.72, pips: 0 } },
+   { name: '테이프까지 감은 손', tone: 0xe0dccc, cut: { bulk: 1.22, cuff: 1.4, pips: 0 } }],
+  [{ name: '보라 빨판', tone: 0x8f4fd1, cut: { bulk: 1.38, cuff: 2.1, pips: 5 } },
+   { name: '붉은 빨판', tone: 0xd14f6f, cut: { bulk: 1.42, cuff: 1.95, pips: 5 } },
+   { name: '먹색 빨판', tone: 0x2a2f4f, cut: { bulk: 1.36, cuff: 2.3, pips: 5 } }]
 ];
 
 export const MAX_GRIP = GLOVES.length - 1;
