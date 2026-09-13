@@ -271,16 +271,24 @@ export const HAIR_SKINS = [
    { name: '쓰러진 모히칸', tone: 0x8f2fd1, cut: { wide: 0.42, tall: 1.55, phi: 0.56, tilt: 0.24 } }]
 ];
 
-/* 잉크 변형. 머리와 같은 형식이다. span은 위팔을 덮는 비율, girth는 감는 두께 배율이다. */
+/* 잉크 변형. 머리와 같은 형식이다. span은 위팔을 덮는 비율, girth는 감는 두께 배율이다.
+   띠는 등급마다 같은 자리에서 시작해 위로만 자란다. 그래서 span이 가까운 두 등급은 한 띠가
+   다른 띠 안에 들어앉고, 나눠 쓰는 자리가 두 span의 비를 따라간다. 0등급은 무늬를 안 새기고
+   띠만 깔아서 그 비가 그대로 드러난다. 실측: 0등급 0.14와 1등급 0.20이 키 200에서 0.765였고,
+   0등급의 붕대가 1등급의 뜯긴 스티커보다 넓었다. 1등급부터는 별과 글씨와 번개가 갈라서
+   비가 같아도 그림이 갈린다. 그래서 0등급의 띠를 1등급 아래로 내리고 span을 등급 순서로 세운다.
+   0등급을 더 내리지는 않는다. 띠가 좁으면 칠한 자리의 무게중심이 아래로 내려가고, 자리 절이
+   그것을 먼저 잡는다. 실측으로 0.09까지 내렸을 때 키 200에서 세로가 0.842로 상한 0.8을 넘었다.
+   0.14에서 0.17이 두 축이 같이 사는 칸이다. */
 export const INK_SKINS = [
   [{ name: '맨살', tone: 0x5f8f93, cut: { span: 0.14, girth: 1 } },
-   { name: '햇볕에 탄 자국', tone: 0x8f6f53, cut: { span: 0.2, girth: 1.02 } },
-   { name: '붕대 감은 팔', tone: 0xd8d4c6, cut: { span: 0.24, girth: 1.06 } }],
+   { name: '햇볕에 탄 자국', tone: 0x8f6f53, cut: { span: 0.15, girth: 1.02 } },
+   { name: '붕대 감은 팔', tone: 0xd8d4c6, cut: { span: 0.17, girth: 1.06 } }],
   [{ name: '문신 스티커', tone: 0x3a4f7a, cut: { span: 0.26, girth: 1.03 } },
    { name: '번진 스티커', tone: 0x4f3a7a, cut: { span: 0.34, girth: 1.01 } },
-   { name: '반쯤 뜯긴 스티커', tone: 0x2f5f4a, cut: { span: 0.2, girth: 1.08 } }],
+   { name: '반쯤 뜯긴 스티커', tone: 0x2f5f4a, cut: { span: 0.25, girth: 1.08 } }],
   [{ name: '이름 석 자', tone: 0x2a2f3a, cut: { span: 0.38, girth: 1.04 } },
-   { name: '등번호 하나', tone: 0x7a2a2f, cut: { span: 0.32, girth: 1.1 } },
+   { name: '등번호 하나', tone: 0x7a2a2f, cut: { span: 0.36, girth: 1.1 } },
    { name: '알아볼 수 없는 글씨', tone: 0x1f3a2a, cut: { span: 0.44, girth: 1.02 } }],
   [{ name: '검은 먹토시', tone: 0x14161c, cut: { span: 0.98, girth: 1.2 } },
    { name: '푸른 먹토시', tone: 0x14263c, cut: { span: 0.9, girth: 1.26 } },
