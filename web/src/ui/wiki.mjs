@@ -34,90 +34,64 @@ const table = (heads, list) => '<table><thead><tr>'
   + '</tr></thead><tbody>'
   + list.map((r) => '<tr>' + r.map((c, i) => (i ? cell(c) : '<th scope="row">' + esc(c) + '</th>')).join('') + '</tr>').join('')
   + '</tbody></table>';
-const says = (list) => list.filter((s) => s).map((s) => '<p>' + esc(s) + '</p>').join('');
+// gamewiki (MIT), https://github.com/DaedalGames/gamewiki: reuse its GFM renderer.
+// JSON modules provide a synchronous built fallback; one fetch refreshes the pages.
+import builtPages from '../../wiki/dist/pages.json' with { type: 'json' };
+import entities from '../../wiki/dist/entities.json' with { type: 'json' };
+const CONSTANTS = {
+  wallet: { COIN_SAVE, COIN_CONCEDED, COIN_DRILL },
+  roster: { PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP },
+  gram: { LIKE_BASE, LIKE_PER_CITY, MUTUAL_STEP, MUTUAL_CAP, SELFIE_BASE }
+};
+const value = (id) => {
+  const ref = entities.find(e => e.id === id)?.valueFrom;
+  const [module, name] = (ref || '').split('.');
+  const number = CONSTANTS[module]?.[name];
+  if (typeof number !== 'number') throw new Error('Unknown wiki valueFrom: ' + ref);
+  return number;
+};
+let pages = builtPages;
+export const wikiReady = typeof window === 'undefined' ? Promise.resolve() : fetch(new URL('../../wiki/dist/pages.json', import.meta.url))
+  .then(response => { if (!response.ok) throw new Error('Wiki HTTP ' + response.status); return response.json(); })
+  .then(data => {
+    if (!Array.isArray(data) || !WIKI_CATS.every(c => data.some(p => p.id === c.key && typeof p.bodyHtml === 'string'))) throw new Error('Invalid wiki pages');
+    pages = data;
+    window.dispatchEvent(new Event('wiki-ready'));
+  }).catch(() => {});
 
-/* 본문 아홉. 제목은 명사구, 그 아래 두세 줄, 그리고 표다. 문장만 있는 칸은 수치를 물으러 온 눈이
-   빈손으로 나가고, 표만 있는 칸은 그 수가 무엇의 수인지가 안 적힌다. */
-const BODY = {
-  hand: () => ({
-    head: '세 칸과 타이밍',
-    text: ['화면 세 칸을 누른다. 공이 올 곳을 찍는다',
-      '너무 빠르면 역동작, 너무 늦으면 손이 안 닿는다',
-      '마우스도 같은 세 칸이고 키보드도 된다',
-      '컨디션은 이번 판의 능력에 더해지는 보정이다'],
-    tables: [
+const TABLES = {
+  hand: (ctx) => [
       table(['키', '하는 일'], KEY_MAP.map(({ label, note }) => [label, note])),
       table(['버튼', '하는 일'], [['돌진', '각을 좁히러 나간다. 뚫리면 골대가 빈다']])
-    ]
-  }),
-  coin: () => ({
-    head: '버는 법',
-    text: ['유명한 키커일수록 막았을 때 더 붙는다',
-      '세이브 다섯 칸은 이번 판의 슛 결과다: 초록은 세이브, 빨강은 실점, 노랑은 진행 중이다'],
-    tables: [table(['자리', '값'], [
-      ['막으면', COIN_SAVE],
-      ['최상급', COIN_SAVE + COIN_FAME_STEP * 9],
-      ['먹혀도', COIN_CONCEDED],
-      ['훈련 대신', COIN_DRILL],
+    ],
+  coin: (ctx) => [table(['자리', '값'], [
+      ['막으면', value('coin-save')],
+      ['최상급', value('coin-save') + COIN_FAME_STEP * 9],
+      ['먹혀도', value('coin-conceded')],
+      ['훈련 대신', value('drill')],
       ['스폰', '결제']
-    ])]
-  }),
-  drill: (ctx) => ({
-    head: '능력',
-    text: ['다섯 슛으로 한 판을 마치면 레벨이 오르고 훈련 한 회가 쌓인다',
-      '훈련은 능력 한 칸을 올린다',
-      '올릴 칸이 없으면 훈련 한 회가 값으로 바뀐다'],
-    tables: [table(['자리', '값'], [['훈련 대신', COIN_DRILL]])]
-  }),
-  gear: (ctx) => ({
-    head: '장비',
-    text: [],
-    tables: (ctx.shelves || []).map((s) => '<h5>' + esc(s.head) + '</h5>'
-      + table(['이름', '효과'], (s.rows || []).map((g) => [g.name, g.note])))
-  }),
-  pull: () => ({
-    head: '이적시장',
-    text: (PULL_KINDS || []).map((k) => k.note).concat(['이용권은 완봉으로 쌓인다']),
-    tables: [table(['자리', '값'], [
-      ['한 장', PULL_COST],
-      ['묶음', PULL_BULK],
-      ['묶음 보상', PULL_BONUS],
-      ['이용권 한도', TICKET_CAP]
-    ])]
-  }),
-  gram: () => ({
-    head: '팔로워와 맞팔',
-    text: ['막은 슛이 소문이 되어 팔로워가 붙는다',
-      '맞팔은 소문을 조금씩 넓힌다',
-      '동네 등급이 오르면 같은 슛에 더 붙는다'],
-    tables: [table(['자리', '값'], [
-      ['좋아요', LIKE_BASE],
-      ['동네 한 등급', LIKE_PER_CITY],
-      ['맞팔 한 명', MUTUAL_STEP],
-      ['맞팔 한도', MUTUAL_CAP],
-      ['같이 한 장', SELFIE_BASE]
-    ])]
-  }),
-  bot: (ctx) => ({
-    head: '봇',
-    text: [(ctx.notices || [])[0],
-      '판단력만 봇 값으로 바뀐다',
-      '크레딧은 여섯 시간까지만 쌓인다'],
-    tables: [table(['이름', '판단력', '분', '값'],
-      BOTS.map((b) => [b.name, b.judge, b.minutes, b.cost]))]
-  }),
-  buff: (ctx) => ({
-    head: '버프',
-    text: [(ctx.notices || [])[1],
-      '한 종류를 다 쓰기 전에는 다른 종류를 못 산다',
-      '쌓아 둘 수 있는 슛에는 한도가 있다'],
-    tables: [table(['이름', '효과', '슛', '값'],
-      BUFFS.map((b) => [b.name, b.note, b.shots, b.cost]))]
-  }),
-  risk: (ctx) => ({
-    head: '사고',
-    text: ['입력 셋이 어긋나면 그 슛은 거기서 갈린다'],
-    tables: [
+    ])],
+  drill: (ctx) => [table(['자리', '값'], [['훈련 대신', value('drill')]])],
+  gear: (ctx) => (ctx.shelves || []).map((s) => '<h5>' + esc(s.head) + '</h5>'
+      + table(['이름', '효과'], (s.rows || []).map((g) => [g.name, g.note]))),
+  pull: (ctx) => [table(['자리', '값'], [
+      ['한 장', value('pull-cost')],
+      ['묶음', value('pull-bulk')],
+      ['묶음 보상', value('pull-bonus')],
+      ['이용권 한도', value('ticket-cap')]
+    ])],
+  gram: (ctx) => [table(['자리', '값'], [
+      ['좋아요', value('like-base')],
+      ['동네 한 등급', value('like-per-city')],
+      ['맞팔 한 명', value('mutual-step')],
+      ['맞팔 한도', value('mutual-cap')],
+      ['같이 한 장', value('selfie-base')]
+    ])],
+  bot: (ctx) => [table(['이름', '판단력', '분', '값'],
+      BOTS.map((b) => [b.name, b.judge, b.minutes, b.cost]))],
+  buff: (ctx) => [table(['이름', '효과', '슛', '값'],
+      BUFFS.map((b) => [b.name, b.note, b.shots, b.cost]))],
+  risk: (ctx) => [
       table(['입력', '무엇'], [
         [CAUSE_LABEL[INPUT_CAUSES[0]], '고른 자리'],
         [CAUSE_LABEL[INPUT_CAUSES[1]], '누른 때'],
@@ -125,7 +99,6 @@ const BODY = {
       ]),
       table(['사고', '깎는 선반'], ctx.mishaps || [])
     ]
-  })
 };
 
 export function wikiHTML(cur) {
@@ -139,7 +112,10 @@ export function wikiHTML(cur) {
 }
 
 export function wikiBody(key, ctx) {
-  const make = BODY[key] || BODY.hand;
-  const b = make(ctx || {});
-  return '<h4>' + esc(b.head) + '</h4>' + says(b.text) + b.tables.join('');
+  const cat = WIKI_CATS.some(c => c.key === key) ? key : 'hand';
+  const page = pages.find(p => p.id === cat);
+  const html = page.bodyHtml.replaceAll('{{value}}', () => esc(value(cat)));
+  const arrayNotes = cat === 'pull' ? PULL_KINDS.map(k => '<p>' + esc(k.note) + '</p>').join('') : '';
+  return '<h4>' + esc(page.title) + '</h4><div class="wiki-prose" data-wiki-id="' + cat + '">' + html + '</div>'
+    + arrayNotes + TABLES[cat](ctx || {}).join('');
 }
