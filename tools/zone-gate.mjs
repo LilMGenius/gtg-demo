@@ -621,19 +621,19 @@ try {
     await waitRound(p);
     const cut = await p.evaluate(() => {
       const z = document.querySelector('.zone[data-dive="-1"]');
-      const had = typeof z.onkeydown === "function";
-      z.onkeydown = null;
-      return had;
+      // The shared keyboard owner receives bubbling events; withhold this pad's key upstream.
+      z.addEventListener('keydown', (event) => { event.preventDefault(); event.stopPropagation(); }, { once: true });
+      return z instanceof HTMLButtonElement;
     });
     const beforeCut = await p.evaluate(() => window.__lastInput);
     const focusedCut = await focusKey(-1, "Enter");
     const tookCut = await p.waitForFunction(() => window.__lastInput?.dive === -1,
       null, { timeout: PRESS_MS }).then(() => true).catch(() => false);
     const cutInput = await p.evaluate(() => window.__lastInput);
-    check("control:a-pad-stripped-of-its-keydown-reddens-the-focused-key-axis",
+    check("control:a-pad-with-its-key-withheld-reddens-the-focused-key-axis",
       cut === true && focusedCut && tookCut === false && cutInput?.dive !== -1,
-      "with the left pad onkeydown nulled, Enter on it judged " + JSON.stringify(cutInput)
-      + " (was " + JSON.stringify(beforeCut) + "), a handler was there to pull " + cut);
+      "with the left pad key withheld, Enter on it judged " + JSON.stringify(cutInput)
+      + " (was " + JSON.stringify(beforeCut) + "), control installed " + cut);
     /* 묶음 이름은 창이 열린 프레임과 닫힌 프레임에서 따로 읽는다. 한 자리에서만 읽으면 안 움직이는
        이름도 초록이 난다. */
     await shut(p);

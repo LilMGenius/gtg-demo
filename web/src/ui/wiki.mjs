@@ -5,6 +5,7 @@
 // 그 거짓말은 아무도 안 고친다. 그래서 이 파일에는 판정에 쓰이는 수가 하나도 없다.
 import { COIN_SAVE, COIN_CONCEDED, COIN_DRILL, COIN_FAME_STEP } from '../state/wallet.mjs';
 import { BOTS } from '../state/bot.mjs';
+import { KEY_MAP } from './keys.mjs';
 import { BUFFS } from '../state/buff.mjs';
 import { PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP, PULL_KINDS } from '../../../src/roster.mjs';
 import { CAUSE_LABEL, INPUT_CAUSES } from '../../../src/ledger.mjs';
@@ -43,7 +44,7 @@ const BODY = {
       '너무 빠르면 역동작, 너무 늦으면 손이 안 닿는다',
       '마우스도 같은 세 칸이고 키보드도 된다'],
     tables: [
-      table(['자리', '키'], [['왼쪽', '←'], ['가운데', '↑'], ['오른쪽', '→']]),
+      table(['키', '하는 일'], KEY_MAP.map(({ label, note }) => [label, note])),
       table(['버튼', '하는 일'], [['돌진', '각을 좁히러 나간다. 뚫리면 골대가 빈다']])
     ]
   }),
