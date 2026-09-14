@@ -8,7 +8,7 @@ import { PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP } from "../src/roster.mjs"
 // 위키의 자. 도움말이 타이틀 패널 하나와 재화 클릭 하나로 갈려 있어서, 무엇이 어떻게 도는지를
 // 물어볼 자리가 판 안에 없었다. 물음표 하나가 그 자리다.
 //
-// 재는 것은 여섯이다. 물음표가 진짜 버튼인가, 카테고리 여덟이 각각 표를 들고 서는가,
+// 재는 것은 여섯이다. 물음표가 진짜 버튼인가, 카테고리 아홉이 각각 표를 들고 서는가,
 // 수를 싣는 여섯 칸의 숫자가 코드 상수와 같은가, 봇과 버프는 그 숫자가 제 줄에 서는가,
 // 좁은 폭에서 글자가 상자를 넘거나 낱말 한가운데에서 끊기는가, 옛 도움말 표면 둘이 DOM에서 사라졌는가.
 //
@@ -18,8 +18,8 @@ import { PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP } from "../src/roster.mjs"
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const LINE = String.fromCharCode(10);
-// 카테고리 여덟. 키는 ASCII다. 화면 라벨로 찾으면 라벨을 다듬은 날 자가 같이 죽는다.
-const KEYS = ["hand", "coin", "drill", "pull", "gram", "bot", "buff", "risk"];
+// 카테고리 아홉. 키는 ASCII다. 화면 라벨로 찾으면 라벨을 다듬은 날 자가 같이 죽는다.
+const KEYS = ["hand", "coin", "drill", "gear", "pull", "gram", "bot", "buff", "risk"];
 /* 수를 싣는 여섯. hand와 risk는 자리와 이름만 싣는 표라 수가 0인 것이 정상이고,
    그래서 아래 계기 축이 요구하는 "수가 한 칸 이상"의 대상에서 빠진다. */
 /* 신호가 옮겨야 하는 최소 화소 몫. 그늘이 DOM에만 있고 화면을 안 건드리면 위의 축은 빈 초록이다.
@@ -86,7 +86,7 @@ const OVER = () => {
 /* 줄이 낱말 한가운데에서 끊기는지 본다. 상자를 넘지 않으므로 위의 넘침 자는 이것을 통과시킨다.
    글자를 하나씩 재서 윗변이 내려간 자리가 줄이 넘어간 자리이고, 그 앞 글자가 띄어쓰기가 아니면 낱말을 자른 것이다.
    tools/maxview-gate.mjs의 WRAP을 그대로 가져와 훑는 뿌리만 document.body에서 #wiki로 좁혔다.
-   좁힌 이유는 이 자가 재려는 것이 판 전체가 아니라 위키 본문 여덟 칸이기 때문이다.
+   좁힌 이유는 이 자가 재려는 것이 판 전체가 아니라 위키 본문 아홉 칸이기 때문이다.
    이 화면은 이 앱에서 한글 산문이 가장 빽빽한 자리인데, 옛 조작법 패널이 들고 있던 같은 축이
    그 패널과 함께 사라지고 어느 자도 물려받지 않았다.
    끊긴 낱말 0은 훑은 글자 수를 같이 찍어야 뜻이 산다. 아무것도 안 훑은 자와 깨끗한 자는 0을 똑같이 낸다. */
@@ -184,13 +184,13 @@ try {
   check("wiki:the-question-mark-opens-the-guide", up.shown === true && up.aria === "true",
     "shown " + up.shown + " aria " + up.aria);
 
-  // 카테고리 여덟. 하나라도 비면 그 주제는 화면 어디에도 답이 없다.
+  // 카테고리 아홉. 하나라도 비면 그 주제는 화면 어디에도 답이 없다.
   const cats = await p.evaluate(() => [...document.querySelectorAll("#wiki .cats [data-cat]")]
     .map((e) => ({ key: e.dataset.cat, tag: e.tagName, label: (e.textContent || "").trim() })));
   const keys = cats.map((c) => c.key);
   const missing = KEYS.filter((k) => !keys.includes(k));
   const mute = cats.filter((c) => !c.label.length || c.tag !== "BUTTON").map((c) => c.key);
-  check("wiki:eight-categories-stand", cats.length === KEYS.length && missing.length === 0 && mute.length === 0,
+  check("wiki:nine-categories-stand", cats.length === KEYS.length && missing.length === 0 && mute.length === 0,
     cats.length + " categories, missing " + (missing.join(",") || "none") + ", unnamed " + (mute.join(",") || "none"));
 
   // 본문마다 표가 하나 이상. 표 없는 본문은 문장만 남은 자리이고, 수치를 물으러 온 눈이 빈손으로 나간다.
@@ -276,7 +276,7 @@ try {
   check("wiki:the-close-button-closes", closer && byBtn === true, closer ? String(byBtn) : "no close button");
 
   /* 좁은 폭. 740x360에서 카테고리는 옆 기둥이 아니라 위 가로 탭이다. 기둥으로 두면 360px 높이에서
-     여덟 칸이 본문을 아래로 밀어내고, 본문 첫 줄이 화면 밖에서 시작한다. */
+     아홉 칸이 본문을 아래로 밀어내고, 본문 첫 줄이 화면 밖에서 시작한다. */
   await p.setViewportSize({ width: 740, height: 360 });
   await p.waitForTimeout(400);
   if (await p.evaluate(() => Boolean(document.getElementById("wikiBtn")))) await p.click("#wikiBtn", { force: true });
@@ -337,9 +337,9 @@ try {
     afterProbe.bad.slice(0, 2).join(" ") || "probe removed, scan clean again");
 
   /* 넘친다고 화면이 말하는가. 본문은 굴러가지만 굴러간다는 자국이 화면에 하나도 없었다.
-     실측으로 740x360에서 여덟 칸이 전부 넘쳤고, 조작 칸은 187px 창에 317px을 담아 세 줄짜리
+     실측으로 740x360에서 아홉 칸이 전부 넘쳤고, 조작 칸은 187px 창에 317px을 담아 세 줄짜리
      자리/키 표에서 왼쪽 한 줄만 보였다. 옛 타이틀 조작법 패널이 세 줄을 다 보여 주던 자리다.
-     신호는 문장이 아니라 본문 아래끝의 그늘이다. 문장은 여덟 칸에 여덟 번 서서 본문을 또 밀어낸다. */
+     신호는 문장이 아니라 본문 아래끝의 그늘이다. 문장은 아홉 칸에 아홉 번 서서 본문을 또 밀어낸다. */
   const CUE = () => {
     const body = document.querySelector("#wiki .body");
     if (!body) return null;
@@ -490,9 +490,9 @@ try {
 
   /* 일반 앱 UX 문법 둘. 위의 축들은 이 게임의 상수와 카테고리를 알아야 읽히지만, 아래 둘은 도움말이
      어느 앱의 것이든 같은 것을 묻는다. 표면마다 도메인 축 옆에 같은 문법을 세운다는 래칫의 요구다.
-     하나. 같은 종류의 칸은 같은 표기로 선다. 카테고리 여덟은 한 줄에 나란히 선 같은 종류라, 한 칸만
+     하나. 같은 종류의 칸은 같은 표기로 선다. 카테고리 아홉은 한 줄에 나란히 선 같은 종류라, 한 칸만
      글꼴이나 굵기가 다르면 그 칸이 다른 층의 것으로 읽힌다. 지금 선 칸이 아리아로만 갈리고 글꼴로는
-     안 갈리는 것도 같이 확인한다. 현재 칸을 굵게 만드는 앱이 흔하고, 그러면 여덟 중 하나가 다른 표기가 된다.
+     안 갈리는 것도 같이 확인한다. 현재 칸을 굵게 만드는 앱이 흔하고, 그러면 아홉 중 하나가 다른 표기가 된다.
      둘. 상태를 바꾸는 조작이 그 상태가 사는 동안 내내 열려 있다. 도움말이 열려 있는 내내 카테고리를
      바꿀 수 있어야 하고, 본문을 끝까지 굴린 자리에서도, 아래끝 그늘이 서 있는 자리에서도 그대로여야 한다.
      굴린 김에 안 닿게 되는 칸은 사람이 위로 되감아야 겨우 누른다. 묻는 것은 disabled 하나가 아니라
@@ -526,7 +526,7 @@ try {
     face.fonts.length > 1 ? catsRest.length + " buttons carry " + face.fonts.length + " faces: "
       + catsRest.map((c) => c.key + " " + c.font).join(" / ")
       : catsRest.length + " buttons, one face " + face.fonts[0]);
-  /* 대조군. 열린 칸 하나를 굵게 세우면 여덟이 두 표기로 갈리고 위 축이 그것을 봐야 한다. 심고 도로 뺀다.
+  /* 대조군. 열린 칸 하나를 굵게 세우면 아홉이 두 표기로 갈리고 위 축이 그것을 봐야 한다. 심고 도로 뺀다.
      제품이 지금 아리아로만 갈리므로, 이 심기가 잡히지 않으면 위의 초록은 표기를 안 본 초록이다. */
   await p.evaluate(() => { document.querySelector('#wiki .cats [aria-current="true"]').style.fontWeight = "900"; });
   await p.waitForTimeout(160);
@@ -602,7 +602,7 @@ try {
 
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
-  console.log("표본 범위: 카테고리 8 전부 × 본문 표. 수를 싣는 6칸은 상수와 맞대고 봇과 버프는 줄 단위로 맞댄다. 뷰포트 1280x720과 740x360");
+  console.log("표본 범위: 카테고리 9 전부 × 본문 표. 수를 싣는 6칸은 상수와 맞대고 봇과 버프는 줄 단위로 맞댄다. 뷰포트 1280x720과 740x360");
   console.log(fails.length ? "wiki FAIL " + fails.length : "wiki PASS " + notes.length);
   process.exit(fails.length ? 1 : 0);
 } catch (e) {
