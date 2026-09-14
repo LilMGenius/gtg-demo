@@ -1,12 +1,13 @@
 import { chromium } from "playwright";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 
 // 날아오는 공과 그 잔상이 화면에 남는지 화소로 재는 자.
 // 앞선 판은 __flightVis가 돌려주는 씬 그래프 값만 읽었다. 투영 크기 33.8px, 잔상 여덟 장 전부 켜짐,
 // 링 비율 3.94로 통과했는데 같은 시점 스크린샷에는 공도 꼬리도 없었다. 선언 상태를 건강검진으로 읽은 것이다.
 // 그래서 잰다: 세계시간을 멈춘 같은 프레임을 세 번 그린다. 원본, 잔상만 뺀 것, 공까지 뺀 것.
 // 차분이 무엇의 화소인지 그때서야 말할 수 있다. 공 = B-C, 잔상 = A-B.
-// 바: 비행 중 공 지름 30px, 잔상 화소 200개, 잔상이 공 반지름의 1.5배 밖까지 나감.
+// 바: 비행 중 공 지름은 BALL_MIN_H에서 유도, 잔상 화소 200개, 잔상이 공 반지름의 1.5배 밖까지 나감.
 // 반지름만 보는 바는 뭉친 후광을 통과시킨다. 실측: 고스트 간격 18px에 공 지름 34px이라
 // 고스트가 앞 고스트를 반지름만큼 덮어 링 반지름 53px 안에 여덟 장이 전부 뭉쳤는데 비율 3.1로 통과했다.
 // 그래서 뻗은 길이를 따로 잰다. 단, 자의 분자와 분모는 같은 것에서 와야 한다.
@@ -23,7 +24,12 @@ const URL = "http://127.0.0.1:10310/web/index.html?seed=" + (process.argv[2] || 
 const W = 1280;
 const H = 720;
 const ROUNDS = 4;
-const BAR_BALL = 30;
+const sceneSource = readFileSync(new globalThis.URL("../web/src/render/scene.mjs", import.meta.url), "utf8");
+const floorMatches = [...sceneSource.matchAll(/^const BALL_MIN_H = ([0-9.]+);$/gm)];
+if (floorMatches.length !== 1) throw new Error("Expected one BALL_MIN_H constant");
+const BALL_MIN_H = Number(floorMatches[0][1]);
+if (!Number.isFinite(BALL_MIN_H) || BALL_MIN_H <= 0) throw new Error("Invalid BALL_MIN_H");
+const BAR_BALL = Math.floor(BALL_MIN_H * H) - 1;
 const BAR_RATIO = 1.5;
 // 리본이 경로를 걸치는 비율. 실측 네 라운드 1.04 1.08 1.04 1.04. 1을 넘는 것은 링에 꼬리 반지름이
 // 더해지기 때문이다. SP 바닥이 무너져 리본이 공 주위로 뭉치면 이 값이 0으로 내려간다. 바는 0.9.
@@ -153,14 +159,7 @@ const measure = async (p, s, declDia) => {
     nx0: noise.x0, nx1: noise.x1, ny0: noise.y0, ny1: noise.y1 };
 };
 
-let br;
-let fail = 0;
-try {
-  br = await chromium.launch({ executablePath: EXE });
-  const ctx = await br.newContext({ viewport: { width: W, height: H } });
-  const p = await ctx.newPage();
-  const errs = [];
-  p.on("pageerror", (e) => errs.push(String(e)));
+const sample = async (p, control = false) => {
   await p.goto(URL, { waitUntil: "load" });
   await p.waitForTimeout(1200);
   await p.click("#go", { force: true });
@@ -184,7 +183,7 @@ try {
       m.declRing = hit.ringPx;
       m.pathPx = hit.pathPx;
       rows.push(m);
-      console.log("round " + i + " ballPx=" + m.ballN + " dia=" + m.dia + " trailPx=" + m.trailN
+      console.log((control ? "control " : "") + "round " + i + " ballPx=" + m.ballN + " dia=" + m.dia + " trailPx=" + m.trailN
         + " ring=" + m.ring.toFixed(1) + " ratio=" + (m.ring / Math.max(1, m.dia / 2)).toFixed(2) + " noise=" + m.noise);
       // 통과 못 한 라운드는 눈으로 볼 수 있어야 고칠 대상이 정해진다.
       // 선언 지름과 실측 지름을 같이 적어야 공이 작은 것인지 가려진 것인지 갈린다.
@@ -193,14 +192,26 @@ try {
         + " span=" + (hit.ringPx / Math.max(1, hit.pathPx)).toFixed(2)
         + " paint=" + (m.ring / Math.max(1, hit.ringPx)).toFixed(2)
         + " bbox " + m.bx0 + ".." + m.bx1 + "," + m.by0 + ".." + m.by1);
-      if (m.dia < BAR_BALL) {
+      if (!control && m.dia < BAR_BALL) {
         dump("fail" + i, s);
       }
     }
     if (!m) { console.log("skip round " + i + " after 3 retries"); }
     await p.waitForTimeout(1200);
   }
-  if (!rows.length) { console.log("INSTRUMENT DEAD: no flight frames"); process.exit(1); }
+  if (rows.length !== ROUNDS) throw new Error("INSTRUMENT DEAD: incomplete flight frames " + rows.length + "/" + ROUNDS);
+  return rows;
+};
+
+let br;
+let fail = 0;
+try {
+  br = await chromium.launch({ executablePath: EXE });
+  const ctx = await br.newContext({ viewport: { width: W, height: H } });
+  const p = await ctx.newPage();
+  const errs = [];
+  p.on("pageerror", (e) => errs.push(String(e)));
+  const rows = await sample(p);
 
   // 대조군. 비행이 끝난 정지 상태에 같은 자를 댄다.
   await p.waitForTimeout(1200);
@@ -222,7 +233,8 @@ try {
   const minPaint = Math.min(...rows.map((r) => r.ring / Math.max(1, r.declRing)));
   const minFar = Math.min(...rows.map((r) => r.far));
   const maxNoise = Math.max(...rows.map((r) => r.noise), idle.noise);
-  console.log("MIN_DIA " + minDia + "px (bar " + BAR_BALL + ")");
+  console.log("MIN_DIA " + minDia + "px (bar " + BAR_BALL + " = floor(BALL_MIN_H " + BALL_MIN_H
+    + " * " + H + ") - 1) " + (minDia < BAR_BALL ? "RED" : "PASS"));
   console.log("MIN_TRAIL " + minTrail + "px (bar " + BAR_TRAIL + ")");
   console.log("MIN_RATIO " + minRatio.toFixed(2) + " (bar " + BAR_RATIO + ")");
   console.log("MIN_SPAN " + minSpan.toFixed(2) + " (bar " + BAR_SPAN + ")");
@@ -242,6 +254,36 @@ try {
   if (minPaint < BAR_PAINT) fail += 1;
   if (minFar < BAR_FAR) fail += 1;
   if (errs.length) fail += 1;
+  await ctx.close();
+
+  // Reuse ballsize-gate.mjs --control's git-show/page.route mechanism; replace only the gain
+  // so the same pixel measurement must reject a served ball without the readability floor.
+  const headSource = execFileSync("git", ["show", "HEAD:web/src/render/scene.mjs"], {
+    cwd: new globalThis.URL("../", import.meta.url), encoding: "utf8",
+  });
+  const gainPattern = /const BALL_FAR_GAIN = [^;]+;/g;
+  if ([...headSource.matchAll(gainPattern)].length !== 1) throw new Error("Expected one BALL_FAR_GAIN constant");
+  const body = headSource.replace(gainPattern, "const BALL_FAR_GAIN = 1.0;");
+  if (body === headSource) throw new Error("Control did not change BALL_FAR_GAIN");
+  const controlCtx = await br.newContext({ viewport: { width: W, height: H } });
+  const controlPage = await controlCtx.newPage();
+  const controlErrors = [];
+  controlPage.on("pageerror", (e) => controlErrors.push(String(e)));
+  let served = 0;
+  await controlPage.route("**/web/src/render/scene.mjs", (route) => {
+    served += 1;
+    return route.fulfill({ contentType: "text/javascript", body });
+  });
+  const controlRows = await sample(controlPage, true);
+  const controlDia = Math.min(...controlRows.map((r) => r.dia));
+  const controlNoise = Math.max(...controlRows.map((r) => r.noise));
+  const controlPass = served > 0 && controlErrors.length === 0 && controlNoise < BAR_NOISE
+    && controlDia > 0 && controlDia < BAR_BALL && minDia >= BAR_BALL;
+  console.log("control:a-ball-without-the-floor-reds-the-size-bar " + (controlPass ? "PASS" : "FAIL")
+    + " MIN_DIA " + controlDia + "px (bar " + BAR_BALL + ") " + (controlDia < BAR_BALL ? "RED" : "PASS")
+    + " rows=" + controlRows.length + " served=" + served + " noise=" + controlNoise + " errors=" + controlErrors.length);
+  if (!controlPass) fail += 1;
+  await controlCtx.close();
   console.log(fail ? "FAIL" : "PASS");
 } finally {
   if (br) await br.close();
