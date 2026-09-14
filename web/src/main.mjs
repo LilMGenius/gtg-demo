@@ -723,7 +723,7 @@ function rollCaptions(result) {
 }
 
 // 공을 다시 세우는 시간. 스로잉과 골킥이 이 초를 줄이고, 줄어드는 것이 화면에 보여야 선택이 선택이 된다.
-function countdown(sec, label, then) {
+function countdown(sec, label, then, hand) {
   // 실시간이 아니라 세계시간으로 센다. 히트스톱이 걸린 동안에도 초가 흐르면
   // 화면은 멈췄는데 숫자만 혼자 가고, 정지 프레임 두 장이 그 숫자 하나로 갈린다.
   const until = stage.now() + sec;
@@ -739,7 +739,7 @@ function countdown(sec, label, then) {
     const now = stage.now();
     const left = until - now;
     if (left <= 0) { el('caption').textContent = ''; then(); return; }
-    if (now >= bounce && left > 0.45) { stage.sfx.dribble(); bounce = now + 0.62 + roll() * 0.36; }
+    if (hand && now >= bounce && left > 0.45) { stage.sfx.dribble(); bounce = now + 0.62 + roll() * 0.36; }
     tickEl.textContent = left.toFixed(1) + 's';
     timer = stage.after(0.1, tick);
   };
@@ -749,7 +749,7 @@ function countdown(sec, label, then) {
 function restart(result) {
   persist();
   const hand = ballInHand(result);
-  countdown(restartDelay(state.keeper, result), hand ? '공 던져주는 중' : '골킥 차주는 중', nextShot);
+  countdown(restartDelay(state.keeper, result), hand ? CAUSE_LABEL.throwing : CAUSE_LABEL.goalKick, nextShot, hand);
 }
 
 function endSet() {
@@ -765,7 +765,7 @@ function endSet() {
   state.tickets = ticketGain(state.results, state.tickets);
   persist();
   pips();
-  timer = stage.after(0.9, () => countdown(setBreak(), '한숨 돌리는 중', nextSet));
+  timer = stage.after(0.9, () => countdown(setBreak(), '한숨 돌리는 중', nextSet, false));
 }
 
 /* 관찰자 하나. 창 크기가 바뀌면 넘침이 다시 계산되므로, 그릴 때와 굴릴 때만 세면 옛 답이 남는다.
