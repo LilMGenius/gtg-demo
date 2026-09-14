@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { pinClock } from "./clock.mjs";
 
 // 사건이 언제 시작하는가의 자. 판정은 공이 날아가기 전에 이미 끝나 있고 화면은 그것을 연기한다.
@@ -20,6 +21,7 @@ import { pinClock } from "./clock.mjs";
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const LINE = String.fromCharCode(10);
 const STEP = 1 / 60;
+const REST_STEP = 0.02;
 // 페이지마다 받을 구 수. 한 세트가 다섯 구라 여기서 끊으면 세트 사이 쉬는 시간을 안 기다린다.
 const BALLS = 5;
 // 표본이 안 차는데 프레임만 도는 판을 끊는다. 실측으로 다섯 구가 가장 느린 페이지에서 3091 프레임이다.
@@ -122,6 +124,7 @@ try {
         out.push({
           seed, open: i, arrival, wait: (i - arrival) * STEP,
           rest: [0, 1, 2].map((n) => step(rec[i + n].b, rec[i + n - 1].b)),
+          dy: [0, 1, 2].map((n) => Math.abs(rec[i + n].b.y - rec[i + n - 1].b.y)),
           kind: rec[i].k,
           before: step(rec[i - 1].b, rec[i - 3].b) / 2,
           jump: Math.max(step(rec[i + 1].b, rec[i].b), step(rec[i + 2].b, rec[i + 1].b))
@@ -141,7 +144,7 @@ try {
   }
   const touched = all.filter((x) => TOUCHED.has(x.kind));
   const passed = all.filter((x) => !TOUCHED.has(x.kind));
-  const resting = (x) => x.rest[0] < 0.02;
+  const resting = (x) => x.rest[0] < REST_STEP;
   const row = (x) => "seed=" + x.seed + " " + x.kind + " open=" + x.open
     + " step-at-open=" + x.rest[0].toFixed(4) + "m/frame";
   const waits = (rows, mode) => {
@@ -180,7 +183,7 @@ try {
       : passed.map((x) => x.kind + " " + x.before.toFixed(3)).join(", "));
 
   // 뒤를 평균 내면 마지막 착지를 걸친 창이 현재 속도로 읽힌다. 자막이 열린 프레임만 판정한다.
-  // 열린 뒤 두 프레임은 꼬리의 움직임이라 출력만 한다. wide의 재도약은 다음 작업의 잔여다.
+  // wide는 수평으로 굴러 나가므로 열린 뒤 두 프레임의 수직 이동을 같은 정지 바로 잰다.
   const restless = passed.filter((x) => !resting(x));
   check("tailstart:an-untouched-caption-opens-after-the-ball-has-come-to-rest",
     passed.length > 0 && restless.length === 0, (restless.length ? restless : passed).map(row).join(", "));
@@ -214,6 +217,43 @@ try {
       + " rest-axis-red=" + red.length + " " + red.map(row).join(", ")
       + "; touched axes " + (touchedControl.every((x) => x.before >= 0.02 && x.jump <= 0.8) ? "green" : "red"));
   }
+
+
+  const wide = all.filter((x) => x.kind === "wide");
+  const noHop = (x) => x.dy.every((dy) => Number.isFinite(dy) && dy <= REST_STEP);
+  const wideRow = (x) => "seed=" + x.seed + " open=" + x.open + " |dy|="
+    + x.dy.map((dy) => dy.toFixed(6)).join("/") + "m/frame bar=" + REST_STEP;
+  for (const x of wide) console.log("instrument:wide-caption live " + (noHop(x) ? "GREEN " : "RED ") + wideRow(x));
+  check("tailstart:a-wide-ball-does-not-hop-again-after-the-caption-opens",
+    wide.length > 1 && wide.every(noHop), wide.map(wideRow).join(", "));
+
+  // Reuse the served-module control above; git supplies the exact parent bytes.
+  // Keep caption timing and horizontal travel intact so only the fresh hop differs.
+  const wideParent = execFileSync("git", ["show", "dba2d6d:web/src/render/scene.mjs"], { encoding: "utf8" });
+  let wideRouted = 0;
+  const wideControl = [];
+  await p.route("**/render/scene.mjs*", (route) => {
+    wideRouted += 1;
+    return route.fulfill({ contentType: "text/javascript", body: wideParent });
+  });
+  try {
+    for (const seed of new Set(wide.map((x) => x.seed))) {
+      const url = PAGES.find((url) => new URL(url).searchParams.get("seed") === seed);
+      const got = starts(await watch(url), seed);
+      if (got.length !== BALLS) throw Error("incomplete wide parent sample seed=" + seed);
+      wideControl.push(...got.filter((x) => x.kind === "wide"));
+    }
+  } finally {
+    await p.unroute("**/render/scene.mjs*");
+  }
+  for (const x of wideControl) console.log("instrument:wide-caption served-parent dba2d6d "
+    + (noHop(x) ? "GREEN " : "RED ") + wideRow(x));
+  check("control:the-served-parent-reddens-the-wide-hop-axis",
+    wideRouted > 0 && wide.length > 1 && wideControl.length === wide.length
+    && wideControl.every((x, i) => x.seed === wide[i].seed
+      && x.dy.every(Number.isFinite) && !noHop(x)),
+    "served=dba2d6d routed=" + wideRouted + " wide-axis-red=" + wideControl.filter((x) => !noHop(x)).length
+    + " " + wideControl.map(wideRow).join(", "));
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
