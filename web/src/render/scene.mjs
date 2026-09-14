@@ -2108,7 +2108,8 @@ const TOUCHED = new Set(['contact']);
     // 닿는 순간에만 몸이 부풀어야 힘이 들어간 것으로 읽힌다. 길게 주면 몸집이 변한 것으로 보인다.
     kickPop = Math.max(0, kickPop - dt);
     const kpop = 1 + (kickPop > 0 ? Math.sin((kickPop / 0.07) * Math.PI) * 0.15 : 0);
-    kicker.scale.setScalar(kpop);
+    // Keep impact emphasis off the travel axis so its decay cannot pull the boot backward.
+    kicker.scale.set(kpop, kpop, 1);
     // 눌림은 부피를 유지해야 몸집이 변한 것으로 보이지 않는다. 눌린 만큼 옆으로 퍼진다.
     keeperPop = Math.max(0, keeperPop - dt);
     const kep = keeperPop > 0 ? Math.sin((keeperPop / 0.09) * Math.PI) : 0;
