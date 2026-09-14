@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { readFileSync } from "node:fs";
 import { pinClock } from "./clock.mjs";
 
 // 소리 게이트. 귀 대신 파형을 잰다.
@@ -444,7 +445,7 @@ try {
     silent.join(",") || String(KINDS.length) + " kinds");
 
   /* 사건마다 소리가 나는 것과 플레이 내내 소리가 들리는 것은 다른 말이다.
-     사건을 전부 채워도 공을 다시 세우는 몇 초가 비어 있으면 무음으로 신고된다.
+     초읽기는 시간을 그린다. 그 안의 정직한 무음은 따로 적고, 그려진 플레이의 발화 간격만 잰다.
 
      마스터를 탭해 렌더된 피크로 재려 했지만 이 기계에는 도는 오디오 시계가 없다.
      위 절의 계기 축이 그것을 재고 있다. 대신 발화의 프레임을 센다. 판정이 소리를 부를 때마다
@@ -457,56 +458,109 @@ try {
   // 바를 넘은 것은 자가 무언가를 잰 것이 아니라 기계가 바빴던 것이고,
   // 조용한 기계에서 두 번 초록인 것도 그래서 안정의 증거가 아니다.
   // 그래서 세계시계를 1/60로 못 박고(clock.mjs pinClock) 발화마다 그 자리의 프레임을 적는다.
-  const gapCtx = await b.newContext();
-  await pinClock(gapCtx, STEP);
-  // 발화 기록은 페이지가 스스로 안 켠다. 배열이 있으면 그때만 쌓는다.
-  // 제품은 이름과 벽시계만 쌓는다. 제품을 고치지 않고 쌓는 자리만 감싸 프레임을 같이 적는다.
-  // 판정이 소리를 부르는 그 프레임 안에서 쌓이므로, 쌓는 시점의 프레임이 곧 발화의 프레임이다.
-  await gapCtx.addInitScript(() => {
-    const log = [];
-    log.push = function (e) {
-      const f = window.__frames ? window.__frames() : 0;
-      return Array.prototype.push.call(this, [e[0], e[1], e[2], f]);
+  // Reuse restart-gate.mjs page.route controls and this gate's frame log/clock.
+  // main.mjs countdown() owns #caption .tick; exclude only those frames, retaining the 4s bar.
+  const readGap = async (sceneBody) => {
+    const gapCtx = await b.newContext();
+    await pinClock(gapCtx, STEP);
+    // 발화 기록은 페이지가 스스로 안 켠다. 배열이 있으면 그때만 쌓는다.
+    // 제품은 이름과 벽시계만 쌓는다. 제품을 고치지 않고 쌓는 자리만 감싸 프레임을 같이 적는다.
+    // 판정이 소리를 부르는 그 프레임 안에서 쌓이므로, 쌓는 시점의 프레임이 곧 발화의 프레임이다.
+    await gapCtx.addInitScript(() => {
+      const log = [];
+      log.push = function (e) {
+        const f = window.__frames ? window.__frames() : 0;
+        return Array.prototype.push.call(this, [e[0], e[1], e[2], f]);
+      };
+      window.__sfxLog = log;
+    });
+    const gp = await gapCtx.newPage();
+    gp.on("pageerror", (e) => errs.push(String(e)));
+    if (sceneBody !== undefined) await gp.route("**/web/src/render/scene.mjs", (route) =>
+      route.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body: sceneBody }));
+    await gp.goto(GAP_URL, { waitUntil: "load" });
+    // 창까지 가는 길도 프레임으로 센다. 잠으로 기다리면 바쁜 기계에서 프레임이 덜 지나가고,
+    // 창이 열리는 순간의 세계가 회차마다 달라져서 간격이 부하를 다시 읽는다.
+    const waitFrames = async (n) => {
+      await gp.waitForFunction(() => typeof window.__frames === "function", null, { timeout: 30000 });
+      const from = await gp.evaluate(() => window.__frames());
+      await gp.waitForFunction(([f, k]) => window.__frames() - f >= k, [from, n], { timeout: 60000 });
     };
-    window.__sfxLog = log;
-  });
-  const gp = await gapCtx.newPage();
-  gp.on("pageerror", (e) => errs.push(String(e)));
-  await gp.goto(GAP_URL, { waitUntil: "load" });
-  // 창까지 가는 길도 프레임으로 센다. 잠으로 기다리면 바쁜 기계에서 프레임이 덜 지나가고,
-  // 창이 열리는 순간의 세계가 회차마다 달라져서 간격이 부하를 다시 읽는다.
-  const waitFrames = async (n) => {
-    await gp.waitForFunction(() => typeof window.__frames === "function", null, { timeout: 30000 });
-    const from = await gp.evaluate(() => window.__frames());
-    await gp.waitForFunction(([f, k]) => window.__frames() - f >= k, [from, n], { timeout: 90000 });
+    await gp.waitForSelector("#go", { timeout: 15000 });
+    await waitFrames(GAP_WARM);
+    await gp.evaluate(() => {
+      const g = document.querySelector("#go");
+      const r = g.getBoundingClientRect();
+      const o = { bubbles: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
+      g.dispatchEvent(new PointerEvent("pointerdown", o));
+      g.dispatchEvent(new MouseEvent("click", o));
+    });
+    await waitFrames(GAP_SETTLE);
+    await gp.evaluate(() => {
+      const log = window.__sfxLog;
+      log.length = 0;
+      log.countdown = [];
+      log.sampling = true;
+      const sample = () => {
+        if (!log.sampling) return;
+        if (document.querySelector("#caption .tick")) log.countdown.push(window.__frames());
+        requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    });
+    await gp.keyboard.press("ArrowLeft");
+    await waitFrames(GAP_FRAMES);
+    const gapRead = await gp.evaluate(() => {
+      const bs = window.__sfxLog;
+      bs.sampling = false;
+      const countdown = new Set(bs.countdown);
+      const gaps = bs.slice(1).map((e, i) => {
+        const from = bs[i][3];
+        const to = e[3];
+        let excluded = 0;
+        let run = 0;
+        let quietCountdown = 0;
+        for (let f = from; f < to; f += 1) {
+          if (countdown.has(f)) { excluded += 1; run += 1; }
+          else run = 0;
+          quietCountdown = Math.max(quietCountdown, run);
+        }
+        return { from, to, drawn: to - from - excluded, countdown: excluded, quietCountdown };
+      });
+      return { fires: bs.length, frames: Math.max(0, ...gaps.map((g) => g.drawn)),
+        countdown: Math.max(0, ...gaps.map((g) => g.quietCountdown)), gaps };
+    });
+    return { gp, gapCtx, gapRead };
   };
-  await gp.waitForSelector("#go", { timeout: 15000 });
-  await waitFrames(GAP_WARM);
-  await gp.evaluate(() => {
-    const g = document.querySelector("#go");
-    const r = g.getBoundingClientRect();
-    const o = { bubbles: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
-    g.dispatchEvent(new PointerEvent("pointerdown", o));
-    g.dispatchEvent(new MouseEvent("click", o));
-  });
-  await waitFrames(GAP_SETTLE);
-  await gp.evaluate(() => { window.__sfxLog.length = 0; });
-  await gp.keyboard.press("ArrowLeft");
-  await waitFrames(GAP_FRAMES);
-  const gapRead = await gp.evaluate(() => {
-    const bs = window.__sfxLog;
-    if (bs.length < 2) return { fires: bs.length, frames: 0 };
-    let frames = 0;
-    let prev = bs[0][3];
-    for (const e of bs) { const d = e[3] - prev; if (d > frames) frames = d; prev = e[3]; }
-    return { fires: bs.length, frames };
-  });
-  // 프레임으로 센 간격을 세계시각의 초로 되돌린다. 바의 뜻은 그대로 세계시각 4초다.
+  const { gp, gapRead } = await readGap();
   const gapSec = Number((gapRead.frames * STEP).toFixed(2));
-  // 발화가 둘 미만이면 간격이라는 값 자체가 없다. 통과도 실패도 아니고 표본이 없는 것이다.
   check("instrument:play-fired-enough-sounds-to-have-a-gap", gapRead.fires >= 2, gapRead.fires + " fires");
-  check("live:play-never-goes-quiet-for-more-than-four-seconds", gapRead.fires >= 2 && gapSec <= 4,
-    gapSec + "s over " + gapRead.fires + " fires, " + gapRead.frames + " frames");
+  check("live:drawn-play-never-goes-quiet-for-more-than-four-seconds", gapRead.fires >= 2 && gapSec <= 4,
+    gapSec + "s over " + gapRead.fires + " fires, " + gapRead.frames + " drawn frames");
+  const countdownSec = Number((gapRead.countdown * STEP).toFixed(2));
+  check("instrument:the-restart-countdown-is-silent-by-design", Number.isFinite(countdownSec),
+    countdownSec + "s, " + gapRead.countdown + " frames");
+  console.log("drawn-gap HEAD " + JSON.stringify(gapRead));
+
+  // Remove only act() outcome calls in the served scene. No product bytes are written.
+  const sceneSource = readFileSync(new globalThis.URL("../web/src/render/scene.mjs", import.meta.url), "utf8");
+  let silentScene = sceneSource;
+  for (const call of [
+    "    if (GRAB.has(kind)) sfx.kick(0.12);",
+    "    else if (SHOT.has(kind)) sfx.kick(0.5);",
+    "    else if (THUD.has(kind)) sfx.step(true);",
+    "    if (DRIB.has(kind)) sfx.dribble();",
+    "    if (NET.has(kind)) sfx.place();",
+  ]) {
+    if (silentScene.split(call).length !== 2) throw new Error("Outcome control anchor: " + call);
+    silentScene = silentScene.replace(call, "");
+  }
+  const control = await readGap(silentScene);
+  const controlSec = Number((control.gapRead.frames * STEP).toFixed(2));
+  check("control:a-silent-outcome-reddens-the-drawn-gap-axis", control.gapRead.fires >= 2 && controlSec > 4,
+    controlSec + "s over " + control.gapRead.fires + " fires, " + control.gapRead.frames + " drawn frames");
+  console.log("drawn-gap control " + JSON.stringify(control.gapRead));
+  await control.gapCtx.close();
 
   // 발화마다 그래프를 새로 세우고 아무도 안 끊으면 마스터에 노드가 쌓인다.
   // 방치형이라 탭을 하루 켜두는 게 정상 사용이다. 6만 개까지 밀었을 때
