@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { pressOpen, tapClose } from "./draw.mjs";
 
@@ -43,8 +45,6 @@ const SETTLE_MS = 180;
 const PIXEL_TOL = 24;
 // 봉인 단과 열린 단이 다른 그림이라고 부를 최소 면적. 카드의 4분의 1이다.
 const FACE_AREA = 0.25;
-// 실루엣 단의 채도 상한. 열린 단의 이 비율을 넘으면 색이 빠진 것이 아니다.
-const GREY_RATIO = 0.4;
 /* 제품이 선언한 가장 짧은 단이다(main.mjs STAGE_MS의 최솟값). 기록의 두 프레임이 이보다 벌어지면
    그 사이에 단 하나가 통째로 들어갈 수 있으므로, 빠진 단을 제품의 것이라고 부를 수 없다. */
 const BLINK_MS = 240;
@@ -316,7 +316,7 @@ try {
         if (performance.now() - window.__at.t < ms) return null;
         const now = document.querySelector("#pull .now");
         if (!now || now.getAnimations({ subtree: true }).some((a) => a.playState === "running")) return null;
-        return { card: r.shown, stage: r.stage };
+        return { card: r.shown, stage: r.stage, filter: getComputedStyle(now.querySelector("img")).filter };
       }, [steps, have, SETTLE_MS], { timeout: SHOT_MS, polling: "raf" });
       at = await hit.jsonValue();
     } catch (e) { return null; }
@@ -326,7 +326,7 @@ try {
     const skin = at.stage === STAGES - 1 ? await plateCut() : null;
     const after = await read();
     if (after.stage !== at.stage || after.card !== at.card) return { card: at.card, stage: at.stage, png: null };
-    return { card: at.card, stage: at.stage, png: png, name: after.name, rare: after.rare, skin: skin };
+    return { card: at.card, stage: at.stage, png: png, name: after.name, rare: after.rare, skin: skin, filter: at.filter };
   };
 
   // 찍은 장을 카드 이름 아래 모은다. 뽑은 순서대로 서므로 아래 축이 고르는 표본이 회차 순서를 따른다.
@@ -335,6 +335,7 @@ try {
     let one = pix.find((x) => x.name === s.name);
     if (!one) { one = { name: s.name, rare: s.rare, f: {} }; pix.push(one); }
     one.f[s.stage] = s.png;
+    if (s.stage === 2) one.filter = s.filter;
     if (s.skin) one.skin = s.skin;
     return true;
   };
@@ -616,15 +617,19 @@ try {
   const grey = pix.find((c) => !c.rare && c.f[2] && c.f[4]);
   check("instrument:a-plain-card-was-caught-in-silhouette-and-open", Boolean(grey),
     grey ? grey.name : "no plain card yielded stage 2 and stage 4 over " + pix.length + " cards shot");
+  // hud.css의 실루엣 필터 계약을 직접 묻고, 어두워졌는지는 같은 화소로 잰다.
+  const greyReading = async (c) => {
+    const dim = c ? await toneOn(c.f[2], c.f[4], c.skin) : null;
+    const lit = c ? await toneOn(c.f[4], c.f[4], c.skin) : null;
+    const measured = Boolean(dim && lit && dim.n > 0 && lit.n > 0 && c.filter);
+    return { measured, ok: measured && c.filter.split(" ").includes("grayscale(1)") && dim.lum < lit.lum,
+      detail: !measured ? "unmeasured, no silhouette filter and open ink pair"
+        : c.name + " filter " + c.filter + ", luminance " + dim.lum.toFixed(1) + " of "
+          + lit.lum.toFixed(1) + ", over " + dim.n + " ink pixels the open portrait paints" };
+  };
+  const greyHead = await greyReading(grey);
   if (grey) {
-    const dim = await toneOn(grey.f[2], grey.f[4], grey.skin);
-    const lit = await toneOn(grey.f[4], grey.f[4], grey.skin);
-    check("pullshow:the-silhouette-stage-has-no-colour",
-      Boolean(dim) && Boolean(lit) && dim.n > 0 && dim.sat <= lit.sat * GREY_RATIO && dim.lum < lit.lum,
-      (!dim || !lit || dim.n === 0 ? "unmeasured, the open stage inked nothing above the plate"
-        : "saturation " + dim.sat.toFixed(1) + " of " + lit.sat.toFixed(1) + ", luminance "
-        + dim.lum.toFixed(1) + " of " + lit.lum.toFixed(1) + ", over " + dim.n
-        + " ink pixels the open portrait paints"));
+    check("pullshow:the-silhouette-stage-has-no-colour", greyHead.ok, greyHead.detail);
   }
   const late = cards.filter((c) => c.rows[3] !== undefined && c.rows[4] !== undefined);
   check("pullshow:the-stat-rows-stand-only-at-the-last-stage",
@@ -1150,6 +1155,41 @@ try {
     check("control:a-label-without-the-hold-clause-reddens-the-hold-axis",
       namesHold(stripped) === false && namesHold(putBack) === true,
       "planted " + holdSay(stripped) + "; removed " + holdSay(putBack));
+  }
+
+  // page.route로 제공하는 사본에서만 회색 필터를 걷는다. 같은 판독이 빨개져야 교정이다.
+  const headCSS = readFileSync(fileURLToPath(new URL("../web/src/ui/hud.css", import.meta.url)), "utf8");
+  const greyRule = '#pull .now[data-stage="2"] img{filter:grayscale(1) brightness(.24)}';
+  if (headCSS.split(greyRule).length !== 2) throw new Error("stage-2 CSS control anchor must match once");
+  const colouredCSS = headCSS.replace(greyRule, '#pull .now[data-stage="2"] img{filter:brightness(.24)}');
+  let served = 0;
+  await p.route("**/ui/hud.css", async (route) => {
+    const response = await route.fetch();
+    served += 1;
+    await route.fulfill({ response, body: colouredCSS });
+  });
+  let coloured = null;
+  try {
+    await p.setViewportSize({ width: 1280, height: 720 });
+    await p.goto(BASE, { waitUntil: "load" });
+    await p.waitForSelector("#go", { timeout: 15000 });
+    await p.click("#go", { force: true });
+    await p.waitForTimeout(900);
+    await dismiss();
+    await p.evaluate(() => window.__shop(true));
+    await p.waitForSelector("#shop .buy.pull", { timeout: 8000 });
+    await record();
+    pix.length = 0;
+    for (let i = 0; i < SOLO_CAP && !coloured; i += 1) {
+      await solo("town");
+      coloured = pix.find((c) => !c.rare && c.f[2] && c.f[4]);
+    }
+    const planted = await greyReading(coloured);
+    check("control:a-coloured-silhouette-stage-reddens-the-grey-axis",
+      served > 0 && greyHead.ok && planted.measured && !planted.ok,
+      "HEAD " + greyHead.ok + "; served " + served + "; planted axis " + planted.ok + "; " + planted.detail);
+  } finally {
+    await p.unroute("**/ui/hud.css");
   }
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
