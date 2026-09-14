@@ -1,4 +1,6 @@
 import { chromium } from "playwright";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { clearDraw } from "./draw.mjs";
 
 // 화면 위 조작 한 벌의 자. 조작 하나가 다른 그림 언어나 다른 색이나 다른 크기를 쓰면
@@ -12,9 +14,10 @@ import { clearDraw } from "./draw.mjs";
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 // veteran은 첫 진입 개봉을 마친 저장이다. 개봉판은 화면 전체를 덮고 그동안 어떤 창도 안 열리므로,
 // 신규 저장에서 시작하면 이 자는 창 크롬이 아니라 잠긴 문 앞의 어두운 화면을 잰다. 실측 밝기 9.5였다.
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
+const PAGE = "http://127.0.0.1:10310/web/index.html";
+const BASE = PAGE + "?seed=20&preset=rich,veteran";
 // 그 잠금 자체를 재는 표본은 프리셋 없이 따로 세운다. 같은 판에서 둘을 재면 하나가 다른 하나를 지운다.
-const FIRST = "http://127.0.0.1:10310/web/index.html?seed=20";
+const FIRST = PAGE + "?seed=20";
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();
@@ -28,10 +31,12 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 // 기기를 만지는 설정이라 오른쪽 기둥 맨 위 제 칸을 쓴다. 판때기는 자리가 아니라 하는 일을
 // 따라가므로, 소리는 오른쪽으로 가서도 토글 판때기 그대로다.
 const PLAY = ["auto", "out"];
-const SETTINGS = ["mute"];
-const TOGGLES = SETTINGS.concat(PLAY);
+// Help shares the compact settings plate; it is not a gameplay-column opener.
+const SETTINGS = ["mute", "wikiBtn"];
+const COMPACT = SETTINGS.concat(PLAY);
 const OPENERS = ["gymBtn", "rosterBtn", "gramBtn", "shopBtn"];
-const IDS = TOGGLES.concat(OPENERS);
+const IDS = COMPACT.concat(OPENERS);
+const RIGHT = SETTINGS.concat(OPENERS);
 
 let b;
 try {
@@ -106,7 +111,7 @@ try {
     const cols = {
       toggleRight: Math.max(...span(arg.play).map((r) => r.right)),
       openerLeft: Math.min(...span(arg.openers).map((r) => r.left)),
-      settingsBottom: mute.bottom,
+      settingsBottom: Math.max(...span(arg.settings).map((r) => r.bottom)),
       openerTop: Math.min(...span(arg.openers).map((r) => r.top))
     };
     /* 소리와 상태 칩이 세로로 겹쳐 있을 때는 위아래 거리 하나로 충분했다. 둘이 좌우로 갈라선
@@ -116,7 +121,7 @@ try {
     const dy = Math.max(0, Math.max(top.top - mute.bottom, mute.top - top.bottom));
     const chipGap = (dx === 0 && dy === 0) ? 0 : Math.round(Math.max(dx, dy));
     return { out, cols, chipGap, lift };
-  }, { ids: IDS, play: PLAY, openers: OPENERS });
+  }, { ids: IDS, play: PLAY, settings: SETTINGS, openers: OPENERS });
 
   check("instrument:every-control-was-found", scan.out.every((s) => !s.missing),
     scan.out.filter((s) => s.missing).map((s) => s.id).join(", ") || IDS.length + " controls");
@@ -127,11 +132,11 @@ try {
   const plate = (list) => new Set(scan.out.filter((s) => list.includes(s.id)).map((s) => s.w + "x" + s.h));
   const said = (list) => scan.out.filter((s) => list.includes(s.id)).map((s) => s.id + " " + s.w + "x" + s.h).join(", ");
   // 갈래 안에서는 판때기가 같고 갈래끼리는 다르다. 크기까지 같으면 무엇이 창을 여는지가 눌러 봐야 안다.
-  check("chrome:each-kind-of-control-shares-one-plate", plate(TOGGLES).size === 1 && plate(OPENERS).size === 1,
-    said(TOGGLES) + " | " + said(OPENERS));
+  check("chrome:each-kind-of-control-shares-one-plate", plate(COMPACT).size === 1 && plate(OPENERS).size === 1,
+    said(COMPACT) + " | " + said(OPENERS));
   check("instrument:the-plates-were-not-all-identical-by-accident",
-    new Set([...plate(TOGGLES), ...plate(OPENERS)]).size === 2,
-    [...plate(TOGGLES)].join(",") + " against " + [...plate(OPENERS)].join(","));
+    new Set([...plate(COMPACT), ...plate(OPENERS)]).size === 2,
+    [...plate(COMPACT)].join(",") + " against " + [...plate(OPENERS)].join(","));
   check("chrome:the-two-kinds-stand-in-different-columns", scan.cols.toggleRight < scan.cols.openerLeft,
     "toggles end at " + scan.cols.toggleRight.toFixed(0) + "px, openers start at " + scan.cols.openerLeft.toFixed(0) + "px");
   // 설정 칸은 창 기둥 위에 선다. 아래 버튼을 물면 소리를 끄려다 훈련장이 열린다.
@@ -177,6 +182,56 @@ try {
   await np.click("#go", { force: true });
   await np.waitForTimeout(1300);
   const tightRhythm = await rhythmOf(np);
+  // Reuse the gate's live rectangles and pullshow-gate's served-CSS control mechanism.
+  // The parent bytes must fail the same predicate, not merely differ from the candidate.
+  const rightBoxes = (page) => page.evaluate((ids) => ({
+    width: innerWidth,
+    open: !document.getElementById("wiki").hidden,
+    buttons: ids.map((id) => {
+      const e = document.getElementById(id);
+      const r = e.getBoundingClientRect();
+      return { id, left: r.left, width: r.width, height: r.height };
+    })
+  }), RIGHT);
+  const clears = (r) => r.open && r.buttons.length === RIGHT.length
+    && r.buttons.every((x) => x.width > 0 && x.height > 0 && x.left >= r.width);
+  const detail = (r) => r.width + "px " + r.buttons.map((x) => x.id + " left=" + x.left.toFixed(2)).join(", ");
+  const parentCSS = execFileSync("git", ["show", "c2c66a7:web/src/ui/hud.css"], {
+    cwd: fileURLToPath(new URL("..", import.meta.url)), encoding: "utf8", timeout: 10000, windowsHide: true
+  });
+  const candidateReadings = [], parentReadings = [];
+  for (const page of [p, np]) {
+    await page.evaluate(() => window.__wiki(true));
+    await page.waitForTimeout(400);
+    const reading = await rightBoxes(page);
+    candidateReadings.push(reading);
+    await page.evaluate(() => window.__wiki(false));
+    await page.waitForTimeout(400);
+    const control = await b.newContext({ viewport: page.viewportSize() });
+    try {
+      const q = await control.newPage();
+      let served = 0;
+      await q.route("**/ui/hud.css", async (route) => {
+        served++;
+        await route.fulfill({ status: 200, contentType: "text/css; charset=utf-8", body: parentCSS });
+      });
+      await q.goto(BASE, { waitUntil: "load" });
+      await q.click("#go", { force: true });
+      await q.waitForTimeout(1300);
+      await q.evaluate(() => window.__wiki(true));
+      await q.waitForTimeout(400);
+      const old = await rightBoxes(q);
+      parentReadings.push({ ...old, served });
+    } finally {
+      await control.close();
+    }
+  }
+  check("chrome:every-right-column-button-clears-the-viewport-when-a-window-opens",
+    candidateReadings.length === 2 && candidateReadings.every(clears), candidateReadings.map(detail).join(" | "));
+  check("control:served-parent-css-reddens-the-right-column-axis-on-wiki",
+    parentReadings.length === 2 && parentReadings.every((r) => r.served > 0 && r.open && !clears(r)
+      && r.buttons.some((x) => x.id === "wikiBtn" && x.width > 0 && x.height > 0 && x.left < r.width)),
+    parentReadings.map((r) => "RED served=" + r.served + " " + detail(r)).join(" | "));
   await narrow.close();
   const wide = judge(wideRhythm), tight = judge(tightRhythm);
   check("chrome:the-left-column-keeps-the-right-column-rhythm",

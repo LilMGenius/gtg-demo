@@ -340,7 +340,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
    판때기는 자리가 아니라 하는 일을 따라간다. 창을 여는 것이 아니라 켜고 끄는 것이라
    오른쪽으로 옮겨도 46px 토글 판때기를 그대로 쓰고, 그래서 기둥 안에서 갈래가 눈에 갈린다.
    왼쪽 기둥에 두면 자원 띠 두 줄로 실측 85px까지 내려온 상태 칩과 그림자가 서로를 문다. */
-#mute{position:absolute;right:var(--pad-r);top:calc(12px + env(safe-area-inset-top));
+#mute{--col-r:var(--pad-r);position:absolute;right:var(--col-r);top:calc(12px + env(safe-area-inset-top));
   pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);color:var(--dim);
   transform:rotate(var(--tilt));box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel)}
@@ -352,7 +352,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #mute[aria-pressed="true"] .slash{opacity:1}
 /* 상점. 오른쪽 창 기둥의 넷째다. 아웃문그램 214px 판때기 아래 226px에서 시작해 266px에 끝나고,
    세로 360px짜리 가로 모바일에서도 화면 안이다. 판때기와 아이콘 크기는 기둥의 나머지 셋과 같다. */
-#shopBtn{position:absolute;right:var(--pad-r);top:calc(226px + env(safe-area-inset-top));
+#shopBtn{--col-r:var(--pad-r);position:absolute;right:var(--col-r);top:calc(226px + env(safe-area-inset-top));
   pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);color:var(--dim);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(var(--tilt))}
@@ -360,7 +360,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #shopBtn:active{transform:rotate(var(--tilt)) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 /* 도움말. 판을 굴리는 손이 아니라 판을 묻는 손이라 소리와 같은 설정 칸에 선다.
    소리 46px 판때기 왼쪽으로 12px 띄운 58px 자리이고, 740px 폭에서도 상단 띠와 안 겹친다. */
-#wikiBtn{position:absolute;right:calc(var(--pad-r) + 58px);top:calc(12px + env(safe-area-inset-top));
+#wikiBtn{--col-r:calc(var(--pad-r) + 58px);position:absolute;right:var(--col-r);top:calc(12px + env(safe-area-inset-top));
   pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);color:var(--dim);
   transform:rotate(1.4deg);box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel)}
@@ -438,7 +438,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 
 /* 훈련장 진입. 오른쪽 창 기둥의 첫째다. 위 칸은 설정 58px이 쓰므로 70px에서 시작해
    110px에 끝나고, 크로스바 325px보다 위라 여전히 하늘 띠 안이다. */
-#gymBtn{position:absolute;right:var(--pad-r);top:calc(70px + env(safe-area-inset-top));
+#gymBtn{--col-r:var(--pad-r);position:absolute;right:var(--col-r);top:calc(70px + env(safe-area-inset-top));
   pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(-1.4deg);
@@ -518,7 +518,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 }
 
 /* 선수단 진입. 훈련장 110px 아래 122px에서 시작해 162px에 끝난다. 크로스바 325px 위다. */
-#rosterBtn{position:absolute;right:var(--pad-r);top:calc(122px + env(safe-area-inset-top));
+#rosterBtn{--col-r:var(--pad-r);position:absolute;right:var(--col-r);top:calc(122px + env(safe-area-inset-top));
   pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(1.1deg);
@@ -598,7 +598,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #roster .close:active{transform:rotate(1.2deg) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 
 /* 아웃문그램 진입. 선수단 162px 아래 174px에서 시작해 214px에 끝난다. 크로스바 325px 위다. */
-#gramBtn{position:absolute;right:var(--pad-r);top:calc(174px + env(safe-area-inset-top));
+#gramBtn{--col-r:var(--pad-r);position:absolute;right:var(--col-r);top:calc(174px + env(safe-area-inset-top));
   pointer-events:auto;width:66px;height:40px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel);transform:rotate(-2.9deg);
@@ -1438,9 +1438,11 @@ body { word-break: keep-all; overflow-wrap: break-word; }
 /* 창이 열리면 조작 두 기둥은 화면 밖으로 물러난다. 덮개는 밝기만 낮추므로,
    판이 큰 상점과 판이 작은 훈련장이 같은 덮개를 쓰고도 남는 여백이 갈려
    창마다 다른 말을 했다. 상태 칩은 남긴다. 잔고를 보며 사는 자리라 사라지면 살 수가 없다.
-   96px은 마진 12px에 가장 넓은 판때기 66px을 더하고 그림자 여유를 둔 값이라
-   어느 기둥도 자기 폭보다 많이 빠져 화면에 한 화소도 안 남는다.
+   오른쪽은 각 버튼의 폭과 --col-r만큼 물러나고 기울기와 배지를 위해 12px을 더 비운다.
+   왼쪽은 96px 물러나 화면에 한 화소도 안 남는다.
    .24s는 창이 뜨는 시간과 같아 두 움직임이 한 동작으로 읽힌다. */
-#mute,#auto,#out,#gymBtn,#rosterBtn,#gramBtn,#shopBtn{transition:translate .24s ease}
+/* Native translate percentages use the button width; --col-r shares its rest offset.
+   https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/translate */
+#mute,#wikiBtn,#auto,#out,#gymBtn,#rosterBtn,#gramBtn,#shopBtn{transition:translate .24s ease}
 #hud:has(:is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is(#auto,#out){translate:-96px 0}
-#hud:has(:is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is(#mute,#wikiBtn,#gymBtn,#rosterBtn,#gramBtn,#shopBtn){translate:96px 0}
+#hud:has(:is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is(#mute,#wikiBtn,#gymBtn,#rosterBtn,#gramBtn,#shopBtn){translate:calc(100% + var(--col-r) + 12px) 0}
