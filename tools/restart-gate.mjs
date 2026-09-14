@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { CAUSE_LABEL } from "../src/ledger.mjs";
 import { pinClock } from "./clock.mjs";
@@ -27,7 +27,7 @@ const waitFrames = async (page, n) => {
   await page.waitForFunction(([f, k]) => window.__frames() - f >= k, [from, n], { timeout: 60000, polling: "raf" });
 };
 
-async function sample(browser, body, tag) {
+async function sample(browser, body, tag, { scene, error = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const errors = [];
   try {
@@ -44,8 +44,13 @@ async function sample(browser, body, tag) {
     page.on("pageerror", (e) => errors.push(String(e)));
     page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
     if (body !== null) await page.route("**/web/src/main.mjs", (r) => r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body }));
+    if (scene) await page.route("**/web/src/render/scene.mjs", (r) => r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body: scene }));
+    if (error) await ctx.addInitScript(() => {
+      window.addEventListener("load", () => { throw new Error("m2 restart injected page error"); }, { once: true });
+    });
     await page.goto(BASE, { waitUntil: "load" });
     await page.waitForSelector("#go");
+    if (error) return { errors };
     await waitFrames(page, 54);
     await page.click("#go", { force: true });
     await waitFrames(page, 84);
@@ -106,7 +111,7 @@ async function sample(browser, body, tag) {
       const records = await page.evaluate(() => window.__m2Windows);
       for (const r of records.slice(seen)) {
         const type = ["save", "catch"].includes(r.kind) ? "hand" : r.z[0] < 0 ? "net" : "other";
-        console.log(tag + " natural " + type + " " + JSON.stringify({ caption: r.caption, kind: r.kind, frames: [r.start, r.end], dribbles: r.dribbles, z: [Math.min(...r.z), Math.max(...r.z)], rest: r.z[0], reset: r.resetZ, spot, radius, samples: r.z.length }));
+        console.log(tag + " natural " + type + " " + JSON.stringify({ caption: r.caption, kind: r.kind, frames: [r.start, r.end], dribbles: r.dribbles, z: [Math.min(...r.z), Math.max(...r.z)], rest: r.z[0], reset: r.resetZ, spot, radius }));
         if (type !== "other" && !chosen[type]) chosen[type] = r;
       }
       seen = records.length;
@@ -120,6 +125,8 @@ async function sample(browser, body, tag) {
       silent: Boolean(net) && net.dribbles === 0,
       bounce: Boolean(hand) && hand.dribbles > 0,
       stationary: stationary(net) && stationary(hand),
+      kicked: Boolean(net) && net.z.every(Number.isFinite) && Math.max(...net.z) > net.z[0] + radius,
+      zMax: net && Math.max(...net.z),
       detail: JSON.stringify({ net: net?.caption, hand: hand?.caption, netDribbles: net?.dribbles, handDribbles: hand?.dribbles }),
       errors
     };
@@ -138,10 +145,20 @@ try {
   const live = await sample(browser, null, "live");
   check("restart:the-caption-names-the-owning-stat-and-nothing-it-does-not-draw", live.caption, live.detail);
   check("restart:no-dribble-sound-while-the-ball-is-in-the-net", live.silent, live.detail);
-  check("restart:the-held-ball-still-bounces", live.bounce, live.detail);
+  check("restart:the-held-ball-still-calls-the-dribble-sound", live.bounce, live.detail);
   check("restart:nothing-is-kicked-before-the-next-shot", live.stationary, "all sampled z <= resting z + ball radius; reset z equals ready spot");
   const control = await sample(browser, old, "control");
   check("control:the-old-caption-and-dribble-redden-the-axes", !control.caption && !control.silent && control.bounce && control.stationary, OLD + " caption=" + control.caption + " net-silent=" + control.silent + " " + control.detail);
+  // Reuse walkback-gate's served-module routing for a rendered-ball plant. The scene's
+  // ballPos is a getter; accumulate the nudge after poses overwrite the ball each frame.
+  const source = readFileSync(new URL("../web/src/render/scene.mjs", import.meta.url), "utf8");
+  const anchor = "    if (cue) { ballProbe.sample(tail ? tail.kind : 'flight'); stageProbe.sample(); }";
+  if (source.split(anchor).length !== 2) throw new Error("scene plant anchor must match once");
+  const scene = "window.__m2plant = true;\n" + source.replace(anchor, anchor + "\n    if (window.__m2plant && tail && cue?.ended && document.querySelector('#caption .tick')) ball.position.z += (tail.m2KickZ = (tail.m2KickZ || 0) + 0.05);");
+  const planted = await sample(browser, null, "planted", { scene });
+  check("control:a-kicked-ball-reddens-the-stationary-axis", live.stationary && !planted.stationary && planted.kicked, "live stationary=" + live.stationary + " planted stationary=" + planted.stationary + " planted z max=" + planted.zMax);
+  const injected = await sample(browser, null, "injected", { error: true });
+  check("control:an-injected-page-error-reddens-the-console-axis", live.errors.length === 0 && injected.errors.some((e) => e === "Error: m2 restart injected page error"), "live errors=" + JSON.stringify(live.errors) + " injected errors=" + JSON.stringify(injected.errors));
   check("console:no-errors", live.errors.length + control.errors.length === 0, JSON.stringify([...live.errors, ...control.errors]));
 } catch (e) {
   check("instrument:completed", false, String(e.stack || e));
