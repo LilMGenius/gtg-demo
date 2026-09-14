@@ -79,7 +79,7 @@ const TABLES = {
       ['묶음', value('pull-bulk')],
       ['묶음 보상', value('pull-bonus')],
       ['이용권 한도', value('ticket-cap')]
-    ])],
+    ]), table(['종류', '설명'], PULL_KINDS.map(k => [k.name, k.note]))],
   gram: (ctx) => [table(['자리', '값'], [
       ['좋아요', value('like-base')],
       ['동네 한 등급', value('like-per-city')],
@@ -115,7 +115,6 @@ export function wikiBody(key, ctx) {
   const cat = WIKI_CATS.some(c => c.key === key) ? key : 'hand';
   const page = pages.find(p => p.id === cat);
   const html = page.bodyHtml.replaceAll('{{value}}', () => esc(value(cat)));
-  const arrayNotes = cat === 'pull' ? PULL_KINDS.map(k => '<p>' + esc(k.note) + '</p>').join('') : '';
   return '<h4>' + esc(page.title) + '</h4><div class="wiki-prose" data-wiki-id="' + cat + '">' + html + '</div>'
-    + arrayNotes + TABLES[cat](ctx || {}).join('');
+    + TABLES[cat](ctx || {}).join('');
 }
