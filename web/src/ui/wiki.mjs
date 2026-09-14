@@ -1,5 +1,5 @@
 // 위키. 도움말이 타이틀 패널 하나와 재화 칩 하나로 갈려 있었다. 두 자리 다 판 밖이라
-// 판을 굴리는 중에는 무엇이 어떻게 도는지 물어볼 곳이 없었다. 물음표 하나 아래 여덟 칸이 그 자리다.
+// 판을 굴리는 중에는 무엇이 어떻게 도는지 물어볼 곳이 없었다. 물음표 하나 아래 아홉 칸이 그 자리다.
 //
 // 표의 수는 전부 코드 상수에서 읽는다. 화면에 수를 옮겨 적으면 상수가 바뀐 날 화면만 옛 수를 말하고,
 // 그 거짓말은 아무도 안 고친다. 그래서 이 파일에는 판정에 쓰이는 수가 하나도 없다.
@@ -11,11 +11,12 @@ import { PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP, PULL_KINDS } from '../../
 import { CAUSE_LABEL, INPUT_CAUSES } from '../../../src/ledger.mjs';
 import { LIKE_BASE, LIKE_PER_CITY, MUTUAL_STEP, MUTUAL_CAP, SELFIE_BASE } from '../state/gram.mjs';
 
-// 카테고리 여덟. 키는 ASCII고 화면에 서는 것은 라벨이다. 라벨로 찾으면 라벨을 다듬은 날 계기가 죽는다.
+// 카테고리 아홉. 키는 ASCII고 화면에 서는 것은 라벨이다. 라벨로 찾으면 라벨을 다듬은 날 계기가 죽는다.
 export const WIKI_CATS = [
   { key: 'hand', label: '조작' },
   { key: 'coin', label: '재화' },
   { key: 'drill', label: '훈련' },
+  { key: 'gear', label: '장비' },
   { key: 'pull', label: '이적시장' },
   { key: 'gram', label: '아웃문그램' },
   { key: 'bot', label: '봇' },
@@ -35,7 +36,7 @@ const table = (heads, list) => '<table><thead><tr>'
   + '</tbody></table>';
 const says = (list) => list.filter((s) => s).map((s) => '<p>' + esc(s) + '</p>').join('');
 
-/* 본문 여덟. 제목은 명사구, 그 아래 두세 줄, 그리고 표다. 문장만 있는 칸은 수치를 물으러 온 눈이
+/* 본문 아홉. 제목은 명사구, 그 아래 두세 줄, 그리고 표다. 문장만 있는 칸은 수치를 물으러 온 눈이
    빈손으로 나가고, 표만 있는 칸은 그 수가 무엇의 수인지가 안 적힌다. */
 const BODY = {
   hand: () => ({
@@ -51,9 +52,7 @@ const BODY = {
   }),
   coin: () => ({
     head: '버는 법',
-    text: ['막은 슛과 먹힌 슛이 모두 값을 남긴다',
-      '유명한 키커일수록 막았을 때 더 붙는다',
-      '스폰은 결제로만 들어온다',
+    text: ['유명한 키커일수록 막았을 때 더 붙는다',
       '세이브 다섯 칸은 이번 판의 슛 결과다: 초록은 세이브, 빨강은 실점, 노랑은 진행 중이다'],
     tables: [table(['자리', '값'], [
       ['막으면', COIN_SAVE],
@@ -64,14 +63,17 @@ const BODY = {
     ])]
   }),
   drill: (ctx) => ({
-    head: '능력과 선반',
+    head: '능력',
     text: ['다섯 슛으로 한 판을 마치면 레벨이 오르고 훈련 한 회가 쌓인다',
       '훈련은 능력 한 칸을 올린다',
-      '올릴 칸이 없으면 훈련 한 회가 값으로 바뀐다',
-      '선반은 등급마다 판정을 조금씩 민다'],
-    tables: [table(['자리', '값'], [['훈련 대신', COIN_DRILL]])].concat(
-      (ctx.shelves || []).map((s) => '<h5>' + esc(s.head) + '</h5>'
-        + table(['이름', '효과'], (s.rows || []).map((g) => [g.name, g.note]))))
+      '올릴 칸이 없으면 훈련 한 회가 값으로 바뀐다'],
+    tables: [table(['자리', '값'], [['훈련 대신', COIN_DRILL]])]
+  }),
+  gear: (ctx) => ({
+    head: '장비',
+    text: [],
+    tables: (ctx.shelves || []).map((s) => '<h5>' + esc(s.head) + '</h5>'
+      + table(['이름', '효과'], (s.rows || []).map((g) => [g.name, g.note])))
   }),
   pull: () => ({
     head: '이적시장',
@@ -114,9 +116,7 @@ const BODY = {
   }),
   risk: (ctx) => ({
     head: '사고',
-    text: ['막을 수 있었는데 안 막히는 자리가 있다',
-      '입력 셋이 어긋나면 그 슛은 거기서 갈린다',
-      '선반은 이 사고들을 조금씩 깎는다'],
+    text: ['입력 셋이 어긋나면 그 슛은 거기서 갈린다'],
     tables: [
       table(['입력', '무엇'], [
         [CAUSE_LABEL[INPUT_CAUSES[0]], '고른 자리'],
