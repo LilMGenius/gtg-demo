@@ -263,8 +263,15 @@ try {
   });
   const gainPattern = /const BALL_FAR_GAIN = [^;]+;/g;
   if ([...headSource.matchAll(gainPattern)].length !== 1) throw new Error("Expected one BALL_FAR_GAIN constant");
-  const body = headSource.replace(gainPattern, "const BALL_FAR_GAIN = 1.0;");
+  let body = headSource.replace(gainPattern, "const BALL_FAR_GAIN = 1.0;");
   if (body === headSource) throw new Error("Control did not change BALL_FAR_GAIN");
+  // The distance curve has two anchors; remove near enlargement as well for an unscaled control.
+  const nearPattern = /const ballNearGain = [^;]+;/g;
+  const nearMatches = [...body.matchAll(nearPattern)];
+  if (headSource.includes("const distanceGain =")) {
+    if (nearMatches.length !== 1) throw new Error("Expected one ballNearGain anchor");
+    body = body.replace(nearPattern, "const ballNearGain = 1.0;");
+  }
   const controlCtx = await br.newContext({ viewport: { width: W, height: H } });
   const controlPage = await controlCtx.newPage();
   const controlErrors = [];
