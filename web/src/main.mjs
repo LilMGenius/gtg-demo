@@ -723,13 +723,11 @@ function rollCaptions(result) {
 }
 
 // 공을 다시 세우는 시간. 스로잉과 골킥이 이 초를 줄이고, 줄어드는 것이 화면에 보여야 선택이 선택이 된다.
-function countdown(sec, label, then, hand) {
+function countdown(sec, label, then) {
   // 실시간이 아니라 세계시간으로 센다. 히트스톱이 걸린 동안에도 초가 흐르면
   // 화면은 멈췄는데 숫자만 혼자 가고, 정지 프레임 두 장이 그 숫자 하나로 갈린다.
   const until = stage.now() + sec;
-  // 공을 다시 세우는 몇 초가 통째로 무음이었다. 키퍼는 그동안 공을 바닥에 튀기고 있다.
-  // 간격을 고정하면 메트로놈이 되어 사람 손이 아니라 기계로 들린다.
-  let bounce = stage.now() + 0.38;
+  // 초읽기는 시간만 그린다. 화면에 없는 접촉을 메트로놈처럼 소리로 채우지 않는다.
   // 자막은 세로 flex다. 라벨과 숫자를 형제로 넣으면 두 칸으로 갈리고, column-reverse라
   // 숫자가 실점 원인 배지 자리로 올라간다. 한 span 안에 넣어 한 줄로 붙인다.
   // 구조는 한 번만 만들고 숫자만 간다. 매 틱 새 span이면 등장 애니메이션이 0.1초마다 다시 돈다.
@@ -739,7 +737,6 @@ function countdown(sec, label, then, hand) {
     const now = stage.now();
     const left = until - now;
     if (left <= 0) { el('caption').textContent = ''; then(); return; }
-    if (hand && now >= bounce && left > 0.45) { stage.sfx.dribble(); bounce = now + 0.62 + roll() * 0.36; }
     tickEl.textContent = left.toFixed(1) + 's';
     timer = stage.after(0.1, tick);
   };
@@ -749,7 +746,7 @@ function countdown(sec, label, then, hand) {
 function restart(result) {
   persist();
   const hand = ballInHand(result);
-  countdown(restartDelay(state.keeper, result), hand ? CAUSE_LABEL.throwing : CAUSE_LABEL.goalKick, nextShot, hand);
+  countdown(restartDelay(state.keeper, result), hand ? CAUSE_LABEL.throwing : CAUSE_LABEL.goalKick, nextShot);
 }
 
 function endSet() {
@@ -765,7 +762,7 @@ function endSet() {
   state.tickets = ticketGain(state.results, state.tickets);
   persist();
   pips();
-  timer = stage.after(0.9, () => countdown(setBreak(), '한숨 돌리는 중', nextSet, false));
+  timer = stage.after(0.9, () => countdown(setBreak(), '한숨 돌리는 중', nextSet));
 }
 
 /* 관찰자 하나. 창 크기가 바뀌면 넘침이 다시 계산되므로, 그릴 때와 굴릴 때만 세면 옛 답이 남는다.
