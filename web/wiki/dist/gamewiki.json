@@ -1,0 +1,26 @@
+{
+  "command": "embed",
+  "generatedFrom": [
+    "bot.md",
+    "buff.md",
+    "coin-conceded.md",
+    "coin-save.md",
+    "coin.md",
+    "drill.md",
+    "gear.md",
+    "gram.md",
+    "hand.md",
+    "like-base.md",
+    "like-per-city.md",
+    "mutual-cap.md",
+    "mutual-step.md",
+    "pull-bonus.md",
+    "pull-bulk.md",
+    "pull-cost.md",
+    "pull.md",
+    "risk.md",
+    "selfie-base.md",
+    "ticket-cap.md"
+  ],
+  "tool": "gamewiki"
+}

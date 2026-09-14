@@ -46,7 +46,7 @@ try {
   const tracked = hashes(DIST);
   const fresh = embed(SOURCE, join(temp, 'fresh'));
   report.trackedHashes = tracked;
-  check('wikisrc:the-tracked-output-matches-a-fresh-build', same(tracked, fresh) && Object.keys(tracked).length === 4, { tracked, fresh });
+  check('wikisrc:the-tracked-output-matches-a-fresh-build', same(tracked, fresh) && Object.keys(tracked).length === 5, { tracked, fresh });
   const entities = JSON.parse(readFileSync(join(DIST, 'entities.json')));
   const pages = JSON.parse(readFileSync(join(DIST, 'pages.json')));
   const counts = Object.fromEntries(KEYS.map(k => [k, entities.filter(e => e.categories.includes(k)).length]));
@@ -91,24 +91,35 @@ try {
   await page.click('#go', { force: true });
   await page.click('#wikiBtn', { force: true });
   await page.evaluate(() => import('./src/ui/wiki.mjs').then(m => m.wikiReady));
-  for (const key of KEYS) {
-    await page.locator('#wiki .cats [data-cat="' + key + '"]').click();
-    const expected = pages.find(p => p.id === key);
-    const result = await page.evaluate(({ html, title }) => {
+  const readBody = expected => page.evaluate(({ html, title }) => {
       const template = document.createElement('template');
       template.innerHTML = html;
-      const prose = document.querySelector('#wiki .wiki-prose');
       const body = document.querySelector('#wiki .body');
-      return { expected: template.content.textContent, actual: prose?.textContent, expectedTitle: title,
+      const paragraphs = root => [...root.querySelectorAll('p')].filter(p => !p.closest('table')).map(p => p.textContent);
+      return { expected: paragraphs(template.content), actual: paragraphs(body), expectedTitle: title,
         title: body.querySelector('h4').textContent, visible: !document.querySelector('#wiki').hidden && body.getBoundingClientRect().height > 0,
         tables: body.querySelectorAll('table').length };
     }, { html: substituted(expected), title: expected.title });
+  const matchesBody = r => same(r.actual, r.expected) && r.title === r.expectedTitle && r.visible && r.tables > 0;
+  for (const key of KEYS) {
+    await page.locator('#wiki .cats [data-cat="' + key + '"]').click();
+    const result = await readBody(pages.find(p => p.id === key));
     report.bodies.push({ key, ...result });
     if (key === 'coin' || key === 'gear') {
       await page.screenshot({ path: join(EVIDENCE, 'p6b-wiki-' + key + '.png') });
     }
   }
-  check('wikisrc:the-panel-renders-the-built-body', report.bodies.length === KEYS.length && report.bodies.every(r => r.actual === r.expected && r.title === r.expectedTitle && r.visible && r.tables > 0), report.bodies);
+  check('wikisrc:the-panel-renders-the-built-body', report.bodies.length === KEYS.length && report.bodies.every(matchesBody), report.bodies);
+  await page.locator('#wiki .cats [data-cat="pull"]').click();
+  await page.evaluate(() => {
+    const extra = document.createElement('p');
+    extra.textContent = 'Extra paragraph control';
+    document.querySelector('#wiki .body').append(extra);
+  });
+  const injected = await readBody(pages.find(p => p.id === 'pull'));
+  const matchAxis = matchesBody(injected);
+  console.log('CONTROL extra non-table paragraph ' + (matchAxis ? 'GREEN' : 'RED'));
+  check('control:an-extra-paragraph-reddens-the-built-body-axis', !matchAxis && injected.actual.length === injected.expected.length + 1, { ...injected, matchAxis });
   await page.locator('#wiki .cats [data-cat="drill"]').click();
   const link = page.locator('#wiki .wiki-prose a');
   await link.click();
@@ -145,9 +156,9 @@ try {
   await delayed.click('#go', { force: true });
   await delayed.click('#wikiBtn', { force: true });
   await delayed.locator('#wiki .cats [data-cat="coin"]').click();
-  const before = await delayed.locator('#wiki .wiki-prose').textContent();
+  const before = await delayed.locator('#wiki .body p').evaluateAll(ps => ps.filter(p => !p.closest('table')).map(p => p.textContent));
   const expectedCoin = report.bodies.find(r => r.key === 'coin').expected;
-  check('wikisrc:the-built-fallback-opens-before-fetch-returns', before === expectedCoin && fetches === 1, { expected: expectedCoin, before, fetches });
+  check('wikisrc:the-built-fallback-opens-before-fetch-returns', same(before, expectedCoin) && fetches === 1, { expected: expectedCoin, before, fetches });
   release();
   await delayed.waitForFunction(text => document.querySelector('#wiki .wiki-prose')?.textContent.includes(text), marker);
   check('control:changed-fetched-body-repaints-the-open-panel', fetches === 1 && (await delayed.locator('#wiki .wiki-prose').textContent()).includes(marker), { fetches, marker });
