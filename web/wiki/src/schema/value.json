@@ -1,0 +1,54 @@
+{
+  "type": "object",
+  "required": [
+    "id",
+    "type",
+    "game",
+    "title",
+    "categories",
+    "aliases",
+    "relations",
+    "valueFrom"
+  ],
+  "properties": {
+    "type": {
+      "const": "value"
+    },
+    "game": {
+      "const": "gtg"
+    },
+    "categories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "enum": [
+          "hand",
+          "coin",
+          "drill",
+          "gear",
+          "pull",
+          "gram",
+          "bot",
+          "buff",
+          "risk"
+        ]
+      }
+    },
+    "valueFrom": {
+      "enum": [
+        "wallet.COIN_SAVE",
+        "wallet.COIN_CONCEDED",
+        "wallet.COIN_DRILL",
+        "roster.PULL_COST",
+        "roster.PULL_BULK",
+        "roster.PULL_BONUS",
+        "roster.TICKET_CAP",
+        "gram.LIKE_BASE",
+        "gram.LIKE_PER_CITY",
+        "gram.MUTUAL_STEP",
+        "gram.MUTUAL_CAP",
+        "gram.SELFIE_BASE"
+      ]
+    }
+  }
+}

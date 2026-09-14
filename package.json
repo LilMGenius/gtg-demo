@@ -16,12 +16,14 @@
     "gate:sfx": "node tools/sfx-gate.mjs",
     "gate:perf": "node tools/perf-gate.mjs",
     "gate:version": "node tools/version-gate.mjs",
-    "test": "node --test test/contract.test.mjs"
+    "test": "node --test test/contract.test.mjs",
+    "wiki:build": "gamewiki check web/wiki/src && gamewiki embed web/wiki/src --out web/wiki/dist"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.4.2",
     "@gltf-transform/extensions": "^4.4.2",
     "@gltf-transform/functions": "^4.4.2",
+    "gamewiki": "file:../gamewiki",
     "meshoptimizer": "^1.2.0",
     "three": "^0.185.1"
   }

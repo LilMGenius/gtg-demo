@@ -401,6 +401,8 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 .cue.up{top:0;background:linear-gradient(to bottom,#080b07f2,#080b0700)}
 #wiki h4{font-family:var(--disp);font-weight:400;font-size:var(--fs-title);color:#ffd83d}
 #wiki h5{font-family:var(--body);font-weight:700;font-size:var(--fs-body);color:var(--ink)}
+#wiki .wiki-prose{display:contents}
+#wiki .wiki-prose a{color:inherit}
 #wiki p{font-family:var(--body);font-size:var(--fs-body);color:var(--dim);line-height:1.45}
 #wiki table{width:100%;border-collapse:collapse}
 #wiki th,#wiki td{padding:5px 8px 6px;border:2px solid #ffffff14;text-align:left;vertical-align:top;

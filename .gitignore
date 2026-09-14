@@ -34,3 +34,6 @@ sim/out/
 # npm tarballs. vendor/ already holds the extracted files
 *.tgz
 cmsg.txt
+
+# Built wiki data is served directly with web/.
+!web/wiki/dist/

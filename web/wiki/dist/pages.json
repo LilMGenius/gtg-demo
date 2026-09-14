@@ -1,0 +1,276 @@
+[
+  {
+    "backlinks": [
+      "gram"
+    ],
+    "bodyHtml": "<p>봇이 대신 막은 슛에는 팔로워가 안 붙는다</p>\n<p>판단력만 봇 값으로 바뀐다</p>\n<p>크레딧은 여섯 시간까지만 쌓인다</p>",
+    "categories": [
+      "bot"
+    ],
+    "id": "bot",
+    "links": [],
+    "title": "봇",
+    "url": "bot.html"
+  },
+  {
+    "backlinks": [
+      "bot"
+    ],
+    "bodyHtml": "<p>시간이 아니라 슛으로 닳는다. 한 번에 한 종류만 든다</p>\n<p>한 종류를 다 쓰기 전에는 다른 종류를 못 산다</p>\n<p>쌓아 둘 수 있는 슛에는 한도가 있다</p>",
+    "categories": [
+      "buff"
+    ],
+    "id": "buff",
+    "links": [],
+    "title": "버프",
+    "url": "buff.html"
+  },
+  {
+    "backlinks": [
+      "coin-conceded",
+      "coin-save",
+      "hand"
+    ],
+    "bodyHtml": "<p>유명한 키커일수록 막았을 때 더 붙는다</p>\n<p>세이브 다섯 칸은 이번 판의 슛 결과다: 초록은 세이브, 빨강은 실점, 노랑은 진행 중이다</p>",
+    "categories": [
+      "coin"
+    ],
+    "id": "coin",
+    "links": [],
+    "title": "버는 법",
+    "url": "coin.html"
+  },
+  {
+    "backlinks": [],
+    "bodyHtml": "<p><a class=\"internal new\" href=\"./coin.html\">coin</a></p>",
+    "categories": [
+      "coin"
+    ],
+    "id": "coin-conceded",
+    "links": [
+      "coin"
+    ],
+    "title": "먹혀도",
+    "url": "coin-conceded.html"
+  },
+  {
+    "backlinks": [],
+    "bodyHtml": "<p><a class=\"internal new\" href=\"./coin.html\">coin</a></p>",
+    "categories": [
+      "coin"
+    ],
+    "id": "coin-save",
+    "links": [
+      "coin"
+    ],
+    "title": "막으면",
+    "url": "coin-save.html"
+  },
+  {
+    "backlinks": [
+      "coin",
+      "drill"
+    ],
+    "bodyHtml": "<p>다섯 슛으로 한 판을 마치면 레벨이 오르고 훈련 한 회가 쌓인다</p>\n<p><a class=\"internal new\" href=\"./drill.html\">훈련</a>은 능력 한 칸을 올린다</p>\n<p>올릴 칸이 없으면 훈련 한 회가 {{value}} 땀으로 바뀐다</p>",
+    "categories": [
+      "drill"
+    ],
+    "id": "drill",
+    "links": [
+      "drill"
+    ],
+    "title": "능력",
+    "url": "drill.html"
+  },
+  {
+    "backlinks": [
+      "drill"
+    ],
+    "bodyHtml": "",
+    "categories": [
+      "gear"
+    ],
+    "id": "gear",
+    "links": [],
+    "title": "장비",
+    "url": "gear.html"
+  },
+  {
+    "backlinks": [
+      "like-base",
+      "like-per-city",
+      "mutual-cap",
+      "mutual-step",
+      "pull",
+      "selfie-base"
+    ],
+    "bodyHtml": "<p>막은 슛이 소문이 되어 팔로워가 붙는다</p>\n<p>맞팔은 소문을 조금씩 넓힌다</p>\n<p>동네 등급이 오르면 같은 슛에 더 붙는다</p>",
+    "categories": [
+      "gram"
+    ],
+    "id": "gram",
+    "links": [],
+    "title": "팔로워와 맞팔",
+    "url": "gram.html"
+  },
+  {
+    "backlinks": [
+      "risk"
+    ],
+    "bodyHtml": "<p>화면 세 칸을 누른다. 공이 올 곳을 찍는다</p>\n<p>너무 빠르면 역동작, 너무 늦으면 손이 안 닿는다</p>\n<p>마우스도 같은 세 칸이고 키보드도 된다</p>\n<p>컨디션은 이번 판의 능력에 더해지는 보정이다</p>",
+    "categories": [
+      "hand"
+    ],
+    "id": "hand",
+    "links": [],
+    "title": "세 칸과 타이밍",
+    "url": "hand.html"
+  },
+  {
+    "backlinks": [],
+    "bodyHtml": "<p><a class=\"internal new\" href=\"./gram.html\">gram</a></p>",
+    "categories": [
+      "gram"
+    ],
+    "id": "like-base",
+    "links": [
+      "gram"
+    ],
+    "title": "좋아요",
+    "url": "like-base.html"
+  },
+  {
+    "backlinks": [],
+    "bodyHtml": "<p><a class=\"internal new\" href=\"./gram.html\">gram</a></p>",
+    "categories": [
+      "gram"
+    ],
+    "id": "like-per-city",
+    "links": [
+      "gram"
+    ],
+    "title": "동네 한 등급",
+    "url": "like-per-city.html"
+  },
+  {
+    "backlinks": [],
+    "bodyHtml": "<p><a class=\"internal new\" href=\"./gram.html\">gram</a></p>",
+    "categories": [
+      "gram"
+    ],
+    "id": "mutual-cap",
+    "links": [
+      "gram"
+    ],
+    "title": "맞팔 한도",
+    "url": "mutual-cap.html"
+  },
+  {
+    "backlinks": [],
+    "bodyHtml": "<p><a class=\"internal new\" href=\"./gram.html\">gram</a></p>",
+    "categories": [
+      "gram"
+    ],
+    "id": "mutual-step",
+    "links": [
+      "gram"
+    ],
+    "title": "맞팔 한 명",
+    "url": "mutual-step.html"
+  },
+  {
+    "backlinks": [
+      "gear",
+      "pull-bonus",
+      "pull-bulk",
+      "pull-cost",
+      "ticket-cap"
+    ],
+    "bodyHtml": "<p>이용권은 완봉으로 쌓인다</p>",
+    "categories": [
+      "pull"
+    ],
+    "id": "pull",
+    "links": [],
+    "title": "이적시장",
+    "url": "pull.html"
+  },
+  {
+    "backlinks": [],
+    "bodyHtml": "<p><a class=\"internal new\" href=\"./pull.html\">pull</a></p>",
+    "categories": [
+      "pull"
+    ],
+    "id": "pull-bonus",
+    "links": [
+      "pull"
+    ],
+    "title": "묶음 보상",
+    "url": "pull-bonus.html"
+  },
+  {
+    "backlinks": [],
+    "bodyHtml": "<p><a class=\"internal new\" href=\"./pull.html\">pull</a></p>",
+    "categories": [
+      "pull"
+    ],
+    "id": "pull-bulk",
+    "links": [
+      "pull"
+    ],
+    "title": "묶음",
+    "url": "pull-bulk.html"
+  },
+  {
+    "backlinks": [],
+    "bodyHtml": "<p><a class=\"internal new\" href=\"./pull.html\">pull</a></p>",
+    "categories": [
+      "pull"
+    ],
+    "id": "pull-cost",
+    "links": [
+      "pull"
+    ],
+    "title": "한 장",
+    "url": "pull-cost.html"
+  },
+  {
+    "backlinks": [
+      "buff"
+    ],
+    "bodyHtml": "<p>입력 셋이 어긋나면 그 슛은 거기서 갈린다</p>",
+    "categories": [
+      "risk"
+    ],
+    "id": "risk",
+    "links": [],
+    "title": "사고",
+    "url": "risk.html"
+  },
+  {
+    "backlinks": [],
+    "bodyHtml": "<p><a class=\"internal new\" href=\"./gram.html\">gram</a></p>",
+    "categories": [
+      "gram"
+    ],
+    "id": "selfie-base",
+    "links": [
+      "gram"
+    ],
+    "title": "같이 한 장",
+    "url": "selfie-base.html"
+  },
+  {
+    "backlinks": [],
+    "bodyHtml": "<p><a class=\"internal new\" href=\"./pull.html\">pull</a></p>",
+    "categories": [
+      "pull"
+    ],
+    "id": "ticket-cap",
+    "links": [
+      "pull"
+    ],
+    "title": "이용권 한도",
+    "url": "ticket-cap.html"
+  }
+]

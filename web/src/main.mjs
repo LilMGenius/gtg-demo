@@ -1263,6 +1263,7 @@ function meCues() {
 // 표의 수는 wiki.mjs가 상수에서 읽으므로 이 자리는 화면에 붙이는 일만 한다.
 let wikiAt = 'hand';
 let wikiWatch = null;
+window.addEventListener('wiki-ready', () => { if (el('wiki') && !el('wiki').hidden) paintWiki(); });
 
 function paintWiki() {
   const box = el('wiki');
@@ -1271,6 +1272,10 @@ function paintWiki() {
     { notices: SHOP_NOTICES_FOR_WIKI, shelves: SHELF_NOTES_FOR_WIKI, mishaps: MISHAP_SHELF });
   for (const b of box.querySelectorAll('.cats [data-cat]')) b.onclick = () => { wikiAt = b.dataset.cat; paintWiki(); };
   box.querySelector('.close').onclick = closeWiki;
+  for (const link of box.querySelectorAll('.wiki-prose a')) link.onclick = (event) => {
+    const id = link.getAttribute('href').replace(/^\.\//, '').replace(/\.html$/, '');
+    if (box.querySelector('.cats [data-cat="' + id + '"]')) { event.preventDefault(); wikiAt = id; paintWiki(); }
+  };
   const body = box.querySelector('.body');
   body.onscroll = () => scrollCue(box.querySelector('.bodybox'));
   /* 창 크기가 바뀌면 넘침이 다시 계산된다. 그릴 때와 굴릴 때만 세면 창만 바뀐 화면에 옛 답이 남는다.
