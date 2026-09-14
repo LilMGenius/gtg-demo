@@ -1250,7 +1250,7 @@ const TOUCHED = new Set(['contact']);
     /* 첫 사건이 언제 시작하는가. 접촉으로 끝나는 사건은 공이 어딘가에 내려앉기 전에 시작해야 한다.
        0.9초를 기다리면 막은 공도 이미 흙에 서 있고 먹힌 공은 그물 안에 있어서, 그 뒤에 장갑으로
        옮겨지는 그림이 판정이 뒤늦게 발동해 공을 순간이동시킨 것으로 읽힌다.
-       공이 아무에게도 안 닿고 지나가는 사건만 그 0.9초를 그대로 쓴다. 거기서는 그물이 부푸는 것과
+       공이 아무에게도 안 닿고 지나가는 사건만 0.9초 이상 기다린다. 거기서는 그물이 부푸는 것과
        공이 바 위로 넘어가는 것이 사건 자체라 잘라내면 결과가 화면에서 사라진다. */
     const first = (result.events || []).find((e) => e.t !== 'result');
     cue.wait = TOUCHED.has(first && first.t) ? 0 : 0.9;
@@ -1371,7 +1371,8 @@ const TOUCHED = new Set(['contact']);
         // 그물은 공을 세우지 못한다. 힘을 잃고 떨어져 골대 안쪽으로 굴러 들어간다.
         if (p >= 1) {
           const u = t - runup - flight;
-          if (!cue.settle) {
+          const firstSettle = !cue.settle;
+          if (firstSettle) {
             // 정착 시작 자리를 한 번만 붙잡는다. 매 프레임 현재 값을 다시 읽으면
             // 보간이 자기 출력을 먹어 지수감쇠가 되고, x y z가 한 덩어리로 미끄러진다.
             cue.settle = { x: ball.position.x, y: ball.position.y, z: ball.position.z };
@@ -1398,11 +1399,13 @@ const TOUCHED = new Set(['contact']);
           const g = 9.8;
           const drop = Math.max(0, s0.y - BALL_R);
           const tf = Math.sqrt(2 * drop / g);
+          // 반발 0.34는 흙 운동장이다. 잔디보다 덜 튀고 콘크리트보다는 튄다.
+          const e = 0.34;
+          // 자막은 공이 따르지 않는 시계만 기다렸다. 이제 공의 정지 시간을 기다리되 0.9초를 하한으로 둔다.
+          if (firstSettle && cue.wait === 0.9) cue.wait = Math.max(cue.wait, tf * (1 + 2 * e + 2 * e * e));
           let y;
           if (u < tf) y = s0.y - 0.5 * g * u * u;
           else {
-            // 반발 0.34는 흙 운동장이다. 잔디보다 덜 튀고 콘크리트보다는 튄다.
-            const e = 0.34;
             let vt = g * tf * e;
             let tb = u - tf;
             const air = 2 * vt / g;

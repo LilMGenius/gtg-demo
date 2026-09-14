@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { readFileSync } from "node:fs";
 import { pinClock } from "./clock.mjs";
 
 // 사건이 언제 시작하는가의 자. 판정은 공이 날아가기 전에 이미 끝나 있고 화면은 그것을 연기한다.
@@ -35,10 +36,14 @@ const PAGES = [
   "http://127.0.0.1:10310/web/index.html?seed=20&preset=maxed",
   "http://127.0.0.1:10310/web/index.html?seed=3&preset=maxed",
   "http://127.0.0.1:10310/web/index.html?seed=42&preset=maxed",
-  "http://127.0.0.1:10310/web/index.html?seed=7"
+  "http://127.0.0.1:10310/web/index.html?seed=7",
+  "http://127.0.0.1:10310/web/index.html?seed=27&preset=maxed",
+  "http://127.0.0.1:10310/web/index.html?seed=11&preset=maxed"
 ];
 // 구로 세는 자는 바쁜 기계에서 벽시계가 늘어난다. 여기서 죽으면 그 늘어남이 다시 판정에 섞인다.
-const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 540000);
+const began = Date.now();
+const elapsed = () => "instrument:elapsed " + ((Date.now() - began) / 1000).toFixed(1) + "s (watchdog 540s; runner cap 570s)";
+const t = setTimeout(() => { console.log(elapsed()); console.log("WATCHDOG"); process.exit(1); }, 540000);
 t.unref();
 
 const fails = [], notes = [];
@@ -58,25 +63,43 @@ try {
 
   // 프레임마다 브라우저 안에서 모은다. 시작 프레임은 밖에서 폴링하면 그 간격만큼 늦게 잡힌다.
   // 구가 몇 개 열렸는지도 같은 자리에서 센다. 밖에서 세면 그 수가 다시 폴링 간격에 걸린다.
-  const watch = async (url) => {
+  const watch = async (url, capture = null) => {
     await p.goto(url, { waitUntil: "load" });
     await p.evaluate(() => localStorage.clear());
     await p.goto(url, { waitUntil: "load" });
     await p.waitForSelector("#go", { timeout: 15000 });
     await p.click("#go", { force: true });
-    await p.evaluate(() => {
+    await p.evaluate((capture) => {
+      window.__tailstartCapture = null;
       window.__rec = [];
       window.__opens = 0;
       window.__openAt = 0;
       const tick = () => {
+        if (window.__tailstartCapture?.pending) { requestAnimationFrame(tick); return; }
         const k = window.__tailKind();
         const n = window.__rec.length;
         if (k && n > 0 && !window.__rec[n - 1].k) { window.__opens += 1; window.__openAt = n; }
         window.__rec.push({ b: window.__ballPos(), k });
+        // 둘째 구의 자막이 열린 바로 그 프레임을 붙잡는다.
+        if (capture && window.__opens === 2 && n === window.__openAt) {
+          window.__tailstartCapture = { pending: true, frame: n, kind: k, ball: window.__ballPos() };
+          window.__freeze(true);
+        }
         requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
-    });
+    }, capture);
+    if (capture) {
+      await p.waitForFunction(() => window.__tailstartCapture?.pending, null, { timeout: 120000, polling: "raf" });
+      // 세계를 멈춘 채 개봉 카드를 닫아 공과 자막을 같은 컷에 담는다.
+      await p.evaluate(() => window.__shop(false));
+      if (await p.locator("#pull").isVisible()) throw Error("capture is covered by the reveal card");
+      await p.screenshot({ path: capture });
+      const shot = await p.evaluate(() => ({ ...window.__tailstartCapture, after: window.__ballPos() }));
+      if (shot.kind === "contact" || step(shot.ball, shot.after) !== 0) throw Error("capture moved or touched");
+      console.log("instrument:capture " + JSON.stringify({ path: capture, ...shot }));
+      await p.evaluate(() => { window.__tailstartCapture.pending = false; window.__freeze(false); });
+    }
     // 마지막 구도 뒤 프레임 몇 장이 있어야 튐을 잰다. 목표를 채운 자리에서 바로 끊으면
     // starts가 그 구를 못 읽어, 세어 놓은 구 수와 실제로 뽑힌 구 수가 하나씩 어긋난다.
     await p.waitForFunction(([n, cap]) => (window.__opens >= n && window.__rec.length >= window.__openAt + 8)
@@ -85,11 +108,20 @@ try {
   };
 
   // 첫 사건이 시작한 프레임만 뽑는다. 자막이 여러 줄이면 꼬리가 여러 번 갈리는데, 문제는 첫 줄이다.
-  const starts = (rec) => {
+  const starts = (rec, seed) => {
     const out = [];
     for (let i = 3; i < rec.length - 4; i += 1) {
       if (rec[i].k && !rec[i - 1].k) {
+        // 조준점 도달은 깊이가 줄다가 되밀리기 시작하는 프레임이다. 큐를 노출하지 않고
+        // 자막 전 비행의 가장 깊은 프레임을 읽으므로 기다림은 한 프레임 눈금으로만 보고한다.
+        let arrival = i - 1;
+        for (let j = i - 2; j >= 0 && !rec[j].k; j -= 1) {
+          if (rec[j].b.z <= rec[arrival].b.z) arrival = j;
+          if (rec[j].b.z > 10) break;
+        }
         out.push({
+          seed, open: i, arrival, wait: (i - arrival) * STEP,
+          rest: [0, 1, 2].map((n) => step(rec[i + n].b, rec[i + n - 1].b)),
           kind: rec[i].k,
           before: step(rec[i - 1].b, rec[i - 3].b) / 2,
           jump: Math.max(step(rec[i + 1].b, rec[i].b), step(rec[i + 2].b, rec[i + 1].b))
@@ -101,16 +133,31 @@ try {
 
   const all = [], seen = [];
   for (const url of PAGES) {
-    const got = starts(await watch(url));
+    const seed = new URL(url).searchParams.get("seed");
+    const got = starts(await watch(url, seed === "27" ? process.env.TAILSTART_CAPTURE : null), seed);
+    console.log("instrument:page seed=" + seed + " balls=" + got.length + " " + elapsed());
     seen.push(url.split("seed=")[1].split("&")[0] + ":" + got.length);
     for (const x of got) all.push(x);
   }
   const touched = all.filter((x) => TOUCHED.has(x.kind));
   const passed = all.filter((x) => !TOUCHED.has(x.kind));
+  const resting = (x) => x.rest[0] < 0.02;
+  const row = (x) => "seed=" + x.seed + " " + x.kind + " open=" + x.open
+    + " step-at-open=" + x.rest[0].toFixed(4) + "m/frame";
+  const waits = (rows, mode) => {
+    for (const x of rows) {
+      console.log("instrument:wait " + mode + " " + row(x)
+        + " arrival=" + x.arrival + " wait=" + x.wait.toFixed(3) + "s (frame-derived)");
+      console.log("instrument:the-ball-after-the-caption-opens " + mode + " seed=" + x.seed
+        + " " + x.kind + " open=" + x.open + " steps-after="
+        + x.rest.slice(1).map((d) => d.toFixed(4)).join("/") + "m/frame");
+    }
+  };
+  waits(passed, "live");
 
   // 몇 구를 봤는지를 같이 적는다. 갈래가 비었을 때 표본이 모자란 것인지 사건이 안 난 것인지는
   // 이 수가 없으면 못 가르고, 그 둘은 고칠 자리가 다르다.
-  check("instrument:both-classes-of-event-were-seen", touched.length > 1 && passed.length > 1,
+  check("instrument:both-classes-of-event-were-seen", touched.length > 1 && passed.length > 1 && all.length === PAGES.length * BALLS,
     touched.length + " touched (" + touched.map((x) => x.kind).join(",") + "), "
     + passed.length + " untouched (" + passed.map((x) => x.kind).join(",") + "), "
     + all.length + " balls seen (" + seen.join(" ") + ")");
@@ -132,11 +179,48 @@ try {
     early.length ? early.map((x) => x.kind + " " + x.before.toFixed(3) + "m/frame").join(", ")
       : passed.map((x) => x.kind + " " + x.before.toFixed(3)).join(", "));
 
+  // 뒤를 평균 내면 마지막 착지를 걸친 창이 현재 속도로 읽힌다. 자막이 열린 프레임만 판정한다.
+  // 열린 뒤 두 프레임은 꼬리의 움직임이라 출력만 한다. wide의 재도약은 다음 작업의 잔여다.
+  const restless = passed.filter((x) => !resting(x));
+  check("tailstart:an-untouched-caption-opens-after-the-ball-has-come-to-rest",
+    passed.length > 0 && restless.length === 0, (restless.length ? restless : passed).map(row).join(", "));
+
+  // toon-gate의 page.route 대조군처럼 제공할 바이트만 바꾼다. 디스크의 제품은 그대로 둔다.
+  // 기다림을 늘리는 한 줄만 뺀 같은 장면이 이 축을 붉혀야 정지한 공을 재는 자다.
+  const source = readFileSync(new URL("../web/src/render/scene.mjs", import.meta.url), "utf8");
+  const waitLine = "if (firstSettle && cue.wait === 0.9) cue.wait = Math.max(cue.wait, tf * (1 + 2 * e + 2 * e * e));";
+  const copies = source.split(waitLine);
+  if (copies.length === 1) {
+    check("control:a-clock-only-wait-reddens-the-rest-axis", false, "wait extension absent; live sample is already clock-only");
+  } else {
+    if (copies.length !== 2) throw Error("wait extension must occur exactly once");
+    const forceLive = process.argv.includes("--control-live");
+    const parent = forceLive ? source : copies.join("");
+    let routed = 0;
+    await p.route("**/render/scene.mjs*", (route) => {
+      routed += 1;
+      return route.fulfill({ contentType: "text/javascript", body: parent });
+    });
+    const control = starts(await watch(PAGES.find((url) => new URL(url).searchParams.get("seed") === "27")), "27");
+    await p.unroute("**/render/scene.mjs*");
+    const untouchedControl = control.filter((x) => !TOUCHED.has(x.kind));
+    const touchedControl = control.filter((x) => TOUCHED.has(x.kind));
+    const red = untouchedControl.filter((x) => !resting(x));
+    waits(untouchedControl, forceLive ? "forced-live" : "clock-only");
+    check("control:a-clock-only-wait-reddens-the-rest-axis",
+      routed > 0 && control.length === BALLS && red.length > 0 && touchedControl.length > 0
+      && touchedControl.every((x) => x.before >= 0.02 && x.jump <= 0.8),
+      "served=" + (forceLive ? "live" : "clock-only") + " routed=" + routed + " balls=" + control.length
+      + " rest-axis-red=" + red.length + " " + red.map(row).join(", ")
+      + "; touched axes " + (touchedControl.every((x) => x.before >= 0.02 && x.jump <= 0.8) ? "green" : "red"));
+  }
+
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
+  console.log(elapsed());
   console.log(fails.length ? "tailstart FAIL " + fails.length : "tailstart PASS " + notes.length);
   if (fails.length) process.exitCode = 1;
 } finally {
