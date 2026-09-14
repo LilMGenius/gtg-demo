@@ -1,6 +1,7 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
 import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain, judgeWindow, GEAR_STEP } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
+import { KEY_MAP } from './ui/keys.mjs';
 import { KEEPERS, KICKERS, keeperCost, kickerCost, kickerByName, ROLES, ROLE_SLOTS, ELEVEN, defaultEleven, TRAITS, PULL_COST, PULL_BULK, PULL_BONUS, pullYield, TICKET_CAP, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
@@ -842,6 +843,56 @@ function renderGym() {
 // 손잡이로만 열리는 창이고 그때 첫 진입 개봉이 조용히 걷힌다. 처음 오는 사람이 자기가 무엇을
 // 들고 시작하는지를 못 보고 지나가는 자리이고, 계기가 사람이 못 가는 상태를 재게 되는 자리다.
 const PANEL_SHUT = { gym: closeGym, roster: closeRoster, gram: closeGram, me: closeMe, date: closeDate, shop: closeShop, wiki: closeWiki, pull: stopReveal };
+const CATEGORY = { wiki: '.cats [data-cat]', roster: '.kind[data-pos]', me: '.tab[data-tab]', shop: '.tab[data-tab]' };
+const panelStack = [];
+const panelFocus = new Map();
+const buttons = (box) => {
+  for (const control of box.querySelectorAll('*')) {
+    if (control.onclick && !control.matches('button, input, select, a[href], [tabindex]')) {
+      control.tabIndex = 0;
+      control.setAttribute('role', 'button');
+    }
+  }
+  return [...box.querySelectorAll('button, input, select, a[href], [tabindex]')]
+    .filter((b) => !b.disabled && b.tabIndex >= 0 && b.getClientRects().length);
+};
+const bookmark = (target) => {
+  const panel = target?.closest?.(Object.keys(PANEL_SHUT).map((id) => '#' + id).join(','));
+  return { target, panel, index: panel ? buttons(panel).indexOf(target) : -1 };
+};
+const restore = (mark) => {
+  const target = mark?.target?.isConnected ? mark.target : mark?.panel && buttons(mark.panel)[mark.index];
+  if (target?.getClientRects().length) target.focus({ preventScroll: true });
+};
+let lastFocus = bookmark(document.activeElement);
+addEventListener('focusin', (e) => { lastFocus = bookmark(e.target); });
+// Focus before pointerdown openers replace their content; native click still owns activation.
+addEventListener('pointerdown', (e) => {
+  const button = e.target.closest?.('button');
+  button?.focus();
+  if (button?.onpointerdown && !button.onclick) e.preventDefault();
+}, true);
+// MutationObserver covers every existing opener and renderer, including nested dates and reveals.
+const panelObserver = new MutationObserver(() => {
+  let returning;
+  let opened = false;
+  for (const id of [...panelStack].reverse()) {
+    if (!el(id).hidden) continue;
+    returning = panelFocus.get(id);
+    panelFocus.delete(id);
+    panelStack.splice(panelStack.indexOf(id), 1);
+  }
+  for (const id of Object.keys(PANEL_SHUT)) {
+    if (el(id).hidden || panelStack.includes(id)) continue;
+    panelFocus.set(id, lastFocus);
+    panelStack.push(id);
+    opened = true;
+    (el(id).querySelector(CATEGORY[id] || '.close') || buttons(el(id))[0])?.focus({ preventScroll: true });
+  }
+  if (returning && !opened) restore(returning);
+  else if (!lastFocus.target?.isConnected) restore(lastFocus);
+});
+for (const id of Object.keys(PANEL_SHUT)) panelObserver.observe(el(id), { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
 function shutOthers(keep) {
   if (keep !== 'pull' && !el('pull').hidden) return false;
   const spare = keep === 'date' ? ['me', 'date'] : [keep];
@@ -2528,14 +2579,6 @@ for (const b of document.querySelectorAll('.zone')) {
      따로 놀았다. 비활성 단추에도 pointerdown과 pointerup은 그대로 오고 click과 mousedown만 안 온다(실측).
      지금은 어느 마디에서도 단추를 안 잠그므로 그 사정에 기대지 않는다. */
   b.onpointerdown = () => chooseDive(Number(b.dataset.dive));
-  /* 손가락 말고 자판으로 고르는 길이다. 초점이 선 단추에서 Enter는 click으로 오는데 그 자리에는 click을
-     받는 자가 없고, space는 창 전체가 받아 가운데로 읽었다. 두 키를 같은 chooseDive로 보내면 초점이 선
-     판이 곧 그 방향이다. 기본 동작은 막는다. 안 막으면 space가 화면을 한 칸 내린다. */
-  b.onkeydown = (e) => {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    e.preventDefault();
-    chooseDive(Number(b.dataset.dive));
-  };
 }
 const autoBtn = el('auto');
 autoBtn.classList.toggle('on', state.auto);
@@ -2577,8 +2620,6 @@ el('wikiBtn').onpointerdown = (e) => {
   e.stopPropagation();
   if (el('wiki').hidden) openWiki(); else closeWiki();
 };
-// 닫는 길이 둘이다. 버튼 하나뿐이면 열린 판이 화면을 계속 가린다.
-addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el('wiki').hidden) closeWiki(); });
 el('purse').onpointerdown = (e) => {
   e.stopPropagation();
   if (el('wiki').hidden) openWiki('coin'); else closeWiki();
@@ -2664,13 +2705,49 @@ el('out').onpointerdown = () => {
   el('out').classList.toggle('on', advance > 0);
 };
 addEventListener('keydown', (e) => {
-  /* 판이 이미 삼킨 키는 여기서 두 번 읽지 않는다. space를 그냥 두면 초점이 선 판을 눌러도 가운데가
-     들어가고, Enter를 그냥 두면 자막 한 줄이 두 칸 넘어간다. 방향키는 초점과 상관없이 그대로 흐른다. */
-  if ((e.key === ' ' || e.key === 'Enter') && e.target.closest && e.target.closest('.zone')) return;
-  // 방향키는 손가락과 같은 문법을 따른다. 창 안이면 판정을 굴리고, 창 밖이면 선호만 옮기고 자막이 서 있으면 같이 넘긴다.
-  if (e.key === 'ArrowLeft') return chooseDive(-1);
-  if (e.key === 'ArrowRight') return chooseDive(1);
-  if (e.key === 'ArrowUp' || e.key === ' ') return chooseDive(0);
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!el('title').hidden) return;
+  const key = e.key.length === 1 && e.key !== ' ' ? e.key.toLowerCase() : e.key;
+  const binding = KEY_MAP.find((b) => b.key === key || (b.keys && Object.hasOwn(b.keys, key)));
+  const id = panelStack.at(-1);
+  if (binding?.action === 'close') {
+    e.preventDefault();
+    if (id && (id !== 'pull' || (state.onboard >= ONBOARD_DONE && shown >= lastPull.length && pullStage === STAGE_LAST))) PANEL_SHUT[id]();
+    return;
+  }
+  if (id && (binding?.action === 'category' || binding?.action === 'focus')) {
+    e.preventDefault();
+    const box = el(id);
+    const cats = CATEGORY[id] && [...box.querySelectorAll(CATEGORY[id])];
+    const cycle = binding.action === 'category' && cats?.length;
+    const list = cycle ? cats : buttons(box);
+    const at = cycle ? list.findIndex((b) => b.getAttribute('aria-current') === 'true' || b.getAttribute('aria-selected') === 'true') : list.indexOf(document.activeElement);
+    const next = (at + (e.shiftKey ? -1 : 1) + list.length) % list.length;
+    if (cycle) { list[next].click(); el(id).querySelectorAll(CATEGORY[id])[next]?.focus(); }
+    else list[next]?.focus();
+    return;
+  }
+  if (e.target.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+  if (binding?.action === 'confirm') {
+    const button = e.target.closest?.('button, [role="button"]');
+    if (button?.classList.contains('zone')) { e.preventDefault(); chooseDive(Number(button.dataset.dive)); return; }
+    if (button) {
+      if (button.onpointerdown && !button.onclick) { e.preventDefault(); button.onpointerdown(e); }
+      else if (button.tagName !== 'BUTTON') { e.preventDefault(); button.click(); }
+      return;
+    }
+    if (id) return;
+    if (binding.value !== undefined) { e.preventDefault(); chooseDive(binding.value); return; }
+  }
+  if (id) return;
+  if (binding?.action === 'dive') { e.preventDefault(); chooseDive(binding.keys[key]); return; }
+  const action = binding?.action === 'open' ? binding.keys[key] : binding?.action;
+  if (action && el(action)?.onpointerdown) {
+    e.preventDefault();
+    el(action).focus();
+    el(action).onpointerdown(e);
+    return;
+  }
   if (state.phase === 'caption' && state.skip) state.skip();
 });
 
