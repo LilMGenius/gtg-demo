@@ -22,7 +22,7 @@ import { pinClock } from "./clock.mjs";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&vary=0";
+const BASE = (process.argv.find((a) => a.startsWith("--origin="))?.slice(9) || "http://127.0.0.1:10310") + "/web/index.html?seed=20&vary=0";
 // 페이지는 브라우저 게이트 전부와 F3이 함께 쓰는 데스크톱 기준에서 측정한다. 폭이 갈리면 관절 좌표를 게이트 간에 못 맞댄다.
 const W = 1280;
 const H = 720;
@@ -172,6 +172,81 @@ async function frozen(page) {
   return { held: t0.v === t1.v && t1.f > t0.f, v: t1.v, f0: t0.f, f1: t1.f };
 }
 
+// The existing frame freeze and Three.js mesh world transforms own the measurement.
+// The ball comparison uses its launch plane: the flying ball has already left by follow-through.
+
+const SWING_PHASES = [['windup',24],['plant',32],['strike',38],['follow',46]];
+function rigProbeSource(source) {
+  const anchor = '  window.__kickVis = () => {';
+  if (source.split(anchor).length !== 2) throw new Error('kick rig probe anchor must be unique');
+  return source.replace(anchor, `  window.__poseKickRig = () => {
+    kicker.updateMatrixWorld(true);
+    const j = kicker.userData.joints;
+    const world = (o) => o.getWorldPosition(new THREE.Vector3());
+    // buildBody adds the boot after the shin; reject a changed hierarchy.
+    const boot = (joint) => {
+      const mesh = joint.children.at(-1);
+      if (!mesh.isMesh || mesh.position.z === 0) throw new Error('boot mesh missing');
+      return world(mesh).toArray();
+    };
+    const head = kicker.userData.head;
+    const faceDir = Math.sign(head.userData.eyes[0].position.z);
+    const facing = (o) => new THREE.Vector3(0,0,faceDir).transformDirection(o.matrixWorld)
+      .dot(camera.position.clone().sub(world(o)).normalize());
+    return {right:boot(j.knR),left:boot(j.knL),ball:ball.position.toArray(),camera:camera.position.toArray(),
+      faceDir,yaw:kicker.rotation.y,headDot:facing(head),chestDot:facing(kicker.userData.torso)};
+  };
+` + anchor);
+}
+const swingOK = (samples) => samples.length === 4 && samples.every((s,i) =>
+  s.held && s.headDot > 0 && s.chestDot > 0 && (i === 0 || samples[i-1].right[2] > s.right[2]))
+  && samples[0].right[2] > samples[0].ball[2] && samples[3].right[2] < samples[0].ball[2];
+async function sampleSwing(browser, url, sources, screenshots) {
+  const results = [];
+  for (const [kind,power,strong,chip] of KICKS) {
+    const samples = [];
+    for (const [phase,steps] of SWING_PHASES) {
+      const ctx = await browser.newContext({viewport:{width:1280,height:720}});
+      try {
+        await pinClock(ctx,1/60);
+        const page = await ctx.newPage();
+        const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
+        for (const [file,body] of sources) await page.route('**/'+file,route=>route.fulfill({contentType:'text/javascript; charset=utf-8',body:file.endsWith('/scene.mjs')?rigProbeSource(body):body}));
+        await page.goto(url + '&preset=veteran',{waitUntil:'load'});
+        await page.waitForSelector('#go'); await page.click('#go',{force:true});
+        const stop = await page.evaluate(([pw,st,ch,n])=>{
+          window.__lockRound(); const f=window.__frames(); window.__plan(0,'',f+n);
+          if(!window.__frameShot(0.4,0.3,false,pw,st,ch)) throw new Error('frameShot failed');
+          window.__poseSwingTrace = [];
+          const tick = () => {
+            const step = window.__frames() - f;
+            if (step >= 24 && step <= 46 && !window.__poseSwingTrace.some((s) => s.step === step))
+              window.__poseSwingTrace.push({step,z:window.__poseKickRig().right[2]});
+            if (step < 46) requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+          return f+n;
+        },[power,strong,chip,steps]);
+        await page.waitForFunction(n=>window.__frames()>=n,stop,{timeout:40000});
+        const fz = await frozen(page);
+        const sample = await page.evaluate(()=>window.__poseKickRig());
+        if(errors.length) throw new Error(errors.join('\n'));
+        if (phase === 'follow') sample.trace = await page.evaluate(() => window.__poseSwingTrace);
+        samples.push({phase,steps,held:fz.held,...sample});
+        console.log("swing sample " + kind + "/" + phase + " " + JSON.stringify(samples.at(-1)));
+        if(screenshots && kind==='instep') await page.screenshot({path:screenshots+'-'+phase+'.png'});
+      } finally {await ctx.close();}
+    }
+    const trace = samples[3].trace;
+    if (trace.length !== 23 || samples.some((s) => !s.held || ![...s.right, ...s.left, s.headDot, s.chestDot].every(Number.isFinite)))
+      throw new Error('swing instrumentation did not capture a complete frozen rig');
+    const reversals = trace.filter((s,i) => i && s.z > trace[i-1].z);
+    console.log('continuous',kind,JSON.stringify({trace,reversals}));
+    results.push({kind,ok:swingOK(samples) && trace.length === 23 && reversals.length === 0,samples});
+  }
+  return results;
+}
+
 let b;
 const out = {};
 const land = {};
@@ -179,6 +254,29 @@ const kicks = {};
 const errAll = [];
 try {
   b = await chromium.launch({ executablePath: EXE });
+  const liveSwingSources = new Map();
+  const parentSwingSources = new Map();
+  for (const file of LAYER) {
+    const response = await fetch(new URL("/" + file, BASE));
+    if (!response.ok) throw new Error("swing source HTTP " + response.status);
+    liveSwingSources.set(file, routed.get(file) || await response.text());
+    parentSwingSources.set(file, execFileSync("git", ["show", "c2c66a7:" + file],
+      { cwd: ROOT, encoding: "utf8", maxBuffer: 32000000 }));
+  }
+  const swing = await sampleSwing(b, BASE, liveSwingSources, process.argv.find((a) => a.startsWith("--screens="))?.slice(10));
+  say("kick:the-swing-runs-from-behind-the-ball-toward-the-camera",
+    swing.every((r) => r.ok), swing.map((r) => r.kind + "=" + (r.ok ? "GREEN" : "RED")
+      + " z=" + r.samples.map((s) => s.right[2].toFixed(6)).join(">")).join(" "));
+  if (!WAS) {
+    if ([...liveSwingSources].every(([file,body]) =>
+      body.replace(/\r/g, "") === parentSwingSources.get(file).replace(/\r/g, "")))
+      throw new Error("swing parent control is a no-op");
+    console.log("swing served-parent c2c66a7");
+    const parent = await sampleSwing(b, BASE, parentSwingSources);
+    say("control:the-served-parent-kick-swing-reads-red",
+      parent.length === KICKS.length && parent.every((r) => !r.ok),
+      "c2c66a7 " + parent.map((r) => r.kind + "=" + (r.ok ? "GREEN" : "RED")).join(" "));
+  }
   for (const k of KINDS) {
     const { ctx, page, errs } = await open(b);
     const base = await page.evaluate(() => window.__frames());
@@ -211,6 +309,7 @@ try {
     // 실루엣 거리는 예전과 같은 프레임에서 뽑는다. 세계가 그 프레임에 멈춰 있지 않을 뿐이다.
     const shot = mine.find((r) => r[0] >= actAt + TAIL_STEPS) || mine[mine.length - 1];
     out[k] = { v: shot[6], rz: shot[7] };
+    console.log("pose sampled " + k);
     /* 착지. 떨어지던 몸이 멈춘 프레임이다. 머리 월드 높이의 하강 속도를 세계시간으로 미분해서
        가장 빠른 프레임을 찾고, 그 뒤로 속도가 그 최고값의 10퍼센트 아래로 처음 꺾이는 자리를 쓴다.
        바닥에 닿는 것은 내려감이 끊기는 것이고, 그 뒤의 느린 가라앉음과 잔여 진동은 이미 닿은
