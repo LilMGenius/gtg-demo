@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 import { pinClock } from "./clock.mjs";
 import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const controlRef = process.argv.find((x) => x.startsWith("--control="))?.slice(10);
 
@@ -23,6 +23,20 @@ const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win6
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
 const LINE = String.fromCharCode(10);
 const STEP = 1 / 60;
+// Reuse flight-gate's source-derived floor, including for the served-parent control.
+const source = readFileSync(new URL("../web/src/render/scene.mjs", import.meta.url), "utf8");
+const constant = (name) => {
+  const matches = [...source.matchAll(new RegExp("^const " + name + " = ([0-9.]+);$", "gm"))];
+  if (matches.length !== 1 || !(Number(matches[0][1]) > 0)) throw new Error("Expected one positive " + name);
+  return Number(matches[0][1]);
+};
+const BALL_REAL_D = constant("BALL_REAL_D");
+const BALL_NEAR_X = constant("BALL_NEAR_X");
+const BALL_MIN_H = constant("BALL_MIN_H");
+const units = readFileSync(new URL("../web/src/render/units.mjs", import.meta.url), "utf8");
+const radius = [...units.matchAll(/export const BALL_R = ([0-9.]+);/g)];
+if (radius.length !== 1) throw new Error("Expected one BALL_R");
+const BALL_R = Number(radius[0][1]);
 // 창의 폭. 60프레임 시계에서 4.2초에 해당한다. 한 구가 통째로 들어와야 아래 두 계기 축이 선다.
 const FRAMES = 252;
 // 프레임으로 세는 자는 바쁜 기계에서 벽시계가 늘어난다. 여기서 죽으면 그 늘어남이 다시 판정에 섞인다.
@@ -39,9 +53,13 @@ try {
   // 세계시계를 프레임에 못 박는다. 페이지가 열리기 전에 걸어야 손잡이가 생기는 그 틱에 켜진다.
   await pinClock(ctx, STEP);
   const p = await ctx.newPage();
+  let served = 0;
   if (controlRef) {
     const body = execFileSync("git", ["show", controlRef + ":web/src/render/scene.mjs"], { encoding: "utf8" });
-    await p.route("**/web/src/render/scene.mjs", (route) => route.fulfill({ contentType: "text/javascript", body }));
+    await p.route("**/web/src/render/scene.mjs", (route) => {
+      served += 1;
+      return route.fulfill({ contentType: "text/javascript", body });
+    });
   }
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -56,7 +74,8 @@ try {
     const tick = () => {
       const size = window.__ballSize();
       const flight = window.__flightVis();
-      window.__rec.push({ ...size, screenRadius: flight.ballPx / 2, approach: flight.cue });
+      window.__rec.push({ ...size, screenRadius: flight.ballPx / 2, angularPx: flight.px,
+        fov: window.__camDbg().fov, height: document.querySelector("#stage").clientHeight, approach: flight.cue });
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
@@ -102,12 +121,25 @@ try {
   const detail = steps + " approach steps, decreases " + decreases + ", worst drop " + worstDrop.toFixed(6)
     + "px, far/near radius " + (far?.screenRadius || 0).toFixed(3) + "/" + (near?.screenRadius || 0).toFixed(3)
     + "px, near/far ratio " + ratio.toFixed(3) + " (bar >=1.5)";
+  check("ballsize:the-screen-radius-grows-as-the-ball-approaches", perspective, detail);
+  // flight.px records the unscaled angular diameter at the live camera distance and FOV.
+  const distance = near ? BALL_R * near.height / (near.angularPx * Math.tan(near.fov * Math.PI / 360)) : NaN;
+  const realDiameter = BALL_REAL_D * near?.height / (2 * distance * Math.tan(near?.fov * Math.PI / 360));
+  const multiple = 2 * near?.screenRadius / realDiameter;
+  const nearOK = Number.isFinite(multiple) && multiple > 0 && multiple <= BALL_NEAR_X + 0.05;
+  const nearAxis = "ballsize:the-near-ball-reads-as-at-most-BALL_NEAR_X-real-balls";
+  const nearDetail = "diameter=" + (2 * near?.screenRadius).toFixed(3) + "px real=" + realDiameter.toFixed(3)
+    + "px distance=" + distance.toFixed(3) + "m multiple=" + multiple.toFixed(4) + " bar<=" + (BALL_NEAR_X + 0.05);
   if (controlRef) {
-    console.log("  parent " + controlRef + " perspective " + (perspective ? "GREEN" : "RED") + " " + detail);
-    check("control:the-flattened-ball-reddens-the-perspective-axis", steps > 10 && Number.isFinite(ratio) && ratio > 0 && !perspective, detail);
-  } else {
-    check("ballsize:the-screen-radius-grows-as-the-ball-approaches", perspective, detail);
-  }
+    console.log("  parent " + controlRef + " " + nearAxis + " " + (nearOK ? "GREEN" : "RED") + " " + nearDetail);
+    check("control:the-oversized-parent-reddens-the-near-axis", served > 0 && Number.isFinite(multiple) && multiple > 0 && !nearOK,
+      nearDetail + " served=" + served);
+  } else check(nearAxis, nearOK, nearDetail);
+  const rest = rec.find((r) => r.z === 11 && round(r));
+  const restDiameter = 2 * rest?.screenRadius;
+  const floor = Math.floor(BALL_MIN_H * (rest?.height || 720)) - 1;
+  check("ballsize:the-far-ball-keeps-the-readability-floor", restDiameter >= floor,
+    "rest=" + restDiameter.toFixed(3) + "px bar>=" + floor);
   // 대조군. 이어져야 할 것과 튀어야 할 것이 같은 자에 안 걸린다는 증거다.
   let squashStep = 0;
   for (let i = 1; i < rec.length; i += 1) {

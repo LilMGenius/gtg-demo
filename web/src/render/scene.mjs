@@ -474,6 +474,8 @@ export function createScene(canvas) {
   // 0.047은 720p에서 지름 34px이다. 실측으로 비행 중 최소 17.7px까지 내려갔고 그 크기에서는
   // 공이 오는지 서 있는지가 안 읽혔다. 잔상도 그 점 안에 갇혀 같이 죽었다.
 const BALL_MIN_H = 0.047;
+const BALL_REAL_D = 0.22;
+const BALL_NEAR_X = 2.0;
 const BALL_GAIN_CAP = 2.4;
 let ballGain = 1;
 // 이번 프레임에 비행 쪽이 이미 크기를 걸었는가. 두 곳이 같은 프레임에 걸면 짜부라짐이 지워진다.
@@ -751,10 +753,18 @@ const TOUCHED = new Set(['contact']);
   // 가로가 기준이다. 화면이 그보다 좁으면 수직 화각을 늘려 골대 폭을 지킨다.
   const BASE_ASPECT = 16 / 9;
   const BASE_FOV = 38;
-  // 먼 발밑에서 읽히는 배율을 고정해 가까이 오는 공의 원근을 보존한다.
+  // 먼 발밑의 가독성과 골라인의 실물 대비 크기를 거리 양끝에 고정한다.
   const ballFarDistance = new THREE.Vector3(0, BALL_R, 11).distanceTo(CAM_BASE);
   const ballFarAngular = BALL_R / (ballFarDistance * Math.tan(BASE_FOV * Math.PI / 360));
   const BALL_FAR_GAIN = Math.max(1, Math.min(BALL_GAIN_CAP, BALL_MIN_H / ballFarAngular));
+  // Reuse the far readability anchor; log-distance interpolation makes BALL_NEAR_X the near-size switch.
+  const ballNearDistance = new THREE.Vector3(0, BALL_R, 0).distanceTo(CAM_BASE);
+  const ballNearGain = BALL_NEAR_X * BALL_REAL_D / (2 * BALL_R);
+  const distanceGain = () => {
+    const distance = ball.position.distanceTo(camera.position);
+    const t = Math.max(0, Math.min(1, Math.log(distance / ballNearDistance) / Math.log(ballFarDistance / ballNearDistance)));
+    return ballNearGain + (BALL_FAR_GAIN - ballNearGain) * t;
+  };
   // resize가 화면 비율마다 화각을 다시 잰다. 이벤트 화각은 그 위에 얹는 증감이라
   // 기준값을 따로 들고 있어야 한다. BASE_FOV로 되돌리면 좁은 화면에서 골대 폭이 잘린다.
   let fovBase = BASE_FOV;
@@ -1426,10 +1436,10 @@ const TOUCHED = new Set(['contact']);
         const sq = Math.max(0, 1 - (t - runup) / 0.13);
         // 실측으로 비행 중 공 지름이 17.7px까지 내려갔다. 720p 화면 폭의 1.4%다.
         // 그 크기에서는 공이 오는지 서 있는지가 안 읽히고 잔상도 그 점 안에 갇혀 같이 죽는다.
-        // 발밑에서 정한 배율을 비행 내내 써서 가독성과 원근을 함께 지킨다.
+        // 현재 거리의 배율에 짜부라짐을 곱해 가독성과 원근을 함께 지킨다.
         // 0.12초에 걸쳐 올려봤더니 그 구간이 최소 크기를 만들어 25px에서 걸렸다.
         // 발에 맞는 순간 커지는 것은 오류가 아니라 임팩트다. 같은 프레임의 짜부라짐과 한 사건으로 읽힌다.
-        ballGain = BALL_FAR_GAIN;
+        ballGain = distanceGain();
         ball.scale.set((1 + sq * 0.5) * ballGain, (1 - sq * 0.34) * ballGain, (1 + sq * 0.5) * ballGain);
         ballScaled = true;
         // 골포스트와 크로스바를 스치는 코스만 금속음이 난다.
@@ -2353,7 +2363,7 @@ const TOUCHED = new Set(['contact']);
     impact.update(dt, camera);
     // 비행이 아닌 프레임도 같은 배율을 쓴다. 놓인 공과 구르는 공과 잡힌 공이 전부 여기를 지난다.
     if (!ballScaled) {
-      ballGain = BALL_FAR_GAIN;
+      ballGain = distanceGain();
       ball.scale.setScalar(ballGain);
     }
     // 세계시계로 줄인다. 히트스톱이 걸린 사건에서는 짜부라짐도 같이 늘어져 보인다.
