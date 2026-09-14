@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { HUD_LINKS } from '../web/src/ui/links.mjs';
 import { createRequire } from "node:module";
 
 // Babel (MIT, https://babeljs.io/docs/babel-parser) already ships in Playwright.
@@ -109,7 +110,7 @@ try {
   check("entry:currency-does-not-open-the-shop", hitPurse && !(await shown("shop")), hitPurse ? "shop " + (await shown("shop")) : "#purse missing");
   check("entry:currency-opens-how-to-earn", hitPurse && (await shown("wiki")), hitPurse ? "wiki " + (await shown("wiki")) : "#purse missing");
 
-  // 재화 띠는 칩 셋이 한 손잡이 안에 선다. 하나만 눌러 나온 초록은 나머지 둘을 아무도 안 잰 초록이다.
+  // 재화 띠의 각 버튼은 링크 표의 목적지를 연다. 팔로워도 별도로 누르고 목적지까지 잰다.
   const chips = await p.evaluate(() => document.querySelectorAll("#purse .cur").length);
   const deaf = [];
   for (let i = 0; i < chips; i += 1) {
@@ -118,9 +119,11 @@ try {
     if (!c) { deaf.push("chip" + i); continue; }
     await c.click({ force: true });
     await p.waitForTimeout(240);
-    if (!(await shown("wiki"))) deaf.push("chip" + i);
+    const key = await c.getAttribute('data-hud-link');
+    const link = HUD_LINKS[key];
+    if (!link || !(await shown(link.panel)) || (link.cat && await p.locator('#wiki [aria-current="true"]').getAttribute('data-cat') !== link.cat)) deaf.push('chip' + i);
   }
-  check("entry:every-currency-chip-opens-how-to-earn", chips >= 3 && deaf.length === 0,
+  check("entry:every-currency-chip-opens-its-own-destination", chips >= 3 && deaf.length === 0,
     chips + " chips, " + (deaf.join(",") || "all opened"));
 
   // 버는 법은 문장이 아니라 표다. 항목 한 칸과 값 한 칸이고, 값 칸은 숫자거나 두 글자 명사다.
