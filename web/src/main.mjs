@@ -1,4 +1,5 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
+import { HUD_LINKS, linkAttrs } from './ui/links.mjs';
 import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain, judgeWindow, GEAR_STEP } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
 import { KEY_MAP } from './ui/keys.mjs';
@@ -345,13 +346,13 @@ function pips() {
   }
   /* 재화 띠. 팔로워와 육수와 스폰이 한 줄에 선다. 세 값은 갈래가 달라도 등급이 같아서,
      따로 떨어져 있으면 지금 무엇을 얼마나 들고 있는지가 화면 두 자리를 읽어야 아는 값이 된다.
-     갈래는 크기가 아니라 칩 사이에 선 세로선이 가른다. 띠 전체가 한 손잡이라 어느 칩을 눌러도
-     버는 법이 열린다. */
-  el('purse').innerHTML = '<span class="cur" id="fans">' + IC_FANS + '<b>' + state.fans.toLocaleString() + '</b></span>'
-    + '<span class="cur">' + IC_SWEAT + '<b>' + state.wallet.coin.toLocaleString() + '</b></span>'
-    + '<span class="cur">' + IC_SPON + '<i>' + state.wallet.cash.toLocaleString() + '</i></span>'
+     갈래는 크기가 아니라 칩 사이에 선 세로선이 가른다. 팔로워는 아웃문그램을, 재화는
+     위키의 재화 칸을 연다. */
+  el('purse').innerHTML = '<button class="cur" id="fans" ' + linkAttrs('fans') + '>' + IC_FANS + '<b>' + state.fans.toLocaleString() + '</b></button>'
+    + '<button class="cur" ' + linkAttrs('purse') + '>' + IC_SWEAT + '<b>' + state.wallet.coin.toLocaleString() + '</b></button>'
+    + '<button class="cur" ' + linkAttrs('purse') + '>' + IC_SPON + '<i>' + state.wallet.cash.toLocaleString() + '</i></button>'
     // 남은 버프도 같은 줄에 선다. 몇 판 뒤에 꺼지는지를 상점을 열어야 알면 계획이 안 선다.
-    + (state.buff.shots > 0 ? '<span class="cur">' + buffIcon(state.buff.kind) + '<u>' + state.buff.shots + '</u></span>' : '');
+    + (state.buff.shots > 0 ? '<button class="cur" ' + linkAttrs('purse') + '>' + buffIcon(state.buff.kind) + '<u>' + state.buff.shots + '</u></button>' : '');
   // 남은 훈련 횟수는 버튼 위에 붙는다. 열어봐야 아는 숫자는 방치형에서 안 열린다.
   const badge = el('gymDot');
   badge.textContent = state.points > 9 ? '9+' : String(state.points);
@@ -417,9 +418,9 @@ function formChip() {
      라벨만 붙이면 계산은 되어도 읽어 주는 자에게 간다는 보장이 없고, 실측으로 이 판이
      role=generic에 이름을 얹어 돌려줬다. title은 같은 이름을 마우스에 준다. */
   const name = '컨디션 ' + (up ? '좋음' : dn ? '나쁨' : '보통');
-  box.setAttribute('aria-label', name);
-  box.setAttribute('title', name);
-  hudSay('form', name);
+  box.setAttribute('aria-label', name + ': ' + HUD_LINKS.form.label);
+  box.setAttribute('title', name + ': ' + HUD_LINKS.form.label);
+  hudSay('form', name + ': ' + HUD_LINKS.form.label);
 }
 
 /* 묶음 이름 둘. 판이 사는 동안 방향은 언제든 바뀌므로 단추 하나하나는 늘 같은 뜻이고, 갈리는 것은
@@ -1113,9 +1114,9 @@ function renderGram() {
   const tip = '맞팔 ' + mut + '명이면 팔로워가 ' + boost + '% 더 붙는다';
   const head = '<img class="pfp" alt="' + state.keeper.name + '" src="' + myFace + '">'
     + '<span class="who">' + state.keeper.name + '</span>'
-    + '<small><span class="stat">' + IC_FANS + '<em>' + state.fans.toLocaleString() + '</em></span>'
-    + '<span class="stat" title="' + tip + '" aria-label="' + tip + '">' + IC_MUTUAL
-    + '<em>' + mut + '</em><i>+' + boost + '%</i></span></small>';
+    + '<small><button class="stat" id="gramFollowers" ' + linkAttrs('gramFollowers') + '>' + IC_FANS + '<em>' + state.fans.toLocaleString() + '</em></button>'
+    + '<button class="stat" id="gramEffect" ' + linkAttrs('gramEffect') + ' aria-description="' + tip + '">' + IC_MUTUAL
+    + '<em>' + mut + '</em><i>+' + boost + '%</i></button></small>';
   /* 작성자 초상. img가 아니라 판때기 배경으로 깐다. img로 세우면 사진 글의 첫 그림이 초상이 되고,
      사진을 화소로 재는 자들이 얼굴을 그 글의 사진으로 읽는다. 행인은 생김새가 저장에 없어 실루엣이다. */
   const plate = (face) => (face
@@ -2620,10 +2621,21 @@ el('wikiBtn').onpointerdown = (e) => {
   e.stopPropagation();
   if (el('wiki').hidden) openWiki(); else closeWiki();
 };
-el('purse').onpointerdown = (e) => {
+for (const id of ['lv', 'form', 'pips']) {
+  const button = el(id);
+  button.dataset.hudLink = id;
+  button.setAttribute('aria-label', HUD_LINKS[id].label);
+  button.title = HUD_LINKS[id].label;
+}
+// Native buttons supply Enter/Space clicks, as in keys.mjs; delegation survives HUD repaint.
+addEventListener('click', (e) => {
+  const button = e.target.closest?.('button[data-hud-link]');
+  const link = button && HUD_LINKS[button.dataset.hudLink];
+  if (!link) return;
   e.stopPropagation();
-  if (el('wiki').hidden) openWiki('coin'); else closeWiki();
-};
+  if (link.panel === 'gram') openGram();
+  else openWiki(link.cat);
+});
 // 진단용. __pick은 화소 피킹이 이미 쓴다.
 window.__squad = () => ({ squad: state.squad.map((k) => k.name), pick: state.pick, coin: state.wallet.coin });
 window.__roster = (open) => { if (open) openRoster(); else closeRoster(); };
@@ -2641,7 +2653,7 @@ window.__me = (open) => { if (open) openMe(); else closeMe(); };
 window.__date = (city, passer) => { if (city === undefined) closeDate(); else openDate(city, passer); };
 window.__shop = (open) => { if (open) openShop(); else closeShop(); };
 // 재화 칩이 열던 버는 법은 위키의 재화 칸이 가져갔다. 훅 이름은 계기 아흔 곳이 읽으므로 그대로 둔다.
-window.__earn = (open) => { if (open) openWiki('coin'); else closeWiki(); };
+window.__earn = (open) => { if (open) openWiki(HUD_LINKS.purse.cat); else closeWiki(); };
 window.__wiki = (open, cat) => { if (open) openWiki(cat); else closeWiki(); };
 // 이용권 잔고. 완봉 보상과 뽑기 차감을 계기가 데이터에서 읽는다.
 window.__tickets = () => state.tickets;
