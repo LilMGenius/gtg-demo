@@ -1,10 +1,14 @@
 import { chromium } from "playwright";
 import { pinClock } from "./clock.mjs";
+import { execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
+
+const controlRef = process.argv.find((x) => x.startsWith("--control="))?.slice(10);
 
 // 공 크기의 자. 크기는 두 가지가 곱해진 것이다. 거리에서 오는 배율과 발에 맞은 순간의 짜부라짐.
 // 앞엣것은 이어져야 하고 뒤엣것은 튀어야 한다. 한 수로 재면 그 둘이 구분되지 않는다.
 //
-// 재는 것은 셋이다. 거리 배율이 프레임 사이에서 안 튀는가, 그 배율이 실제로 거리를 따라가는가,
+// 재는 것은 셋이다. 배율이 프레임 사이에서 안 튀는가, 다가오는 공의 화면 반지름이 커지는가,
 // 짜부라짐은 여전히 한 프레임에 터지는가. 표본은 브라우저 안에서 프레임마다 모은다.
 // 밖에서 폴링하면 프레임을 건너뛰고, 건너뛴 자리가 곧 튐이 숨는 자리다.
 // 표본 범위: 판정을 안 부른다. 화면 크기만 재므로 키퍼 표본이 결론을 안 바꾼다.
@@ -35,6 +39,10 @@ try {
   // 세계시계를 프레임에 못 박는다. 페이지가 열리기 전에 걸어야 손잡이가 생기는 그 틱에 켜진다.
   await pinClock(ctx, STEP);
   const p = await ctx.newPage();
+  if (controlRef) {
+    const body = execFileSync("git", ["show", controlRef + ":web/src/render/scene.mjs"], { encoding: "utf8" });
+    await p.route("**/web/src/render/scene.mjs", (route) => route.fulfill({ contentType: "text/javascript", body }));
+  }
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
   p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
@@ -45,12 +53,18 @@ try {
   await p.click("#go", { force: true });
   await p.evaluate(() => {
     window.__rec = [];
-    const tick = () => { window.__rec.push(window.__ballSize()); requestAnimationFrame(tick); };
+    const tick = () => {
+      const size = window.__ballSize();
+      const flight = window.__flightVis();
+      window.__rec.push({ ...size, screenRadius: flight.ballPx / 2, approach: flight.cue });
+      requestAnimationFrame(tick);
+    };
     requestAnimationFrame(tick);
   });
   // 창을 프레임으로 끊는다. 여기가 벽시계로 남으면 위의 못 박기가 아무것도 안 한다.
   await p.waitForFunction((n) => window.__rec.length >= n, FRAMES, { timeout: 240000, polling: "raf" });
   const rec = await p.evaluate(() => window.__rec);
+  if (process.env.BALLSIZE_RECORD) writeFileSync(process.env.BALLSIZE_RECORD, JSON.stringify(rec, null, 2));
 
   const moved = Math.max.apply(null, rec.map((r) => r.z)) - Math.min.apply(null, rec.map((r) => r.z));
   check("instrument:the-recorder-saw-a-whole-shot", rec.length > 90 && moved > 3,
@@ -69,10 +83,31 @@ try {
   }
   check("ballsize:the-distance-gain-never-jumps-between-frames", worst <= 0.08,
     "worst step " + worst.toFixed(3) + " at frame " + at + " (z " + (at > 0 ? rec[at].z.toFixed(1) : "-") + ")");
-  const far = rec[0].gain;
-  const near = Math.min.apply(null, rec.map((r) => r.gain));
-  check("ballsize:the-gain-follows-the-distance", far - near > 0.2,
-    "at rest " + far.toFixed(2) + " down to " + near.toFixed(2));
+  // __flightVis의 screenR은 현재 카메라로 공 반지름을 투영한다. 짜부라짐은 아래에서 따로 잰다.
+  const round = (r) => Math.abs(r.x / r.y - 1) < 0.001;
+  const approach = rec.filter((r) => r.approach && r.z >= 0 && round(r));
+  const far = approach.reduce((a, r) => r.z > a.z ? r : a, approach[0]);
+  const near = approach.reduce((a, r) => r.z < a.z ? r : a, approach[0]);
+  let steps = 0, decreases = 0, worstDrop = 0;
+  for (let i = 1; i < rec.length; i += 1) {
+    const a = rec[i - 1], r = rec[i];
+    if (!a.approach || !r.approach || r.z < 0 || r.z >= a.z || Math.abs(r.z - a.z) > 1 || !round(a) || !round(r)) continue;
+    steps += 1;
+    const drop = a.screenRadius - r.screenRadius;
+    if (drop > 1e-6) decreases += 1;
+    worstDrop = Math.max(worstDrop, drop);
+  }
+  const ratio = near && far ? near.screenRadius / far.screenRadius : 0;
+  const perspective = steps > 10 && decreases === 0 && ratio >= 1.5;
+  const detail = steps + " approach steps, decreases " + decreases + ", worst drop " + worstDrop.toFixed(6)
+    + "px, far/near radius " + (far?.screenRadius || 0).toFixed(3) + "/" + (near?.screenRadius || 0).toFixed(3)
+    + "px, near/far ratio " + ratio.toFixed(3) + " (bar >=1.5)";
+  if (controlRef) {
+    console.log("  parent " + controlRef + " perspective " + (perspective ? "GREEN" : "RED") + " " + detail);
+    check("control:the-flattened-ball-reddens-the-perspective-axis", steps > 10 && Number.isFinite(ratio) && ratio > 0 && !perspective, detail);
+  } else {
+    check("ballsize:the-screen-radius-grows-as-the-ball-approaches", perspective, detail);
+  }
   // 대조군. 이어져야 할 것과 튀어야 할 것이 같은 자에 안 걸린다는 증거다.
   let squashStep = 0;
   for (let i = 1; i < rec.length; i += 1) {
