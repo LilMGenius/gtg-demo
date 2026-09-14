@@ -1725,7 +1725,8 @@ const TOUCHED = new Set(['contact']);
              z는 골라인을 지나 카메라 쪽으로 흐른다. 그물에 안 걸린 공은 계속 굴러간다. */
           ball.position.set(
             lerp(tail.from.x, (tail.aimX >= 0 ? 1 : -1) * (2.9 + tail.vary.b * 0.7), e),
-            0.14 + Math.abs(Math.sin(u * 5)) * 0.4 * (1 - u),
+            // Continue from the captured height; the remaining hop cannot exceed it.
+            lerp(0.14, tail.from.y, Math.abs(Math.cos(u * 5)) * (1 - e)),
             lerp(tail.from.z, -0.6, e)
           );
           break;
