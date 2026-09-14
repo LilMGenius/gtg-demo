@@ -67,7 +67,7 @@ async function sample(browser, body, tag, { scene, error = false } = {}) {
           const rect = cap.getBoundingClientRect();
           const style = getComputedStyle(cap);
           current = {
-            caption: cap.textContent, html: cap.innerHTML, kind, start: f, z: [pos.z],
+            caption: cap.textContent, html: cap.innerHTML, kind, start: f, z: [pos.z], y: [pos.y],
             visible: rect.width > 0 && rect.height > 0 && rect.top >= 0 && rect.bottom <= innerHeight && style.visibility === "visible" && style.display !== "none",
             single: cap.children.length === 1 && cap.firstElementChild.tagName === "SPAN" && tick.parentElement === cap.firstElementChild,
             captions: [], end: null
@@ -75,6 +75,7 @@ async function sample(browser, body, tag, { scene, error = false } = {}) {
         }
         if (current && tick) {
           current.z.push(pos.z);
+          current.y.push(pos.y);
           if (current.captions.at(-1) !== cap.textContent) current.captions.push(cap.textContent);
         } else if (current) {
           current.end = f;
@@ -111,7 +112,7 @@ async function sample(browser, body, tag, { scene, error = false } = {}) {
       const records = await page.evaluate(() => window.__m2Windows);
       for (const r of records.slice(seen)) {
         const type = ["save", "catch"].includes(r.kind) ? "hand" : r.z[0] < 0 ? "net" : "other";
-        console.log(tag + " natural " + type + " " + JSON.stringify({ caption: r.caption, kind: r.kind, frames: [r.start, r.end], dribbles: r.dribbles, z: [Math.min(...r.z), Math.max(...r.z)], rest: r.z[0], reset: r.resetZ, spot, radius }));
+        console.log(tag + " natural " + type + " " + JSON.stringify({ caption: r.caption, kind: r.kind, frames: [r.start, r.end], dribbles: r.dribbles, y: [Math.min(...r.y), Math.max(...r.y)], firstY: r.y[0], samples: r.y.length, z: [Math.min(...r.z), Math.max(...r.z)], rest: r.z[0], reset: r.resetZ, spot, radius }));
         if (type !== "other" && !chosen[type]) chosen[type] = r;
       }
       seen = records.length;
@@ -124,10 +125,12 @@ async function sample(browser, body, tag, { scene, error = false } = {}) {
       caption: captionOk(net, CAUSE_LABEL.goalKick) && captionOk(hand, CAUSE_LABEL.throwing),
       silent: Boolean(net) && net.dribbles === 0,
       bounce: Boolean(hand) && hand.dribbles > 0,
+      handSilent: Boolean(hand) && hand.dribbles === 0,
+      held: Boolean(hand) && hand.end > hand.start && hand.y.length > 1 && hand.y.every((y) => Number.isFinite(y) && Math.abs(y - hand.y[0]) <= radius),
       stationary: stationary(net) && stationary(hand),
       kicked: Boolean(net) && net.z.every(Number.isFinite) && Math.max(...net.z) > net.z[0] + radius,
       zMax: net && Math.max(...net.z),
-      detail: JSON.stringify({ net: net?.caption, hand: hand?.caption, netDribbles: net?.dribbles, handDribbles: hand?.dribbles }),
+      detail: JSON.stringify({ net: net?.caption, hand: hand?.caption, netDribbles: net?.dribbles, handDribbles: hand?.dribbles, handY: hand && [Math.min(...hand.y), Math.max(...hand.y)], firstY: hand?.y[0], radius }),
       errors
     };
   } finally {
@@ -145,10 +148,11 @@ try {
   const live = await sample(browser, null, "live");
   check("restart:the-caption-names-the-owning-stat-and-nothing-it-does-not-draw", live.caption, live.detail);
   check("restart:no-dribble-sound-while-the-ball-is-in-the-net", live.silent, live.detail);
-  check("restart:the-held-ball-still-calls-the-dribble-sound", live.bounce, live.detail);
+  check("restart:no-dribble-sound-while-the-ball-is-in-the-glove", live.handSilent, live.detail);
+  check("restart:the-held-ball-stays-in-the-glove-while-it-counts-down", live.held, live.detail);
   check("restart:nothing-is-kicked-before-the-next-shot", live.stationary, "all sampled z <= resting z + ball radius; reset z equals ready spot");
   const control = await sample(browser, old, "control");
-  check("control:the-old-caption-and-dribble-redden-the-axes", !control.caption && !control.silent && control.bounce && control.stationary, OLD + " caption=" + control.caption + " net-silent=" + control.silent + " " + control.detail);
+  check("control:the-old-caption-and-dribble-redden-the-axes", !control.caption && !control.silent && !control.handSilent && control.bounce && control.stationary, OLD + " caption=" + control.caption + " net-silent=" + control.silent + " hand-silent=" + control.handSilent + " " + control.detail);
   // Reuse walkback-gate's served-module routing for a rendered-ball plant. The scene's
   // ballPos is a getter; accumulate the nudge after poses overwrite the ball each frame.
   const source = readFileSync(new URL("../web/src/render/scene.mjs", import.meta.url), "utf8");
