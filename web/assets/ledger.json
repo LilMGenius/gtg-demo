@@ -1,0 +1,50 @@
+[
+  {
+    "path": "audio/bgm.m4a",
+    "origin": "assets/audio/bgm.mp3, ID3 artist 브금추천, title 축구게임 스타일 락 브금 | Soccer Game type Rock BGM, 12:12, licence not on record; candidate replacement assets/audio/demo-bgm.mp3 (LAME in FL Studio 2026, 2:07, authorship unrecorded)",
+    "rights": "unconfirmed",
+    "form": "m4a"
+  },
+  {
+    "path": "audio/bgm.ogg",
+    "origin": "assets/audio/bgm.mp3, ID3 artist 브금추천, title 축구게임 스타일 락 브금 | Soccer Game type Rock BGM, 12:12, licence not on record; candidate replacement assets/audio/demo-bgm.mp3 (LAME in FL Studio 2026, 2:07, authorship unrecorded)",
+    "rights": "unconfirmed",
+    "form": "ogg"
+  },
+  {
+    "path": "fonts/black-han-sans.ttf",
+    "origin": "Google Fonts",
+    "rights": "OFL-1.1",
+    "form": "ttf"
+  },
+  {
+    "path": "fonts/pretendard-bold.subset.woff2",
+    "origin": "orioncactus/pretendard 1.3.9",
+    "rights": "OFL-1.1",
+    "form": "woff2"
+  },
+  {
+    "path": "fonts/pretendard-regular.subset.woff2",
+    "origin": "orioncactus/pretendard 1.3.9",
+    "rights": "OFL-1.1",
+    "form": "woff2"
+  },
+  {
+    "path": "models/markings.glb",
+    "origin": "tools/build-assets.mjs",
+    "rights": "self",
+    "form": "glb"
+  },
+  {
+    "path": "models/skyline.glb",
+    "origin": "tools/build-assets.mjs",
+    "rights": "self",
+    "form": "glb"
+  },
+  {
+    "path": "og.png",
+    "origin": "tools/og-shot.mjs",
+    "rights": "self",
+    "form": "png"
+  }
+]
