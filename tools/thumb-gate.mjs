@@ -313,7 +313,24 @@ try {
         }
         /* 자리 절은 등급마다 0번 변형 하나를 그대로 읽는다. 그 절이 재는 것은 겨냥이라 변형을
            얹어도 답이 안 갈리고, 얹으면 축이 든 등급 번호가 무엇을 가리키는지만 흐려진다. */
-        per.push({ body: k.height + "/" + k.weight,
+        // headBox owns the projected disc; reuse the same marked shell mask as the shape axis.
+        // A paid haircut must leave at least half that disc available for the face on every body.
+        const paid = [];
+        if (s.tab === "hair") for (let i = 0; i < looks.length; i += 1) {
+          const L = looks[i];
+          if (L.rank < 2) continue;
+          const box = m.headBox("hair", k, g.lookOf({ hair: L.rank, hairSkin: L.skin }));
+          const pixels = one[i];
+          let disc = 0, shell = 0;
+          for (let y = 0; y < pixels.h; y += 1) for (let x = 0; x < pixels.w; x += 1) {
+            if (((x + 0.5) / pixels.w - box.x) ** 2 / box.rx ** 2
+              + ((y + 0.5) / pixels.h - box.y) ** 2 / box.ry ** 2 > 1) continue;
+            disc += 1;
+            shell += pixels[y * pixels.w + x];
+          }
+          paid.push({ tag: L.tag, disc, shell, ratio: disc ? shell / disc : 1 });
+        }
+        per.push({ body: k.height + "/" + k.weight, paid,
           mid: one.filter((x, i) => looks[i].skin === 0).map(midOf), pairs,
           cover: one.map((x) => x.reduce((a, b) => a + b, 0)) });
       }
@@ -379,6 +396,14 @@ try {
   const sayClip = (q) => q.x.toFixed(3) + " collar " + q.y0.toFixed(3) + " sides "
     + q.x0.toFixed(3) + ".." + q.x1.toFixed(3) + " hem " + q.y1.toFixed(3);
   for (const s of shapes) {
+    if (s.tab === "hair") {
+      const paid = s.per.flatMap((row) => row.paid.map((q) => ({ ...q, body: row.body })));
+      const expected = s.looks.filter((tag) => Number(tag.split(":")[0]) >= 2).length * BODIES.length;
+      check("thumb:hair:the-paid-shell-leaves-half-the-head-disc",
+        expected > 0 && paid.length === expected && paid.every((q) => q.disc > 0 && q.ratio <= 0.50),
+        paid.length + " of " + expected + " paid skins; " + paid.map((q) => q.body + " " + q.tag
+          + " " + q.shell + "/" + q.disc + "=" + q.ratio.toFixed(4)).join(", "));
+    }
     /* 0.75. 두 등급이 칠해진 자리의 4분의 3을 공유하면 사람은 같은 물건에 색만 바꾼 것으로 읽는다.
        판정은 다섯 벌에서 등급이 다른 모든 겉모습 쌍이다. 실측으로 표본을 변형까지 넓히자 다섯 선반이
        상한을 넘었다. 머리 0:2-2:1이 188/84에서 0.829, 장갑 1:1-2:2가 188/84에서 0.801, 양말 1:1-2:2가
