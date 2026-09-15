@@ -1,6 +1,6 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
 import { HUD_LINKS, linkAttrs } from './ui/links.mjs';
-import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, growthGain, followerGain, judgeWindow, GEAR_STEP } from '../../src/chain.mjs';
+import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, followerGain, judgeWindow, GEAR_STEP } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
 import { KEY_MAP } from './ui/keys.mjs';
 import { KEEPERS, KICKERS, keeperCost, kickerCost, kickerByName, ROLES, ROLE_SLOTS, ELEVEN, defaultEleven, TRAITS, PULL_COST, PULL_BULK, PULL_BONUS, pullYield, TICKET_CAP, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
@@ -10,6 +10,7 @@ import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dmLine, gazeAct } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord, readSquadKickers, useAccount, saveKey } from './state/save.mjs';
+import { autoTrain, trainStat } from './state/coach.mjs';
 import { currentId } from './state/account.mjs';
 import { coinGain, readWallet, COIN_DRILL } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
@@ -80,7 +81,7 @@ state.pref = [-1, 0, 1].includes(Number(saved?.pref)) ? Number(saved.pref) : 0;
 // 호출 수는 로그가 아니라 실제 입력 자리를 세야 손 모드의 우회 호출을 놓치지 않는다.
 window.__autoCalls = 0;
 window.__lastInput = null;
-// 비운 시간은 훈련 선택권으로만 바뀌고, 그 선택은 손으로 한다.
+// 비운 시간은 훈련 포인트로 쌓이고 자동이 켜져 있으면 선방 우선순위대로 쓴다.
 // 이전 배포본 세이브에는 points가 없다. 없으면 0으로 읽고 게임은 그대로 이어진다.
 state.points = (Number(saved?.points) || 0) + (saved ? offlineGain(saved.at, Date.now()) : 0);
 // 아웃문그램 팔로워. 의사소통과 악동이 여기서 값을 낸다.
@@ -755,12 +756,13 @@ function endSet() {
   // 세트 사이에 다른 자막이 끼어도 사람은 이 줄만 이어서 기억한다. 직전 요약을 따로 들고 금지한다.
   lastSetEnd = setEndLine(5 - conceded, rng, lastSetEnd);
   say(lastSetEnd, null);
-  // 판이 끝나면 레벨이 오르고 훈련 한 번이 쌓인다. 쓰는 시점은 손이 정한다.
+  // 판이 끝나면 레벨이 오르고 훈련 한 번이 쌓인다. 자동은 바로 훈련한다.
   // 자동 팝업이 없으므로 전 스탯 만렙이어도 다음 판이 그대로 온다.
   state.keeper.level += 1;
   state.points += 1;
   // 완봉이면 이적시장 이용권 한 장. 규칙은 판정이 소유하고 화면은 그 답을 받는다.
   state.tickets = ticketGain(state.results, state.tickets);
+  if (state.auto) trainKeeper();
   persist();
   pips();
   timer = stage.after(0.9, () => countdown(setBreak(), '한숨 돌리는 중', nextSet));
@@ -769,6 +771,24 @@ function endSet() {
 /* 관찰자 하나. 창 크기가 바뀌면 넘침이 다시 계산되므로, 그릴 때와 굴릴 때만 세면 옛 답이 남는다.
    내 정보와 위키가 각자 제 상자에 두고 있는 그것이고, 구르는 창 중에 훈련장만 없었다. */
 let gymWatch = null;
+let lastAutoTraining = '';
+
+// 손과 자동은 같은 성장 굴림과 저장, 외형 갱신을 쓴다. 예산은 쌓인 훈련 포인트뿐이다.
+function trainKeeper(stat) {
+  if (state.points <= 0) return;
+  const result = stat === undefined ? autoTrain(state.keeper, state.points, rng) : trainStat(state.keeper, stat, rng);
+  if (!result.spent) return;
+  Object.assign(state.keeper, result.keeper);
+  state.points -= result.spent;
+  if (stat === undefined) {
+    const line = result.lines.at(-1);
+    lastAutoTraining = '자동 훈련: ' + CAUSE_LABEL[line.stat] + ' ' + line.before + ' → ' + line.after;
+  }
+  persist();
+  stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
+  pips();
+  renderGym();
+}
 
 // 훈련장. 열고 닫는 것은 손이고, 열려 있는 동안에도 판은 돈다.
 // 포인트가 0이어도 열린다. 그때는 내 스탯을 보는 창이다.
@@ -777,7 +797,7 @@ function renderGym() {
   // 성장 칸이 전부 상한이면 훈련은 더 쌓여도 쓸 곳이 없다. 그때만 환전 줄이 열린다.
   const maxed = GROWABLE.every((k) => state.keeper[k] >= 10);
   // 제목과 수를 점으로 잇지 않는다. 창 이름은 제목이 갖고 수는 그 뒤 작은 줄이 갖는다.
-  const head = '훈련장<small>' + (state.points > 0 ? '남은 훈련 ' + state.points + '회' : '밀린 훈련이 없다') + '</small>';
+  const head = '훈련장<small>' + (state.points > 0 ? '남은 훈련 ' + state.points + '회' : '밀린 훈련이 없다') + '</small>' + (lastAutoTraining ? '<small class="auto-training">' + lastAutoTraining + '</small>' : '');
   // 못 누르는 버튼도 사유를 글자로 들고 있다. 빈 자리는 왜 못 쓰는지를 말하지 않는다.
   const swap = maxed
     ? '<button class="swap"' + (state.points <= 0 ? ' disabled' : '') + '>'
@@ -809,13 +829,7 @@ function renderGym() {
   for (const b of box.querySelectorAll('.row button')) {
     b.onclick = () => {
       if (b.disabled || state.points <= 0) return;
-      // 프로의식은 히든이다. 숫자는 안 보이고 가끔 두 칸이 오른다.
-      state.keeper[b.dataset.k] += growthGain(state.keeper, rng);
-      state.points -= 1;
-      persist();
-      stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
-      pips();
-      renderGym();
+      trainKeeper(b.dataset.k);
     };
   }
   /* 굴러가는 창이 제가 구른다는 사실을 화면에 하나도 안 적었다. 실측 740x360에서 성장 칸이 전부
@@ -2801,6 +2815,7 @@ addEventListener('keydown', (e) => {
   if (state.phase === 'caption' && state.skip) state.skip();
 });
 
+if (state.auto) trainKeeper();
 markDive(state.pref, false);
 pips();
 mountTitle(() => {
