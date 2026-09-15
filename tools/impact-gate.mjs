@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 // 사건이 일어난 순간이 그림으로 남는지 재는 자.
 // critic 28은 아홉 장의 스크린샷을 보고 히트스톱도 셰이크도 흙도 없다고 판정했다.
@@ -139,6 +139,17 @@ try {
   const p = await ctx.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
+  // Reuse walkback-gate.mjs's served-module control: change only save's shake,
+  // leaving the rendered displacement measurement intact. This invocation must fail:
+  // node tools/impact-gate.mjs 7 --no-save-shake
+  if (process.argv.includes("--no-save-shake")) {
+    const source = readFileSync(new globalThis.URL("../web/src/render/scene.mjs", import.meta.url), "utf8");
+    const anchor = "save: [0.045, 0.34]";
+    if (source.split(anchor).length !== 2) throw new Error("save shake anchor must match once");
+    const body = source.replace(anchor, "save: [0, 0.34]");
+    await p.route("**/render/scene.mjs", (r) => r.fulfill({ status: 200, contentType: "text/javascript", body }));
+    console.log("CONTROL save shake amplitude=0");
+  }
   await p.goto(URL, { waitUntil: "load" });
   await p.waitForTimeout(1200);
   await p.click("#go", { force: true });
@@ -179,8 +190,8 @@ try {
       const vis = await p.evaluate(() => window.__impactVis());
       // 강제 선언한 사건 뒤에 그 구의 진짜 사건이 따라오면 act가 최고값을 0으로 되돌린다.
       // 계측: save만 cam과 squash가 동시에 0이고 나머지 셋은 정상이었다.
-      // 두 시점의 최고값을 취하면 덮이기 전 표본이 남는다.
-      const camOff = Math.max(vis.camOff, lateState.camOff);
+      // squash와 같은 버스트 표본을 포함해야 늦은 두 표본이 모두 리셋 뒤여도 셰이크가 남는다.
+      const camOff = Math.max(vis.camOff, lateState.camOff, hitVis.camOff);
       const squash = Math.max(vis.squashEver, lateState.squashEver, hitVis.squashEver);
       row = { kind, peak: peak.n, late: late.n, noise: noise.n, stall: stall.ratio,
         cam: camOff, squash, u: live.u, lateU: lateState.u };
