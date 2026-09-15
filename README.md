@@ -11,3 +11,9 @@ Wiki prose lives in web/wiki/src as GFM with gamewiki wikilinks, JSON schemas an
 Each valueFrom field names an imported code constant. wiki.mjs resolves it without evaluating expressions; arrays and the derived top reward remain code-owned tables. JSON module imports provide the built fallback while a single pages.json fetch refreshes the panel.
 
 Run node tools/wikisrc-gate.mjs against the static server to check fresh-build hashes, category sources, number-free prose, rendered bodies and controls.
+
+## Gates
+
+| Gate | What it proves |
+| --- | --- |
+| `node tools/live-gate.mjs` | Five deployed GitHub Pages files match HEAD by SHA-256; a fresh phone landscape browser completes five balls through touch input and displays the round result without console errors; a 404 cannot complete the same flow; Start alone enters play with untouched empty credentials, no navigation and no cookies. An intercepted title that requires an account must fail that login axis. The 240-second gate records resource waits and a result PNG under `.omo/evidence/`. |
