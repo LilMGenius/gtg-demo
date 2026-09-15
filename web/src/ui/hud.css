@@ -128,11 +128,11 @@ body.playing #hud{opacity:1}
 #form .up{color:#4fd08a;opacity:1;display:block}
 #form .dn{color:var(--bad);opacity:1;display:block}
 #form .mid{color:var(--dim);display:block}
-/* 재화 띠. 팔로워와 육수와 스폰이 별도 버튼으로 한 줄에 선다. 재화를 누르면 파는 곳이 아니라
+/* 재화 띠. 팔로워와 골드와 캐시가 별도 버튼으로 한 줄에 선다. 재화를 누르면 파는 곳이 아니라
    버는 곳이 열린다. 재화를 눌러 상점이 열리는 것은 어느 게임의 문법도 아니고,
    상점은 오른쪽 창 기둥의 제 버튼이 소유한다.
    font:inherit은 여기 못 쓴다. 그 한 줄이 --fs-num을 body의 16px으로 되돌려,
-   같은 띠 안에서 팔로워만 22px이고 육수와 스폰이 16px로 갈린다.
+   같은 띠 안에서 팔로워만 22px이고 골드와 캐시가 16px로 갈린다.
    gap도 0이다. 칩 사이는 칩이 소유한다. 컨테이너 gap과 칩 여백이 겹치면 실측 간격이
    둘의 합이 되어, 토큰 하나를 고쳐도 화면이 그만큼 안 움직인다. */
 #purse{grid-area:bal;position:relative;gap:0;
@@ -160,9 +160,9 @@ body.playing #hud{opacity:1}
   /* 60%까지 불투명하게 버틴다. 곧바로 흐려지기 시작하면 눈이 옮겨오기 전에 값이 지워진다. */
   60%{opacity:1;transform:translateY(-4px) scale(1)}
   100%{opacity:0;transform:translateY(-15px) scale(1)}}
-/* 스폰은 결제로만 들어온다. 시간으로 버는 육수와 색이 같으면 둘이 한 갈래로 읽힌다. */
+/* 캐시는 결제로만 들어온다. 시간으로 버는 골드와 색이 같으면 둘이 한 갈래로 읽힌다. */
 #purse i{font-style:normal;font-weight:700;opacity:1;color:#7fe3ff}
-/* 버프 잔량은 벌어 둔 값이 아니라 줄어드는 값이다. 육수 노랑과 스폰 하늘색 사이에 없는
+/* 버프 잔량은 벌어 둔 값이 아니라 줄어드는 값이다. 골드 노랑과 캐시 하늘색 사이에 없는
    연두를 써야 세 번째 칸이 잔고의 일종으로 안 읽힌다. u 기본 밑줄은 지운다. */
 #purse u{text-decoration:none;font-weight:700;opacity:1;color:#9be86a}
 #pips{pointer-events:auto;background:none;border:0;padding:0;grid-area:pips;display:flex;gap:6px}
@@ -581,7 +581,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #roster .row button .tag{font-style:normal;font-size:var(--fs-body);color:var(--dim);margin-left:var(--gap-2)}
 #roster .row button:disabled .tag{color:#f6efdc44}
 #roster .row button.here .tag{color:#ffd83d}
-/* 지금 뛰는 자리와 육수가 모자란 카드. 눌러도 아무 일이 없다는 것이 먼저 보여야 한다. */
+/* 지금 뛰는 자리와 골드가 모자란 카드. 눌러도 아무 일이 없다는 것이 먼저 보여야 한다. */
 #roster .row button:disabled{color:#f6efdc5c;background:#141a12;cursor:default}
 #roster .row button:disabled em{color:#f6efdc44}
 /* 출전 중인 한 장은 죽은 카드와 다른 색이어야 한다. 둘 다 안 눌리기 때문이다. */
@@ -810,7 +810,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 @media (max-height:520px){
   /* 재화 띠 아래에서 첫 단을 세운다. 띠는 8px에서 시작해 칩 55px로 서고 --lift 4px 그림자를 아래로 던진다.
      창은 inset:0이라 첫 단이 화면 맨 위, 곧 띠와 같은 자리에서 시작해서 실측 740x360에서 초상과 이름이
-     띠 아래끝 66.2px보다 61.8px 위에 서고 스폰 칩을 통째로 덮었다. 여기서 첫 단은 실측 71.4px에 서고,
+     띠 아래끝 66.2px보다 61.8px 위에 서고 캐시 칩을 통째로 덮었다. 여기서 첫 단은 실측 71.4px에 서고,
      길어진 만큼은 창이 제 스크롤로 받는다(숨은 높이 436px에서 503px). */
   #me{padding-top:calc(8px + 55px + var(--lift) + var(--gap-2) + env(safe-area-inset-top));gap:var(--gap-2)}
   #me .card{max-height:none;gap:var(--gap-1)}

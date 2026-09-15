@@ -102,7 +102,7 @@ try {
           times: times ? times.textContent.trim() : "",
           timesLit: lit(times),
           coin: px ? Number(px.dataset.coin) : null,
-          // 값 자리에 그려진 숫자. 값을 치르는 회차면 육수 수이고, 이용권으로 다 내면 이용권 수다.
+          // 값 자리에 그려진 숫자. 값을 치르는 회차면 골드 수이고, 이용권으로 다 내면 이용권 수다.
           shown: slot ? slot.textContent.replace(/[^0-9]/g, "") : "",
           priceLit: lit(slot),
           icon: Boolean(slot && slot.querySelector("svg")),

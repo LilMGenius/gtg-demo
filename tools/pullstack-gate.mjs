@@ -57,7 +57,7 @@ try {
 
   await p.evaluate(() => window.__shop(true));
   await p.waitForSelector("#shop .buy[data-want]", { timeout: 8000 });
-  /* 판이 뒤에서 계속 돈다. 구가 끝날 때마다 육수가 들어오므로, 두 시점의 잔고를 비교하는 축은
+  /* 판이 뒤에서 계속 돈다. 구가 끝날 때마다 골드가 들어오므로, 두 시점의 잔고를 비교하는 축은
      그 사이에 굴러간 구를 뽑기가 쓴 값으로 읽는다. 재는 동안 판을 멈춘다. */
   await p.evaluate(() => window.__lockRound());
   const wants = await p.evaluate(() => [...document.querySelectorAll("#shop .buy[data-want]")].map((e) => Number(e.dataset.want)));
