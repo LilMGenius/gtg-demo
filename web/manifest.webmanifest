@@ -1,0 +1,16 @@
+{
+  "name": "골키퍼 키우기 3D",
+  "short_name": "골키퍼",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0d110c",
+  "theme_color": "#0d110c",
+  "icons": [
+    {
+      "src": "assets/og.png",
+      "sizes": "1200x630",
+      "type": "image/png"
+    }
+  ]
+}
