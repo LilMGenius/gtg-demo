@@ -2700,6 +2700,18 @@ const TOUCHED = new Set(['contact']);
 
   // 선언된 잔상과 화면에 남은 잔상은 다른 주장이다. 화소로 재려면 같은 프레임을
   // 공만 뺀 것, 공과 잔상을 뺀 것으로도 그려야 차분이 무엇의 화소인지 말할 수 있다.
+  window.__padHide = (on) => {
+    let count = 0;
+    for (const arm of keeper.userData.arms) {
+      for (const mesh of arm.children) {
+        if (!mesh.isMesh || mesh.geometry.type !== 'BoxGeometry') continue;
+        mesh.visible = !on;
+        count += 1;
+      }
+    }
+    return count;
+  };
+
   window.__flightHide = (mode) => {
     ball.visible = mode !== 'both';
     const off = mode === 'ghosts' || mode === 'both';

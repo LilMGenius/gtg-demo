@@ -20,6 +20,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { pinClock } from "./clock.mjs";
 import { clearDraw } from "./draw.mjs";
+import { liveShoulders } from "./live-shoulder.mjs";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
@@ -596,6 +597,33 @@ try {
     rp >= RUN_MIN && rf > 0 && rp / rf >= RUN_RATIO,
     "run " + rp.toFixed(2) + " vs " + rf.toFixed(2) + "px (ratio " + (rf ? rp / rf : 0).toFixed(2) + ")");
   say("console:no-errors", errs.length === 0, errs.length ? errs[0].slice(0, 120) : "clean");
+  // The live pitch owns lateral readability; crown height belongs to thumb-gate.
+  // Half the smallest measured clear sample: 341px at 165/65 kit 2:1 hand 1.
+  // This fixed floor must not follow a shrinking population on subsequent runs.
+  const SHOULDER_FLOOR = 170;
+  const shoulderDetail = r => r.body + " " + r.look + " hand " + r.hand
+    + " lateral=" + r.lateral + " (left=" + r.lateralLeft + ",right=" + r.lateralRight
+    + ") above=" + r.above + " total=" + r.total
+    + " " + (r.lateral >= SHOULDER_FLOOR ? "GREEN" : "RED");
+  const shoulders = await liveShoulders(browser, BASE);
+  const parentShoulders = await liveShoulders(browser, BASE, true);
+  const parentRed = parentShoulders.filter(r => r.lateral < SHOULDER_FLOOR);
+  const population = shoulders.concat(parentShoulders);
+  say("control:the-live-shoulder-pairs-repeat-and-restore",
+    population.every(r => r.drift === 0 && r.torsoPixels > 0),
+    population.length + " samples, maximum changed pixels " + Math.max(...population.map(r => r.drift)));
+  say("control:the-same-body-with-hidden-pads-has-no-pad-pixels",
+    population.every(r => r.noPad === 0),
+    population.length + " same-body counterfactuals, maximum " + Math.max(...population.map(r => r.noPad)));
+  say("live:the-shoulder-pad-widens-the-keeper-silhouette",
+    shoulders.every(r => r.lateral >= SHOULDER_FLOOR),
+    "floor " + SHOULDER_FLOOR + " = floor(341/2), smallest clear sample 165/65 2:1 hand 1; "
+    + shoulders.map(shoulderDetail).join("; "));
+  say("control:the-served-parent-fails-the-live-shoulder-population",
+    parentShoulders.length === shoulders.length && parentRed.length > 0,
+    "2564b55 actors served via page.route; RED " + parentRed.length + "/" + parentShoulders.length
+    + "; failed samples: " + parentRed.map(shoulderDetail).join("; ")
+    + "; all parent samples: " + parentShoulders.map(shoulderDetail).join("; "));
 } finally {
   clearTimeout(t);
   if (browser) await browser.close();
