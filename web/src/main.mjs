@@ -216,18 +216,17 @@ const IC_NOFACE = SVG('aria-hidden="true"', FACE_PX);
 // 24 격자의 가운데가 12라 마지막 단은 6폭이 하한이다. 3폭으로 좁히면 중심이 격자 밖으로 나간다.
 const IC_LIKE = G('좋아요', R(6, 3, 3, 3) + R(15, 3, 3, 3) + R(3, 6, 18, 3) + R(3, 9, 18, 3)
   + R(6, 12, 12, 3) + R(9, 15, 6, 3));
-// 육수. 시간으로 버는 재화다. 땀을 뺀 결과를 부르는 입말이라 물방울 하나가 그대로 단위로 읽히고,
-// 뾰족한 위와 둥근 아래라 별 실루엣과 안 겹친다. 판을 세던 옛 단위 '구'와 글자가 안 겹친다.
-const IC_SWEAT = G('육수', R(10.5, 3, 3, 3) + R(7.5, 6, 9, 3) + R(6, 9, 12, 3) + R(4.5, 12, 15, 3)
-  + R(4.5, 15, 15, 3) + R(6, 18, 12, 3) + R(7.5, 21, 9, 3));
-/* 값을 말하는 자리는 전부 이 함수를 지난다. 상단 잔고는 아이콘인데 상점 버튼만 '140 육수'처럼
+// 골드. 시간으로 버는 재화는 3px 격자의 둥근 동전과 테두리로 그린다.
+const IC_GOLD = G('골드', R(6, 3, 12, 3) + R(3, 6, 3, 12) + R(18, 6, 3, 12)
+  + R(6, 18, 12, 3) + R(9, 9, 6, 6));
+/* 값을 말하는 자리는 전부 이 함수를 지난다. 상단 잔고는 아이콘인데 상점 버튼만 '140 골드'처럼
    글자로 적으면 같은 재화가 두 표기로 갈리고, 어느 재화로 사는지를 글자를 읽어야 안다. */
 // data-coin은 계기가 읽는 자리다. 그려진 숫자는 천 단위 쉼표가 붙고 아이콘 이름이 섞여 들어와,
 // 글자를 파싱하면 계기가 값을 못 읽거나 잘못 읽는다. 값은 데이터에서 꺼내 쓴다.
-const SW = (n) => '<span class="px" data-coin="' + Number(n) + '">' + IC_SWEAT
+const SW = (n) => '<span class="px" data-coin="' + Number(n) + '">' + IC_GOLD
   + '<b>' + Number(n).toLocaleString() + '</b></span>';
-// 스폰. 결제로만 들어오는 재화다. 별은 어느 게임에서든 유료 갈래로 읽힌다.
-const IC_SPON = G('스폰', R(10.5, 3, 3, 3) + R(9, 6, 6, 3) + R(0, 9, 24, 3) + R(4.5, 12, 15, 3)
+// 캐시. 결제로만 들어오는 재화다. 별은 어느 게임에서든 유료 갈래로 읽힌다.
+const IC_CASH = G('캐시', R(10.5, 3, 3, 3) + R(9, 6, 6, 3) + R(0, 9, 24, 3) + R(4.5, 12, 15, 3)
   + R(6, 15, 12, 3) + R(4.5, 18, 6, 3) + R(13.5, 18, 6, 3));
 // 기복. 화살표 하나면 오늘 컨디션이 어느 쪽인지가 문장 없이 선다.
 const IC_UP = G('컨디션 좋음', R(10.5, 3, 3, 3) + R(7.5, 6, 9, 3) + R(4.5, 9, 15, 3) + R(9, 12, 6, 12));
@@ -238,8 +237,8 @@ const IC_MID = G('컨디션 보통', R(4.5, 9, 15, 3) + R(4.5, 15, 15, 3));
 // 버프. 목이 좁고 배가 넓은 병 하나면 마시는 물건인 것이 문장 없이 선다.
 const IC_BUFF = G('버프', R(9, 0, 6, 3) + R(9, 3, 6, 3) + R(6, 6, 12, 3) + R(4.5, 9, 15, 12)
   + R(6, 21, 12, 3));
-/* 이용권. 완봉으로만 들어오는 자원이라 육수와도 스폰과도 다른 그림이어야 한다.
-   가로로 누운 테두리와 가운데 절취선이면 표로 읽히고, 물방울이나 별 실루엣과 안 겹친다. */
+/* 이용권. 완봉으로만 들어오는 자원이라 골드와도 캐시와도 다른 그림이어야 한다.
+   가로로 누운 테두리와 가운데 절취선이면 표로 읽히고, 동전이나 별 실루엣과 안 겹친다. */
 const IC_TICKET = G('이용권', R(3, 6, 18, 3) + R(3, 15, 18, 3) + R(3, 9, 3, 6) + R(18, 9, 3, 6)
   + R(12, 9, 3, 3) + R(12, 15, 3, 3));
 /* 종류마다 다른 그림. 병 하나로 셋을 다 그리면 지금 무엇이 걸려 있는지가 상점을 열어야 아는 값이 된다.
@@ -344,13 +343,13 @@ function pips() {
     btn.dataset.who = who;
     btn.innerHTML = '<img alt="' + who + '" src="' + thumbURL('face', state.keeper, lookOf(state.gear, who)) + '">';
   }
-  /* 재화 띠. 팔로워와 육수와 스폰이 한 줄에 선다. 세 값은 갈래가 달라도 등급이 같아서,
+  /* 재화 띠. 팔로워와 골드와 캐시가 한 줄에 선다. 세 값은 갈래가 달라도 등급이 같아서,
      따로 떨어져 있으면 지금 무엇을 얼마나 들고 있는지가 화면 두 자리를 읽어야 아는 값이 된다.
      갈래는 크기가 아니라 칩 사이에 선 세로선이 가른다. 팔로워는 아웃문그램을, 재화는
      위키의 재화 칸을 연다. */
   el('purse').innerHTML = '<button class="cur" id="fans" ' + linkAttrs('fans') + '>' + IC_FANS + '<b>' + state.fans.toLocaleString() + '</b></button>'
-    + '<button class="cur" ' + linkAttrs('purse') + '>' + IC_SWEAT + '<b>' + state.wallet.coin.toLocaleString() + '</b></button>'
-    + '<button class="cur" ' + linkAttrs('purse') + '>' + IC_SPON + '<i>' + state.wallet.cash.toLocaleString() + '</i></button>'
+    + '<button class="cur" ' + linkAttrs('purse') + '>' + IC_GOLD + '<b>' + state.wallet.coin.toLocaleString() + '</b></button>'
+    + '<button class="cur" ' + linkAttrs('purse') + '>' + IC_CASH + '<i>' + state.wallet.cash.toLocaleString() + '</i></button>'
     // 남은 버프도 같은 줄에 선다. 몇 판 뒤에 꺼지는지를 상점을 열어야 알면 계획이 안 선다.
     + (state.buff.shots > 0 ? '<button class="cur" ' + linkAttrs('purse') + '>' + buffIcon(state.buff.kind) + '<u>' + state.buff.shots + '</u></button>' : '');
   // 남은 훈련 횟수는 버튼 위에 붙는다. 열어봐야 아는 숫자는 방치형에서 안 열린다.
@@ -490,7 +489,7 @@ function tally(name, conceded) {
   else row.saved += 1;
 }
 
-// 이번 구에 들어온 육수를 잔고 옆에 한 번 띄운다.
+// 이번 구에 들어온 골드를 잔고 옆에 한 번 띄운다.
 // 총액만 갱신하면 유명한 키커를 막아 더 벌었다는 사실이 화면에 남지 않는다.
 // pips()가 지갑 칸을 통째로 다시 그리므로 반드시 그 뒤에 붙인다.
 function coinPop(n) {
@@ -672,7 +671,7 @@ function rollCaptions(result) {
       // 라포는 말을 섞은 구에서만 쌓인다. 스쳐 지나간 얼굴은 다음에도 남이다.
       // 봇이 뛴 구는 팔로워와 같은 규칙으로 0이다. 봇이 서 있었으니 얼굴이 익을 리 없다.
       if (!state.botRan && result.events.some((e) => e.t === 'talked')) state.rapport = addRapport(state.rapport, state.gear.city, state.shots[state.i].passer);
-      // 육수는 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
+      // 골드는 구마다 들어온다. 먹혀도 들어오고, 막으면 더 들어온다.
       // 유명한 키커를 막을수록 더 들어온다. 팔로워와 같은 fame 값을 쓴다.
       const coin = coinGain(result.conceded, result.fame, result.untested);
       state.wallet.coin += coin;
@@ -1613,7 +1612,7 @@ function commitDate(city, passer, moveId) {
   persist();
   pips();
   renderDate(city, passer, out);
-  // 뒤에 열려 있는 내 정보도 같이 그린다. 안 그리면 방금 쓴 육수와 내려간 라포가
+  // 뒤에 열려 있는 내 정보도 같이 그린다. 안 그리면 방금 쓴 골드와 내려간 라포가
   // 반투명 배경 너머에서 옛 값으로 남아 만남 버튼이 아직 열린 것처럼 보인다.
   renderMe();
 }
@@ -2460,7 +2459,7 @@ function bindBuff(box) {
       const spec = buffAt(b.dataset.buff);
       if (!spec || state.wallet.coin < spec.cost) return;
       const next = addBuff(state.buff, spec.kind);
-      // 다른 종류가 살아 있으면 addBuff가 원본을 그대로 돌려준다. 그때 값을 치르면 육수만 사라진다.
+      // 다른 종류가 살아 있으면 addBuff가 원본을 그대로 돌려준다. 그때 값을 치르면 골드만 사라진다.
       if (next === state.buff) return;
       state.wallet.coin -= spec.cost;
       state.buff = next;
