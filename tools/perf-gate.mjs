@@ -2,6 +2,7 @@
 // p50만 보면 못 잡는다. 정지 카메라에서 94fps가 나오는 동안 게임이 멈춰 있을 수 있다.
 // 그래서 p50/p95/p99와 최악 프레임, 그리고 드로우콜과 삼각형을 같이 남긴다.
 import { chromium } from 'playwright';
+import { execFileSync } from 'node:child_process';
 
 const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
 const URL = 'http://127.0.0.1:10310/web/index.html?seed=11';
@@ -17,6 +18,17 @@ function pct(sorted, p) {
 
 let browser;
 try {
+  let cpu = 'unread', foreignChrome = 'unread';
+  try {
+    const load = JSON.parse(execFileSync('powershell', ['-NoProfile', '-Command',
+      '[pscustomobject]@{ cpu = ((Get-CimInstance Win32_Processor -ErrorAction Stop | Measure-Object -Property LoadPercentage -Average).Average); foreignChrome = @(Get-Process chrome -ErrorAction SilentlyContinue).Count } | ConvertTo-Json -Compress',
+    ], { encoding: 'utf8', timeout: 2500, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }));
+    if (Number.isFinite(load.cpu) && Number.isFinite(load.foreignChrome)) {
+      cpu = load.cpu;
+      foreignChrome = load.foreignChrome;
+    }
+  } catch {}
+  const machineLoad = 'cpu=' + cpu + (typeof cpu === 'number' ? '%' : '') + ' foreign-chrome=' + foreignChrome;
   browser = await chromium.launch({ executablePath: EXE, args: ['--use-gl=angle', '--enable-gpu'] });
   const page = await (await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 2 })).newPage();
   const errors = [];
@@ -51,8 +63,12 @@ try {
   const p95 = pct(sorted, 0.95);
   const p99 = pct(sorted, 0.99);
   const worst = sorted[sorted.length - 1];
-  const rows = [];
-  const ok = (name, pass, detail) => rows.push([pass, name, detail]);
+  const rows = [[true, 'instrument:machine-load-at-measurement', machineLoad]];
+  const ok = (name, pass, detail) => rows.push([pass, name,
+    !pass && name.startsWith('frame:') && (cpu >= 50 || foreignChrome > 0)
+      ? detail + ' under load (' + machineLoad + '): rerun standalone before reading as product'
+      : detail,
+  ]);
 
   // 대조군. 계측기가 실제로 시간을 재는지부터 증명한다.
   const stall = await page.evaluate(() => {
