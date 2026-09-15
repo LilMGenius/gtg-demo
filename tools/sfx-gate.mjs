@@ -61,11 +61,13 @@ try {
       const tl = [];
       const hm = [];
       const tb = [];
+      const body = { lo: [], mid: [], hi: [] };
       for (let i = 0; i < 11; i += 1) {
         const one = await m.renderSfx(sfx, name, ARG[name], LEN[name]);
         at.push(m.attackMs(one));
         pk.push(m.peakOf(one));
         const y = m.measure(one);
+        for (const band of Object.keys(body)) body[band].push(y.body[band]);
         tl.push(y.tailMs);
         ce.push(m.centroid(one, 0, Math.max(60, y.tailMs)));
         hm.push(m.harmonicity(y.peaks));
@@ -78,9 +80,13 @@ try {
       x.cen = mid(ce);
       x.harmonicity = Number(mid(hm).toFixed(3));
       x.tailBright = mid(tb);
+      // meter.mjs의 몸 대역도 같은 열한 렌더의 중앙값으로 잰다.
+      for (const band of Object.keys(body)) x.body[band] = mid(body[band]);
       // 흩어짐을 같이 들고 나간다. 중앙값 하나만 찍으면 그 수가 얼마나 흔들리는 수인지 안 보인다.
       x.cenLow = ce[0];
       x.cenHigh = ce[ce.length - 1];
+      x.bodyLoLow = body.lo[0];
+      x.bodyLoHigh = body.lo[body.lo.length - 1];
       out.each[name] = x;
     }
     out.kickSoft = Number(m.peakOf(await m.renderSfx(sfx, "kick", 0.05, 0.6)).toFixed(4));
@@ -210,10 +216,23 @@ try {
   // 그래프 피크 0.95에 400Hz 미만 97%는 작은 스피커에서 무음과 같다.
   // 양쪽을 다 재야 한다. 저역이 있어야 사물이고, 재생되는 대역이 있어야 소리다.
   for (const name of ["kick", "dribble", "place"]) {
-    const lo = r.each[name].body.lo;
-    check(name + ":body-has-weight", lo >= 0.28, lo.toFixed(3));
-    check(name + ":survives-a-laptop-speaker", 1 - lo >= 0.3, (1 - lo).toFixed(3));
+    const x = r.each[name];
+    const lo = x.body.lo;
+    check(name + ":body-has-weight", lo >= 0.28,
+      lo.toFixed(3) + " (11 draws " + x.bodyLoLow.toFixed(3) + ".." + x.bodyLoHigh.toFixed(3) + ")");
+    check(name + ":survives-a-laptop-speaker", 1 - lo >= 0.3,
+      (1 - lo).toFixed(3) + " (11 draws " + (1 - x.bodyLoHigh).toFixed(3) + ".." + (1 - x.bodyLoLow).toFixed(3) + ")");
   }
+  const dribble = r.each.dribble;
+  const laptop = 1 - dribble.body.lo;
+  const laptopLow = 1 - dribble.bodyLoHigh;
+  const laptopHigh = 1 - dribble.bodyLoLow;
+  const deviation = Math.max(laptop - laptopLow, laptopHigh - laptop);
+  const noSpread = laptopHigh - laptopLow < 0.005;
+  check("control:a-single-draw-can-fall-under-the-laptop-bar",
+    Number.isFinite(deviation) && (noSpread || (laptopLow < laptop && deviation > 0.005)),
+    laptop.toFixed(3) + " (11 draws " + laptopLow.toFixed(3) + ".." + laptopHigh.toFixed(3) +
+      "), max deviation " + deviation.toFixed(3) + (noSpread ? "; no spread" : ""));
 
   // 골대. 금속은 오래 울리고 배음이 정수배가 아니다.
   check("post:rings-longer-than-the-leather-sounds", r.each.post.tailMs >= 220, r.each.post.tailMs + "ms");
