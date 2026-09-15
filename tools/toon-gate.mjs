@@ -10,10 +10,8 @@
 // 그렇게 못 박고 남는 것이 무엇인지도 재 뒀다. 흔들림을 박고 임팩트 층을 내린 뒤 같은 계획을 두
 // 프로세스에서 돌리면 세계는 같은 자리에 선다. vnow와 키퍼와 공의 좌표가 소수 넷째 자리까지 같다.
 // 그런데 화면 png의 해시는 여전히 갈린다. 래스터가 프로세스 사이에서 비트까지 같지는 않다는 뜻이다.
-// 큰 그늘은 그 잡음보다 두꺼워 세 회차가 같은 수를 내고, 가장 작은 그늘 둘(뛰쳐나간 키퍼, 470에서
-// 490 화소대)만 문턱 8 언저리에 걸친 화소 다섯쯤이 회차마다 뒤집힌다. 실측 세 회차: 471/475/471과
-// 484/488/483. 바 400에 대해 17퍼센트 여유라 판정은 안 흔들린다.
-// 문턱을 옮겨 수를 굳히는 대신 그 폭을 여기 적는다. 어느 문턱에도 경계는 있고, 옮기면 경계만 옮긴다.
+// 그림자 차분은 공을 양쪽에서 걷고 잰다. 커진 공이 같은 그늘을 덮으면 캐스터가 그대로여도
+// 면적이 줄어든다. 공을 되놓은 화면이 원본과 같은지, 돌진의 앞뒤 한 프레임도 바를 넘는지 함께 잰다.
 //
 // 표본 범위: 사건 셋(save, distracted, charge) x 두 모드(384 확대 기본, ?pix=0 풀해상), 1280x720.
 // 740x360은 바 없이 판 크기만 적는다. 그 폭에서는 타깃이 캔버스보다 커서 확대가 축소로 뒤집힌다.
@@ -256,7 +254,7 @@ async function darkerBlobs([A, B, drop, link, rays, occStep, ballR]) {
     }
     const c = window.__ballProbe.sample();
     const bp = window.__ballPos();
-    if (c && c.ndc) {
+    if (c && c.ndc && window.__flightState().ball) {
       const o = window.__ballProbe.probeAt(bp.x + ballR, bp.y, bp.z);
       const rad = Math.max(4, Math.hypot(o.ndc[0] - c.ndc[0], o.ndc[1] - c.ndc[1]) * 0.5 * w);
       const cx = (c.ndc[0] * 0.5 + 0.5) * w;
@@ -368,6 +366,51 @@ function ownerOf([pts, w, h]) {
   });
 }
 
+// Reuse scene.mjs __flightHide: isolate the caster from the non-casting foreground ball.
+// Both difference frames have the same occluders; the visible frame must survive restoration.
+async function shadowAt(page, tag, control = false) {
+  const A = (await page.screenshot()).toString("base64");
+  const flight = await page.evaluate(() => window.__flightState());
+  let off;
+  let cast;
+  let ctrl;
+  try {
+    await page.evaluate(() => window.__flightHide("both"));
+    await page.waitForTimeout(200);
+    const S = (await page.screenshot()).toString("base64");
+    const S2 = (await page.screenshot()).toString("base64");
+    off = await page.evaluate(() => window.__castOff(true));
+    await page.waitForTimeout(200);
+    const B = (await page.screenshot()).toString("base64");
+    ctrl = await page.evaluate(darkerBlobs, [S, S2, SHADOW_DROP, SHADOW_LINK, OWNER_RAYS, OCC_STEP, BALL_R]);
+    cast = await page.evaluate(darkerBlobs, [S, B, SHADOW_DROP, SHADOW_LINK, OWNER_RAYS, OCC_STEP, BALL_R]);
+  } finally {
+    await page.evaluate((before) => {
+      window.__castOff(false);
+      window.__flightHide(!before.ball ? "both" : before.shown ? "" : "ghosts");
+    }, flight);
+  }
+  await page.waitForTimeout(200);
+  const restored = (await page.screenshot()).toString("base64");
+  const restore = await page.evaluate(darkerBlobs, [A, restored, SHADOW_DROP, SHADOW_LINK, OWNER_RAYS, OCC_STEP, BALL_R]);
+  const restoreBack = await page.evaluate(darkerBlobs, [restored, A, SHADOW_DROP, SHADOW_LINK, OWNER_RAYS, OCC_STEP, BALL_R]);
+  say("control:the-ball-restoration-preserves-the-frame " + tag,
+    restore.hits === 0 && restoreBack.hits === 0, restore.hits + "/" + restoreBack.hits + " changed pixels");
+  const top = cast.blobs[0] || null;
+  const owners = top ? await page.evaluate(ownerOf, [top.pts, W, H]) : [];
+  const floor = owners.filter((o) => o.name === "box" || o.name === "ground");
+  const share = owners.length ? floor.length / owners.length : 0;
+  const zMed = floor.length ? floor.map((o) => o.z).sort((a, b) => a - b)[floor.length >> 1] : 0;
+  say("control:the-frozen-frame-repeats-itself " + tag, ctrl.blobs.length === 0 && off > 0,
+    "ctrl blobs " + ctrl.blobs.length + " diff " + ctrl.hits + "px, casters " + off);
+  say((control ? "control:the-charge-shadow-survives-an-adjacent-frame " : "shadow:the-keeper-drops-a-cast-shadow-on-the-floor ") + tag,
+    Boolean(top) && top.px >= SHADOW_MIN && owners.length >= 8 && share >= OWNER_FLOOR,
+    (top ? top.px + "px of " + cast.hits + "px" : "no blob") + " on the floor, "
+    + floor.length + "/" + owners.length + " rays on box or ground z" + zMed.toFixed(1)
+    + ", bridged over " + cast.occCells + " occluded cells; ball isolated");
+  return A;
+}
+
 const routed = new Map();
 if (WAS) {
   for (const f of LAYER) {
@@ -445,7 +488,7 @@ try {
         const base = anchor > 0 ? anchor : f;
         window.__plan(base + lead, k, base + lead + tail);
         return { f, stop: base + lead + tail };
-      }, [kind, LEAD, TAIL, anchored ? 0 : ANCHOR]);
+      }, [kind, LEAD, kind === "charge" ? TAIL - 1 : TAIL, anchored ? 0 : ANCHOR]);
       const stopAt = plan.stop;
       if (!anchored) {
         // 예약이 닻보다 늦게 걸리면 첫 정지 프레임의 세계시각이 다시 벽시계를 탄다. 조용히 밀리는 대신 여기서 빨개진다.
@@ -465,30 +508,25 @@ try {
         v: window.__camDbg().vnow, f: window.__frames(), k: window.__keeperPos(), b: window.__ballPos()
       }));
       const fix = (o) => [o.x, o.y, o.z].map((n) => n.toFixed(3)).join(",");
-      say("control:the-world-stopped-at-the-planned-frame " + tag, t0.v === t1.v && t1.f > t0.f,
+      say("control:the-world-stopped-at-the-planned-frame " + tag + (kind === "charge" ? " -1" : ""), t0.v === t1.v && t1.f > t0.f,
         "vnow " + t1.v.toFixed(4) + " held while frames kept ticking, keeper " + fix(t1.k) + " ball " + fix(t1.b));
 
-      const A = (await page.screenshot()).toString("base64");
-      const A2 = (await page.screenshot()).toString("base64");
-      const off = await page.evaluate(() => (window.__castOff ? window.__castOff(true) : -1));
-      await page.waitForTimeout(200);
-      const B = (await page.screenshot()).toString("base64");
-      await page.evaluate(() => { if (window.__castOff) window.__castOff(false); });
-
-      const ctrl = await page.evaluate(darkerBlobs, [A, A2, SHADOW_DROP, SHADOW_LINK, OWNER_RAYS, OCC_STEP, BALL_R]);
-      const cast = await page.evaluate(darkerBlobs, [A, B, SHADOW_DROP, SHADOW_LINK, OWNER_RAYS, OCC_STEP, BALL_R]);
-      const top = cast.blobs[0] || null;
-      const owners = top ? await page.evaluate(ownerOf, [top.pts, W, H]) : [];
-      const floor = owners.filter((o) => o.name === "box" || o.name === "ground");
-      const share = owners.length ? floor.length / owners.length : 0;
-      const zMed = floor.length ? floor.map((o) => o.z).sort((a, b) => a - b)[floor.length >> 1] : 0;
-      say("control:the-frozen-frame-repeats-itself " + tag, ctrl.blobs.length === 0 && off > 0,
-        "ctrl blobs " + ctrl.blobs.length + " diff " + ctrl.hits + "px, casters " + off);
-      say("shadow:the-keeper-drops-a-cast-shadow-on-the-floor " + tag,
-        Boolean(top) && top.px >= SHADOW_MIN && owners.length >= 8 && share >= OWNER_FLOOR,
-        (top ? top.px + "px of " + cast.hits + "px" : "no blob") + " on the floor, "
-        + floor.length + "/" + owners.length + " rays on box or ground z" + zMed.toFixed(1)
-        + ", bridged over " + cast.occCells + " occluded cells");
+      const advance = async () => {
+        const before = await page.evaluate(() => {
+          const stop = window.__frames() + 2;
+          window.__plan(0, null, stop);
+          return { stop, v: window.__camDbg().vnow };
+        });
+        await at(before.stop);
+        const elapsed = await page.evaluate(() => window.__camDbg().vnow) - before.v;
+        say("control:the-charge-neighbor-is-one-world-step-away " + tag,
+          Math.abs(elapsed - STEP) < 1e-9, elapsed.toFixed(6) + " seconds");
+      };
+      if (kind === "charge") {
+        await shadowAt(page, tag + " -1", true);
+        await advance();
+      }
+      const A = await shadowAt(page, tag);
 
       if (kind === "save" && mode === "pix") {
         const cells = await page.evaluate(dirtCells, [W, H]);
@@ -514,6 +552,10 @@ try {
 
       const run = await page.evaluate(runLength, [A, 470, 700, 200, 1080, W]);
       if (kind === "save") shots["run-" + mode] = run;
+      if (kind === "charge") {
+        await advance();
+        await shadowAt(page, tag + " +1", true);
+      }
     }
     const bands = modes(pool);
     say("toon:the-uniform-reads-as-three-bands " + mode,
