@@ -4,7 +4,7 @@
 
 // 값 기준은 봇, 장비 선반과 같다. 전 칸이 이적시장 380 골드 미만이다. 소모형이라 다시 산다.
 export const BUFFS = [
-  { kind: 'tonic', name: '자양강장제', cost: 220, shots: 12, note: '한눈팔기와 수다가 반으로 준다. 대신 화제도 반이다' },
+  { kind: 'tonic', name: '자양강장제', cost: 220, shots: 12, note: '한눈팔기와 수다가 반으로 준다. 수다로 버는 팔로워가 반으로 준다' },
   { kind: 'hype', name: '바이럴 떡밥', cost: 260, shots: 8, note: '소문이 1.5배로 퍼진다. 막는 실력과는 무관하다' },
   { kind: 'rosin', name: '송진 스프레이', cost: 300, shots: 10, note: '장갑 한 등급이 손에 더 붙는다. 3등급도 이득이다' }
 ];

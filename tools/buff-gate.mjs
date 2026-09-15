@@ -1,6 +1,6 @@
 import { makeRng, buildSet, resolve, newKeeper, followerGain } from "../src/chain.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
-import { newBuff, addBuff, spendBuff, readBuff, BUFF_CAP } from "../web/src/state/buff.mjs";
+import { newBuff, addBuff, spendBuff, readBuff, BUFF_CAP, BUFFS } from "../web/src/state/buff.mjs";
 
 // 버프 게이트. 세 종이 선반 문구가 판 것을 실제로 움직이는가.
 // 브라우저를 안 띄운다. 판정은 src/chain.mjs 순수 함수고, 짝지은 시드 비교라 표본이 싸다.
@@ -54,8 +54,7 @@ const c2 = sweep({});
 check("control", c1.rate === c2.rate && c1.fans === c2.fans,
   "rate " + c1.rate.toFixed(2) + " vs " + c2.rate.toFixed(2) + " fans " + c1.fans + " vs " + c2.fans);
 
-// 자양강장제. 문구는 한눈팔기와 수다가 반, 대신 화제도 반이다.
-// 두 방향이 같이 서야 통과다. 세이브만 오르고 화제가 안 내리면 교환이 아니라 순이득이다.
+// 자양강장제. 한눈팔기와 수다를 줄이고, 수다로 버는 팔로워를 함께 줄인다.
 const tonic = sweep({ focusAid: 0.5 });
 check("tonic-save", tonic.rate > c1.rate,
   c1.rate.toFixed(2) + " -> " + tonic.rate.toFixed(2));
@@ -66,10 +65,7 @@ check("tonic-distract", tonic.lapse < c1.lapse,
 check("tonic-cost", tonic.flairFans < c1.flairFans,
   c1.flairFans + " -> " + tonic.flairFans + " (total " + c1.fans + " -> " + tonic.fans + ")");
 
-// 선반은 화제도 반이라고 적혀 있는데 신인에게는 총 팔로워가 오히려 오른다. 수다 몫이 전체의 1.6퍼센트뿐이라
-// 세이브가 늘어난 몫이 그것을 덮기 때문이다. 만렙은 의사소통과 악동이 10이라 수다가 열 배 넘게 일어나고
-// 그 몫이 전체의 12퍼센트가 되므로, 같은 약이 같은 비율을 깎아도 총합의 방향이 뒤집힌다.
-// 문구가 어느 표본에서 참인지를 축이 직접 말한다.
+// 같은 약을 만렙에게도 대본다. 수다 몫과 총합은 서로 다른 방향으로 움직일 수 있다.
 const top = newKeeper();
 for (const k of GROWABLE) top[k] = 10;
 const topBase = sweep({ keeper: top });
@@ -78,6 +74,19 @@ check("tonic-cost-at-max", topTonic.fans < topBase.fans,
   "total " + topBase.fans + " -> " + topTonic.fans + " (talk " + topBase.flairFans + " -> " + topTonic.flairFans + ")");
 check("tonic-save-at-max", topTonic.rate > topBase.rate,
   topBase.rate.toFixed(2) + " -> " + topTonic.rate.toFixed(2));
+
+// Parse the shipped sentence's scope, then reuse tonic-cost's directional test.
+// Halving focusAid changes event probability; finite sweeps need not halve earnings exactly.
+// An unknown claim fails closed instead of silently measuring a different quantity.
+const tonicNote = BUFFS.find((b) => b.kind === "tonic").note;
+const claim = /^한눈팔기와 수다가 반으로 준다\. (?:대신 )?(수다로 버는 팔로워가|화제도) 반(?:으로 준다|이다)$/u.exec(tonicNote);
+const metric = claim ? (claim[1] === "수다로 버는 팔로워가" ? "flairFans" : "fans") : null;
+const sentenceSweeps = [["rookie", c1, tonic], ["maxed", topBase, topTonic]].map(([segment, before, after]) => ({
+  segment, before: metric ? before[metric] : null, after: metric ? after[metric] : null,
+  ok: Boolean(metric) && before[metric] > 0 && after[metric] < before[metric] && after.lapse < before.lapse
+}));
+check("tonic-sentence", sentenceSweeps.every((s) => s.ok),
+  JSON.stringify({ note: tonicNote, metric, sweeps: sentenceSweeps }));
 
 // 바이럴 떡밥. 문구는 소문이 1.5배, 막는 실력과는 무관하다.
 // 판정 인자가 아니라서 세이브율은 완전히 같아야 한다. 조금이라도 움직이면 축이 샌 것이다.
