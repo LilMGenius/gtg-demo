@@ -340,13 +340,15 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
    판때기는 자리가 아니라 하는 일을 따라간다. 창을 여는 것이 아니라 켜고 끄는 것이라
    오른쪽으로 옮겨도 46px 토글 판때기를 그대로 쓰고, 그래서 기둥 안에서 갈래가 눈에 갈린다.
    왼쪽 기둥에 두면 자원 띠 두 줄로 실측 85px까지 내려온 상태 칩과 그림자가 서로를 문다. */
-#mute{--col-r:var(--pad-r);position:absolute;right:var(--col-r);top:calc(12px + env(safe-area-inset-top));
+#mute,#fullscreen{--col-r:var(--pad-r);position:absolute;right:var(--col-r);top:calc(12px + env(safe-area-inset-top));
   pointer-events:auto;width:46px;height:46px;display:grid;place-items:center;
   border:var(--line) solid var(--edge);background:var(--panel);color:var(--dim);
   transform:rotate(var(--tilt));box-shadow:var(--lift) var(--lift) 0 var(--edge), var(--bevel)}
-#mute svg{width:24px;height:24px}
+#mute svg,#fullscreen svg{width:24px;height:24px}
+#fullscreen{--col-r:calc(var(--pad-r) + 116px)}
+#fullscreen[hidden]{display:none}
 #mute .slash{opacity:0}
-#mute:active{transform:rotate(var(--tilt)) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
+#mute:active,#fullscreen:active{transform:rotate(var(--tilt)) translate(3px,4px);box-shadow:1px 1px 0 var(--edge)}
 #mute[aria-pressed="true"]{color:var(--bad)}
 #mute[aria-pressed="true"] .wave{opacity:0}
 #mute[aria-pressed="true"] .slash{opacity:1}
@@ -1445,6 +1447,6 @@ body { word-break: keep-all; overflow-wrap: break-word; }
    .24s는 창이 뜨는 시간과 같아 두 움직임이 한 동작으로 읽힌다. */
 /* Native translate percentages use the button width; --col-r shares its rest offset.
    https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/translate */
-#mute,#wikiBtn,#auto,#out,#gymBtn,#rosterBtn,#gramBtn,#shopBtn{transition:translate .24s ease}
+#mute,#fullscreen,#wikiBtn,#auto,#out,#gymBtn,#rosterBtn,#gramBtn,#shopBtn{transition:translate .24s ease}
 #hud:has(:is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is(#auto,#out){translate:-96px 0}
-#hud:has(:is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is(#mute,#wikiBtn,#gymBtn,#rosterBtn,#gramBtn,#shopBtn){translate:calc(100% + var(--col-r) + 12px) 0}
+#hud:has(:is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is(#mute,#fullscreen,#wikiBtn,#gymBtn,#rosterBtn,#gramBtn,#shopBtn){translate:calc(100% + var(--col-r) + 12px) 0}

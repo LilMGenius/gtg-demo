@@ -2703,6 +2703,39 @@ window.__botRan = () => state.botRan;
 // 소리. 끌 수 없는 소리는 소리가 아니라 사고다.
 // 음소거는 음량을 건드리지 않는다. 둘을 섞어버리면 한 번 누른 사람은 다시 켜도 무음으로 남는다.
 const MUTE_KEY = 'gtg.muted';
+const fullscreenBtn = el('fullscreen');
+window.__fsLog = [];
+const fullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+const fullscreenSupported = Boolean(document.fullscreenEnabled || document.documentElement.webkitRequestFullscreen);
+fullscreenBtn.hidden = !fullscreenSupported;
+const reflectFullscreen = () => fullscreenBtn.setAttribute('aria-pressed', String(Boolean(fullscreenElement())));
+document.addEventListener('fullscreenchange', reflectFullscreen);
+document.addEventListener('webkitfullscreenchange', reflectFullscreen);
+// Native Fullscreen API owns activation and state; keep orientation failure optional.
+function enterFullscreen() {
+  const root = document.documentElement;
+  const request = root.requestFullscreen || root.webkitRequestFullscreen;
+  if (!fullscreenSupported || !request || fullscreenElement()) return;
+  window.__fsLog.push({ t: performance.now(), call: 'requestFullscreen' });
+  try {
+    Promise.resolve(request.call(root, { navigationUI: 'hide' }))
+      .then(() => screen.orientation?.lock?.('landscape')).catch(() => {});
+  } catch {}
+}
+fullscreenBtn.onclick = () => {
+  if (!fullscreenSupported) return;
+  if (!fullscreenElement()) return enterFullscreen();
+  window.__fsLog.push({ t: performance.now(), call: 'exitFullscreen' });
+  try { Promise.resolve((document.exitFullscreen || document.webkitExitFullscreen).call(document)).catch(() => {}); } catch {}
+};
+let startFullscreenTried = false;
+const startFullscreen = () => {
+  if (startFullscreenTried || navigator.maxTouchPoints === 0 || !matchMedia('(pointer: coarse)').matches) return;
+  startFullscreenTried = true;
+  enterFullscreen();
+};
+// A touch pointerdown need not grant activation; click does, before title startup.
+el('go').addEventListener('click', startFullscreen, { capture: true, once: true });
 const muteBtn = el('mute');
 function setMuted(on) {
   bgm.muted = on;
@@ -2758,6 +2791,7 @@ addEventListener('keydown', (e) => {
   }
   if (id) return;
   if (binding?.action === 'dive') { e.preventDefault(); chooseDive(binding.keys[key]); return; }
+  if (binding?.action === 'fullscreen') { e.preventDefault(); if (!fullscreenBtn.hidden) fullscreenBtn.click(); return; }
   const action = binding?.action === 'open' ? binding.keys[key] : binding?.action;
   if (action && el(action)?.onpointerdown) {
     e.preventDefault();

@@ -61,6 +61,7 @@ export const wikiReady = typeof window === 'undefined' ? Promise.resolve() : fet
 
 const TABLES = {
   hand: (ctx) => [
+      (typeof document !== 'undefined' && !document.fullscreenEnabled && !document.documentElement.webkitRequestFullscreen) ? '<p>iPhone에서는 공유 메뉴에서 홈 화면에 추가한 뒤 실행하면 전체 화면으로 플레이할 수 있다.</p>' : '',
       table(['키', '하는 일'], KEY_MAP.map(({ label, note }) => [label, note])),
       table(['버튼', '하는 일'], [['돌진', '각을 좁히러 나간다. 뚫리면 골대가 빈다']])
     ],
