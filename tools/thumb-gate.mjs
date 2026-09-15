@@ -80,6 +80,12 @@ try {
   b = await chromium.launch({ executablePath: EXE });
   const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
   const p = await ctx.newPage();
+  // 기존 카드 렌더러의 실제 리그와 카메라를 계기 안에서만 연다. 상품 코드는 그대로 쓴다.
+  await p.route("**/web/src/render/thumb.mjs", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, body: await response.text() +
+      '\nexport function spongeSurface(k, look) { frame("pads", k, look); return { rig, scene, cam, cv: R.domElement, render: () => R.render(scene, cam) }; }' });
+  });
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
   await p.goto(BASE, { waitUntil: "load" });
@@ -705,11 +711,9 @@ try {
      rx -0.30으로 숙이고 어깨 관절을 rz -0.78과 0.84로 벌린다. 숙인 몸통은 옷깃을 내리고, 벌어진
      어깨는 폭이 armR 1.9 더하기 torsoR girth 0.9인 상자의 위 모서리를 들어 올린다. 실측으로 같은
      자리가 +0.047과 +0.039다. 그래서 이 축은 식이 아니라 rig에서 정점을 월드로 옮겨 읽는다.
-     상의 꼭대기는 옷 자신의 지오메트리다. 외곽선 껍질이 아니다. addOutline(torso, 0.05)이 같은
-     지오메트리를 제 배율로 키운 자식을 달아 두는데, 그 자식의 행렬로 읽으면 옷이 아니라 잉크의
-     꼭대기가 난다. 실측으로 그 껍질이 옷보다 0.046에서 0.055 높고, 껍질까지 세면 예순 줄 가운데
-     다섯이 그 아래로 들어간다(165/96 3:0 둘과 3:2 둘, 200/96 3:2 하나). 껍질은 상의 색이 아니고
-     kit IoU 자의 마스크도 그것을 안 세므로 이 축이 잴 옷은 옷 자신이다. 그 다섯은 그대로 적는다.
+     옷의 꼭대기와 잉크의 꼭대기를 따로 잰다. 옷 위에 선 상자라도 몸통 잉크 아래면
+     어깨 윗선이 없다. 자기 외곽선을 단 스펀지는 그 외곽선 정점이 몸통 외곽선보다 바닥만큼
+     높아야 하고, 카드에서 몸통만 남긴 실루엣보다 위에 실제로 찍힌 행도 있어야 한다.
      스펀지는 메시 하나다. 빨판과 달리 병합되지 않아 어깨 관절의 BoxGeometry 자식 하나가 그것이고,
      하나가 아니면 축이 수 대신 그 어긋남으로 먼저 빨개진다. 폭과 두께와 깊이와 앉은 높이를
      actors.mjs에서 한 자리씩 읽어 다시 세워 맞춘다. 여기 수를 베껴 두면 그 식이 얇아진 날 이 축만
@@ -739,7 +743,7 @@ try {
   const [TORSO_K] = manyOf(/torsoR: w \* ([\d.]+), torsoLen: h \* [\d.]+,/, "the keeper torso radius");
   const [W_BASE, W_AT, W_STEP] = manyOf(/const w = ([\d.]+) \+ \(weight - (\d+)\) \* ([\d.]+);/, "the girth from weight");
   const [PAD_TH_K] = manyOf(/const th = o\.armR \* ([\d.]+) \* kc\.pad;/, "the sponge thickness");
-  const [PAD_LIFT_K, PAD_SEAT_K] = manyOf(/pad\.position\.set\(side \* o\.armR \* [\d.]+, o\.armR \* ([\d.]+) \+ th \* ([\d.]+), 0\);/, "the sponge seat");
+  const [PAD_LIFT_K, PAD_SEAT_K, PAD_SEAT_DOWN] = manyOf(/pad\.position\.set\(side \* \(o\.armR \* [\d.]+ \+ Math\.max\([\d.]+, kc\.pad\) \* [\d.]+\), o\.armR \* ([\d.]+) \+ th \* ([\d.]+) - ([\d.]+), 0\);/, "the sponge seat");
   const [PAD_WIDE_K, PAD_GIRTH_K] = manyOf(/const wide = o\.armR \* ([\d.]+) \+ o\.torsoR \* kc\.girth \* ([\d.]+);/, "the sponge width");
   const [PAD_DEEP_K] = manyOf(/new THREE\.BoxGeometry\(wide, th, o\.armR \* ([\d.]+)\)/, "the sponge depth");
   const [TORSO_PEN] = manyOf(/addOutline\(torso, ([\d.]+)\);/, "the torso outline width");
@@ -794,6 +798,9 @@ try {
           const top = pad ? seatTo(home.y) : 0;
           const fall = pad ? top - seatTo(home.y - 1) : 0;
           const margin = top - crown;
+          const padInk = pad ? pad.children.filter((c) => c.userData.isOutline) : [];
+          const inkTop = padInk.length === 1 ? topOf(padInk[0], padInk[0].matrixWorld, null) : top;
+          const torsoInkTop = ink.length === 1 ? topOf(ink[0], ink[0].matrixWorld, null) : crown;
           out.rows.push({
             body: k.height + "/" + k.weight, tag: L.rank + ":" + L.skin, hand: at,
             boxes: boxes.length, verts: pad ? pad.geometry.attributes.position.count : 0,
@@ -802,8 +809,9 @@ try {
             wide: Number(par.width) || 0, high: Number(par.height) || 0, deep: Number(par.depth) || 0,
             wantWide: armR * lit.wideK + torsoR * cut.girth * lit.girthK,
             wantHigh: th, wantDeep: armR * lit.deepK,
-            seat: home.y, wantSeat: armR * lit.liftK + th * lit.seatK,
+            seat: home.y, wantSeat: armR * lit.liftK + th * lit.seatK - lit.seatDown,
             crown, pen: ink.length === 1 ? topOf(torso, ink[0].matrixWorld, null) - crown : 0,
+            inkTop, torsoInkTop, inkMargin: inkTop - torsoInkTop,
             top, live: pad ? topOf(pad, pad.matrixWorld, null) : 0, fall, margin,
             sank: pad && fall > 0 ? seatTo(home.y - (margin + floor) / fall) - crown : 0,
             half: pad ? seatTo(home.y * halfAt) - crown : 0
@@ -813,13 +821,13 @@ try {
     }
     return out;
   }, [BODIES, { armK: ARM_K, torsoK: TORSO_K, wBase: W_BASE, wAt: W_AT, wStep: W_STEP, thK: PAD_TH_K,
-    liftK: PAD_LIFT_K, seatK: PAD_SEAT_K, wideK: PAD_WIDE_K, girthK: PAD_GIRTH_K, deepK: PAD_DEEP_K },
+    liftK: PAD_LIFT_K, seatK: PAD_SEAT_K, seatDown: PAD_SEAT_DOWN, wideK: PAD_WIDE_K, girthK: PAD_GIRTH_K, deepK: PAD_DEEP_K },
   CROWN_FLOOR, PLANT_SEAT]);
   const crownSay = (r) => r.body + " " + r.tag + " hand " + r.hand + " clears by " + r.margin.toFixed(5);
   const crownEnds = (k) => Math.min.apply(null, crowns.rows.map((r) => r[k])).toFixed(5)
     + ".." + Math.max.apply(null, crowns.rows.map((r) => r[k])).toFixed(5);
   const crownDrift = crowns.rows.filter((r) => r.boxes !== 1 || r.verts !== crowns.box || r.inks !== 1
-    || r.padInks !== 0 || !(r.fall > 0 && r.fall <= 1) || Math.abs(r.top - r.live) > 1e-9
+    || r.padInks > 1 || !(r.fall > 0 && r.fall <= 1) || Math.abs(r.top - r.live) > 1e-9
     || Math.abs(r.wide - r.wantWide) > 1e-9 || Math.abs(r.high - r.wantHigh) > 1e-9
     || Math.abs(r.deep - r.wantDeep) > 1e-9 || Math.abs(r.seat - r.wantSeat) > 1e-9);
   const crownLow = crowns.rows.filter((r) => !(r.margin > CROWN_FLOOR));
@@ -843,6 +851,75 @@ try {
           + TORSO_PEN + " ink shell stands " + crownEnds("pen") + " proud of that crown and buries "
           + crownInk.length + " of " + crowns.rows.length + ", the seat dropped by each margin sinks all "
           + crownSank.length + " to -" + CROWN_FLOOR + " while halving it sinks only " + crownHalf.length);
+
+  const inkLow = crowns.rows.filter((r) => r.padInks !== 1 || r.inkMargin < CROWN_FLOOR);
+  check("thumb:pads:the-sponge-silhouette-clears-the-ink-shell",
+    crowns.rows.length === BODIES.length * crowns.looks.length * 2 && inkLow.length === 0,
+    "floor " + CROWN_FLOOR + ", margins " + crownEnds("inkMargin") + ", below " + inkLow.length
+      + " of " + crowns.rows.length + ": " + inkLow.map((r) => r.body + " " + r.tag + " hand "
+        + r.hand + " " + r.inkMargin.toFixed(5)).join(", "));
+
+  // 상자 정점은 화소가 아니다. 같은 카드에서 스펀지를 숨긴 장과 원래 장을 굽는다.
+  // 어깨 열은 스펀지만 남긴 장에서 읽고, 몸통 잉크 윗행은 몸통만 남긴 장에서 읽는다.
+  // 머리는 어깨가 아니므로 몸통 대조군에 넣지 않는다. 색 표식은 기존 셔츠 마스크와 같다.
+  const spongePixels = await p.evaluate(async (bodies) => {
+    const t = await import("/web/src/render/thumb.mjs");
+    const g = await import("/web/src/state/gear.mjs");
+    const rows = [];
+    const belongs = (o, parent) => { for (let q = o; q; q = q.parent) if (q === parent) return true; return false; };
+    const mark = (d, i) => d[i] > 40 && d[i + 2] > 40 && d[i] > d[i + 1] * 1.9 && d[i + 2] > d[i + 1] * 1.9;
+    for (const body of bodies) for (let rank = 0; rank < g.KITS.length; rank += 1) {
+      for (let skin = 0; skin < g.skinsAt("pads", rank).length; skin += 1) {
+        if (!(g.skinAt("pads", rank, skin).cut.pad > 0)) continue;
+        const look = g.lookOf({ pads: rank, padsSkin: skin });
+        look.shirt = 0xff00ff;
+        const s = t.spongeSurface(body, look);
+        const pads = s.rig.userData.arms.map((a) => a.children.filter((c) => c.isMesh && c.geometry.type === "BoxGeometry"));
+        if (pads.length !== 2 || pads.some((a) => a.length !== 1)) throw Error("sponge pixel population drift");
+        const meshes = [];
+        s.rig.traverse((o) => { if (o.isMesh) meshes.push([o, o.visible]); });
+        const cv = document.createElement("canvas");
+        cv.width = s.cv.width; cv.height = s.cv.height;
+        const c = cv.getContext("2d");
+        const grab = () => { s.render(); c.clearRect(0, 0, cv.width, cv.height); c.drawImage(s.cv, 0, 0); return c.getImageData(0, 0, cv.width, cv.height).data; };
+        const restore = () => { for (const [o, visible] of meshes) o.visible = visible; };
+        try {
+          const full = grab();
+          for (const [o] of meshes) o.visible = belongs(o, s.rig.userData.torso);
+          const torso = grab();
+          for (let hand = 0; hand < pads.length; hand += 1) {
+            restore();
+            pads[hand][0].visible = false;
+            const bare = grab();
+            for (const [o] of meshes) o.visible = belongs(o, pads[hand][0]);
+            const padOnly = grab();
+            const cols = new Set();
+            for (let i = 0; i < padOnly.length; i += 4) if (mark(padOnly, i)) cols.add((i / 4) % cv.width);
+            let edge = cv.height;
+            for (const x of cols) for (let y = 0; y < cv.height; y += 1) {
+              if (torso[(y * cv.width + x) * 4 + 3] > 24) { edge = Math.min(edge, y); break; }
+            }
+            const painted = new Set();
+            let pixels = 0, shirt = 0;
+            for (const x of cols) for (let y = 0; y < edge; y += 1) {
+              const i = (y * cv.width + x) * 4;
+              const changed = Math.max(...[0, 1, 2, 3].map((n) => Math.abs(full[i + n] - bare[i + n]))) > 24;
+              const ink = full[i + 3] > 24 && Math.max(full[i], full[i + 1], full[i + 2]) < 80;
+              if (changed && (mark(full, i) || ink)) { pixels += 1; painted.add(y); if (mark(full, i)) shirt += 1; }
+            }
+            rows.push({ body: body.height + "/" + body.weight, tag: rank + ":" + skin, hand,
+              columns: cols.size, edge, height: cv.height, rows: painted.size, pixels, shirt });
+          }
+        } finally { restore(); }
+      }
+    }
+    return rows;
+  }, BODIES);
+  const pixelLow = spongePixels.filter((r) => r.columns === 0 || r.edge <= 0 || r.edge >= r.height || r.rows < 1);
+  check("thumb:pads:the-card-sponge-paints-above-the-no-pad-ink-silhouette",
+    spongePixels.length === crowns.rows.length && pixelLow.length === 0,
+    "floor 1 row, below " + pixelLow.length + " of " + spongePixels.length + ": "
+      + spongePixels.map((r) => r.body + " " + r.tag + " hand " + r.hand + " " + r.rows + "rows/" + r.pixels + "px").join(", "));
 
 
   /* 타투 칸이 파는 것은 팔이 아니라 팔에 새긴 그림이다. 위의 축들은 등급끼리 다른가와
