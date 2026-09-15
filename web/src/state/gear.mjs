@@ -252,7 +252,7 @@ export const MAX_HAIR = HAIRS.length - 1;
    phi에는 바닥도 천장도 있다. 0.18은 정수리만 남겨 카드에 219화소를 칠했고 thumb의 하한 1000을
    깼다. 0.62를 넘기면 껍데기가 앞으로 돌아 내려와 눈을 덮어서 카드가 머리가 아니라 알로 읽힌다.
    그래서 세 등급이 각자 띠를 갖는다. 깎아준 머리는 0.46에서 0.5, 투블럭은 0.31에서 0.35라
-   옆이 드러나고, 기른 머리는 0.54에서 0.58에 서서 길이를 tall로 받는다.
+   옆이 드러나고, 기른 머리는 0.55에서 0.59에 서서 길이를 tall로 받는다.
    이름이 기른 머리라고 말하면 자도 길이를 재야 한다. 그 셋은 칠한 상자의 아래끝이 다섯 체격
    모두에서 0등급 어느 변형보다 낮다. 이름이 안 든 날인 0등급 변형이 그 자리를 넘어서 있었고,
    실측으로 그 장과 은발이 칠한 자리의 0.829를 함께 썼다. */
@@ -263,9 +263,9 @@ export const HAIR_SKINS = [
   [{ name: '기본 투블럭', tone: 0x1b1410, cut: { wide: 1, tall: 1.14, phi: 0.33, tilt: 0 } },
    { name: '올백 투블럭', tone: 0x2a2018, cut: { wide: 0.94, tall: 1.3, phi: 0.35, tilt: 0.11 } },
    { name: '반삭 투블럭', tone: 0x141010, cut: { wide: 1.06, tall: 1.06, phi: 0.31, tilt: 0 } }],
-  [{ name: '탈색 노랑', tone: 0xd8b45c, cut: { wide: 1.14, tall: 1.32, phi: 0.56, tilt: 0 } },
-   { name: '물 빠진 은발', tone: 0xd6d8d2, cut: { wide: 1.2, tall: 1.28, phi: 0.58, tilt: 0 } },
-   { name: '탈색 실패 주황', tone: 0xd9762f, cut: { wide: 1.1, tall: 1.4, phi: 0.54, tilt: 0.06 } }],
+  [{ name: '탈색 노랑', tone: 0xd8b45c, cut: { wide: 0.98, tall: 1.32, phi: 0.57, tilt: 0 } },
+   { name: '물 빠진 은발', tone: 0xd6d8d2, cut: { wide: 0.98, tall: 1.28, phi: 0.59, tilt: 0 } },
+   { name: '탈색 실패 주황', tone: 0xd9762f, cut: { wide: 0.98, tall: 1.4, phi: 0.55, tilt: 0.06 } }],
   [{ name: '빨간 모히칸', tone: 0xc4402c, cut: { wide: 0.34, tall: 1.8, phi: 0.6, tilt: 0 } },
    { name: '파란 모히칸', tone: 0x2f6fd9, cut: { wide: 0.28, tall: 2.1, phi: 0.66, tilt: 0 } },
    { name: '쓰러진 모히칸', tone: 0x8f2fd1, cut: { wide: 0.42, tall: 1.55, phi: 0.56, tilt: 0.24 } }]
