@@ -313,14 +313,18 @@ try {
         }
         /* 자리 절은 등급마다 0번 변형 하나를 그대로 읽는다. 그 절이 재는 것은 겨냥이라 변형을
            얹어도 답이 안 갈리고, 얹으면 축이 든 등급 번호가 무엇을 가리키는지만 흐려진다. */
-        // headBox owns the projected disc; reuse the same marked shell mask as the shape axis.
-        // A paid haircut must leave at least half that disc available for the face on every body.
+        // The shop wearer's beard shares hairTone. Measure the actual card mask, including it,
+        // rather than silently substituting the clean-shaven look used by the shape comparison.
         const paid = [];
         if (s.tab === "hair") for (let i = 0; i < looks.length; i += 1) {
           const L = looks[i];
           if (L.rank < 2) continue;
-          const box = m.headBox("hair", k, g.lookOf({ hair: L.rank, hairSkin: L.skin }));
-          const pixels = one[i];
+          const wearer = window.__keeperStats().name;
+          if (!wearer) throw new Error("hair shelf wearer missing");
+          const look = g.lookOf({ hair: L.rank, hairSkin: L.skin }, wearer);
+          look.hair = MARK;
+          const box = m.headBox("hair", k, look);
+          const pixels = await mask(box.url);
           let disc = 0, shell = 0;
           for (let y = 0; y < pixels.h; y += 1) for (let x = 0; x < pixels.w; x += 1) {
             if (((x + 0.5) / pixels.w - box.x) ** 2 / box.rx ** 2

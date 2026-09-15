@@ -66,8 +66,7 @@ const AIM = {
      머리카락이 프레임 위로 밀려 파는 물건이 작아진다. 실측으로 2등급이 칠하는 화소가
      942까지 떨어져 thumb의 하한 1000을 깼고 무게중심이 위쪽 0.12까지 올라갔다.
      정사각으로 되돌리는 갈래는 버렸다. contain이 96x96으로 줄여 넣어 옛 결함이 돌아온다. */
-  // The near-frontal angle leaves half the head disc clear while keeping the long hair hem.
-  hair: { part: "head", dist: 0.8, lift: 0.1, high: 0, yaw: -0.35 },
+  hair: { part: "head", dist: 0.8, lift: 0.1, high: 0 },
   /* 파는 것은 팔이 아니라 팔에 새긴 그림이다. 겨냥점이 어깨 관절이라 lift가 그 아래
      위팔 한가운데를 잡고, 0.58에서는 칸의 대부분을 소매와 유니폼이 먹어 무늬가 위쪽
      귀퉁이에 손톱만 하게 걸린다. 실측: 세 유료 등급의 무늬가 칸의 16.6과 18.4와
