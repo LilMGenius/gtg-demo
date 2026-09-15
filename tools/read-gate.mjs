@@ -8,7 +8,8 @@ import { chromium } from "playwright";
 // 대조군: 공이 없는 자리에 같은 자를 대면 링이 배경 수준으로 붕괴해야 한다. 통과하면 자가 고장난 것이다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const SEED = process.argv[2] || 7;
-const URL = "http://127.0.0.1:10310/web/index.html?seed=" + SEED;
+// Reuse flight-gate's veteran fixture: measure play after the onboarding overlay closes.
+const URL = "http://127.0.0.1:10310/web/index.html?seed=" + SEED + "&preset=veteran";
 const W = 1280;
 const H = 720;
 const ROUNDS = 8;
@@ -27,7 +28,10 @@ function ballScreen([w, h, r]) {
   const rad = Math.hypot(o.ndc[0] - c.ndc[0], o.ndc[1] - c.ndc[1]);
   const px = (c.ndc[0] * 0.5 + 0.5) * w;
   const py = (-c.ndc[1] * 0.5 + 0.5) * h;
-  return { world: p, x: px, y: py, r: Math.max(2, rad * 0.5 * w), onScreen: c.onScreen, visible: c.visible };
+  // Reuse scene.mjs __flightVis screenR, as ballsize-gate does; it includes the live render scale.
+  const projectedR = window.__flightVis().ballPx / 2;
+  if (!Number.isFinite(projectedR) || projectedR <= 0) throw new Error("Invalid projected ball radius");
+  return { world: p, x: px, y: py, r: projectedR, oldR: Math.max(2, rad * 0.5 * w), onScreen: c.onScreen, visible: c.visible };
 }
 
 // 배경의 임자를 링 바깥에서 되묻는다. 다른 재질끼리 견주면 밝기 차를 판독성 차로 읽는다.
@@ -112,6 +116,7 @@ try {
   await p.waitForTimeout(1200);
   await p.click("#go", { force: true });
   await p.waitForTimeout(1800);
+  await p.waitForSelector("#pull", { state: "hidden" });
 
   const samples = [];
   for (let i = 0; i < ROUNDS; i += 1) {
@@ -126,12 +131,16 @@ try {
     const drift = Math.hypot(b.x - a.x, b.y - a.y);
     if (drift > 1.5 || !b.visible) { console.log("skip round " + i + " drift=" + drift.toFixed(2) + " vis=" + b.visible); continue; }
 
+    if (await p.locator("#pull").isVisible()) throw new Error("Onboarding covered the measured play surface");
     const owner = await p.evaluate(bgOwner, [b.x, b.y, b.r, W, H]);
     const side = b.x > W / 2 ? -1 : 1;
     const ctrl = { x: b.x + side * CTRL_DX, y: b.y, r: b.r };
     const shot = (await p.screenshot()).toString("base64");
-    const [real, fake] = await p.evaluate(measure, [shot, [{ x: b.x, y: b.y, r: b.r }, ctrl]]);
-    samples.push({ i, owner, x: b.x, y: b.y, r: b.r, z: b.world.z, real, fake });
+    const [real, fake, inside] = await p.evaluate(measure, [shot, [{ x: b.x, y: b.y, r: b.r }, ctrl, { x: b.x, y: b.y, r: b.oldR }]]);
+    samples.push({ i, owner, x: b.x, y: b.y, r: b.r, oldR: b.oldR, z: b.world.z, real, fake, inside });
+    console.log("RADIUS round=" + i + " old=" + b.oldR.toFixed(3) + " projected=" + b.r.toFixed(3)
+      + " inside ring=" + inside.ring.med.toFixed(2) + " bgP95=" + inside.bg.p95.toFixed(2)
+      + " ratio=" + (inside.bg.p95 ? inside.ring.med / inside.bg.p95 : 0).toFixed(2));
     console.log("round " + i + " bg=" + owner + " r=" + b.r.toFixed(1) + "px z=" + b.world.z.toFixed(2)
       + "  ring=" + real.ring.med.toFixed(2) + " bgP95=" + real.bg.p95.toFixed(2)
       + "  ctrl ring=" + fake.ring.med.toFixed(2) + " bgP95=" + fake.bg.p95.toFixed(2));
@@ -151,13 +160,22 @@ try {
     const bgP95 = median(set.map((s) => s.real.bg.p95));
     const cRing = median(set.map((s) => s.fake.ring.med));
     const cBg = median(set.map((s) => s.fake.bg.p95));
+    // Keep the old world-radius measurement as a negative control on the same pixels and background bucket.
+    const innerRing = median(set.map((s) => s.inside.ring.med));
+    const innerBg = median(set.map((s) => s.inside.bg.p95));
+    const insideOk = set.every((s) => s.oldR + 3 < s.r && s.inside.ring.n > 0 && s.inside.bg.n > 0)
+      && innerRing <= innerBg;
+    const populated = set.every((s) => [s.real, s.fake].every((m) => m.ring.n > 0 && m.bg.n > 0));
     console.log("TARGET bg=" + main[0] + " n=" + set.length);
     console.log("CONTROL ring=" + cRing.toFixed(2) + " vs bgP95=" + cBg.toFixed(2)
       + "  (ring must NOT exceed)  " + (cRing > cBg ? "INSTRUMENT BROKEN" : "ok"));
     console.log("BALL    ring=" + ringMed.toFixed(2) + " vs bgP95=" + bgP95.toFixed(2)
       + "  ratio=" + (bgP95 ? ringMed / bgP95 : 0).toFixed(2));
     console.log("errors " + (errs.slice(0, 2).join(" | ") || "clean"));
-    const ok = cRing <= cBg && ringMed > bgP95 && errs.length === 0;
+    console.log("control:a-ring-drawn-inside-the-ball-reddens-the-axis " + (insideOk ? "PASS RED" : "FAIL")
+      + " n=" + set.length + " ring=" + innerRing.toFixed(2) + " bgP95=" + innerBg.toFixed(2)
+      + " ratio=" + (innerBg ? innerRing / innerBg : 0).toFixed(2));
+    const ok = populated && insideOk && cRing <= cBg && ringMed > bgP95 && errs.length === 0;
     console.log(ok ? "read PASS" : "read FAIL");
     if (!ok) process.exitCode = 1;
   }
@@ -165,4 +183,3 @@ try {
   clearTimeout(t);
   if (br) await br.close();
 }
-
