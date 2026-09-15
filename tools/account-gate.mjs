@@ -97,7 +97,7 @@ try {
   await signUp("bran", "other9", "다른사람");
   check("account:an-id-cannot-be-taken-twice", (await said()).length > 0, await said());
 
-  /* 판이 갈리는가. 첫 계정으로 들어가 육수를 심고, 둘째 계정으로 들어가 그 값이 안 보이면 갈린 것이다.
+  /* 판이 갈리는가. 첫 계정으로 들어가 골드를 심고, 둘째 계정으로 들어가 그 값이 안 보이면 갈린 것이다.
      그리고 첫 계정으로 돌아가 값이 그대로면 갈린 것이지 지운 것이 아니다. */
   await open();
   await logIn("bran", "pass12");

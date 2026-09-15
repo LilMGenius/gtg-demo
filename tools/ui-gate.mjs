@@ -221,7 +221,7 @@ try {
   };
   const wide = await strip(1280, 720);
   const narrow = await strip(740, 360);
-  // 칩이 둘 이하로 잡히면 간격 축은 잴 것이 없이 초록이 된다. 띠의 바닥은 팔로워·육수·스폰 셋이다.
+  // 칩이 둘 이하로 잡히면 간격 축은 잴 것이 없이 초록이 된다. 띠의 바닥은 팔로워·골드·캐시 셋이다.
   check("instrument:the-resource-bar-carries-three-chips", wide.chips >= 3 && narrow.chips >= 3,
     wide.chips + " wide, " + narrow.chips + " narrow");
   const tight = [["1280x720", wide], ["740x360", narrow]]
