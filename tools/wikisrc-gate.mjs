@@ -61,6 +61,17 @@ try {
   });
   report.sourceTree = files(SOURCE).map(f => relative(ROOT, f));
   check('wikisrc:no-number-lives-in-the-markdown', markdown.length >= KEYS.length && markdown.every(f => f.digits === 0), markdown);
+  // Reuse the source inventory for a deterministic scan; include runtime text too.
+  const particleHits = text => [...text.matchAll(/골드으로|캐시으로|골드이|캐시이|골드과|캐시과|골드을|캐시을|골드은|캐시은/gu)].map(m => m[0]);
+  const particleFiles = [...files(SOURCE).filter(f => f.endsWith('.md')),
+    ...files(join(ROOT, 'web/src')).filter(f => f.endsWith('.mjs') && !f.includes('.local'))];
+  const wrongParticles = particleFiles.flatMap(f => particleHits(readFileSync(f, 'utf8')).map(hit => ({ file: relative(ROOT, f), hit })));
+  const particlesOk = hits => hits.length === 0;
+  check('wikisrc:currency-particles-match-the-final-vowel', particleFiles.length > 0 && particlesOk(wrongParticles),
+    { files: particleFiles.length, hits: wrongParticles });
+  const plantedParticle = particleHits('골드으로');
+  check('control:a-wrong-currency-particle-reddens-the-source-axis', !particlesOk(plantedParticle) && plantedParticle.length === 1,
+    { planted: '골드으로', hits: plantedParticle, axisOk: particlesOk(plantedParticle) });
   report.valueFrom = entities.filter(e => e.valueFrom).map(e => {
     const [module, key] = e.valueFrom.split('.');
     const value = modules[module]?.[key];
