@@ -663,7 +663,11 @@ function buildBody(o) {
       const pad = new THREE.Mesh(new THREE.BoxGeometry(wide, th, o.armR * 2.7), flat(o.shirt));
       pad.name = tag;
       jitterMesh(pad, 0.015, side < 0 ? 27 : 28);
-      pad.position.set(side * o.armR * 0.45, o.armR * 1.15 + th * 0.3, 0);
+      /* 몸통 껍질 폭 0.05를 어깨 여유의 단위로 쓴다. 준비 자세의 어깨는 기울어 있어 로컬 y만
+         올리면 스펀지가 목 안으로 들어간다. 작은 스펀지는 덜 올리고 두꺼운 저지는 더 솟는다.
+         외곽선은 handmade.mjs의 addOutline을 장갑과 축구화의 폭 0.028로 그대로 쓴다. */
+      pad.position.set(side * (o.armR * 0.45 + Math.max(1, kc.pad) * 0.05), o.armR * 1.15 + th * 0.3 - 0.05, 0);
+      addOutline(pad, 0.028);
       sh.add(pad);
     }
     const upper = seg(o.armR, o.upperLen, o.sleeve, tag, side < 0 ? 21 : 22, o.cuffSleeve, o.cuffSpan, o.cuffGirth, o.inkGrade);
