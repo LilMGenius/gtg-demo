@@ -32,7 +32,7 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 // 따라가므로, 소리는 오른쪽으로 가서도 토글 판때기 그대로다.
 const PLAY = ["auto", "out"];
 // Help shares the compact settings plate; it is not a gameplay-column opener.
-const SETTINGS = ["mute", "wikiBtn"];
+const SETTINGS = ["mute", "wikiBtn", "fullscreen"];
 const COMPACT = SETTINGS.concat(PLAY);
 const OPENERS = ["gymBtn", "rosterBtn", "gramBtn", "shopBtn"];
 const IDS = COMPACT.concat(OPENERS);

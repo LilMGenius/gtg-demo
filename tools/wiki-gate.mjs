@@ -473,7 +473,8 @@ try {
   await p.evaluate(OPEN_CAT, "hand");
   await p.waitForTimeout(240);
   const drew = await p.evaluate(CUE);
-  await p.setViewportSize({ width: 1280, height: 720 });
+  // The fullscreen shortcut adds a row; use the keys-gate viewport for the fitted sample.
+  await p.setViewportSize({ width: 1280, height: 900 });
   await p.waitForTimeout(440);
   const grew = await p.evaluate(CUE);
   await p.setViewportSize({ width: 740, height: 360 });
@@ -485,7 +486,7 @@ try {
     && grew.over === 0 && grew.down.op === 0
     && shrank.over > 1 && shrank.down.op === 1;
   check("wiki:a-live-resize-recomputes-the-cue", liveOk,
-    "painted at 740x360 " + say(drew) + ", grown to 1280x720 without a click " + say(grew)
+    "painted at 740x360 " + say(drew) + ", grown to 1280x900 without a click " + say(grew)
       + ", back to 740x360 " + say(shrank));
 
   /* 일반 앱 UX 문법 둘. 위의 축들은 이 게임의 상수와 카테고리를 알아야 읽히지만, 아래 둘은 도움말이
