@@ -1,5 +1,7 @@
 import { chromium } from "playwright";
 import { photoOdds, likesFor, whoKey } from "../web/src/state/gram.mjs";
+import { passerCountAt } from "../web/src/state/passer.mjs";
+import { RAPPORT_STEPS, rapportTier } from "../web/src/state/rapport.mjs";
 import { pinClock } from "./clock.mjs";
 
 // 타임라인의 자. 계정에 내가 쓴 글만 올라오면 그것은 일기지 타임라인이 아니다.
@@ -35,16 +37,31 @@ try {
   await p.click("#go", { force: true });
   // 얼굴을 튼 사람이 없으면 아무도 안 찍는다. 그 문이 설계라 열 자리를 모두 3단계로 심는다.
   // 동네도 최고 등급으로 올린다. 지나가는 사람이 잦아야 표본에 사진이 든다.
-  await p.evaluate(() => {
+  // Reuse the game's rapport thresholds and passer roster: six talks is tier 1, not tier 3.
+  const rapport = await p.evaluate(([count, talks]) => {
     const r = window.__rapport();
-    for (let i = 0; i < 12; i += 1) r["3:" + i] = 6;
+    for (let i = 0; i < count; i += 1) r["3:" + i] = talks;
     window.__gear().city = 3;
-  });
+    return r;
+  }, [passerCountAt(3), RAPPORT_STEPS.at(-1)]);
+  const tiers = Array.from({ length: passerCountAt(3) }, (_, i) => rapportTier(rapport, 3, i));
+  check("instrument:passers-start-at-top-rapport", tiers.every((tier) => tier === RAPPORT_STEPS.length),
+    tiers.length + " passers at tiers " + tiers.join(","));
   const from = await p.evaluate(() => window.__frames());
   await p.waitForFunction((n) => window.__frames() >= n, from + 60 * 150, { timeout: 200000 });
   await p.evaluate(() => window.__plan(0, null, window.__frames()));
   await p.waitForTimeout(150);
 
+  // Negative control runs the same axes against a live feed with its passer photos removed.
+  if (process.argv.includes("--no-passers")) {
+    const removed = await p.evaluate(() => {
+      const feed = window.__posts();
+      const before = feed.length;
+      for (let i = feed.length - 1; i >= 0; i -= 1) if (feed[i].ph) feed.splice(i, 1);
+      return before - feed.length;
+    });
+    console.log("control:removed-passer-posts " + removed);
+  }
   const posts = await p.evaluate(() => window.__posts());
   const shots = posts.filter((x) => x.ph);
   check("instrument:the-account-filled-up", posts.length >= 6, posts.length + " posts");
