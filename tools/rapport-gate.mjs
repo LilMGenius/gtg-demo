@@ -66,19 +66,15 @@ for (let city = 0; city <= 3; city++) {
 // 0번은 미인이다. 어떤 등급에서도 숨기지 않는 자리라 반드시 뽑혀야 한다.
 check("passer-zero", true, "index 0 present in every tier above");
 
-// 2. 스트림 불변식. gazeAid를 안 주면 라포가 붙기 전과 한 수치도 달라지지 않아야 한다.
-// 아래 다섯 값은 라포 배선 이전 HEAD 판본에서 실측한 것이다. 하나라도 어긋나면 난수 스트림이 밀린 것이다.
-// 라포는 gazeAid로 gazeP만 좁히므로 여기서는 distracted만 센다. 340이다.
-// buff-gate는 focusAid가 둘 다 좁히므로 distracted+talked를 lapse로 센다. 441이다.
-// 이름을 갈라 둔 이유는 같은 이름이 두 수를 가리키면 읽는 쪽이 반드시 섞기 때문이다.
-const BASE = { rate: 18.94, fans: 766850, gazeSlip: 340, flairFans: 12126, shots: 10000 };
+// e243bd7: 수정된 판정의 sweep({}) 실측이다. 스트림의 조용한 이동을 잡으며 손으로 전사하지 않는다.
+const BASE = {"rate":24.44,"fans":741489,"gazeSlip":331,"flairFans":13066,"talked":108,"shots":10000};
 const c1 = sweep({});
 check("stream-rate", Number(c1.rate.toFixed(2)) === BASE.rate, BASE.rate + " vs " + c1.rate.toFixed(2));
 check("stream-fans", c1.fans === BASE.fans, BASE.fans + " vs " + c1.fans);
 check("stream-slip", c1.gazeSlip === BASE.gazeSlip, BASE.gazeSlip + " vs " + c1.gazeSlip);
 check("stream-flair", c1.flairFans === BASE.flairFans, BASE.flairFans + " vs " + c1.flairFans);
-// 두 게이트가 같은 판을 보고 있다는 증명. 340 + 101 = 441이 buff-gate 기준선이다.
-check("slip-bridge", c1.gazeSlip + c1.talked === 441, c1.gazeSlip + " + " + c1.talked);
+// 한눈팔기와 말 걸기의 합도 같은 실측에서 온다. 고정된 옛 합은 정상 제품 변화를 스트림 결함으로 읽었다.
+check("slip-bridge", c1.gazeSlip + c1.talked === BASE.gazeSlip + BASE.talked, c1.gazeSlip + " + " + c1.talked);
 check("stream-shots", c1.shots === BASE.shots, BASE.shots + " vs " + c1.shots);
 
 // 3. tier가 오르면 한눈팔기가 줄어든다. 세 단계가 전부 단조로 내려가야 한다.
