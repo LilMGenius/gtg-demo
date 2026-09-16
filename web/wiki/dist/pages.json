@@ -214,7 +214,7 @@
       "pull-cost",
       "ticket-cap"
     ],
-    "bodyHtml": "<p>이용권은 완봉으로 쌓인다</p>",
+    "bodyHtml": "<p>이용권은 완봉으로 쌓인다</p>\n<p>전체 명단 46명 기준 확률이다. 보유한 키퍼는 제외하므로 현재 확률은 상점의 확률 표를 따른다.</p>\n<table>\n<thead>\n<tr>\n<th>등급</th>\n<th>인원</th>\n<th>확률</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>명성 10</td>\n<td>6</td>\n<td>1.11%</td>\n</tr>\n<tr>\n<td>명성 9</td>\n<td>10</td>\n<td>7.42%</td>\n</tr>\n<tr>\n<td>명성 8 이하</td>\n<td>30</td>\n<td>91.47%</td>\n</tr>\n</tbody>\n</table>",
     "categories": [
       "pull"
     ],
