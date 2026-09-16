@@ -37,6 +37,7 @@
     },
     "valueFrom": {
       "enum": [
+        "wallet.CASH_RATE",
         "wallet.COIN_SAVE",
         "wallet.COIN_CONCEDED",
         "wallet.COIN_DRILL",

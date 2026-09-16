@@ -34,6 +34,22 @@
     "type": "guide"
   },
   {
+    "aliases": [],
+    "categories": [
+      "coin"
+    ],
+    "game": "gtg",
+    "id": "cash-rate",
+    "relations": {
+      "explainedBy": [
+        "coin"
+      ]
+    },
+    "title": "환산",
+    "type": "value",
+    "valueFrom": "wallet.CASH_RATE"
+  },
+  {
     "aliases": [
       "coin"
     ],

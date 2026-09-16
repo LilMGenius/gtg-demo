@@ -1,6 +1,11 @@
 [
   {
     "field": "explainedBy",
+    "source": "cash-rate",
+    "target": "coin"
+  },
+  {
+    "field": "explainedBy",
     "source": "coin-conceded",
     "target": "coin"
   },
