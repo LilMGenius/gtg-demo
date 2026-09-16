@@ -119,8 +119,8 @@ body.playing #hud{opacity:1}
 .px{display:inline-flex;align-items:center;gap:.28em;vertical-align:-.12em}
 .px svg{width:.9em;height:.9em;flex:none;color:#ffd83d}
 .px b{font-weight:inherit;color:inherit}
-.price{display:inline-flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.35em;max-width:100%}
-.price .or{display:block;width:1px;height:1em;background:currentColor;opacity:.4;flex:none}
+.price{display:inline-flex;flex-wrap:nowrap;flex-shrink:0;align-items:center;justify-content:center;gap:.35em;max-width:100%}
+.price .or{display:inline;font-style:normal;font-size:var(--fs-body);color:var(--dim);flex:none}
 .px.cash svg{color:#7fe3ff}
 #shop .price .px.bad-price,#me .price .px.bad-price,#roster .price .px.bad-price,
 #shop .price .px.bad-cash,#me .price .px.bad-cash,#roster .price .px.bad-cash{color:var(--bad)}
@@ -567,7 +567,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #roster .kind svg{width:16px;height:16px;flex:none}
 #roster .kind[aria-selected="true"]{background:#2b3a22;color:#ffd83d}
 #roster .kind:active{box-shadow:1px 1px 0 var(--edge)}
-#roster .row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;
+#roster .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px;
   width:min(94vw,940px);max-height:52vh;overflow-y:auto;padding:4px}
 #roster .row button{padding:9px 11px 11px;
   border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
@@ -993,10 +993,9 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
   padding:2px 7px 4px;border:2px solid var(--edge);background:#22301c;cursor:pointer}
 #shop .fitting .tried i[data-off] b{font-weight:400;color:var(--dim);font-family:var(--body)}
 #shop .fitting .tried i[data-off]:hover b{color:var(--bad)}
-/* 구매와 벗기를 나란히 둔다. 세로로 쌓으면 왼쪽 기둥이 한 줄 길어지고 그만큼 효과 표가 잘린다.
-   합계 배지는 구매 버튼 안에 선다. 이름과 값이 한 버튼에 서므로 무엇을 얼마에 사는지가 한 자리에서 읽힌다. */
-#shop .fitting .acts{display:flex;gap:var(--gap-2);width:100%}
-#shop .fitting .acts .all{flex:1 1 auto;display:flex;align-items:center;justify-content:center;gap:var(--gap-2)}
+/* The alternative-price bill needs the full fitting column; stripping has its own row. */
+#shop .fitting .acts{display:flex;flex-wrap:wrap;gap:var(--gap-2);width:100%}
+#shop .fitting .acts .all{flex:1 0 100%;display:flex;align-items:center;justify-content:center;gap:var(--gap-2)}
 #shop .fitting .strip{flex:0 0 auto;padding:9px 11px 11px;border:var(--line) solid var(--edge);
   background:#241a16;color:var(--dim);font-family:var(--body);font-size:var(--fs-body);font-weight:400}
 #shop .fitting .strip:disabled{background:#141a12;color:#f6efdc5c;cursor:default}
@@ -1224,7 +1223,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #shop .buy.pull{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;
   padding:12px 0 13px;line-height:1.1}
 #shop .buy.pull b{font-family:var(--body);font-size:var(--fs-num);font-weight:400;color:inherit}
-#shop .buy.pull i{display:flex;align-items:center;gap:4px;font-style:normal;font-size:var(--fs-num);font-weight:700}
+#shop .buy.pull > i{display:flex;align-items:center;gap:4px;font-style:normal;font-size:var(--fs-num);font-weight:700}
 #shop .buy.pull i svg{width:14px;height:14px;display:block}
 /* 사유 배지. 버튼 위 모서리에 걸쳐 서서 버튼 안 글자를 밀어내지 않는다. */
 #shop .buy.pull u{position:absolute;top:-9px;left:50%;translate:-50% 0;text-decoration:none;

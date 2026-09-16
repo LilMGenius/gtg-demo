@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 // 화면 값은 구현의 상수가 아니라 배포 매니페스트와 맞댄다.
 const RELEASE = JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version;
-import { COIN_SAVE, COIN_CONCEDED, COIN_DRILL, COIN_FAME_STEP } from "../web/src/state/wallet.mjs";
+import { COIN_SAVE, COIN_CONCEDED, COIN_DRILL, COIN_FAME_STEP, CASH_RATE } from "../web/src/state/wallet.mjs";
 import { BOTS } from "../web/src/state/bot.mjs";
 import { BUFFS } from "../web/src/state/buff.mjs";
 import { LIKE_BASE, LIKE_PER_CITY, MUTUAL_STEP, MUTUAL_CAP, SELFIE_BASE } from "../web/src/state/gram.mjs";
@@ -34,7 +34,7 @@ const GATED = ["coin", "drill", "pull", "gram", "bot", "buff"];
    부동소수 비교가 되고, 천 단위 쉼표가 붙은 날 조용히 지나간다. 글자로 맞대면 서식이 바뀐 것도 잡힌다. */
 const S = (v) => String(v);
 const WANT = {
-  coin: [COIN_SAVE, COIN_CONCEDED, COIN_DRILL, COIN_SAVE + COIN_FAME_STEP * 9].map(S),
+  coin: [COIN_SAVE, COIN_CONCEDED, COIN_DRILL, COIN_SAVE + COIN_FAME_STEP * 9, CASH_RATE].map(S),
   drill: [COIN_DRILL].map(S),
   pull: [PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP].map(S),
   gram: [LIKE_BASE, LIKE_PER_CITY, MUTUAL_STEP, MUTUAL_CAP, SELFIE_BASE].map(S),

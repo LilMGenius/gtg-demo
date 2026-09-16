@@ -16,14 +16,19 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 async function cashLane(ctx, parent = false) {
   const page = await ctx.newPage();
   if (parent) {
-    // Existing wiki-gate served-parent control; date imports the new wallet API too.
-    for (const file of ['main.mjs', 'state/wallet.mjs', 'state/date.mjs']) {
+    // Existing wiki-gate served-parent control; date and wiki import the new wallet API too.
+    for (const file of ['main.mjs', 'state/wallet.mjs', 'state/date.mjs', 'ui/wiki.mjs']) {
       const body = execFileSync('git', ['show', '258b2a4:web/src/' + file], { encoding: 'utf8' });
       await page.route('**/src/' + file, route => route.fulfill({ contentType: 'text/javascript', body }));
     }
   }
   try {
     await page.goto(URL + '&preset=rich,veteran');
+    if (parent) {
+      const booted = await page.evaluate(() => typeof window.__wallet === 'function');
+      check('instrument:the-parent-fixture-boots', booted, String(booted));
+      if (!booted) return {};
+    }
     await page.click('#go', { force: true });
     await page.evaluate(() => { window.__wallet().cash = 8000; window.__shop(true); });
     const tabs = await page.locator('#shop .tab').evaluateAll(es => es.map(e => e.dataset.tab));
