@@ -20,7 +20,6 @@ const argN = (name, fallback) => {
 };
 const BALLS = argN("balls", 20000);
 const SET = 5;
-const SEEDS = Math.ceil(BALLS / SET);
 // 재시작에 붙은 칸. 세이브 경로가 아니므로 0이어야 한다. 회전율 표가 이 둘의 존재 이유다.
 const RESTART = ["goalKick", "throwing"];
 // 팔로워 경로에 붙은 칸. 세이브율을 파는 대신 클립과 소문을 산다. 음수가 설계다.
@@ -31,23 +30,23 @@ const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 
 // 한 변종의 세이브율. 시드마다 키퍼를 새로 만들고 그 자리에서 한 칸만 올린다.
-function rate(bump) {
+function rate(bump, level = 1, mode = 'perfect', limit = BALLS, seedOffset = 0) {
   let saved = 0;
   let balls = 0;
-  for (let s = 0; s < SEEDS; s += 1) {
-    const rng = makeRng(1000003 + s);
-    const keeper = keeperAtLevel(1, rng);
+  for (let s = 0; s < Math.ceil(limit / SET); s += 1) {
+    const rng = makeRng(1000003 + s + seedOffset);
+    const keeper = keeperAtLevel(level, rng);
     rollForm(keeper, rng);
     if (bump) keeper[bump] = Math.min(10, (Number(keeper[bump]) || 1) + 1);
-    for (const shot of buildSet(rng, 1)) {
-      if (balls >= BALLS) break;
+    for (const shot of buildSet(rng, level)) {
+      if (balls >= limit) break;
       // 완벽 수동. 방향은 맞고 타이밍은 정확하다. 손가락을 상수로 고정해야 칸만 남는다.
       const input = { dive: shot.side, errMs: 0, advance: 0, auto: false };
-      const r = resolve({ keeper, shot, rng, input });
+      const r = resolve(mode === 'perfect' ? { keeper, shot, rng, input } : { keeper, shot, rng });
       balls += 1;
       if (!r.conceded) saved += 1;
     }
-    if (balls >= BALLS) break;
+    if (balls >= limit) break;
   }
   return { pct: 100 * saved / balls, balls };
 }
@@ -81,6 +80,33 @@ console.log("쏠림 " + top.k + " " + top.d.toFixed(2) + " against " + second.k 
   + "  ratio " + (second.d === 0 ? "inf" : (top.d / second.d).toFixed(2)));
 
 modifierContract({ gate: "corr", fields: ["studs"], engine: { makeRng, buildSet, resolve, newKeeper }, growable: GROWABLE, check });
+
+// The opening table's scope remains level one; this separate axis reads offers.
+// Reuse corr's one-point probe at the frozen research seeds (12,000 shots per cell).
+// Bars are lap hypotheses, not player preference: DaedalGames/daedal-games docs/gamedev/judgement.md.
+// This population includes untested shots; the original level-one table keeps its own seeds and size.
+function measureOfferDominance() {
+  const savePath = GROWABLE.filter(k => !RESTART.includes(k) && !FAME.includes(k));
+  for (const mode of ['perfect', 'auto']) {
+    for (const level of [1, 5, 13]) {
+      const baseline = rate(null, level, mode, 12000, level * 7919);
+      const gains = savePath.map(k => ({ k, d: rate(k, level, mode, 12000, level * 7919).pct - baseline.pct }))
+        .sort((a, b) => b.d - a.d);
+      const positiveSum = gains.reduce((sum, row) => sum + Math.max(0, row.d), 0);
+      const [top, second] = gains;
+      const share = positiveSum > 0 ? 100 * top.d / positiveSum : Infinity;
+      const cap = mode === 'perfect' ? 45 : 40;
+      const nonpositive = gains.filter(row => row.d <= 0);
+      const details = `${mode} Lv${level} share=${share.toFixed(1)}% <= ${cap}% ratio=${second.d > 0 ? (top.d / second.d).toFixed(2) : 'inf'} regret=${(top.d - second.d).toFixed(2)}pp base=${baseline.pct.toFixed(2)}% balls=${baseline.balls}`
+        + (Math.abs(share - cap) < 0.05 ? ` unrounded-share=${share}%` : '');
+      check('corr:no-single-slot-dominates-at-the-offer', baseline.balls === 12000 && share <= cap, details);
+      if (mode === 'perfect') check('corr:every-offered-save-path-slot-is-strictly-positive', nonpositive.length === 0,
+        `Lv${level} ` + (nonpositive.map(row => `${row.k}=${row.d.toFixed(4)}pp`).join(', ') || `${gains.length} positive`));
+      console.log(`offer-marginals ${mode} Lv${level} ` + gains.map(row => `${row.k}=${row.d.toFixed(4)}pp`).join(', '));
+    }
+  }
+}
+measureOfferDominance();
 
 if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
 if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
