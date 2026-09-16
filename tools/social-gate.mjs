@@ -39,13 +39,13 @@ try {
     Object.keys(bare.social.follows).length === 0 && Math.abs(mutualBoost(bare.social) - 1) < 1e-9,
     "follows " + Object.keys(bare.social.follows).length + ", posts " + bare.posts);
 
-  // 얼굴을 튼 사람이 없으면 댓글이 한 줄도 안 붙는다. 그 문이 이 시스템의 설계라 먼저 열어 둔다.
-  // 행인 인덱스는 구마다 굴러 나오므로 열 자리를 모두 3단계로 심는다.
-  await p.evaluate(() => { const r = window.__rapport(); for (let i = 0; i < 10; i += 1) r["0:" + i] = 6; });
+  // 시드 추첨이 바뀌면 70초 안의 34% 댓글 굴림은 전부 빗나갈 수 있다.
+  // 열 자리를 실제 3단계(15)로 심고 댓글이 생길 때까지 기다려 선팔을 잰다.
+  await p.evaluate(() => { const r = window.__rapport(); for (let i = 0; i < 10; i += 1) r["0:" + i] = 15; });
   const from = await p.evaluate(() => window.__frames());
-  await p.waitForFunction((n) => window.__frames() >= n, from + 60 * 70, { timeout: 120000 });
+  await p.waitForFunction(() => window.__posts().some(p => p.cm) && window.__posts().length >= 3, null, { timeout: 120000 });
   // 읽는 동안에도 판이 돌면 장부와 화면이 한 글 어긋난다. 세우고 읽는다.
-  await p.evaluate(() => window.__plan(0, null, window.__frames()));
+  const elapsed = await p.evaluate((start) => { const frame = window.__frames(); window.__plan(0, null, frame); return frame - start; }, from);
   await p.waitForTimeout(150);
 
   const posts = await p.evaluate(() => window.__posts());
@@ -105,6 +105,26 @@ try {
   check("social:the-multiplier-follows-the-mutuals",
     after.head.indexOf(String(Math.round((mutualBoost(after.social) - 1) * 100)) + "%") >= 0,
     after.head + " against " + mutualBoost(after.social).toFixed(2));
+
+  // 같은 시드와 같은 프레임 창에서 얼굴을 모르면 댓글이 없어야 한다.
+  // 양성 표본이 댓글을 만들었으므로 둘 다 댓글 배선이 끊긴 상태는 통과하지 못한다.
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "load" });
+  await p.click("#go", { force: true });
+  const controlFrom = await p.evaluate((frames) => {
+    const r = window.__rapport();
+    for (const key of Object.keys(r)) delete r[key];
+    const frame = window.__frames();
+    window.__plan(0, null, frame + frames);
+    return frame;
+  }, elapsed);
+  await p.waitForFunction((n) => window.__frames() >= n, controlFrom + elapsed, { timeout: 120000 });
+  const control = await p.evaluate(() => ({ posts: window.__posts(), rapport: window.__rapport() }));
+  check("instrument:the-no-face-control-has-posts", control.posts.length > 0,
+    control.posts.length + " posts over " + elapsed + " frames");
+  const controlComments = control.posts.filter((post) => post.cm).length;
+  check("control:no-face-no-comment", controlComments === 0 && Object.values(control.rapport).every((n) => n < 3),
+    controlComments + " comments over " + elapsed + " frames");
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
