@@ -1,14 +1,14 @@
 [
   {
     "path": "audio/bgm.m4a",
-    "origin": "assets/audio/bgm.mp3, ID3 artist 브금추천, title 축구게임 스타일 락 브금 | Soccer Game type Rock BGM, 12:12, licence not on record; candidate replacement assets/audio/demo-bgm.mp3 (LAME in FL Studio 2026, 2:07, authorship unrecorded)",
-    "rights": "unconfirmed",
+    "origin": "assets/audio/bgm.mp3, ID3 artist 브금추천, title 축구게임 스타일 락 브금 | Soccer Game type Rock BGM, 12:12; URL not in ID3; 상업용 무료, founder-confirmed 2026-09-16",
+    "rights": "commercial-free",
     "form": "m4a"
   },
   {
     "path": "audio/bgm.ogg",
-    "origin": "assets/audio/bgm.mp3, ID3 artist 브금추천, title 축구게임 스타일 락 브금 | Soccer Game type Rock BGM, 12:12, licence not on record; candidate replacement assets/audio/demo-bgm.mp3 (LAME in FL Studio 2026, 2:07, authorship unrecorded)",
-    "rights": "unconfirmed",
+    "origin": "assets/audio/bgm.mp3, ID3 artist 브금추천, title 축구게임 스타일 락 브금 | Soccer Game type Rock BGM, 12:12; URL not in ID3; 상업용 무료, founder-confirmed 2026-09-16",
+    "rights": "commercial-free",
     "form": "ogg"
   },
   {

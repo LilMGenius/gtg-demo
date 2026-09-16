@@ -44,7 +44,7 @@ const shipped = readdirSync(ASSETS, { recursive: true }).map((p) => p.replaceAll
 const rows = JSON.parse(readFileSync(resolve(ASSETS, "ledger.json"), "utf8"));
 const validRows = Array.isArray(rows) && rows.every((r) => r && typeof r.path === "string"
   && typeof r.origin === "string" && r.origin.trim().length > 0
-  && ["self", "OFL-1.1", "unconfirmed"].includes(r.rights)
+  && ["self", "OFL-1.1", "unconfirmed", "commercial-free"].includes(r.rights)
   && typeof r.form === "string" && r.form.trim().length > 0);
 check("ledger:rows-have-the-required-fields", validRows, "path, origin, rights, form");
 if (validRows) {
@@ -68,6 +68,14 @@ if (validRows) {
       const lic = shipped.includes(row.path) && /\.(ttf|otf|woff2?)$/i.test(extname(row.path))
         && readdirSync(beside).find((f) => f.toLowerCase().startsWith(family(name).toLowerCase()) && /ofl\.txt$/i.test(f));
       check("ledger:" + name + ":carries-its-licence", Boolean(lic), lic || "no *OFL.txt beside " + row.path);
+    }
+    if (row.rights === "commercial-free") {
+      // 출처 이름이 있어야 상업용 무료 확인을 특정 원작자에게 연결할 수 있다.
+      const sourceName = /(?:^|[,;]\s*)(?:ID3 artist|source)\s+[^,;\s][^,;]*/i;
+      // 이용 조건과 확인 날짜가 한 절에 있어야 권리 판단의 근거를 다시 읽을 수 있다.
+      const licenceClause = /(?:상업용 무료|commercial-free)[^;]*\b\d{4}-\d{2}-\d{2}\b/i;
+      check("ledger:" + name + ":origin-names-a-source", sourceName.test(row.origin), row.origin);
+      check("ledger:" + name + ":origin-carries-a-dated-licence", licenceClause.test(row.origin), row.origin);
     }
     check("ledger:" + name + ":rights-are-confirmed", row.rights !== "unconfirmed", row.origin);
   }
