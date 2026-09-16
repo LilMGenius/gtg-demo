@@ -33,10 +33,10 @@ export function botAt(tier) {
   return BOTS.find((b) => b.tier === Number(tier)) || null;
 }
 
-// 봇이 서면 판단력만 봇 값으로 바꾼 얕은 복사를 돌려준다.
-// autoInput은 keeper.judgement 하나만 읽으므로 chain.mjs를 건드리지 않는다.
+// 봇은 훈련한 판단력을 보존하고 자동 방향 판단에 쓸 등급을 복사한다.
 export function botKeeper(keeper, bot) {
   const spec = botAt(bot && bot.tier);
   if (!spec) return keeper;
-  return { ...keeper, judgement: spec.judge };
+  // 훈련보다 낮은 봇은 판단력을 내리지 않고 등급 품질만 보태므로 만렙에서도 산다.
+  return { ...keeper, judgement: Math.max(keeper.judgement, spec.judge), botTier: spec.tier };
 }

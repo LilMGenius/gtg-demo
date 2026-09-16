@@ -1,3 +1,4 @@
+import { modifierContract } from "./modifier-contract.mjs";
 import { makeRng, buildSet, resolve, newKeeper, followerGain } from "../src/chain.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 
@@ -12,13 +13,15 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 
 const sweep = (stat, v) => {
   const k = Object.assign(newKeeper(), { [stat]: v });
-  let saved = 0, shots = 0, empty = 0, fans = 0;
+  let saved = 0, shots = 0, empty = 0, fans = 0, contactMisses = 0;
   const cause = {};
   for (let s = 0; s < SEEDS; s += 1) {
     const rng = makeRng(s + 90001);
     for (const shot of buildSet(makeRng(s + 1), 5, 0)) {
       const r = resolve({ keeper: k, shot, rng, input: { dive: shot.side, errMs: 0, advance: 0, auto: false } });
       shots += 1;
+      // 원인 이름은 커버 계수에 따라 옮겨간다. 옆 공의 실제 접촉 실패를 세어야 커버를 잰다.
+      if (!shot.chip && shot.course !== "정면" && r.events.some((e) => e.t === "miss")) contactMisses += 1;
       if (!r.conceded) saved += 1;
       else cause[r.cause || "none"] = (cause[r.cause || "none"] || 0) + 1;
       if (r.events.some((e) => e.t === "emptyGoal")) empty += 1;
@@ -26,7 +29,7 @@ const sweep = (stat, v) => {
       fans += followerGain(k, r, 0, 1, 1, 1);
     }
   }
-  return { rate: Number((saved / shots * 100).toFixed(2)), empty, fans, cause };
+  return { rate: Number((saved / shots * 100).toFixed(2)), empty, fans, cause, contactMisses };
 };
 
 const c1 = sweep("offball", 3), c2 = sweep("offball", 3);
@@ -35,9 +38,10 @@ check("control", c1.rate === c2.rate && c1.empty === c2.empty, c1.rate + " " + c
 const lo = sweep("offball", 1);
 const hi = sweep("offball", 10);
 
-// 이 칸이 실제로 무언가를 사 준다. 다이빙으로 잡히던 실점이 줄어야 좌우 커버가 값을 한 것이다.
-check("offball:buys-lateral-cover", (hi.cause.diving || 0) < (lo.cause.diving || 0),
-  "diving conceded " + (lo.cause.diving || 0) + " -> " + (hi.cause.diving || 0));
+// 커버는 옆 공의 접촉 실패 감소로 잰다. 다이빙 원인 귀속은 참고값으로만 남긴다.
+check("offball:buys-lateral-cover-in-contact-misses", hi.contactMisses < lo.contactMisses,
+  "lateral non-chip contact misses " + lo.contactMisses + " -> " + hi.contactMisses);
+console.log("note diving-attributed concessions " + (lo.cause.diving || 0) + " -> " + (hi.cause.diving || 0));
 
 // 대가도 실재한다. 앞으로 나오면 넘겨 차이는 공이 늘어난다.
 check("offball:costs-chips", hi.empty > lo.empty, "emptyGoal " + lo.empty + " -> " + hi.empty);
@@ -49,12 +53,17 @@ check("offball:net-not-negative", hi.rate >= lo.rate,
 // 나머지 성장 칸도 같은 규칙을 받는다. 다만 값을 하는 축이 세이브율 하나는 아니다.
 // 악동과 의사소통은 수다를 열어 세이브율을 내주고 화제를 사는 칸이므로, 두 축을 같이 본다.
 // 어느 축에서도 안 오르는 칸만 함정이다. 올리면 나빠지기만 하는 칸을 훈련장에 세울 수는 없다.
+check("offball:net-save-gain-in-band", hi.rate - lo.rate >= 0.5 && hi.rate - lo.rate <= 2,
+  "delta " + (hi.rate - lo.rate).toFixed(2) + " in [0.5, 2.0]");
+
 const trap = [];
 for (const stat of GROWABLE) {
   const a = sweep(stat, 1), b = sweep(stat, 10);
   if (b.rate < a.rate && b.fans <= a.fans) trap.push(stat + " rate " + a.rate + "->" + b.rate + " fans " + a.fans + "->" + b.fans);
 }
 check("growable:every-stat-buys-something", trap.length === 0, trap.join(" | ") || "all fifteen pay in save rate or in reach");
+
+modifierContract({ gate: "offball", fields: ["studs"], engine: { makeRng, buildSet, resolve, newKeeper }, growable: GROWABLE, check });
 
 const LINE = String.fromCharCode(10);
 if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
