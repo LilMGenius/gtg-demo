@@ -94,8 +94,11 @@ axis('refresh-independent-judgement', () => {
   const scene = source('web/src/render/scene.mjs');
   assert(/let dt = Math\.min\(0\.05, Math\.max\(0, real - realLast\)\)/.test(scene));
   assert(/if \(fixedDt > 0\) dt = fixedDt/.test(scene));
-  const touched = walk('src').filter(p => /\.mjs$/.test(p)).filter(p => /\bdt\b/.test(source(p)));
-  assert.equal(touched.length, 0, touched.join(', ')); return 'render clamp=0.05s; fixedDt override; judgement dt reads=0';
+  const judges = walk('src').filter(p => /\.mjs$/.test(p));
+  const touched = judges.filter(p => /\bdt\b/.test(source(p)));
+  const control = [...scene.matchAll(/\bdt\b/g)].length;
+  assert(judges.length > 0 && control > 0, 'The dt scan needs judgement modules and a positive renderer control');
+  assert.equal(touched.length, 0, touched.join(', ')); return `render clamp=0.05s; fixedDt override; ${judges.length} judgement modules, dt reads=0; renderer positive control=${control}`;
 });
 axis('storage-denied-and-persistence', storageScenario);
 function storageScenario() {
