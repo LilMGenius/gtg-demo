@@ -373,7 +373,7 @@ try {
   for (const tab of shopTabs) {
     await p.click('#shop .tab[data-tab="' + tab + '"]', { force: true });
     await p.waitForTimeout(180);
-    const one = p.locator("#shop .goods .buy:not(.bad-price) .px b").first();
+    const one = p.locator("#shop .goods .buy:not(.bad-price) .px:not(.cash) b").first();
     if (!(await one.count())) continue;
     warmOf[tab] = await one.evaluate((e) => {
       const c = getComputedStyle(e).color.match(/[0-9]+/g).map(Number);
@@ -392,7 +392,7 @@ try {
     await p.click('#shop .tab[data-tab="' + tab + '"]', { force: true });
     await p.waitForTimeout(180);
     await sweepLabels("poor:" + tab, "#shop .goods");
-    const list = p.locator("#shop .bad-price .px b");
+    const list = p.locator("#shop .bad-price .px:not(.cash) b");
     const many = await list.count();
     for (let i = 0; i < many; i += 1) {
       const g = await paintAt(list.nth(i), tab + "#" + i, warmOf[tab] || null);
@@ -436,16 +436,16 @@ try {
   // 세는 창은 아이콘 자기 상자다. 표기 전체를 창으로 쓰면 옆의 숫자가 분모를 키워
   // 같은 아이콘이 6%대로 읽힌다. ui-gate의 8%는 아이콘 상자를 재던 수이므로 창을 맞춰야 같은 뜻이 된다.
   const win = await p.evaluate(() => {
-    const s = document.querySelector("#shop .px");
+    const s = document.querySelector("#shop .px:not(.cash)");
     const g = s.querySelector("svg");
     const a = s.getBoundingClientRect(), c = g.getBoundingClientRect();
     return { x: (c.left - a.left) / a.width, y: (c.top - a.top) / a.height, w: c.width / a.width, h: c.height / a.height };
   });
-  const one = p.locator("#shop .px").first();
+  const one = p.locator("#shop .px:not(.cash)").first();
   const on = (await one.screenshot()).toString("base64");
-  await p.evaluate(() => { document.querySelector("#shop .px svg").style.visibility = "hidden"; });
+  await p.evaluate(() => { document.querySelector("#shop .px:not(.cash) svg").style.visibility = "hidden"; });
   const off = (await one.screenshot()).toString("base64");
-  await p.evaluate(() => { document.querySelector("#shop .px svg").style.visibility = ""; });
+  await p.evaluate(() => { document.querySelector("#shop .px:not(.cash) svg").style.visibility = ""; });
   const cover = await p.evaluate(([a, c, box]) => {
     const load = (s) => new Promise((res) => {
       const im = new Image();
@@ -490,7 +490,7 @@ try {
      선택자를 같이 들고 오는 이유는 화소를 재는 자가 두 지갑에서 같은 자리를 집어야 하기 때문이다. */
   const pxHere = (mark) => {
     const out = [];
-    for (const px of document.querySelectorAll("#shop .px, #me .met .px")) {
+    for (const px of document.querySelectorAll("#shop .px:not(.cash), #me .met .px:not(.cash)")) {
       if (!px.getClientRects().length) continue;
       const b = px.closest("button");
       if (!b) continue;
@@ -498,23 +498,23 @@ try {
       let key = "", sel = "", shelf = mark;
       if (d.kind !== undefined && d.rank !== undefined) {
         key = "gear:" + d.kind + ":" + d.rank;
-        sel = '#shop .buy[data-kind="' + d.kind + '"][data-rank="' + d.rank + '"] .px b';
+        sel = '#shop .buy[data-kind="' + d.kind + '"][data-rank="' + d.rank + '"] .px:not(.cash) b';
       } else if (d.bot !== undefined) {
         key = "bot:" + d.bot;
-        sel = '#shop .buy[data-bot="' + d.bot + '"] .px b';
+        sel = '#shop .buy[data-bot="' + d.bot + '"] .px:not(.cash) b';
       } else if (d.buff !== undefined) {
         key = "buff:" + d.buff;
-        sel = '#shop .buy[data-buff="' + d.buff + '"] .px b';
+        sel = '#shop .buy[data-buff="' + d.buff + '"] .px:not(.cash) b';
       } else if (d.want !== undefined) {
         key = "pull:" + d.want;
-        sel = '#shop .buy[data-want="' + d.want + '"] .px b';
+        sel = '#shop .buy[data-want="' + d.want + '"] .px:not(.cash) b';
       } else if (d.city !== undefined && d.passer !== undefined) {
         key = "date:" + d.city + ":" + d.passer;
-        sel = '#me .go[data-city="' + d.city + '"][data-passer="' + d.passer + '"] .px b';
+        sel = '#me .go[data-city="' + d.city + '"][data-passer="' + d.passer + '"] .px:not(.cash) b';
         shelf = "date";
       } else if (b.classList.contains("all")) {
         key = "fitting:all";
-        sel = "#shop .fitting .all .px b";
+        sel = "#shop .fitting .all .px:not(.cash) b";
         shelf = "fitting";
       }
       if (!key) continue;
@@ -622,6 +622,26 @@ try {
         : poorList.length + " short digits red, lowest " + Math.min.apply(null, poorList.map((e) => e.red))
           + ", " + richList.length + " rich digits with none");
 
+  const cashRows = async (cash) => {
+    await p.evaluate(c => { window.__wallet().cash=c; window.__shop(true); }, cash);
+    const result=[];
+    for (const tab of shopTabs) {
+      await p.click('#shop .tab[data-tab="' + tab + '"]', { force: true });
+      result.push(await p.evaluate(tab => ({ tab, gold:document.querySelectorAll('#shop .px:not(.cash)').length,
+        cash:document.querySelectorAll('#shop .price .cash').length,
+        rows:[...document.querySelectorAll('#shop .price')].map(e => ({ value:+e.dataset.cash,
+          token:+e.querySelector('.cash').dataset.cash, shown:+e.querySelector('.cash b').textContent.replace(/,/g,''),
+          fits:e.scrollWidth<=e.clientWidth+1 && e.getBoundingClientRect().right<=e.closest('button').getBoundingClientRect().right+1 })) }), tab));
+    }
+    return result;
+  };
+  const richCash=await cashRows(8000), poorCash=await cashRows(0);
+  check('price:the-cash-token-reads-the-cash-value', richCash.every(s=>s.rows.length>0 && s.rows.every(e=>e.value===e.token && e.value===e.shown)), JSON.stringify(richCash));
+  check('price:short-and-rich-show-the-same-cash-number', JSON.stringify(richCash.map(s=>s.rows.map(e=>e.shown)))===JSON.stringify(poorCash.map(s=>s.rows.map(e=>e.shown))), String(poorCash.length));
+  check('instrument:cash-tokens-equal-gold-tokens-on-every-tab', richCash.every(s=>s.gold>0 && s.gold===s.cash), JSON.stringify(richCash.map(({tab,gold,cash})=>({tab,gold,cash}))));
+  await p.setViewportSize({width:740,height:360});
+  const smallCash=await cashRows(8000);
+  check('price:two-currencies-fit-the-small-shelf', smallCash.every(s=>s.rows.length>0 && s.rows.every(e=>e.fits)), JSON.stringify(smallCash));
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 

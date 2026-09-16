@@ -2,6 +2,7 @@
 // 그 자리에 한 번의 만남을 두어 얼굴을 튼 것이 어디로 가는지를 만든다.
 // 판정식은 건드리지 않는다. 라포 숫자와 지갑과 팔로워만 움직인다.
 
+import { cashPrice } from './wallet.mjs';
 import { RAPPORT_CAP, RAPPORT_STEPS, rapportKey, rapportTier } from "./rapport.mjs";
 
 // 만남이 열리는 단계. RAPPORT_STEPS의 마지막 문턱이라 열다섯 번 말을 섞어야 닿는다.
@@ -63,11 +64,11 @@ export function applyDate(rapport, city, passer, won) {
 
 // 만남을 열 수 있는지. 단계와 지갑 둘 다 본다.
 // 못 누르는 이유를 화면이 글자로 말해야 하므로 사유를 같이 낸다.
-export function dateGate(rapport, city, passer, coin) {
+export function dateGate(rapport, city, passer, coin, cash = 0) {
   const tier = rapportTier(rapport, city, passer);
   if (tier < DATE_TIER) return { open: false, why: "아직 얼굴만 아는 사이다" };
   const short = DATE_COST - (Number(coin) || 0);
   // 값은 수로만 낸다. 여기서 재화 이름을 글자로 박으면 화면이 아이콘으로 그리는 표기와 갈린다.
-  if (short > 0) return { open: false, short };
+  if (short > 0 && cash < cashPrice(DATE_COST)) return { open: false, short };
   return { open: true, cost: DATE_COST };
 }
