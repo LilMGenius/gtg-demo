@@ -33,7 +33,7 @@
      띠는 8px에서 서고 여백 2/3px과 테두리 3/3px로 11px을 쓴다. 안쪽은 초상화 44px과
      글자 두 줄 중 큰 쪽이고, 두 줄은 컨디션 아이콘 .9em과 잔고 1.05em에 줄 사이 --gap-3이다.
      --fs-num이 16.4px을 넘는 폭 912px부터 글자가 초상화를 넘어 띠가 자란다. */
-  --strip-b:calc(8px + max(44px, calc(.9 * var(--fs-num) + var(--gap-3) + 1.05 * var(--fs-num))) + 11px);
+  --strip-b:calc(8px + max(44px, calc(max(24px, .9 * var(--fs-num)) + var(--gap-3) + max(24px, 1.05 * var(--fs-num)))) + 11px);
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;background:#0d110c;overflow:hidden;
@@ -826,7 +826,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
      창은 inset:0이라 첫 단이 화면 맨 위, 곧 띠와 같은 자리에서 시작해서 실측 740x360에서 초상과 이름이
      띠 아래끝 66.2px보다 61.8px 위에 서고 캐시 칩을 통째로 덮었다. 여기서 첫 단은 실측 71.4px에 서고,
      길어진 만큼은 창이 제 스크롤로 받는다(숨은 높이 436px에서 503px). */
-  #me{padding-top:calc(8px + 55px + var(--lift) + var(--gap-2) + env(safe-area-inset-top));gap:var(--gap-2)}
+  #me{padding-top:calc(var(--strip-b) + var(--lift) + var(--gap-2) + env(safe-area-inset-top));gap:var(--gap-2)}
   #me .card{max-height:none;gap:var(--gap-1)}
   #me .pane{max-height:none;gap:var(--gap-1);padding-top:0}
   /* 걸친 것은 맨 아래로 간다. 창을 연 이유는 탭 안의 답이고 걸친 것은 그 답이 아닌데,
