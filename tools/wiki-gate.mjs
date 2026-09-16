@@ -1,4 +1,8 @@
 import { chromium } from "playwright";
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+// 화면 값은 구현의 상수가 아니라 배포 매니페스트와 맞댄다.
+const RELEASE = JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version;
 import { COIN_SAVE, COIN_CONCEDED, COIN_DRILL, COIN_FAME_STEP } from "../web/src/state/wallet.mjs";
 import { BOTS } from "../web/src/state/bot.mjs";
 import { BUFFS } from "../web/src/state/buff.mjs";
@@ -19,7 +23,7 @@ const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win6
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const LINE = String.fromCharCode(10);
 // 카테고리 아홉. 키는 ASCII다. 화면 라벨로 찾으면 라벨을 다듬은 날 자가 같이 죽는다.
-const KEYS = ["hand", "coin", "drill", "gear", "pull", "gram", "bot", "buff", "risk"];
+const KEYS = ["game", "hand", "coin", "drill", "gear", "pull", "gram", "bot", "buff", "risk"];
 /* 수를 싣는 여섯. hand와 risk는 자리와 이름만 싣는 표라 수가 0인 것이 정상이고,
    그래서 아래 계기 축이 요구하는 "수가 한 칸 이상"의 대상에서 빠진다. */
 /* 신호가 옮겨야 하는 최소 화소 몫. 그늘이 DOM에만 있고 화면을 안 건드리면 위의 축은 빈 초록이다.
@@ -146,7 +150,7 @@ const rowGap = (want, got) => {
 let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
-  const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 720 }, permissions: ["clipboard-read", "clipboard-write"] });
   const p = await ctx.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -184,14 +188,53 @@ try {
   check("wiki:the-question-mark-opens-the-guide", up.shown === true && up.aria === "true",
     "shown " + up.shown + " aria " + up.aria);
 
-  // 카테고리 아홉. 하나라도 비면 그 주제는 화면 어디에도 답이 없다.
+  // 개수는 KEYS.length가 소유하므로 축 이름에 수를 박아 카테고리 추가 때 낡게 두지 않는다.
   const cats = await p.evaluate(() => [...document.querySelectorAll("#wiki .cats [data-cat]")]
     .map((e) => ({ key: e.dataset.cat, tag: e.tagName, label: (e.textContent || "").trim() })));
   const keys = cats.map((c) => c.key);
   const missing = KEYS.filter((k) => !keys.includes(k));
   const mute = cats.filter((c) => !c.label.length || c.tag !== "BUTTON").map((c) => c.key);
-  check("wiki:nine-categories-stand", cats.length === KEYS.length && missing.length === 0 && mute.length === 0,
+  check("wiki:every-declared-category-stands", cats.length === KEYS.length && missing.length === 0 && mute.length === 0,
     cats.length + " categories, missing " + (missing.join(",") || "none") + ", unnamed " + (mute.join(",") || "none"));
+
+  // 열린 첫 칸과 실제 값 셀을 함께 읽어 숨은 문자열만으로 통과시키지 않는다.
+  const buildLabel = async page => {
+    if (!await page.locator('#wiki .cats [data-cat="game"]').count()) return { ok: false, detail: 'no game category' };
+    await page.locator('#wiki .cats [data-cat="game"]').click();
+    await page.waitForFunction(() => !document.querySelector('#wiki .copy')?.disabled);
+    // 행 이름으로 찾으므로 표의 순서가 바뀌어도 버전과 빌드를 혼동하지 않는다.
+    const values = await page.locator('#wiki tbody tr').evaluateAll(rows => Object.fromEntries(rows.map(row => [...row.cells].map(cell => cell.textContent.trim()))));
+    return { ok: await page.locator('#wiki .body').isVisible() && values['버전'] === 'v' + RELEASE
+      && /^v\d+\.\d+\.\d+\+(g[0-9a-f]{7}|dev)$/.test(values['빌드']), detail: JSON.stringify(values), full: values['빌드'] };
+  };
+  check('wiki:the-question-mark-opens-the-first-category', await p.locator('#wiki .cats [aria-current="true"]').getAttribute('data-cat') === KEYS[0], KEYS[0]);
+  // 빌드 셀의 실제 표시를 복사 결과와 같은 표본으로 묶는다.
+  const identity = await buildLabel(p);
+  check('wiki:the-game-page-shows-the-build-id', identity.ok, identity.detail);
+  await p.locator('#wiki .copy').click();
+  // 브라우저 클립보드를 읽어 클릭 핸들러의 존재와 복사 성공을 구분한다.
+  const copied = await p.evaluate(() => navigator.clipboard.readText());
+  check('wiki:the-copy-button-copies-the-build-id', identity.ok && copied === identity.full, copied);
+  check('wiki:copy-feedback-appears', await p.locator('#wiki .copy').textContent() === '복사됨', 'copy acknowledged');
+  await p.waitForFunction(() => document.querySelector('#wiki .copy')?.textContent === '복사');
+  // 최신 API가 거절된 실제 선택 복사 경로도 클립보드 내용으로 확인한다.
+  await p.evaluate(async () => { await navigator.clipboard.writeText('copy control'); navigator.clipboard.writeText = () => Promise.reject(new Error('control denied')); });
+  await p.locator('#wiki .copy').click();
+  check('wiki:the-copy-fallback-copies-the-build-id', await p.evaluate(() => navigator.clipboard.readText()) === identity.full
+    && await p.locator('#wiki .copy').textContent() === '복사됨' && await p.locator('textarea').count() === 0, identity.full);
+  // wikisrc 게이트의 응답 교체를 재사용해 작업 트리를 덮지 않고 부모 구현을 서빙한다.
+  const parentSource = execFileSync('git', ['show', '9566a7e:web/src/ui/wiki.mjs'], { encoding: 'utf8' });
+  // 별도 페이지라 현재 모듈 캐시를 대조군이 물려받지 않는다.
+  const parentPage = await ctx.newPage();
+  await parentPage.route('**/src/ui/wiki.mjs', route => route.fulfill({ contentType: 'text/javascript', body: parentSource }));
+  await parentPage.goto(BASE);
+  await parentPage.click('#go', { force: true });
+  await parentPage.click('#wikiBtn', { force: true });
+  // 살아 있는 부모 패널에서 같은 좌표 함수를 호출해야 부재가 계기 사망과 갈린다.
+  const parentIdentity = await buildLabel(parentPage);
+  console.log('CONTROL served-parent 9566a7e wiki:the-game-page-shows-the-build-id ' + (parentIdentity.ok ? 'GREEN' : 'RED') + ' ' + parentIdentity.detail);
+  check('control:the-parent-reddens-the-build-id-axis', !parentIdentity.ok && await parentPage.locator('#wiki .body table').count() > 0, parentIdentity.detail);
+  await parentPage.close();
 
   // 본문마다 표가 하나 이상. 표 없는 본문은 문장만 남은 자리이고, 수치를 물으러 온 눈이 빈손으로 나간다.
   const bare = [], wrong = [], invented = [], headless = [], offRow = [];
@@ -603,7 +646,7 @@ try {
 
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
-  console.log("표본 범위: 카테고리 9 전부 × 본문 표. 수를 싣는 6칸은 상수와 맞대고 봇과 버프는 줄 단위로 맞댄다. 뷰포트 1280x720과 740x360");
+  console.log("표본 범위: 선언된 카테고리 전부 × 본문 표. 수를 싣는 6칸은 상수와 맞대고 봇과 버프는 줄 단위로 맞댄다. 뷰포트 1280x720과 740x360");
   console.log(fails.length ? "wiki FAIL " + fails.length : "wiki PASS " + notes.length);
   process.exit(fails.length ? 1 : 0);
 } catch (e) {

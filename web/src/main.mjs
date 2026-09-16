@@ -23,7 +23,7 @@ import { passerName } from './state/passer.mjs';
 import { DATE_COST, MOVES, dateOdds, dateOutcome, applyDate, dateGate } from './state/date.mjs';
 import { applyPreset, ONBOARD_KEEPER, ONBOARD_KICKERS, ONBOARD_DONE } from './state/inject.mjs';
 import { thumbURL, startSpin, stopSpin } from './render/thumb.mjs';
-import { wikiHTML, wikiBody } from './ui/wiki.mjs';
+import * as wikiUI from './ui/wiki.mjs';
 
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
@@ -1274,15 +1274,16 @@ function meCues() {
 
 // 위키. 물음표 하나가 여는 카테고리 가이드다. 재화 칩이 열던 버는 법도 이 안의 한 칸이다.
 // 표의 수는 wiki.mjs가 상수에서 읽으므로 이 자리는 화면에 붙이는 일만 한다.
-let wikiAt = 'hand';
+let wikiAt = wikiUI.WIKI_CATS[0].key;
 let wikiWatch = null;
 window.addEventListener('wiki-ready', () => { if (el('wiki') && !el('wiki').hidden) paintWiki(); });
 
 function paintWiki() {
   const box = el('wiki');
-  box.innerHTML = wikiHTML(wikiAt);
-  box.querySelector('.body').innerHTML = wikiBody(wikiAt,
+  box.innerHTML = wikiUI.wikiHTML(wikiAt);
+  box.querySelector('.body').innerHTML = wikiUI.wikiBody(wikiAt,
     { notices: SHOP_NOTICES_FOR_WIKI, shelves: SHELF_NOTES_FOR_WIKI, mishaps: MISHAP_SHELF });
+  wikiUI.mountWikiBuild?.(box);
   for (const b of box.querySelectorAll('.cats [data-cat]')) b.onclick = () => { wikiAt = b.dataset.cat; paintWiki(); };
   box.querySelector('.close').onclick = closeWiki;
   for (const link of box.querySelectorAll('.wiki-prose a')) link.onclick = (event) => {
@@ -1305,7 +1306,7 @@ function paintWiki() {
 
 function openWiki(cat) {
   if (!shutOthers('wiki')) return;
-  if (cat) wikiAt = cat;
+  wikiAt = cat || wikiUI.WIKI_CATS[0].key;
   el('wiki').hidden = false;
   el('wikiBtn').setAttribute('aria-expanded', 'true');
   paintWiki();

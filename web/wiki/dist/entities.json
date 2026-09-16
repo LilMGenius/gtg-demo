@@ -102,6 +102,24 @@
   },
   {
     "aliases": [
+      "game",
+      "about"
+    ],
+    "categories": [
+      "game"
+    ],
+    "game": "gtg",
+    "id": "game",
+    "relations": {
+      "relatedTo": [
+        "hand"
+      ]
+    },
+    "title": "이 게임",
+    "type": "guide"
+  },
+  {
+    "aliases": [
       "gear"
     ],
     "categories": [

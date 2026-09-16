@@ -692,7 +692,7 @@ async function wikiLeg(page) {
   await snap(page, "26-wiki-open");
   await snap(page, "26-wiki-sheet", "#wiki .sheet");
   const cats = {};
-  for (const cat of ["hand", "coin", "drill", "pull", "gram", "bot", "buff", "risk"]) {
+  for (const cat of ["game", "hand", "coin", "drill", "gear", "pull", "gram", "bot", "buff", "risk"]) {
     await page.click("#wiki .cats [data-cat='" + cat + "']", { force: true });
     await page.waitForTimeout(260);
     cats[cat] = await wikiAt(page);

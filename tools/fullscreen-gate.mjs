@@ -59,6 +59,7 @@ try {
  check('f:served-parent-b-red-c-red',!b&&!c,{revision:'4eb39f9',b,c,state:await state(old)});
  await old.context().close();
  const no=await fresh(true,false,true);await start(no);await no.click('#wikiBtn');
+ await no.locator('#wiki .cats [data-cat="hand"]').click();
  check('unsupported:hidden-and-home-screen-help',await no.locator('#fullscreen').evaluate(e=>e.hidden)&&(await no.locator('#wiki').innerText()).includes('iPhone')&&(await state(no)).log.length===0,await state(no));
  await no.context().close();
 } catch(e) {check('exception',false,e.stack);}

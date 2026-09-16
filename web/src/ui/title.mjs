@@ -1,9 +1,13 @@
 // 타이틀. 판을 열기 전에 누구인지부터 묻는다. 게임은 시작 버튼을 눌러야 돌고,
 // 브라우저 자동재생 정책도 그 한 번의 입력으로 같이 풀린다.
+import { VERSION } from '../build.mjs';
 import { signUp, logIn, currentId, setCurrent, nickOf, guestUp } from '../state/account.mjs';
 import { useAccount, hasLegacy, adoptLegacy } from '../state/save.mjs';
 
 export function mountTitle(onStart) {
+  // 이전 HTML을 서빙하는 대조군에서도 시작 동작은 살아 있어야 좌표 부재를 따로 잴 수 있다.
+  const build = document.getElementById('build');
+  if (build) build.textContent = 'v' + VERSION;
   const title = document.getElementById('title');
   const gate = document.getElementById('gate');
   const go = document.getElementById('go');

@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { VERSION } from '../web/src/build.mjs';
 
 // 타이틀은 이 게임을 처음 여는 화면인데 계기가 하나도 없었다. 만렙 화면을 훑는 자도
 // 시작 버튼을 누른 뒤부터 보므로 이 화면은 한 번도 안 훑렸다.
@@ -92,6 +93,44 @@ const OWN_MIN = 0.3;
 let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
+
+  // 타이틀 기존 잉크 표본은 그대로 두고 좌표의 두 필수 폭을 따로 잰다.
+  for (const [width, height] of [[740, 360], [1280, 720]]) {
+    // 배율을 고정해 CSS 상자와 화면 화소가 같은 좌표를 쓰게 한다.
+    const context = await b.newContext({ viewport: { width, height } });
+    // 실제 첫 화면에서 시작 버튼을 누르기 전에 좌표를 읽는다.
+    const page = await context.newPage();
+    await page.goto(BASE);
+    await page.waitForSelector('#go');
+    await page.evaluate(() => document.fonts.ready);
+    // 토큰의 계산값을 직접 재서 고정 px로 흉내 낸 글자를 통과시키지 않는다.
+    const label = await page.evaluate(() => {
+      // 없는 라벨은 측정할 상자가 없으므로 바로 실패 표본이다.
+      const element = document.getElementById('build');
+      if (!element) return { ok: false, reason: 'no #build' };
+      // 타이틀과 이웃의 실제 상자가 회전된 마크까지 포함한다.
+      const box = element.getBoundingClientRect(), title = document.getElementById('title').getBoundingClientRect();
+      // 모든 기존 글자 토큰의 계산값 중 최솟값을 기준으로 쓴다.
+      const probe = document.createElement('span');
+      document.getElementById('title').append(probe);
+      // 토큰 목록은 스타일시트에서 읽어 새 토큰이 생겨도 빠뜨리지 않는다.
+      const tokens = [...new Set([...document.styleSheets].flatMap(sheet => [...sheet.cssRules].flatMap(rule => rule.style ? [...rule.style].filter(name => name.startsWith('--fs-')) : [])))];
+      // 단위 환산은 브라우저가 수행한다.
+      const sizes = tokens.map(token => { probe.style.fontSize = 'var(' + token + ')'; return parseFloat(getComputedStyle(probe).fontSize); });
+      probe.remove();
+      // 글자 크기뿐 아니라 보임과 비조작성도 좌표의 계약이다.
+      const style = getComputedStyle(element);
+      // 겹침은 두 축 모두 만나는 경우만 센다.
+      const overlaps = ['mark', 'go'].some(id => { const r = document.getElementById(id).getBoundingClientRect(); return box.left < r.right && box.right > r.left && box.top < r.bottom && box.bottom > r.top; });
+      return { text: element.textContent, size: style.fontSize, smallest: Math.min(...sizes), tokens,
+        ok: tokens.length > 0 && box.width > 0 && box.height > 0 && style.visibility === 'visible' && Number(style.opacity) > 0
+          && parseFloat(style.fontSize) === Math.min(...sizes) && style.pointerEvents === 'none'
+          && box.left >= title.left && box.right <= title.right && box.top >= title.top && box.bottom <= title.bottom && !overlaps,
+        box: box.toJSON(), title: title.toJSON(), overlaps };
+    });
+    check('title:the-corner-carries-the-release-label', label.ok && label.text === 'v' + VERSION, width + 'x' + height + ' ' + JSON.stringify(label));
+    await context.close();
+  }
 
   for (const [w, h] of SIZES) {
     const tag = w + "x" + h;
