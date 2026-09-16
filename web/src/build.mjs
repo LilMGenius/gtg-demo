@@ -3,7 +3,7 @@ export const VERSION = '0.7.0';
 let identity;
 
 export function buildId() {
-  // 열린 세션의 좌표가 재배포 뒤 바뀌지 않도록 첫 응답을 공유한다.
+  // 404는 브라우저 콘솔 오류라 없는 파일로 dev를 표현할 수 없고, 추적된 자리 표시자는 배포가 덮어쓴다.
   identity ??= fetch(new URL('../build.json', import.meta.url), { cache: 'no-store' })
     .then(response => {
       if (!response.ok) throw new Error('Build HTTP ' + response.status);
