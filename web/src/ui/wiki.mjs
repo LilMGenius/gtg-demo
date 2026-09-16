@@ -4,7 +4,7 @@
 // 표의 수는 전부 코드 상수에서 읽는다. 화면에 수를 옮겨 적으면 상수가 바뀐 날 화면만 옛 수를 말하고,
 // 그 거짓말은 아무도 안 고친다. 그래서 이 파일에는 판정에 쓰이는 수가 하나도 없다.
 import { VERSION, buildId } from '../build.mjs';
-import { COIN_SAVE, COIN_CONCEDED, COIN_DRILL, COIN_FAME_STEP } from '../state/wallet.mjs';
+import { COIN_SAVE, COIN_CONCEDED, COIN_DRILL, COIN_FAME_STEP, CASH_RATE } from '../state/wallet.mjs';
 import { BOTS } from '../state/bot.mjs';
 import { KEY_MAP } from './keys.mjs';
 import { BUFFS } from '../state/buff.mjs';
@@ -41,7 +41,7 @@ const table = (heads, list) => '<table><thead><tr>'
 import builtPages from '../../wiki/dist/pages.json' with { type: 'json' };
 import entities from '../../wiki/dist/entities.json' with { type: 'json' };
 const CONSTANTS = {
-  wallet: { COIN_SAVE, COIN_CONCEDED, COIN_DRILL },
+  wallet: { COIN_SAVE, COIN_CONCEDED, COIN_DRILL, CASH_RATE },
   roster: { PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP },
   gram: { LIKE_BASE, LIKE_PER_CITY, MUTUAL_STEP, MUTUAL_CAP, SELFIE_BASE }
 };
@@ -74,7 +74,7 @@ const TABLES = {
       ['최상급', value('coin-save') + COIN_FAME_STEP * 9],
       ['먹혀도', value('coin-conceded')],
       ['훈련 대신', value('drill')],
-      ['캐시', '결제']
+      ['캐시 한 단위', value('cash-rate') + ' 골드 (시험값)']
     ])],
   drill: (ctx) => [table(['자리', '값'], [['훈련 대신', value('drill')]])],
   gear: (ctx) => (ctx.shelves || []).map((s) => '<h5>' + esc(s.head) + '</h5>'
