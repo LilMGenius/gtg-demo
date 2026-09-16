@@ -23,6 +23,7 @@ const overlap = (a, b) => a && b && a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && 
 let br;
 try {
   br = await chromium.launch({ executablePath: EXE });
+  console.log('BINARY '+JSON.stringify({node:process.version,executable:EXE,chromium:br.version(),invocation:process.argv}));
   const errs = [];
 
   const open = async (w, h) => {
@@ -71,6 +72,13 @@ try {
     const small = box.zones.filter((z) => z[2] < TOUCH || z[3] < TOUCH);
     check(tag + ":zones-take-a-finger", box.zones.length === 3 && small.length === 0,
       box.zones.map((z) => z[2] + "x" + z[3]).join(" "));
+
+    const targets = await p.evaluate(() => [...document.querySelectorAll('#hud > button, #top button, #pad button')].filter(e => e.getClientRects().length && !e.hidden).map(e => ({id:e.id || e.dataset.dive,width:e.offsetWidth,height:e.offsetHeight})));
+    check(tag + ':readiness-hud-targets-24px', targets.length >= 15 && targets.every(e => e.width >= 24 && e.height >= 24), JSON.stringify(targets));
+    await p.emulateMedia({reducedMotion:'reduce'});
+    const motion = await p.locator('#hud').evaluate(e => getComputedStyle(e).transitionDuration);
+    check(tag + ':readiness-reduced-motion', motion.split(',').every(t => parseFloat(t) <= 0.00001), motion);
+    await p.emulateMedia({reducedMotion:'no-preference'});
 
     // 버튼이 화면 밖으로 나가면 그 기능은 없는 것과 같다.
     const outside = ["top", "auto", "out", "mute"].filter((k) => {

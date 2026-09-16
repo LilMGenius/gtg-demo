@@ -1,0 +1,199 @@
+HEAD f588239f315a96399d9b056b735e169866005f56
+BINARY C:\Program Files\nodejs\node.exe v26.1.0; package.json has no Node engine pin
+INVOCATION node tools/readiness-gate.mjs
+ARTIFACT C:\Users\LilMG\Desktop\gtg-demo\.omo\evidence\readiness-f588239.txt
+BOOTSTRAP_INVENTORY [{"path":"web/assets/fonts/black-han-sans.ttf","bytes":979200},{"path":"web/vendor/three.module.min.js","bytes":365552},{"path":"web/src/render/scene.mjs","bytes":200772},{"path":"web/src/main.mjs","bytes":174219},{"path":"web/src/ui/hud.css","bytes":124652},{"path":"web/vendor/loaders/GLTFLoader.js","bytes":114976},{"path":"web/assets/fonts/pretendard-bold.subset.woff2","bytes":87932},{"path":"web/assets/fonts/pretendard-regular.subset.woff2","bytes":87044},{"path":"web/src/render/objects/actors.mjs","bytes":49695},{"path":"web/src/render/objects/pitch.mjs","bytes":43910},{"path":"web/src/render/objects/impact.mjs","bytes":40482},{"path":"src/chain.mjs","bytes":40012},{"path":"web/vendor/utils/BufferGeometryUtils.js","bytes":37638},{"path":"src/roster.mjs","bytes":35261},{"path":"web/src/state/gear.mjs","bytes":32862},{"path":"web/src/render/thumb.mjs","bytes":32660},{"path":"web/src/render/texture.mjs","bytes":28708},{"path":"web/src/ui/lines.mjs","bytes":20979},{"path":"web/index.html","bytes":17047},{"path":"web/src/audio/sfx.mjs","bytes":16505},{"path":"web/src/render/objects/places.mjs","bytes":11999},{"path":"web/vendor/utils/SkeletonUtils.js","bytes":11552},{"path":"web/src/state/gram.mjs","bytes":11531},{"path":"web/src/state/passer.mjs","bytes":10373},{"path":"web/assets/models/skyline.glb","bytes":9992},{"path":"web/src/ui/wiki.mjs","bytes":8909},{"path":"web/src/state/save.mjs","bytes":8610},{"path":"web/src/render/handmade.mjs","bytes":7498},{"path":"web/wiki/dist/pages.json","bytes":7336},{"path":"web/src/ui/title.css","bytes":7101},{"path":"web/src/render/units.mjs","bytes":6248},{"path":"web/src/diagnostics/ball-probe.mjs","bytes":6137},{"path":"web/src/render/decor.mjs","bytes":6112},{"path":"web/wiki/dist/entities.json","bytes":5679},{"path":"web/src/state/inject.mjs","bytes":5590},{"path":"web/assets/models/markings.glb","bytes":5068},{"path":"web/src/diagnostics/stage-probe.mjs","bytes":4993},{"path":"web/src/state/account.mjs","bytes":4826},{"path":"web/src/ui/title.mjs","bytes":4730},{"path":"web/src/state/rapport.mjs","bytes":4482},{"path":"web/src/state/date.mjs","bytes":4329},{"path":"web/src/state/wallet.mjs","bytes":3633},{"path":"src/ledger.mjs","bytes":2953},{"path":"web/src/audio/bgm.mjs","bytes":2890},{"path":"web/src/ui/callout.mjs","bytes":2592},{"path":"web/src/state/buff.mjs","bytes":2431},{"path":"web/src/state/coach.mjs","bytes":2263},{"path":"web/src/state/bot.mjs","bytes":2216},{"path":"web/src/render/objects/markspec.mjs","bytes":1880},{"path":"web/src/ui/keys.mjs","bytes":1209},{"path":"web/src/build.mjs","bytes":901},{"path":"web/src/ui/links.mjs","bytes":876},{"path":"web/src/audio/volume.mjs","bytes":662},{"path":"web/manifest.webmanifest","bytes":330},{"path":"web/build.json","bytes":46}]
+LARGEST_ASSET web/assets/fonts/black-han-sans.ttf 979200 bytes
+BUDGET_SCOPE raw on-disk bytes, deduplicated; includes bootstrap modules, CSS/font URLs, JSON fetches and loadDecor GLBs; conservative pre-gesture upper bound, not measured transfer bytes
+DEFERRED BGM codecs are excluded: preload=none and src assigned by gesture kick; procedural textures/portraits have no file payload
+GREEN initial-byte-budget: 2708083 bytes / 20000000; 55 resources; largest web/assets/fonts/black-han-sans.ttf 979200 bytes
+GREEN largest-single-asset: web/assets/fonts/black-han-sans.ttf 979200 bytes (reported, no universal per-file cap)
+GREEN manifest:name: 골키퍼 키우기 3D
+GREEN manifest:short_name: 골키퍼
+GREEN manifest:start_url: ./index.html
+GREEN manifest:display: fullscreen
+RED manifest:icon-192: Missing 192x192 PNG
+RED manifest:icon-512: Missing 512x512 PNG
+RED apple-touch-icon: The expression evaluated to a falsy value:
+
+  assert(/<link\b[^>]*rel="apple-touch-icon"[^>]*href="assets\/icon-192.png"/.test(html))
+
+GREEN orientation: landscape
+GREEN refresh-independent-judgement: render clamp=0.05s; fixedDt override; judgement dt reads=0
+GREEN storage-denied-and-persistence: denied reads=2 writes=1 removes=1; defaults returned; roundtrip onboard=2 pref=-1 level=1
+GREEN audio-resume-hooks-source-only: visibilitychange + pointerdown/keydown/touchstart; source registration only, iOS recovery awaits device test
+TOUCH_DECLARATIONS [{"selector":"#meBtn","px":[44,44]},{"selector":"#lv","px":[0,0]},{"selector":"#form","px":[0,0]},{"selector":"#pips","px":[0,0]},{"selector":"#purse button","px":[0,0]},{"selector":"#auto","px":[46,46]},{"selector":"#out","px":[46,46]},{"selector":"#mute","px":[46,46]},{"selector":"#fullscreen","px":[46,46]},{"selector":"#wikiBtn","px":[46,46]},{"selector":"#gymBtn","px":[66,40]},{"selector":"#rosterBtn","px":[66,40]},{"selector":"#gramBtn","px":[66,40]},{"selector":"#shopBtn","px":[66,40]},{"selector":".zone","px":[48,48]}]
+RED hud-touch-minimum: Missing >=24px declarations: [{"selector":"#lv","px":[0,0]},{"selector":"#form","px":[0,0]},{"selector":"#pips","px":[0,0]},{"selector":"#purse button","px":[0,0]}]
+GREEN contrast-instrument-control: black/white=21, identical=1 (rejects 4.5 and 3)
+GREEN contrast:ink/panel: #f2f4f0/#161c14=15.677:1 >= 4.5:1; opaque root tokens, not composited pixels
+GREEN contrast:ink/edge: #f2f4f0/#12160e=16.545:1 >= 4.5:1; opaque root tokens, not composited pixels
+GREEN contrast:dim/panel: #9aa495/#161c14=6.707:1 >= 4.5:1; opaque root tokens, not composited pixels
+GREEN contrast:dim/edge: #9aa495/#12160e=7.079:1 >= 4.5:1; opaque root tokens, not composited pixels
+GREEN contrast:bad/panel: #e0563f/#161c14=4.604:1 >= 3:1; opaque root tokens, not composited pixels
+GREEN contrast:bad/edge: #e0563f/#12160e=4.859:1 >= 3:1; opaque root tokens, not composited pixels
+GREEN contrast:good/panel: #4fd08a/#161c14=8.859:1 >= 3:1; opaque root tokens, not composited pixels
+GREEN contrast:good/edge: #4fd08a/#12160e=9.349:1 >= 3:1; opaque root tokens, not composited pixels
+RED reduced-motion: The expression evaluated to a falsy value:
+
+  assert(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?transition-duration:\s*(?:0|0?\.01)ms/.test(css))
+
+GREEN ftue-ordered-ids: [["ONBOARD_KEEPER",0],["ONBOARD_KICKERS",1],["ONBOARD_DONE",2]]; ordered declarations in inject.mjs, persisted denominator; not a measured funnel
+POOL_ODDS {"population":46,"totalWeight":539,"odds":["1.11%","7.42%","91.47%"]}
+RED wiki-searchable-odds: Built pull text lacks full-roster reference odds: 1.11%, 7.42%, 91.47%
+GREEN currency-placeholder: cash-rate -> coin; placeholder sentence exists in source and built text
+PAYMENT_RAW_MATCHES ["web\\src\\render\\objects\\pitch.mjs"]; pitch.mjs stripe is the local field-marking geometry helper, not an SDK
+GREEN payment-sdk-scan: 42 product files; payment SDK matches=0; cash is injected only, no real-money sale path at this HEAD
+GREEN hosting-declaration: https://lilmgenius.github.io/gtg-demo/web/index.html; live gate target, not a deployment verification; R25 sale trigger absent
+GREEN owner-registration:entry:HUD native buttons: node tools/entry-gate.mjs -> affordance:every-hud-click-target-is-a-button; not rerun by readiness gate
+대기 HUD native buttons: Existing axis referenced; no prior runtime PASS claimed
+GREEN owner-registration:entry:condition name and icon: node tools/entry-gate.mjs -> entry:the-condition-slot-paints-an-icon-in-every-band; not rerun by readiness gate
+대기 condition name and icon: Existing axis referenced; no prior runtime PASS claimed
+GREEN owner-registration:keys:keyboard ESC Tab no-mouse: node tools/keys-gate.mjs -> keys:the-game-plays-without-a-mouse; not rerun by readiness gate
+대기 keyboard ESC Tab no-mouse: Existing axis referenced; no prior runtime PASS claimed
+GREEN owner-registration:mobile:three dive zones rendered size: node tools/mobile-gate.mjs -> :zones-take-a-finger; not rerun by readiness gate
+대기 three dive zones rendered size: Existing axis referenced; no prior runtime PASS claimed
+GREEN owner-registration:fullscreen:fullscreen optional and unsupported hidden: node tools/fullscreen-gate.mjs -> unsupported:hidden-and-home-screen-help; not rerun by readiness gate
+대기 fullscreen optional and unsupported hidden: Existing axis referenced; no prior runtime PASS claimed
+GREEN owner-registration:pull:in-game odds match current pool: node tools/pull-gate.mjs -> pull:printed-odds-match-the-pool; not rerun by readiness gate
+대기 in-game odds match current pool: Existing axis referenced; no prior runtime PASS claimed
+대기 frame p50/p95/p99 and draw calls: Browser/device measurement required
+대기 field p75 LCP<2.5s INP<200ms CLS<0.1 (mobile/desktop): Browser/device measurement required
+대기 Lighthouse >=90: Browser/device measurement required
+대기 minimum device 30FPS: Browser/device measurement required
+대기 30min soak / 20 scene changes without OOM or context loss: Browser/device measurement required
+대기 cold first-playable p75 <10s: Throttled cold-cache browser run required
+대기 HTTPS installation interaction and 30s dwell: Portal/browser scenario required
+대기 touch selection/context menu and safe areas: Portal/browser scenario required
+대기 iOS audio after background and a new gesture: Portal/browser scenario required
+대기 focus loss does not send gameplayStop: Portal/browser scenario required
+대기 ad-blocker playability: Portal/browser scenario required
+대기 one-click play and skippable intro: Portal/browser scenario required
+대기 parent page does not scroll: Portal/browser scenario required
+대기 host-owned fullscreen hides game button: Portal/browser scenario required
+대기 visible focus and no trap: Rendered accessibility measurement required
+대기 drag alternatives: Rendered accessibility measurement required
+대기 <3 flashes/second: Rendered accessibility measurement required
+대기 non-text contrast and composited text contrast: Rendered accessibility measurement required
+대기 no sound-only information and dialogue captions: Rendered accessibility measurement required
+대기 separate audio channels and saved volumes: Rendered accessibility measurement required
+대기 200% zoom: Browser measurement
+HITL actual phone Korean legibility and platform acceptance: Physical device acceptance
+대기 play conversion >=65%: External collector required; balance.md 최소 텔레메트리 owns schema
+대기 one-minute survival >=80%: External collector required; balance.md 최소 텔레메트리 owns schema
+대기 FTUE completion >=80% of FTUE starts: External collector required; balance.md 최소 텔레메트리 owns schema
+대기 D1 investigate <10%, continue 10-15%, good >15%: External collector required; balance.md 최소 텔레메트리 owns schema
+대기 D7 >=10%: External collector required; balance.md 최소 텔레메트리 owns schema
+대기 D30 >=2% (hypothesis): External collector required; balance.md 최소 텔레메트리 owns schema
+대기 average session 10min; Poki 5min/management 10min: External collector required; balance.md 최소 텔레메트리 owns schema
+대기 7-day 500-play test: External collector required; balance.md 최소 텔레메트리 owns schema
+대기 calendar-day versus elapsed-day retention: External collector required; balance.md 최소 텔레메트리 owns schema
+대기 exact-date versus rolling retention: External collector required; balance.md 최소 텔레메트리 owns schema
+대기 tutorial/play/payment conversion separately: External collector required; balance.md 최소 텔레메트리 owns schema
+대기 daily versus cohort payment conversion: External collector required; balance.md 최소 텔레메트리 owns schema
+대기 ads versus IAP ARPDAU: External collector required; balance.md 최소 텔레메트리 owns schema
+대기 <=500 events/user/day: External collector required; balance.md 최소 텔레메트리 owns schema
+대기 design 15000 / progression 8000 / resource 4000 combinations: External collector required; balance.md 최소 텔레메트리 owns schema
+대기 aggregate idle accrual, ordered journey and explained resource changes: External collector required; balance.md 최소 텔레메트리 owns schema
+HITL 한국의 확률형 아이템 표시 의무(게임산업법 33조)는 직접과 간접 유상 획득을 덮고 온전히 무상인 아이템만 제외하며, 구매와 조회와 사용 화면에 표시하고 문자열로 검색되는 홈페이지에도 두며, 변경은 사전 고지한다.: readiness.md canon; business/legal acceptance remains human-owned
+HITL 중소기업 예외는 사업자마다 3년 평균 매출 1억 원 이하와 중소기업 지위를 요구한다(R19, R20, R21).: readiness.md canon; business/legal acceptance remains human-owned
+HITL EU CPC 원칙(2025-03-21)은 유료 가상 화폐에만 붙고 실제 화폐 가격을 옆에 표시하며 미사용 유료 화폐의 14일 철회를 지원하고 아이에게 직접 구매를 권하지 않는다(R22).: readiness.md canon; business/legal acceptance remains human-owned
+HITL Apple 3.1.1과 Google은 유료 확률 아이템의 확률을 구매 전에 보이고 Google은 백엔드 검증을 권한다(R23, R24).: readiness.md canon; business/legal acceptance remains human-owned
+HITL GitHub Pages는 상거래를 주로 하는 사이트를 금지하므로 현금이 팔리기 전에 호스팅을 옮긴다(R25).: readiness.md canon; business/legal acceptance remains human-owned
+HITL Poki는 인앱 구매를 받지 않고 Yandex는 구매가 있는 게임에 서버 저장을 요구한다(R2, R26).: readiness.md canon; business/legal acceptance remains human-owned
+HITL 구매 게이트(구매가 정확히 한 번 반영, 취소는 반영 없음, 환불 정합): readiness.md canon; business/legal acceptance remains human-owned
+HITL 다섯 외부인이 첫 판을 마친 뒤의 전환은 파운더 손이다.: readiness.md canon; business/legal acceptance remains human-owned
+대기 Poki / CrazyGames featuring and submission: Business decision; retention/conversion/quality/uniqueness required
+RED 전환 규칙: deterministic RED=6; pending/HITL have owners; this is not a launch declaration
+
+row | 층 | status | owner
+initial-byte-budget | 결정론 | GREEN | readiness gate
+largest-single-asset | 결정론 | GREEN | readiness gate
+manifest:name | 결정론 | GREEN | readiness gate
+manifest:short_name | 결정론 | GREEN | readiness gate
+manifest:start_url | 결정론 | GREEN | readiness gate
+manifest:display | 결정론 | GREEN | readiness gate
+manifest:icon-192 | 결정론 | RED | readiness gate
+manifest:icon-512 | 결정론 | RED | readiness gate
+apple-touch-icon | 결정론 | RED | readiness gate
+orientation | 결정론 | GREEN | readiness gate
+refresh-independent-judgement | 결정론 | GREEN | readiness gate
+storage-denied-and-persistence | 결정론 | GREEN | readiness gate
+audio-resume-hooks-source-only | 결정론 | GREEN | readiness gate
+hud-touch-minimum | 결정론 | RED | readiness gate
+contrast-instrument-control | 결정론 | GREEN | readiness gate
+contrast:ink/panel | 결정론 | GREEN | readiness gate
+contrast:ink/edge | 결정론 | GREEN | readiness gate
+contrast:dim/panel | 결정론 | GREEN | readiness gate
+contrast:dim/edge | 결정론 | GREEN | readiness gate
+contrast:bad/panel | 결정론 | GREEN | readiness gate
+contrast:bad/edge | 결정론 | GREEN | readiness gate
+contrast:good/panel | 결정론 | GREEN | readiness gate
+contrast:good/edge | 결정론 | GREEN | readiness gate
+reduced-motion | 결정론 | RED | readiness gate
+ftue-ordered-ids | 결정론 | GREEN | readiness gate
+wiki-searchable-odds | 결정론 | RED | readiness gate
+currency-placeholder | 결정론 | GREEN | readiness gate
+payment-sdk-scan | 결정론 | GREEN | readiness gate
+hosting-declaration | 결정론 | GREEN | readiness gate
+owner-registration:entry:HUD native buttons | 결정론 | GREEN | readiness gate
+HUD native buttons | HOOTL | 대기 | entry gate lap
+owner-registration:entry:condition name and icon | 결정론 | GREEN | readiness gate
+condition name and icon | HOOTL | 대기 | entry gate lap
+owner-registration:keys:keyboard ESC Tab no-mouse | 결정론 | GREEN | readiness gate
+keyboard ESC Tab no-mouse | HOOTL | 대기 | keys gate lap
+owner-registration:mobile:three dive zones rendered size | 결정론 | GREEN | readiness gate
+three dive zones rendered size | HOOTL | 대기 | mobile gate lap
+owner-registration:fullscreen:fullscreen optional and unsupported hidden | 결정론 | GREEN | readiness gate
+fullscreen optional and unsupported hidden | HOOTL | 대기 | fullscreen gate lap
+owner-registration:pull:in-game odds match current pool | 결정론 | GREEN | readiness gate
+in-game odds match current pool | HOOTL | 대기 | pull gate lap
+frame p50/p95/p99 and draw calls | HOOTL | 대기 | perf gate lap
+field p75 LCP<2.5s INP<200ms CLS<0.1 (mobile/desktop) | HOOTL | 대기 | perf gate lap
+Lighthouse >=90 | HOOTL | 대기 | perf gate lap
+minimum device 30FPS | HOOTL | 대기 | perf gate lap
+30min soak / 20 scene changes without OOM or context loss | HOOTL | 대기 | perf gate lap
+cold first-playable p75 <10s | HOTL | 대기 | perf gate lap
+HTTPS installation interaction and 30s dwell | HOOTL | 대기 | fullscreen / keys gate lap
+touch selection/context menu and safe areas | HOOTL | 대기 | fullscreen / keys gate lap
+iOS audio after background and a new gesture | HOOTL | 대기 | fullscreen / keys gate lap
+focus loss does not send gameplayStop | HOOTL | 대기 | fullscreen / keys gate lap
+ad-blocker playability | HOOTL | 대기 | fullscreen / keys gate lap
+one-click play and skippable intro | HOOTL | 대기 | fullscreen / keys gate lap
+parent page does not scroll | HOOTL | 대기 | fullscreen / keys gate lap
+host-owned fullscreen hides game button | HOOTL | 대기 | fullscreen / keys gate lap
+visible focus and no trap | HOOTL | 대기 | keys / entry gate lap
+drag alternatives | HOOTL | 대기 | keys / entry gate lap
+<3 flashes/second | HOOTL | 대기 | keys / entry gate lap
+non-text contrast and composited text contrast | HOOTL | 대기 | keys / entry gate lap
+no sound-only information and dialogue captions | HOOTL | 대기 | keys / entry gate lap
+separate audio channels and saved volumes | HOOTL | 대기 | keys / entry gate lap
+200% zoom | HOOTL | 대기 | keys gate lap
+actual phone Korean legibility and platform acceptance | HITL | HITL | founder
+play conversion >=65% | HOTL/HOOTL | 대기 | telemetry lap
+one-minute survival >=80% | HOTL/HOOTL | 대기 | telemetry lap
+FTUE completion >=80% of FTUE starts | HOTL/HOOTL | 대기 | telemetry lap
+D1 investigate <10%, continue 10-15%, good >15% | HOTL/HOOTL | 대기 | telemetry lap
+D7 >=10% | HOTL/HOOTL | 대기 | telemetry lap
+D30 >=2% (hypothesis) | HOTL/HOOTL | 대기 | telemetry lap
+average session 10min; Poki 5min/management 10min | HOTL/HOOTL | 대기 | telemetry lap
+7-day 500-play test | HOTL/HOOTL | 대기 | telemetry lap
+calendar-day versus elapsed-day retention | HOTL/HOOTL | 대기 | telemetry lap
+exact-date versus rolling retention | HOTL/HOOTL | 대기 | telemetry lap
+tutorial/play/payment conversion separately | HOTL/HOOTL | 대기 | telemetry lap
+daily versus cohort payment conversion | HOTL/HOOTL | 대기 | telemetry lap
+ads versus IAP ARPDAU | HOTL/HOOTL | 대기 | telemetry lap
+<=500 events/user/day | HOTL/HOOTL | 대기 | telemetry lap
+design 15000 / progression 8000 / resource 4000 combinations | HOTL/HOOTL | 대기 | telemetry lap
+aggregate idle accrual, ordered journey and explained resource changes | HOTL/HOOTL | 대기 | telemetry lap
+한국의 확률형 아이템 표시 의무(게임산업법 33조)는 직접과 간접 유상 획득을 덮고 온전히 무상인 아이템만 제외하며, 구매와 조회와 사용 화면에 표시하고 문자열로 검색되는 홈페이지에도 두며, 변경은 사전 고지한다. | HITL | HITL | founder
+중소기업 예외는 사업자마다 3년 평균 매출 1억 원 이하와 중소기업 지위를 요구한다(R19, R20, R21). | HITL | HITL | founder
+EU CPC 원칙(2025-03-21)은 유료 가상 화폐에만 붙고 실제 화폐 가격을 옆에 표시하며 미사용 유료 화폐의 14일 철회를 지원하고 아이에게 직접 구매를 권하지 않는다(R22). | HITL | HITL | founder
+Apple 3.1.1과 Google은 유료 확률 아이템의 확률을 구매 전에 보이고 Google은 백엔드 검증을 권한다(R23, R24). | HITL | HITL | founder
+GitHub Pages는 상거래를 주로 하는 사이트를 금지하므로 현금이 팔리기 전에 호스팅을 옮긴다(R25). | HITL | HITL | founder
+Poki는 인앱 구매를 받지 않고 Yandex는 구매가 있는 게임에 서버 저장을 요구한다(R2, R26). | HITL | HITL | founder
+구매 게이트(구매가 정확히 한 번 반영, 취소는 반영 없음, 환불 정합) | HITL | HITL | founder
+다섯 외부인이 첫 판을 마친 뒤의 전환은 파운더 손이다. | HITL | HITL | founder
+Poki / CrazyGames featuring and submission | HITL | 대기 | founder
+전환 규칙 | HOOTL | RED | readiness gate
+
+readiness FAIL deterministic RED=6

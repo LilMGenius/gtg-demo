@@ -35,6 +35,11 @@ try {
  const response=await p.request.get(url),manifest=await response.json();
  const entry=await p.request.get(new URL(manifest.start_url,url).href);
  check('a:manifest',response.status()===200&&manifest.display==='fullscreen'&&manifest.orientation==='landscape'&&entry.status()===200,{status:response.status(),manifest,entry:entry.status()});
+ for (const size of [192,512]) {
+  const icon=manifest.icons.find(i=>i.sizes===`${size}x${size}`&&i.type==='image/png');
+  const loaded=icon?await p.evaluate(async ({src,size})=>{const image=new Image();image.src=src;try{await image.decode();return {width:image.naturalWidth,height:image.naturalHeight,ok:image.naturalWidth===size&&image.naturalHeight===size};}catch{return {ok:false};}}, {src:new URL(icon.src,url).href,size}):{ok:false};
+  check('readiness:install-icon-'+size,loaded.ok,loaded);
+ }
  check('b:metadata',await tags(p),'three meta tags and manifest link');
  const touch=await start(p);
  check('c:touch-start',cAxis(touch),touch);
