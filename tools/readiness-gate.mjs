@@ -155,7 +155,7 @@ axis('wiki-searchable-odds', () => {
   const odds = [k => k.fame >= 10, k => k.fame === 9, k => k.fame <= 8].map(f => (KEEPERS.filter(f).reduce((n, k) => n + pullWeight(k), 0) / total * 100).toFixed(2) + '%');
   lines.push('POOL_ODDS ' + JSON.stringify({ population: KEEPERS.length, totalWeight: total, odds }));
   assert(odds.every(n => text.includes(n) && read('web/wiki/src/pull.md').includes(n)), 'Built pull text lacks full-roster reference odds: ' + odds.join(', '));
-  assert(!/<canvas\b/i.test(page.bodyHtml)); return 'searchable full-roster reference ' + odds.join(', ') + '; current unowned pool belongs to pull gate';
+  assert(/<table\b/i.test(page.bodyHtml) && !/<canvas\b/i.test(page.bodyHtml)); return 'searchable full-roster reference ' + odds.join(', ') + '; current unowned pool belongs to pull gate';
 });
 axis('currency-placeholder', () => {
   assert(read('web/wiki/src/cash-rate.md').includes('[[coin]]'));
