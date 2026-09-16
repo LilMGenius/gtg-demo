@@ -22,7 +22,7 @@ const W_MOVE = 1.2;    // 무게가 기동에 더하는 지연 ms/kg
 const H_LOW = 3.6;     // 큰 키가 낮은 공에 몸을 접는 데 드는 지연 ms/cm
 const W_BRACE = 0.45;  // 정면 강슛을 버티는 질량
 // 장갑 등급 한 칸이 깎는 값. 벗겨지는 사고 쪽 4, 흘리는 쪽 5다.
-// 핸들링 한 칸이 흘림에서 6을 깎으므로 장갑 한 칸은 스탯 한 칸보다 작다.
+// 핸들링 한 칸이 벗겨짐에서 5, 흘림에서 6을 깎으므로 장갑 한 칸은 스탯 한 칸보다 작다.
 // 장비가 스탯보다 크면 훈련이 장식이 된다.
 const GRIP_TEAR = 4;
 const GRIP_SPILL = 5;
@@ -32,8 +32,8 @@ const STUD_MS = 7;
 // 유니폼 등급 한 칸이 깎는 정면 강슛 동반 실점 확률. 맷집 한 칸이 4.4를 깎으므로 한 칸은 그보다 작다.
 // 세 칸을 다 입어도 9라 맷집 세 칸 13.2에 못 미친다. 장비는 스탯 위에 얇게만 얹는다.
 const KIT_CARRY = 3;
-// 양말 등급 한 칸이 깎는 착지 실패 확률. 밸런스 한 칸이 14를 깎으므로 한 칸은 그보다 작다.
-// 세 칸을 다 신어도 24라 밸런스 세 칸 42에 못 미친다. 장비는 스탯 위에 얇게만 얹는다.
+// 양말 등급 한 칸이 깎는 착지 실패 확률. 밸런스 한 칸이 11을 깎으므로 한 칸은 그보다 작다.
+// 세 칸을 다 신어도 24라 밸런스 세 칸 33에 못 미친다. 장비는 스탯 위에 얇게만 얹는다.
 const SOCK_LAND = 8;
 // 골대 등급 한 칸이 흘린 공을 그물이 먹어 리바운드 국면 자체를 없애는 확률.
 // 같은 축의 스탯은 반응속도다. 반응속도 한 칸은 리바운드 창을 4.5 넓혀 실점을 2.25 깎는다.
@@ -115,6 +115,7 @@ export function rollForm(keeper, rng) {
 
 // 레벨은 성장 포인트의 총량만 정한다. 어디에 붙는지는 성장 선택지가 정하므로 여기서는 무작위 배분이다.
 // 배분을 고정하면 모든 레벨의 키퍼가 같은 약점을 갖고, 실점 원인 분포가 한 칸으로 쏠린다.
+// 이 표본은 N칸 중 셋 제시와 레벨당 3포인트로, 제품의 열다섯 스탯 화면과 세트당 2포인트와 다르다(daedal-games docs/gamedev/judgement.md 계측 모집단).
 export function keeperAtLevel(level, rng) {
   const stats = {};
   for (const k of GROWABLE) stats[k] = 3;
@@ -418,7 +419,7 @@ export function resolve(input) {
   // 0단 배치. 나가서 생긴 사고와 안 와도 될 공에 누운 사고는 같은 판단에서 나온다.
   // 한 단계는 롤 하나를 쓴다. 두 사고는 같은 난수를 구간으로 나눠 가른다.
   const centerish = shot.course === "정면" || shot.chip;
-  const overP = shot.chip ? Math.max(0, (clamp(keeper.offball, 1, 10) - 3) * 7 + shot.kicker.flair * 4 + (place.depth + inp.advance > 1.0 ? 30 : 0)) : 0;
+  const overP = shot.chip ? Math.max(0, (clamp(keeper.offball, 1, 10) - 3) * 5 + shot.kicker.flair * 4 + (place.depth + inp.advance > 1.0 ? 30 : 0)) : 0;
   const diveP = centerish && inp.dive !== 0 ? Math.max(0, keeper.diving * 4.2 - keeper.judgement * 3.4) : 0;
   // 한눈팔기. 행인이 지나가는 구에서만 열리고 집중력이 소유한다.
   // 같은 단계의 사고는 롤 하나를 구간으로 나눠 가른다. 새 롤을 뒤면 한 구가 일곱 번 굴러간다.
@@ -498,13 +499,13 @@ export function resolve(input) {
   const grip = Math.min(3, Math.max(0, Math.floor(Number(input.grip) || 0)));
   // 송진은 저장 정제 뒤에 더한다. 3등급 장갑을 이미 산 사람도 한 등급분 이득이어야 한다.
   const rosin = input.rosin ? 1 : 0;
-  let gloveP = keeper.handling <= 4 ? Math.max(0, (5 - keeper.handling) * 7 - (grip + rosin) * GRIP_TEAR) : 0;
+  let gloveP = keeper.handling <= 4 ? Math.max(0, (5 - keeper.handling) * 5 - (grip + rosin) * GRIP_TEAR) : 0;
   // 훈련이 자란 만큼 감산을 유계 승산으로 넘겨 마지막 등급이 확률 바닥에 지워지지 않는다.
   const rookieShare = (10 - clamp(keeper.handling, 1, 10)) / 9;
   let spillP = Math.max(0, 100 - (34 + keeper.handling * 6 + (grip + rosin) * GRIP_SPILL * rookieShare + LOCKED.punching * -4));
   // 가산 위 유계 승산: 미훈련 손의 실패 몫과 비교해 만렙의 장갑과 유니폼도 산다.
   const carry0 = shot.strong ? Math.max(0, 40 - 4.4 - brace) : 0;
-  const glove0 = 28;
+  const glove0 = 20;
   const spill0 = 60;
   const taken0 = clamp(carry0 + glove0, 0, 100);
   const failure0 = taken0 + spill0 * (100 - taken0) / 100;
@@ -513,7 +514,7 @@ export function resolve(input) {
   const failure = takenRaw + spillShare;
   // 훈련 이득은 맨손끼리 비교한다. 구매 자체가 훈련 기준선을 밀면 같은 버킷이 아니다.
   const trainedCarry = shot.strong ? Math.max(0, 40 - keeper.strength * 4.4 - brace) : 0;
-  const trainedGlove = Math.max(0, (5 - keeper.handling) * 7);
+  const trainedGlove = Math.max(0, (5 - keeper.handling) * 5);
   const trainedTaken = clamp(trainedCarry + trainedGlove, 0, 100);
   const trainedSpill = Math.max(0, 100 - (34 + keeper.handling * 6 + LOCKED.punching * -4));
   const trainedFailure = trainedTaken + trainedSpill * (100 - trainedTaken) / 100;
@@ -558,7 +559,7 @@ export function resolve(input) {
     }
     // 양말 등급. 앞의 셋과 같은 이유로 선반 밖의 값은 잘라 넣는다.
     const socks = Math.min(3, Math.max(0, Math.floor(Number(input.socks) || 0)));
-    const landing = Math.max(0, (10 - keeper.balance) * 14 + keeper.diving * 2 - socks * SOCK_LAND);
+    const landing = Math.max(0, (10 - keeper.balance) * 11 + keeper.diving * 2 - socks * SOCK_LAND);
     const downed = inp.dive !== 0 && roll(landing);
     // 무거우면 일어나는 데 시간이 더 든다.
     const reboundWindow = (18 + keeper.reflex * 4.5) * (1 - (keeper.weight - 84) * 0.006);

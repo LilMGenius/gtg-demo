@@ -6,8 +6,8 @@ import { newBuff, addBuff, spendBuff, readBuff, BUFF_CAP, BUFFS } from "../web/s
 // 브라우저를 안 띄운다. 판정은 src/chain.mjs 순수 함수고, 짝지은 시드 비교라 표본이 싸다.
 // 축은 전부 선반 문구에서 나왔다. 유추로 세운 축은 여기에 없다.
 
-// 2000시드 x 5구 = 10000구. statsens와 같은 표본이다. 1%p를 표준오차 0.4%p로 가른다.
-const SEEDS = 2000;
+// 만렙 총 팔로워 방향은 0.1퍼센트 규모의 효과라 2000시드에서는 부호가 뒤집힌다.
+const SEEDS = 6000;
 
 const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);

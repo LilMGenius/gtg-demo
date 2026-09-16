@@ -6,7 +6,7 @@ import { newRapport, readRapport, addRapport, rapportCount, rapportTier, rapport
 // 라포 게이트. 반복해서 마주친 행인이 판정과 팔로워에 실제로 붙는가.
 // 축은 전부 코드가 선언한 것에서 나왔다. 유추로 세운 축은 여기에 없다.
 
-// 2000시드 x 5구 = 10000구. buff-gate와 같은 표본이라 두 게이트의 수치를 직접 비교할 수 있다.
+// 2000시드 x 5구 = 10000구.
 const SEEDS = 2000;
 
 const fails = [], notes = [];
@@ -66,8 +66,8 @@ for (let city = 0; city <= 3; city++) {
 // 0번은 미인이다. 어떤 등급에서도 숨기지 않는 자리라 반드시 뽑혀야 한다.
 check("passer-zero", true, "index 0 present in every tier above");
 
-// e243bd7: 수정된 판정의 sweep({}) 실측이다. 스트림의 조용한 이동을 잡으며 손으로 전사하지 않는다.
-const BASE = {"rate":24.44,"fans":741489,"gazeSlip":331,"flairFans":13066,"talked":108,"shots":10000};
+// 신인의 착지 실패, 장갑 벗겨짐, 칩 노출을 줄인 판정의 sweep({}) 재실측값이다. 스트림의 조용한 이동을 잡는다.
+const BASE = {"rate":26.22,"fans":759253,"gazeSlip":337,"flairFans":13066,"talked":108,"shots":10000};
 const c1 = sweep({});
 check("stream-rate", Number(c1.rate.toFixed(2)) === BASE.rate, BASE.rate + " vs " + c1.rate.toFixed(2));
 check("stream-fans", c1.fans === BASE.fans, BASE.fans + " vs " + c1.fans);
