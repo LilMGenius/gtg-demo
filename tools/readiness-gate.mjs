@@ -122,7 +122,7 @@ axis('hud-touch-minimum', () => {
   const selectors = ['#meBtn', '#lv', '#form', '#pips', '#purse button', '#auto', '#out', '#mute', '#fullscreen', '#wikiBtn', '#gymBtn', '#rosterBtn', '#gramBtn', '#shopBtn', '.zone'];
   const minimum = selector => {
     const blocks = rules.filter(r => r[1].split(',').map(s => s.trim()).includes(selector)).map(r => r[2]);
-    const defaults = selector === '.zone' ? [] : rules.filter(r => r[1].trim() === '#hud button').map(r => r[2]);
+    const defaults = selector === '.zone' ? [] : rules.filter(r => r[1].split(',').map(s => s.trim()).join(',') === '#hud > button,#top button').map(r => r[2]);
     return ['width', 'height'].map(d => {
       const values = [...blocks, ...defaults].flatMap(b => [...b.matchAll(new RegExp('(?:^|;)\\s*(?:min-)?' + d + ':\\s*(\\d+(?:\\.\\d+)?)px', 'g'))].map(m => Number(m[1])));
       return values.length ? Math.max(...values) : 0;

@@ -40,7 +40,7 @@ html,body{height:100%;background:#0d110c;overflow:hidden;
   font-family:var(--body);color:var(--ink);
   -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 button{font-family:inherit;cursor:pointer}
-#hud button{min-width:24px;min-height:24px}
+#hud > button,#top button{min-width:24px;min-height:24px}
 #stage{position:fixed;inset:0;width:100%;height:100%;display:block}
 
 /* CSS 애니메이션은 실시간 시계로 돈다. 세계시계를 세워도 혼자 계속 가서
