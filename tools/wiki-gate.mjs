@@ -7,7 +7,7 @@ import { COIN_SAVE, COIN_CONCEDED, COIN_DRILL, COIN_FAME_STEP, CASH_RATE } from 
 import { BOTS } from "../web/src/state/bot.mjs";
 import { BUFFS } from "../web/src/state/buff.mjs";
 import { LIKE_BASE, LIKE_PER_CITY, MUTUAL_STEP, MUTUAL_CAP, SELFIE_BASE } from "../web/src/state/gram.mjs";
-import { PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP } from "../src/roster.mjs";
+import { PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP, KEEPERS, pullWeight } from "../src/roster.mjs";
 
 // 위키의 자. 도움말이 타이틀 패널 하나와 재화 클릭 하나로 갈려 있어서, 무엇이 어떻게 도는지를
 // 물어볼 자리가 판 안에 없었다. 물음표 하나가 그 자리다.
@@ -33,10 +33,17 @@ const GATED = ["coin", "drill", "pull", "gram", "bot", "buff"];
 /* 화면에 찍힌 글자와 맞대므로 상수도 글자로 세운다. 수로 맞대면 0.03 같은 값이
    부동소수 비교가 되고, 천 단위 쉼표가 붙은 날 조용히 지나간다. 글자로 맞대면 서식이 바뀐 것도 잡힌다. */
 const S = (v) => String(v);
+const totalWeight = KEEPERS.reduce((n, k) => n + pullWeight(k), 0);
+const ODDS_ROWS = [
+  ['명성 10', k => k.fame >= 10], ['명성 9', k => k.fame === 9], ['명성 8 이하', k => k.fame <= 8]
+].map(([name, accepts]) => {
+  const pool = KEEPERS.filter(accepts);
+  return [name, S(pool.length), (pool.reduce((n, k) => n + pullWeight(k), 0) / totalWeight * 100).toFixed(2) + '%'];
+});
 const WANT = {
   coin: [COIN_SAVE, COIN_CONCEDED, COIN_DRILL, COIN_SAVE + COIN_FAME_STEP * 9, CASH_RATE].map(S),
   drill: [COIN_DRILL].map(S),
-  pull: [PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP].map(S),
+  pull: [...[PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP].map(S), ...ODDS_ROWS.map(r => r[1])],
   gram: [LIKE_BASE, LIKE_PER_CITY, MUTUAL_STEP, MUTUAL_CAP, SELFIE_BASE].map(S),
   bot: BOTS.flatMap((b) => [b.judge, b.minutes, b.cost]).map(S),
   buff: BUFFS.flatMap((b) => [b.shots, b.cost]).map(S)
@@ -246,6 +253,13 @@ try {
     const r = await p.evaluate(READ);
     if (!r) { bare.push(k + " no body"); tally.push(k + " none"); continue; }
     read += 1;
+    if (k === 'pull') {
+      const odds = r.tables.find(t => t[0]?.[0] === ODDS_ROWS[0][0]);
+      const gap = odds ? rowGap(ODDS_ROWS, odds) : 'missing reference odds table';
+      check('wiki:odds-text-matches-the-full-roster', gap === '', JSON.stringify({expected:ODDS_ROWS,actual:odds,gap}));
+      const corrupt = ODDS_ROWS.map(r => [...r]); corrupt[0][2] = '100%';
+      check('control:an-invented-odds-percentage-is-caught', rowGap(ODDS_ROWS, corrupt) !== '', '100% differs from roster weight');
+    }
     tally.push(k + " " + r.tables.length + "t/" + r.nums.length + "n");
     if (r.tables.length < 1) bare.push(k + " " + r.tables.length);
     if (!r.head.length) headless.push(k);
