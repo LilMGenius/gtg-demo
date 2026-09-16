@@ -17,7 +17,7 @@ const FILES = ["web/index.html", "web/src/main.mjs", "web/src/render/scene.mjs",
 const AXES = ["live:the-deployed-bytes-are-the-gated-bytes",
   "live:a-first-round-finishes-on-a-phone-over-the-network",
   "control:a-wrong-path-is-not-a-round", "live:no-login-is-required-before-the-first-ball",
-  "control:a-required-login-reds-the-axis"];
+  "control:a-required-login-reds-the-axis", "live:the-deployed-page-names-its-own-commit"];
 const STEP_MS = 26000;
 const started = Date.now();
 const verdicts = new Map();
@@ -38,6 +38,43 @@ const watchdog = setTimeout(() => {
   process.exit(1);
 }, 240000);
 watchdog.unref();
+
+async function deployedIdentity() {
+  // 배포의 메타데이터를 기준으로 읽어 Pages 지연을 제품 결함과 구분한다.
+  const response = await api.get(new URL('build.json', LIVE).href, { headers: { 'Cache-Control': 'no-cache' } });
+  if (response.status() === 404) {
+    console.log('build.json not deployed yet');
+    check(AXES[5], false, 'build.json not deployed yet');
+    return;
+  }
+  if (!response.ok()) { check(AXES[5], false, 'build.json HTTP ' + response.status()); return; }
+  // 전체 커밋과 축약값을 함께 검증해야 파일 자체의 오기를 화면 일치로 숨기지 않는다.
+  const metadata = await response.json();
+  if (!/^\d+\.\d+\.\d+$/.test(metadata.version) || !/^[0-9a-f]{40}$/.test(metadata.commit)
+    || !/^[0-9a-f]{7}$/.test(metadata.short) || metadata.short !== metadata.commit.slice(0, 7)) {
+    check(AXES[5], false, 'malformed build.json'); return;
+  }
+  console.log('INFO deployed short=' + metadata.short + ' HEAD=' + head.slice(0, 7) + ' equal=' + (metadata.short === head.slice(0, 7)) + ' (Pages lag is informational)');
+  // 새 컨텍스트라 이미 열린 세션의 모듈 캐시가 배포 표본을 바꾸지 않는다.
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  try {
+    // 기존 라이브 판정과 독립된 페이지로 위키 좌표만 읽는다.
+    const page = await context.newPage();
+    await page.goto(LIVE + '?seed=20&preset=veteran');
+    await page.click('#go', { force: true });
+    await page.click('#wikiBtn', { force: true });
+    await page.locator('#wiki .cats [data-cat="game"]').click();
+    await page.waitForFunction(() => !document.querySelector('#wiki .copy')?.disabled);
+    // 구현의 값 대신 서버가 제공한 좌표와 실제 셀을 맞댄다.
+    const expected = 'v' + metadata.version + '+g' + metadata.short;
+    // 행 이름은 화면에 보이는 빌드 셀을 특정한다.
+    const cell = page.locator('#wiki tbody tr').filter({ has: page.locator('th', { hasText: /^빌드$/ }) }).locator('td');
+    // 현재 표시와 새로 읽은 메타데이터를 함께 남겨 배포 전후를 재현한다.
+    const actual = await cell.innerText();
+    check(AXES[5], await cell.isVisible() && actual === expected, 'screen=' + actual + ' metadata=' + expected);
+    writeFileSync(join(OUT, 'bc-live-build.json'), JSON.stringify({ metadata, actual, expected, head }, null, 2));
+  } finally { await context.close(); }
+}
 
 async function deployedBytes() {
   const local = FILES.map((path) => ({ path, hash: sha(git("show", `${head}:${path}`)) }));
@@ -288,6 +325,7 @@ try {
   browser = await chromium.launch({ headless: true });
   console.log(`browser actual=${browser.version()} executable=${chromium.executablePath()}`);
   if (browser.version() !== declared.browserVersion) throw new Error("Chromium differs from Playwright's declared binary");
+  await deployedIdentity();
   const live = await phoneRound(LIVE);
   check(AXES[1], live.status === 200 && live.loadedUrl === LIVE && live.balls === 5 && live.surface
     && !live.error && live.consoleErrors.length === 0 && live.pageErrors.length === 0,
