@@ -1,5 +1,5 @@
 // 화면의 릴리스 좌표를 한 곳에서 읽고 매니페스트와의 일치는 version 게이트가 잰다.
-export const VERSION = '0.7.0';
+export const VERSION = '0.8.0';
 let identity;
 
 export function buildId() {
