@@ -218,9 +218,10 @@ export function buildSet(rng, level = 5, city = 0, pool) {
 
 // 0단 배치. 오프더볼이 소유한다.
 // 서 있는 자리가 밀린 거리. 앞에서 한 칸이 크고 뒤에서 작다.
+// 가설: 커버 배수 4.44, 지수 0.2는 0.01 간격 첫 통과값으로 칩 대가 뒤 순이득을 0.5~2%p에 둔다.
 function lateralGap(offball) {
   const d = 10 - clamp(offball, 1, 10);
-  return Math.sqrt(d) * K_LAT * 2.6;
+  return Math.sqrt(d) * K_LAT * 2.6 - K_LAT * 3 * (4.44 - 2.6) * ((9 - d) / 9) ** 0.2;
 }
 
 function placement(keeper, shot) {
@@ -261,7 +262,26 @@ export function judgeWindow(keeper, shot, input, over) {
 
 // 1단 접촉의 여유. 양수면 닿는다.
 // 각 항의 주인은 STATS 15절이 정한다. 여기서 계수를 발명하지 않는다.
+// https://github.com/DaedalGames/daedal-games/blob/main/docs/gamedev/modifiers.md
+// GTG 계약의 가산 위 유계 승산을 접촉 여유와 손 성공률에 적용해 만렙에서도 산다.
+// 가설: rho 0.07, K 2는 강도가 무한대여도 손 이득 5.68%p 미만으로 남은 실패 6%p를 보존한다.
+export function boughtGain(trained, untrained, strength) {
+  const E = Math.max(0, Number(strength) || 0);
+  return 0.07 * Math.max(0, trained - untrained) * E / (2 + E);
+}
+
+const untrainedStats = Object.fromEntries(GROWABLE.map((stat) => [stat, 1]));
+const gearRank = (value) => clamp(Math.floor(Number(value) || 0), 0, 3);
+
 function contactMargin(keeper, shot, input, over) {
+  const margin = bareContactMargin(keeper, shot, input, over);
+  if (!input.studs) return margin;
+  // 가산 위 유계 승산은 동일 체격의 미훈련 접촉과 비교하므로 만렙에서도 산다.
+  const untrained = bareContactMargin({ ...keeper, ...untrainedStats, form: 0 }, shot, input, null);
+  return margin + boughtGain(margin, untrained, input.gearStrength);
+}
+
+function bareContactMargin(keeper, shot, input, over) {
   const form = keeper.form || 0;
   const s = (k) => clamp((over && k in over ? over[k] : keeper[k]) + form, 1, 10);
   const k = shot.kicker;
@@ -338,7 +358,8 @@ function attributeContact(keeper, shot, input) {
 // 여기서 나온 실패는 손가락 셋으로 귀속하고 스탯 원장에 섞지 않는다.
 export function autoInput(keeper, shot, rng) {
   const j = keeper.judgement;
-  const readP = 34 + j * 6.5;
+  // 가설: 등급당 방향 판단 0.03은 같은 판단력에도 값을 주고 완전 수동 1.0 아래에 둔다.
+  const readP = Math.min(0.999, 0.34 + j * 0.065 + (keeper.botTier || 0) * 0.03) * 100;
   const read = pct(rng, readP);
   const dive = read ? shot.side : [-1, 0, 1][Math.floor(rng() * 3)];
   const spread = 200 - j * 12;
@@ -362,7 +383,9 @@ export function resolve(input) {
   const raw = input.input || autoInput(keeper, shot, rng);
   // 축구화는 손가락이 만든 값이 아니라 신고 나온 값이다. 프로브 전체가 같은 값을 쓰므로
   // 원인 귀속에서 이 항은 상쇄되고, 장비가 실점 원인으로 잡히는 일은 없다.
-  const inp = Object.assign({}, raw, { dirQuality: dirQualityOf(raw.dive, shot), studs: input.studs });
+  // 가산 위 유계 승산의 E는 활성 장비를 한 버킷에 모으므로 독립 구매 승수가 늘지 않는다.
+  const gearStrength = [input.grip, input.studs, input.pads, input.socks, input.frame].reduce((sum, rank) => sum + gearRank(rank) / 3, 0) + (input.rosin ? 1 / 3 : 0);
+  const inp = Object.assign({}, raw, { dirQuality: dirQualityOf(raw.dive, shot), studs: input.studs, gearStrength });
 
   const events = [];
   const state = { stage: 1, rolls: 0 };
@@ -432,8 +455,9 @@ export function resolve(input) {
       say("distracted", "지나가던 행인을 봤습니다. 눈에 하트가 떴습니다.", "focus");
       return done(true, "focus");
     }
-    const beforeTalk = before + gazeP * (100 - before) / 100;
-    if (d < beforeTalk + talkP * (100 - beforeTalk) / 100) {
+    // 라포가 비운 구간을 말 걸기로 바꾸지 않는다. 원래 말 걸기의 시작과 폭을 함께 유지한다.
+    const beforeTalk = before + (gazeP / gazeAid) * (100 - before) / 100;
+    if (d >= beforeTalk && d < beforeTalk + talkP * (100 - beforeTalk) / 100) {
       say("talked", "행인에게 말을 걸었습니다. 번호는 받았고 골은 먹혔습니다.", "communication");
       return done(true, "communication");
     }
@@ -469,13 +493,38 @@ export function resolve(input) {
   const brace = shot.course === "정면" ? (keeper.weight - 84) * W_BRACE : 0;
   // 유니폼 등급. 장갑과 같은 이유로 선반 밖의 값은 잘라 넣는다.
   const pads = Math.min(3, Math.max(0, Math.floor(Number(input.pads) || 0)));
-  const carryP = shot.strong ? Math.max(0, 40 - keeper.strength * 4.4 - brace - pads * KIT_CARRY) : 0;
+  let carryP = shot.strong ? Math.max(0, 40 - keeper.strength * 4.4 - brace - pads * KIT_CARRY) : 0;
   // 장갑 등급. 선반은 0에서 3까지이고 그 밖의 값은 저장이 오염된 것이므로 잘라 넣는다.
   const grip = Math.min(3, Math.max(0, Math.floor(Number(input.grip) || 0)));
   // 송진은 저장 정제 뒤에 더한다. 3등급 장갑을 이미 산 사람도 한 등급분 이득이어야 한다.
   const rosin = input.rosin ? 1 : 0;
-  const gloveP = keeper.handling <= 4 ? Math.max(0, (5 - keeper.handling) * 7 - (grip + rosin) * GRIP_TEAR) : 0;
-  const spillP = Math.max(0, 100 - (34 + keeper.handling * 6 + (grip + rosin) * GRIP_SPILL + LOCKED.punching * -4));
+  let gloveP = keeper.handling <= 4 ? Math.max(0, (5 - keeper.handling) * 7 - (grip + rosin) * GRIP_TEAR) : 0;
+  // 훈련이 자란 만큼 감산을 유계 승산으로 넘겨 마지막 등급이 확률 바닥에 지워지지 않는다.
+  const rookieShare = (10 - clamp(keeper.handling, 1, 10)) / 9;
+  let spillP = Math.max(0, 100 - (34 + keeper.handling * 6 + (grip + rosin) * GRIP_SPILL * rookieShare + LOCKED.punching * -4));
+  // 가산 위 유계 승산: 미훈련 손의 실패 몫과 비교해 만렙의 장갑과 유니폼도 산다.
+  const carry0 = shot.strong ? Math.max(0, 40 - 4.4 - brace) : 0;
+  const glove0 = 28;
+  const spill0 = 60;
+  const taken0 = clamp(carry0 + glove0, 0, 100);
+  const failure0 = taken0 + spill0 * (100 - taken0) / 100;
+  const takenRaw = clamp(carryP + gloveP, 0, 100);
+  const spillShare = spillP * (100 - takenRaw) / 100;
+  const failure = takenRaw + spillShare;
+  // 훈련 이득은 맨손끼리 비교한다. 구매 자체가 훈련 기준선을 밀면 같은 버킷이 아니다.
+  const trainedCarry = shot.strong ? Math.max(0, 40 - keeper.strength * 4.4 - brace) : 0;
+  const trainedGlove = Math.max(0, (5 - keeper.handling) * 7);
+  const trainedTaken = clamp(trainedCarry + trainedGlove, 0, 100);
+  const trainedSpill = Math.max(0, 100 - (34 + keeper.handling * 6 + LOCKED.punching * -4));
+  const trainedFailure = trainedTaken + trainedSpill * (100 - trainedTaken) / 100;
+  const gain = boughtGain(100 - trainedFailure, 100 - failure0, gearStrength);
+  // 실패 몫을 비례 재분배하되 오염된 입력도 음수 확률로 넘어가지 않게 묶는다.
+  const scale = failure > 0 ? clamp((failure - gain) / failure, 0, 1) : 1;
+  carryP *= scale;
+  gloveP *= scale;
+  spillP = 100 - carryP - gloveP > 0 ? spillShare * scale * 100 / (100 - carryP - gloveP) : 0;
+  // 익숙한 행인은 살아 있는 흘림 항을 좁혀 집중력 만렙에서도 라포가 산다. 말 걸기는 그대로다.
+  if (shot.gaze) spillP *= gazeAid;
   const d2 = draw();
   if (d2 < carryP) {
     say("carriedIn", "막았는데 몸이 공과 같이 골라인을 넘었습니다.", "strength");
@@ -502,7 +551,8 @@ export function resolve(input) {
     // 골대 등급. 앞의 넷과 같은 이유로 선반 밖의 값은 잘라 넣는다.
     // 그물이 먼저 공을 먹으면 눕고 못 일어나는 갈래까지 통째로 사라진다.
     const frame = Math.min(3, Math.max(0, Math.floor(Number(input.frame) || 0)));
-    if (frame > 0 && roll(frame * NET_EAT)) {
+    // 이미 굴린 흘림 구간을 정규화한다. 그물을 살 때만 새 롤을 먹으면 등급 비교가 다른 난수를 받는다.
+    if (frame > 0 && (d2 - taken) / (offDir ? 100 - taken : spillP * (100 - taken) / 100) * 100 < frame * NET_EAT) {
       say("reboundMiss", "흘린 공을 그물이 그대로 먹었습니다. 세이브입니다.", null);
       return done(false, null);
     }

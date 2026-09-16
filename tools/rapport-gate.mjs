@@ -1,3 +1,4 @@
+import { modifierContract } from "./modifier-contract.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 import { makeRng, buildSet, resolve, newKeeper, followerGain } from "../src/chain.mjs";
 import { newRapport, readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost, RAPPORT_STEPS, RAPPORT_CAP } from "../web/src/state/rapport.mjs";
@@ -128,6 +129,8 @@ check("rapport:judgement-effect-at-max", topAid.rate !== topBase.rate,
 const topFans = sweep({ keeper: top, rapport: 1.25 });
 check("rapport:reach-effect-at-max", topFans.fans > topBase.fans,
   topBase.fans + " -> " + topFans.fans);
+
+modifierContract({ gate: "rapport", fields: ["rapport"], engine: { makeRng, buildSet, resolve, newKeeper }, growable: GROWABLE, check });
 
 for (const n of notes) console.log("ok  " + n);
 for (const f of fails) console.log("BAD " + f);

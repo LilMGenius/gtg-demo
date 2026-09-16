@@ -1,3 +1,4 @@
+import { modifierContract } from "./modifier-contract.mjs";
 import { makeRng, buildSet, resolve, newKeeper } from "../src/chain.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 
@@ -46,6 +47,8 @@ for (const f of FIELDS) {
 
 // 후반에 약해지는 것 자체는 설계일 수 있다. 완전히 0이 되는 것과는 다르다.
 console.log("  note  base rate fresh " + freshBase.rate + " maxed " + topBase.rate);
+
+modifierContract({ gate: "lategear", fields: ["studs","pads"], engine: { makeRng, buildSet, resolve, newKeeper }, growable: GROWABLE, check });
 
 const LINE = String.fromCharCode(10);
 if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));

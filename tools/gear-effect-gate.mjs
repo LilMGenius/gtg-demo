@@ -1,3 +1,4 @@
+import { modifierContract } from "./modifier-contract.mjs";
 import { makeRng, buildSet, resolve, newKeeper, followerGain } from "../src/chain.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 import { lookBoost, GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, TATTOOS } from "../web/src/state/gear.mjs";
@@ -197,6 +198,8 @@ const p1 = perAtMax(1), p3 = perAtMax(3);
 const ratioMax = p3 / p1;
 check("value-grip-save-at-max", ratioMax >= VALUE_FLOOR,
   "r1 " + p1.toExponential(2) + " r3 " + p3.toExponential(2) + " ratio " + ratioMax.toFixed(2));
+
+modifierContract({ gate: "gear-effect", fields: ["studs","pads"], engine: { makeRng, buildSet, resolve, newKeeper }, growable: GROWABLE, check });
 
 for (const n of notes) console.log("ok  " + n);
 for (const f of fails) console.log("BAD " + f);

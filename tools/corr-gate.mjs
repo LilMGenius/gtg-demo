@@ -1,3 +1,4 @@
+import { modifierContract } from "./modifier-contract.mjs";
 import { resolve, makeRng, buildSet, keeperAtLevel, rollForm, newKeeper } from "../src/chain.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 
@@ -78,6 +79,8 @@ const top = rows[0];
 const second = rows[1];
 console.log("쏠림 " + top.k + " " + top.d.toFixed(2) + " against " + second.k + " " + second.d.toFixed(2)
   + "  ratio " + (second.d === 0 ? "inf" : (top.d / second.d).toFixed(2)));
+
+modifierContract({ gate: "corr", fields: ["studs"], engine: { makeRng, buildSet, resolve, newKeeper }, growable: GROWABLE, check });
 
 if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
 if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));

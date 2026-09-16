@@ -1,3 +1,4 @@
+import { modifierContract } from "./modifier-contract.mjs";
 import { makeRng, buildSet, resolve, newKeeper } from "../src/chain.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 import { BOTS, botKeeper } from "../web/src/state/bot.mjs";
@@ -29,7 +30,8 @@ function sweep(opt) {
     for (const shot of set) {
       const arg = { keeper, shot, rng };
       // input을 빼면 chain이 autoInput을 돌린다. 봇 축은 자동 경로를 재는 자리다.
-      if (o.hand) arg.input = { dive: shot.side, errMs: 0, advance: 0, auto: false };
+      // advance 0 고정은 실제 손 조작이 아니었다. 돌진 버튼의 0.9를 쓰되 칩에는 나가지 않는다.
+      if (o.hand) arg.input = { dive: shot.side, errMs: 0, advance: shot.chip ? 0 : 0.9, auto: false };
       const r = resolve(arg);
       shots++;
       if (!r.conceded) saved++;
@@ -89,6 +91,8 @@ check("bot:never-downgrades-at-max", worst.length === 0,
 // 자동은 입력만 대신한다. 최상급 클론도 손으로 정확히 누른 것보다는 못 막아야 축이 산다.
 const hand = sweep({ hand: true });
 check("bot-below-hand", rate[3] < hand.rate, "bot3 " + F(rate[3]) + " hand " + F(hand.rate));
+
+modifierContract({ gate: "bot-effect", fields: ["bot1","bot2","bot3"], engine: { makeRng, buildSet, resolve, newKeeper }, growable: GROWABLE, botKeeper, check });
 
 for (const n of notes) console.log("ok  " + n);
 for (const n of fails) console.log("BAD " + n);
