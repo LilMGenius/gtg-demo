@@ -85,6 +85,8 @@ modifierContract({ gate: "corr", fields: ["studs"], engine: { makeRng, buildSet,
 // Reuse corr's one-point probe at the frozen research seeds (12,000 shots per cell).
 // Bars are lap hypotheses, not player preference: DaedalGames/daedal-games docs/gamedev/judgement.md.
 // This population includes untested shots; the original level-one table keeps its own seeds and size.
+// Positivity is asserted on perfect input only. Auto input layers finger misjudgement on the stat
+// effect (see the header), so its signed gains are printed and only its share cap is a bar.
 function measureOfferDominance() {
   const savePath = GROWABLE.filter(k => !RESTART.includes(k) && !FAME.includes(k));
   for (const mode of ['perfect', 'auto']) {
