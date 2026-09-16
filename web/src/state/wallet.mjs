@@ -2,11 +2,22 @@
 // 하나로 시작해 나중에 쪼개면 이미 나간 저장의 잔액을 어느 쪽으로 옮길지 정할 수 없고,
 // 그 판단은 결제한 사람과 안 한 사람 중 한쪽을 반드시 손해 보게 만든다.
 
-// 이 파일에 캐시를 올리는 함수는 없다. 없는 것이 이 랩의 산출물이다.
-// 결제 경로는 상점이 열리는 칸에서 들어오고, 그때까지 캐시는 저장 자리만 지킨다.
+// 캐시 충전은 별도 경로다. 선반에서는 골드와 캐시 중 한 갈래만 지출한다.
 
 // 한 구를 막았을 때. 5구 한 판을 다 막으면 60이고, 이 60이 골드 단가의 기준 단위다.
 export const COIN_SAVE = 12;
+// 시험값, 1 캐시 = 10 골드, 가장 싼 장비 150 골드가 15 캐시로 읽히는 소액 팩 관행; 실측이 갱신한다.
+export const CASH_RATE = 10;
+// 캐시는 정수이고 올림이라 캐시로 사는 쪽이 골드보다 싸지지 않는다.
+export const cashPrice = (gold) => Math.ceil(gold / CASH_RATE);
+
+export function pay(wallet, gold, currency) {
+  const key = currency === 'cash' ? 'cash' : 'coin';
+  const amount = key === 'cash' ? cashPrice(gold) : gold;
+  if (wallet[key] < amount) return false;
+  wallet[key] -= amount;
+  return true;
+}
 // 먹혀도 0이 아니다. 0이면 못 막는 사람의 진행이 그 자리에서 멈추고,
 // 방치형에서 멈춘 진행은 이탈이지 난이도가 아니다.
 export const COIN_CONCEDED = 4;

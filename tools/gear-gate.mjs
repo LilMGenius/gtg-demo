@@ -238,6 +238,16 @@ try {
   check("after:filled-shelf-declares-nothing-left", done === SHELVES.length, done + "/" + SHELVES.length);
   check("control:an-unfinished-shelf-does-not-read-as-finished", open === SHELVES.length, open + "/" + SHELVES.length);
 
+  await boot("?seed=20&preset=veteran");
+  const cashBuy = await p.evaluate(() => {
+    const w=window.__wallet(); w.coin=0; w.cash=8000; window.__shop(true);
+    document.querySelector('#shop .tab[data-tab="glove"]').click();
+    const b=document.querySelector('#shop .buy[data-rank="3"]'), price=b.querySelector('.cash');
+    if(b.disabled || !price) return false;
+    const cost=+price.dataset.cash; b.click();
+    return w.coin===0 && w.cash===8000-cost && window.__gear().grip===3;
+  });
+  check('buy:a-dead-gold-button-lives-on-cash', cashBuy, String(cashBuy));
   if (shot) await p.screenshot({ path: shot });
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
 

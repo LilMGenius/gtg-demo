@@ -12,7 +12,7 @@ import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dm
 import { load, save, readSquad, offlineGain, readRecord, readSquadKickers, useAccount, saveKey } from './state/save.mjs';
 import { autoTrain, trainStat } from './state/coach.mjs';
 import { currentId } from './state/account.mjs';
-import { coinGain, readWallet, COIN_DRILL } from './state/wallet.mjs';
+import { coinGain, readWallet, COIN_DRILL, cashPrice, pay } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
@@ -229,6 +229,12 @@ const SW = (n) => '<span class="px" data-coin="' + Number(n) + '">' + IC_GOLD
 // 캐시. 결제로만 들어오는 재화다. 별은 어느 게임에서든 유료 갈래로 읽힌다.
 const IC_CASH = G('캐시', R(10.5, 3, 3, 3) + R(9, 6, 6, 3) + R(0, 9, 24, 3) + R(4.5, 12, 15, 3)
   + R(6, 15, 12, 3) + R(4.5, 18, 6, 3) + R(13.5, 18, 6, 3));
+const affordable = (gold) => state.wallet.coin >= gold || state.wallet.cash >= cashPrice(gold);
+const purchase = (gold) => pay(state.wallet, gold, state.wallet.coin >= gold ? 'coin' : 'cash');
+const PRICE = (n) => '<span class="price" data-coin="' + n + '" data-cash="' + cashPrice(n) + '" aria-label="골드 또는 캐시" title="골드 또는 캐시">'
+  + SW(n).replace('class="px"', 'class="px' + (state.wallet.coin < n ? ' bad-price' : '') + '"')
+  + '<i class="or" aria-hidden="true"></i><span class="px cash' + (state.wallet.cash < cashPrice(n) ? ' bad-cash' : '')
+  + '" data-cash="' + cashPrice(n) + '">' + IC_CASH + '<b>' + cashPrice(n) + '</b></span></span>';
 // 기복. 화살표 하나면 오늘 컨디션이 어느 쪽인지가 문장 없이 선다.
 const IC_UP = G('컨디션 좋음', R(10.5, 3, 3, 3) + R(7.5, 6, 9, 3) + R(4.5, 9, 15, 3) + R(9, 12, 6, 12));
 const IC_DOWN = G('컨디션 나쁨', R(9, 0, 6, 12) + R(4.5, 12, 15, 3) + R(7.5, 15, 9, 3) + R(10.5, 18, 3, 3));
@@ -967,10 +973,10 @@ function renderRoster() {
   const pool = KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name));
   const hire = pool.map((entry) => {
     const cost = keeperCost(entry);
-    const off = state.wallet.coin < cost;
+    const off = !affordable(cost);
     return '<button data-n="' + entry.name + '"' + (off ? ' disabled' : '') + '>'
       + '<img alt="' + entry.name + '" src="' + thumbURL('face', entry, lookOf({}, entry.name)) + '">'
-      + '<span class="nm">' + entry.name + '</span><em>' + SW(cost) + '</em></button>';
+      + '<span class="nm">' + entry.name + '</span><em>' + PRICE(cost) + '</em></button>';
   }).join('');
   /* 포지션 줄. 골키퍼 한 명과 필드 열하나는 다른 질문이라 같은 목록에 못 섞는다.
      골키퍼는 세우는 사람이 하나뿐이고, 키커는 정원 안에서 열하나를 고른다. */
@@ -1005,8 +1011,7 @@ function renderRoster() {
     const entry = KEEPERS.find((k) => k.name === b.dataset.n);
     if (!entry) return;
     const cost = keeperCost(entry);
-    if (state.wallet.coin < cost) return;
-    state.wallet.coin -= cost;
+    if (!purchase(cost)) return;
     state.squad.push(recruit(entry));
     swapTo(state.squad.length - 1);
   };
@@ -1034,10 +1039,10 @@ function kickerPane(role) {
   };
   const hire = KICKERS.filter((k) => k.role === role && state.kickers.indexOf(k.name) < 0).map((k) => {
     const cost = kickerCost(k);
-    const off = state.wallet.coin < cost;
+    const off = !affordable(cost);
     return '<button data-buy="' + k.name + '"' + (off ? ' disabled' : '') + '>'
       + '<img alt="' + k.name + '" src="' + thumbURL("face", k, lookOf({}, k.name)) + '">'
-      + '<span class="nm">' + k.name + '</span><em>' + SW(cost) + '</em></button>';
+      + '<span class="nm">' + k.name + '</span><em>' + PRICE(cost) + '</em></button>';
   }).join("");
   return '<h5>주전 ' + starting.length + ' / ' + slots + '</h5>'
     + '<div class="row mine">' + (starting.map((n) => card(n, true)).join("")
@@ -1072,8 +1077,7 @@ function bindKickerPane(box) {
     const k = kickerByName(b.dataset.buy);
     if (!k) return;
     const cost = kickerCost(k);
-    if (state.wallet.coin < cost) return;
-    state.wallet.coin -= cost;
+    if (!purchase(cost)) return;
     state.kickers.push(k.name);
     persist();
     pips();
@@ -1371,9 +1375,9 @@ function recordRows() {
 
 // 만남 버튼 글자. 문은 판정이 열고, 값을 어떻게 보여 줄지는 화면이 정한다.
 function dateLabel(g) {
-  if (g.open) return SW(g.cost);
+  if (g.open) return PRICE(g.cost);
   // 못 사는 것은 붉은 값과 비활성 버튼이 말한다. 모자란 액수를 적으면 같은 물건이 지갑마다 다른 수로 읽힌다.
-  if (g.short > 0) return SW(DATE_COST);
+  if (g.short > 0) return PRICE(DATE_COST);
   return '만남';
 }
 
@@ -1419,7 +1423,7 @@ function rapportRows() {
     const who = passerName(city, passer, tier);
     const face = tier > 0 ? tier + '단계' : '초면';
     // 만남은 이 사람에게 붙은 행동이라 그 줄 안에 둔다. 못 누르는 사유도 버튼이 직접 말한다.
-    const g = dateGate(state.rapport, city, passer, state.wallet.coin);
+    const g = dateGate(state.rapport, city, passer, state.wallet.coin, state.wallet.cash);
     /* 줄이 아니라 카드다. 실루엣과 동네와 단계 바와 만남 버튼이 한 장에 같이 서야 이 사람이
        지금 어디까지 왔는지가 수를 읽기 전에 보인다. 생김새는 저장에 없으므로 실루엣이다. */
     return '<div class="note met"><span class="ava anon">' + IC_FANS + '</span>'
@@ -1621,7 +1625,7 @@ function renderDate(city, passer, done) {
 function commitDate(city, passer, moveId) {
   const out = dateOutcome(state.keeper, moveId, roll() * 100);
   if (!out) return;
-  state.wallet.coin = Math.max(0, state.wallet.coin - DATE_COST);
+  if (!purchase(DATE_COST)) return;
   state.fans = Math.max(0, state.fans + out.fans);
   state.rapport = applyDate(state.rapport, city, passer, out.won);
   persist();
@@ -1847,11 +1851,12 @@ function fittingRoom() {
      그것을 무르는 자리가 안 갈린다. 세로로 쌓으면 여덟 칸을 걸쳤을 때 기둥이 여덟 줄 길어지고
      그만큼 아래 효과 표가 잘린다. */
   const chips = tried.map((f) => '<i data-off="' + f + '">' + nameOfField(f, fitting[f]) + '<b>X</b></i>').join('');
-  const canAll = tried.length > 0 && bill <= state.wallet.coin;
+  // 합계에서 한 번 올림한다. 개별 캐시 값을 더하면 묶음과 단품의 환산 정책이 갈린다.
+  const canAll = tried.length > 0 && affordable(bill);
   /* 합계 배지는 사는 버튼이 든다. 시착 게이트가 청구서를 이 버튼 안의 .px[data-coin]에서 읽으므로
      배지를 버튼 밖으로 빼면 값을 재는 자가 눈을 잃는다. 모자라도 합계는 같은 수다. */
-  const badge = tried.length ? SW(bill) : '';
-  const allClass = tried.length > 0 && !canAll ? ' bad-price' : '';
+  const badge = tried.length ? PRICE(bill) : '';
+  const allClass = tried.length > 0 && bill > state.wallet.coin ? ' bad-price' : '';
   return '<div class="fitting">'
     + '<div class="who"><span class="face">' + (face ? '<img alt="" src="' + face + '">' : '') + '</span>'
     + '<b>' + state.keeper.name + '</b></div>'
@@ -1887,7 +1892,7 @@ function gearShelf(kind) {
   const have = state.gear[s.field];
   const rows = s.list.map((g) => {
     const rank = g[s.field];
-    let label = SW(g.cost);
+    let label = PRICE(g.cost);
     let off = false;
     let bad = false;
     if (rank === have) {
@@ -1898,8 +1903,8 @@ function gearShelf(kind) {
       off = true;
     } else if (state.wallet.coin < g.cost) {
       // 못 사는 것은 붉은 값과 비활성 버튼이 말한다. 모자란 액수를 적으면 같은 물건이 지갑마다 다른 수로 읽힌다.
-      label = SW(g.cost);
-      off = true;
+      label = PRICE(g.cost);
+      off = !affordable(g.cost);
       bad = true;
     }
     // 썸네일 자리는 마크업에서 비워 두고 그림은 bindGear가 굽는다. 굽는 데 렌더러가 필요해서
@@ -2059,8 +2064,7 @@ function bindGear(box) {
       if (b.disabled) return;
       const s = SHELVES[b.dataset.kind];
       const g = s.at(b.dataset.rank);
-      if (state.wallet.coin < g.cost) return;
-      state.wallet.coin -= g.cost;
+      if (!purchase(g.cost)) return;
       state.gear[s.field] = g[s.field];
       // 걸쳐 보던 변형이 있으면 그 변형으로 산다. 안 옮기면 미리 본 것과 산 것이 다르다.
       if (fitting[s.field + 'Skin'] !== undefined) {
@@ -2342,11 +2346,11 @@ function pullShelf(all) {
     /* 뽑기 버튼은 장르가 오래 쓴 자리를 그대로 쓴다. 큰 글씨로 몇 회인지, 그 아래 값이다.
        내고 몇 장이라는 문장은 버튼이 할 말이 아니고, 못 사는 이유도 버튼 글자가 아니라
        비활성 상태가 이미 말한다. 사유는 버튼 위 배지가 한 마디로 받는다. */
-    const off = !pool.length || !bill.afford || left < want;
+    const off = !pool.length || !affordable(bill.cost) || left < want;
     // 이용권으로 다 내는 회차는 값 대신 이용권 수를 적는다. 나가는 것이 다른 자원이다.
-    const price = bill.cost > 0 ? SW(bill.cost) : IC_TICKET + bill.free;
+    const price = bill.cost > 0 ? PRICE(bill.cost) : IC_TICKET + bill.free;
     const why = !pool.length ? '품절' : (left < want ? '한도' : '');
-    const bad = !pool.length || !bill.afford || left < want;
+    const bad = state.wallet.coin < bill.cost;
     return '<button class="buy pull' + (bad && bill.cost > 0 ? ' bad-price' : '') + '" data-want="' + want + '"' + (off ? ' disabled' : '') + '>'
       + (why ? '<u>' + why + '</u>' : '')
       // 보너스가 붙는 회차는 그 사실이 버튼에 있어야 한다. 눌러 봐야 아는 이득은 이득이 아니다.
@@ -2372,14 +2376,14 @@ function pullShelf(all) {
 function botShelf() {
   const cur = state.bot;
   const rows = BOTS.map((b) => {
-    let label = SW(b.cost);
+    let label = PRICE(b.cost);
     let duration = b.minutes + '분';
     let off = false;
-    let bad = false;
-    if (state.wallet.coin < b.cost) {
+    let bad = state.wallet.coin < b.cost;
+    if (!affordable(b.cost)) {
       // 못 사는 것은 붉은 값과 비활성 버튼이 말한다. 모자란 액수를 적으면 같은 물건이 지갑마다 다른 수로 읽힌다.
-      label = SW(b.cost);
-      off = true;
+      label = PRICE(b.cost);
+      off = !affordable(b.cost);
       bad = true;
     } else if (cur.ms > 0 && b.tier === cur.tier) {
       duration = '+' + b.minutes + '분';
@@ -2421,8 +2425,7 @@ function bindBot(box) {
     b.onclick = () => {
       if (b.disabled) return;
       const spec = botAt(b.dataset.bot);
-      if (!spec || state.wallet.coin < spec.cost) return;
-      state.wallet.coin -= spec.cost;
+      if (!spec || !purchase(spec.cost)) return;
       state.bot.tier = spec.tier;
       // 6시간 상한. 무한 적립이면 방치가 아니라 영구 봇이 된다.
       state.bot.ms = Math.min(BOT_CAP, state.bot.ms + spec.minutes * 60000);
@@ -2437,14 +2440,14 @@ function bindBot(box) {
 function buffShelf() {
   const cur = state.buff;
   const rows = BUFFS.map((b, at) => {
-    let label = SW(b.cost);
+    let label = PRICE(b.cost);
     let duration = b.shots + '슛';
     let off = false;
-    let bad = false;
-    if (state.wallet.coin < b.cost) {
+    let bad = state.wallet.coin < b.cost;
+    if (!affordable(b.cost)) {
       // 못 사는 것은 붉은 값과 비활성 버튼이 말한다. 모자란 액수를 적으면 같은 물건이 지갑마다 다른 수로 읽힌다.
-      label = SW(b.cost);
-      off = true;
+      label = PRICE(b.cost);
+      off = !affordable(b.cost);
       bad = true;
     } else if (cur.shots > 0 && cur.kind === b.kind) {
       duration = '+' + b.shots + '슛';
@@ -2472,11 +2475,11 @@ function bindBuff(box) {
     b.onclick = () => {
       if (b.disabled) return;
       const spec = buffAt(b.dataset.buff);
-      if (!spec || state.wallet.coin < spec.cost) return;
+      if (!spec || !affordable(spec.cost)) return;
       const next = addBuff(state.buff, spec.kind);
       // 다른 종류가 살아 있으면 addBuff가 원본을 그대로 돌려준다. 그때 값을 치르면 골드만 사라진다.
       if (next === state.buff) return;
-      state.wallet.coin -= spec.cost;
+      if (!purchase(spec.cost)) return;
       state.buff = next;
       persist();
       pips();
@@ -2517,8 +2520,7 @@ function renderShop() {
     // 값이 붙는 칸만 청구서에 오르고, 옮기는 것은 걸쳐 본 전부다. 변형은 값이 없지만 같이 입는다.
     const tried = Object.keys(fitting).filter((f) => shelfOfField(f));
     const bill = tried.reduce((n, f) => n + costOfField(f, fitting[f]), 0);
-    if (bill > state.wallet.coin) return;
-    state.wallet.coin -= bill;
+    if (!purchase(bill)) return;
     for (const f of Object.keys(fitting)) state.gear[f] = fitting[f];
     fitting = {};
     if (state.gear.city !== undefined) stage.setCity(state.gear.city, state.gear.citySkin);
@@ -2546,7 +2548,7 @@ function renderShop() {
     const kind = pullKindOf(pullTab);
     const here = poolFor(pool, kind.id);
     const bill = pullBill(want, kind.ticketable ? state.tickets : 0, state.wallet.coin, pullCostOf(kind.id));
-    if (!bill.afford || want > here.length) return;
+    if (!affordable(bill.cost) || want > here.length) return;
     // 값을 깎기 전에 뽑는다. 빈 풀에 값만 치르는 경로는 만렙 훈련 데드락과 같은 결함이다.
     // 뽑은 카드는 풀에서 즉시 빠진다. 안 빼면 한 묶음 안에서 같은 이름이 두 번 나온다.
     const left = here.slice();
@@ -2561,8 +2563,8 @@ function renderShop() {
       drawn.push(pick);
     }
     if (!drawn.length) return;
+    if (!purchase(bill.cost)) return;
     state.tickets -= bill.free;
-    state.wallet.coin -= bill.cost;
     for (const pick of drawn) state.squad.push(recruit(pick));
     // 뽑은 카드로 자동 전환하지 않는다. 무작위 결과가 뛰던 키퍼를 임의로 강등시키면
     // 뽑기가 이득이 아니라 사고가 된다. 교체는 선수단에서 사람이 고른다.
