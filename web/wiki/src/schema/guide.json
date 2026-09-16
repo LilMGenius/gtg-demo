@@ -21,6 +21,7 @@
       "minItems": 1,
       "items": {
         "enum": [
+          "game",
           "hand",
           "coin",
           "drill",

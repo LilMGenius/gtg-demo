@@ -76,6 +76,11 @@
   },
   {
     "field": "relatedTo",
+    "source": "game",
+    "target": "hand"
+  },
+  {
+    "field": "relatedTo",
     "source": "gear",
     "target": "pull"
   },

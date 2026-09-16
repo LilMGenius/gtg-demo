@@ -17,7 +17,7 @@ const CLI = join(ROOT, 'node_modules/gamewiki/dist/cli.js');
 const SOURCE = join(ROOT, 'web/wiki/src');
 const DIST = join(ROOT, 'web/wiki/dist');
 const EVIDENCE = join(ROOT, '.omo/evidence');
-const KEYS = ['hand', 'coin', 'drill', 'gear', 'pull', 'gram', 'bot', 'buff', 'risk'];
+const KEYS = ['game', 'hand', 'coin', 'drill', 'gear', 'pull', 'gram', 'bot', 'buff', 'risk'];
 const modules = { wallet, roster, gram };
 const report = { started: new Date().toISOString(), invocation: process.argv, axes: [], builds: [], bodies: [] };
 mkdirSync(EVIDENCE, { recursive: true });
@@ -144,7 +144,8 @@ try {
   await parentPage.click('#go', { force: true });
   await parentPage.click('#wikiBtn', { force: true });
   const parentRows = [];
-  for (const key of KEYS) {
+  // 역사 대조군은 당시 선언한 칸만 잰다. 새 칸 부재는 wiki 게이트의 좌표 축이 잰다.
+  for (const key of KEYS.filter(key => key !== 'game')) {
     await parentPage.locator('#wiki .cats [data-cat="' + key + '"]').click();
     parentRows.push({ key, visible: await parentPage.locator('#wiki').isVisible(), tables: await parentPage.locator('#wiki table').count() });
   }

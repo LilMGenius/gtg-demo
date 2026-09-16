@@ -79,6 +79,7 @@ try {
   await k.keyboard.press('Escape');
   await k.keyboard.press('w');
   const wikiOpen = !(await hidden(k, 'wiki'));
+  await k.locator('#wiki .cats [data-cat="hand"]').click();
   const rows = await k.locator('#wiki .body table').first().locator('tbody tr').evaluateAll((rs) => rs.map((r) => [...r.cells].map((c) => c.textContent.trim())));
   const expected = KEY_MAP.map(({ label, note }) => [label, note]);
   check('keys:the-wiki-table-matches-the-map', JSON.stringify([...rows].sort()) === JSON.stringify([...expected].sort()), { rows, expected });

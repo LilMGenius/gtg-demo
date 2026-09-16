@@ -8,6 +8,9 @@
     linear-gradient(180deg,#0b0f0a00 62%,#0b0f0a55);
   font-family:var(--disp)}
 #title[hidden]{display:none}
+/* 좌표는 조작이 아니라 구석의 참고 글자라 가장 작은 본문 토큰으로 둔다. */
+#build{position:absolute;right:calc(1em + env(safe-area-inset-right));bottom:calc(1em + env(safe-area-inset-bottom));
+  font-family:var(--body);font-size:var(--fs-body);color:var(--dim);pointer-events:none}
 
 #mark{transform:rotate(-2.2deg);max-width:min(660px,64vw)}
 #kicker{display:inline-block;background:var(--bad);color:#fff;

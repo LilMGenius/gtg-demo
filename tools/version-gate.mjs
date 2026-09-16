@@ -1,3 +1,4 @@
+import { VERSION } from '../web/src/build.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
@@ -45,6 +46,9 @@ for (const tag of tags) {
 }
 
 const head = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+// 화면 모듈과 배포 매니페스트가 다른 릴리스를 말하면 좌표를 믿을 수 없다.
+if (VERSION !== head) fails.push('version:the-screen-label-matches-the-manifest ' + VERSION + ' != ' + head);
+else console.log('  ok version:the-screen-label-matches-the-manifest ' + VERSION);
 const tagged = tags.filter((t) => !NO_MANIFEST.has(t)).map((t) => t.slice(1));
 const top = tagged.sort((a, b) => rank(b) - rank(a))[0];
 

@@ -83,6 +83,19 @@
     "url": "drill.html"
   },
   {
+    "backlinks": [],
+    "bodyHtml": "<p>동네 운동장 방치형</p>\n<p>막아도 안 끝난다. 끝까지 봐야 안다</p>\n<p>조작은 <a class=\"internal new\" href=\"./hand.html\">조작</a> 페이지가 갖는다</p>",
+    "categories": [
+      "game"
+    ],
+    "id": "game",
+    "links": [
+      "hand"
+    ],
+    "title": "이 게임",
+    "url": "game.html"
+  },
+  {
     "backlinks": [
       "drill"
     ],
@@ -115,6 +128,7 @@
   },
   {
     "backlinks": [
+      "game",
       "risk"
     ],
     "bodyHtml": "<p>화면 세 칸을 누른다. 공이 올 곳을 찍는다</p>\n<p>너무 빠르면 역동작, 너무 늦으면 손이 안 닿는다</p>\n<p>마우스도 같은 세 칸이고 키보드도 된다</p>\n<p>컨디션은 이번 판의 능력에 더해지는 보정이다</p>",
