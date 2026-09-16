@@ -9,7 +9,9 @@ const SEEDS = 2000;
 
 // 실측으로 박은 기준선. 판정이나 로스터를 건드리면 여기가 먼저 빨개진다.
 // 그때 할 일은 이 수를 고치는 것이 아니라, 그 이동이 의도였는지 먼저 답하는 것이다.
-const BASE = { new: 19.97, 1: 19.47, 3: 22.83, 5: 25.16, 7: 27.44, 10: 30.55, 15: 35.01, 20: 38.49, 30: 44.00 };
+// 답한 이동 둘 뒤에 다시 박았다(f5e556e). 세트당 훈련 포인트 둘(e51ef96)과 구매 효과 부착(e243bd7)이
+// 곡선을 옮겼고 둘 다 검증 confirmed다. 수는 이 게이트가 그 HEAD에서 인쇄한 값을 스크립트가 옮겨 적었다.
+const BASE = { new: 18.46, 1: 18.38, 3: 22.13, 5: 24.43, 7: 26.81, 10: 30.27, 15: 35.90, 20: 40.58, 30: 47.91 };
 
 // 시드가 고정이라 결과는 결정적이다. 0.3은 부동소수 반올림만 흡수하는 폭이고,
 // 스탯 한 칸이나 계수 하나가 움직이면 그보다 훨씬 크게 벌어진다.
@@ -62,7 +64,8 @@ check("growth:range", range >= MIN_RANGE, range.toFixed(2) + " over " + MIN_RANG
 const LINE = String.fromCharCode(10);
 if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
 if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
-// 목표는 아직 문턱이 아니다. 매번 눈에 보이게 두어야 잊히지 않는다.
-console.log("  note  early " + now[1] + " and late " + now[30] + " against an unconfirmed target of 60 and 85");
+// 목표 구간은 없다. 옛 문서의 60과 85는 파운더가 세운 적 없는 가설이라 정본 balance.md가 기준선 이동 감시로 정했다.
+// 이동은 의도 여부를 먼저 답하고, 답한 이동은 위 기준선을 다시 박는다. 편중 랩(핸들링 5.2배)은 후보 스물여덟이 가드에 걸려 REJECT였다.
+console.log("  note  early " + now[1] + " and late " + now[30] + "; a baseline watch, the target band is the accepted lap record");
 console.log(fails.length ? "balance FAIL " + fails.length : "balance PASS");
 if (fails.length) process.exitCode = 1;
