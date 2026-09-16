@@ -35,5 +35,8 @@ sim/out/
 *.tgz
 cmsg.txt
 
+# Deployment writes the identity beside the served page.
+web/build.json
+
 # Built wiki data is served directly with web/.
 !web/wiki/dist/

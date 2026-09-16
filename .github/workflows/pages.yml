@@ -19,8 +19,16 @@ jobs:
     environment: github-pages
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       # The engine lives outside web/, so the site root is the repo root.
       - uses: actions/configure-pages@v5
+      - name: Write build identity
+        shell: bash
+        run: |
+          export BUILD_COMMIT="$(git rev-parse HEAD)"
+          export BUILD_DESCRIBE="$(git describe --tags --long)"
+          node -e 'const fs = require("node:fs"); const version = JSON.parse(fs.readFileSync("package.json", "utf8")).version; const commit = process.env.BUILD_COMMIT; fs.writeFileSync("web/build.json", JSON.stringify({version, commit, short: commit.slice(0, 7), describe: process.env.BUILD_DESCRIBE, builtAt: new Date().toISOString()}) + "\n");'
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
