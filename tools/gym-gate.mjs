@@ -12,7 +12,7 @@ import { readCloseFloor, closeFloorSaid } from "./close-floor.mjs";
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html";
 // 훈련 한 회의 환전 단가. wallet.mjs의 COIN_DRILL과 같은 값이어야 한다.
-const COIN_DRILL = 24;
+const COIN_DRILL = 12;
 // 성장 칸 수. ledger.mjs GROWABLE의 길이다.
 const SLOTS = 15;
 // 성장 상한이 값 자리에 내는 글자. main.mjs 훈련장의 만렙 판정과 같은 값이어야 한다.
