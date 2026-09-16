@@ -231,9 +231,9 @@ const IC_CASH = G('캐시', R(10.5, 3, 3, 3) + R(9, 6, 6, 3) + R(0, 9, 24, 3) + 
   + R(6, 15, 12, 3) + R(4.5, 18, 6, 3) + R(13.5, 18, 6, 3));
 const affordable = (gold) => state.wallet.coin >= gold || state.wallet.cash >= cashPrice(gold);
 const purchase = (gold) => pay(state.wallet, gold, state.wallet.coin >= gold ? 'coin' : 'cash');
-const PRICE = (n) => '<span class="price" data-coin="' + n + '" data-cash="' + cashPrice(n) + '" aria-label="골드 또는 캐시" title="골드 또는 캐시">'
+const PRICE = (n) => '<span class="price" data-coin="' + n + '" data-cash="' + cashPrice(n) + '" title="골드 또는 캐시">'
   + SW(n).replace('class="px"', 'class="px' + (state.wallet.coin < n ? ' bad-price' : '') + '"')
-  + '<i class="or" aria-hidden="true"></i><span class="px cash' + (state.wallet.cash < cashPrice(n) ? ' bad-cash' : '')
+  + '<i class="or">또는</i><span class="px cash' + (state.wallet.cash < cashPrice(n) ? ' bad-cash' : '')
   + '" data-cash="' + cashPrice(n) + '">' + IC_CASH + '<b>' + cashPrice(n) + '</b></span></span>';
 // 기복. 화살표 하나면 오늘 컨디션이 어느 쪽인지가 문장 없이 선다.
 const IC_UP = G('컨디션 좋음', R(10.5, 3, 3, 3) + R(7.5, 6, 9, 3) + R(4.5, 9, 15, 3) + R(9, 12, 6, 12));

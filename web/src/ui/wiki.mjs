@@ -74,7 +74,7 @@ const TABLES = {
       ['최상급', value('coin-save') + COIN_FAME_STEP * 9],
       ['먹혀도', value('coin-conceded')],
       ['훈련 대신', value('drill')],
-      ['캐시 한 단위', value('cash-rate') + ' 골드 (시험값)']
+      ['캐시 한 단위', value('cash-rate')]
     ])],
   drill: (ctx) => [table(['자리', '값'], [['훈련 대신', value('drill')]])],
   gear: (ctx) => (ctx.shelves || []).map((s) => '<h5>' + esc(s.head) + '</h5>'
