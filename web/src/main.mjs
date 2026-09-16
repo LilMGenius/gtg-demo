@@ -756,10 +756,10 @@ function endSet() {
   // 세트 사이에 다른 자막이 끼어도 사람은 이 줄만 이어서 기억한다. 직전 요약을 따로 들고 금지한다.
   lastSetEnd = setEndLine(5 - conceded, rng, lastSetEnd);
   say(lastSetEnd, null);
-  // 판이 끝나면 레벨이 오르고 훈련 한 번이 쌓인다. 자동은 바로 훈련한다.
+  // 판이 끝나면 레벨이 오르고 훈련 두 번이 쌓인다. 자동은 바로 훈련한다.
   // 자동 팝업이 없으므로 전 스탯 만렙이어도 다음 판이 그대로 온다.
   state.keeper.level += 1;
-  state.points += 1;
+  state.points += 2;
   // 완봉이면 이적시장 이용권 한 장. 규칙은 판정이 소유하고 화면은 그 답을 받는다.
   state.tickets = ticketGain(state.results, state.tickets);
   if (state.auto) trainKeeper();

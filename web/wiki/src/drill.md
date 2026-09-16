@@ -9,7 +9,7 @@ relations:
   relatedTo: [gear]
 valueFrom: 'wallet.COIN_DRILL'
 ---
-다섯 슛으로 한 판을 마치면 레벨이 오르고 훈련 한 회가 쌓인다
+판이 끝나면 훈련 두 회가 쌓인다
 
 [[drill|훈련]]은 능력 한 칸을 올린다
 
