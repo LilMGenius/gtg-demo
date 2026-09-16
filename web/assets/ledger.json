@@ -1,5 +1,17 @@
 [
   {
+    "path": "icon-192.png",
+    "origin": "tools/build-icons.mjs",
+    "rights": "self",
+    "form": "png"
+  },
+  {
+    "path": "icon-512.png",
+    "origin": "tools/build-icons.mjs",
+    "rights": "self",
+    "form": "png"
+  },
+  {
     "path": "audio/bgm.m4a",
     "origin": "assets/audio/bgm.mp3, ID3 artist 브금추천, title 축구게임 스타일 락 브금 | Soccer Game type Rock BGM, 12:12; URL not in ID3; 상업용 무료, founder-confirmed 2026-09-16",
     "rights": "commercial-free",
