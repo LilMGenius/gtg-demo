@@ -50,6 +50,10 @@ body.frozen *,body.frozen *::before,body.frozen *::after{animation-play-state:pa
 #hud{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .3s}
 body.playing #hud{opacity:1}
 
+@media (prefers-reduced-motion: reduce){
+  #hud,#hud *,#title,#title *{transition-duration:.01ms!important}
+}
+
 /* 창은 조작과 상태 칩보다 한 층 위다. #top이 z-index 2를 들고 있어서 층을 안 올리면
    창을 열어도 칩만 덮개 밖에 남아 지금 누를 수 있는 것처럼 보인다. 만남은 내 정보 안에서
    이어지는 한 단계라 그 위 5층을 쓴다. */
