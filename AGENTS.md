@@ -77,9 +77,19 @@ HUD와 패널은 DOM이다. 캔버스는 경기장만 그린다. 패널이 열�
 
 공 차기와 골대 튕김과 드리블과 공 놓기와 발소리를 현실적으로 낸다. 현실적이게 못 하겠으면 넣지 않는다. 어설픈 소리는 없는 것보다 나쁘다.
 
+## 위키
+
+원본은 `web/wiki/src` 하나다. GFM에 gamewiki 위키링크와 JSON 스키마와 이름 붙인 관계를 얹은 글이고, 도구는 MIT인 https://github.com/DaedalGames/gamewiki 를 `file:../gamewiki`로 잇는다. npm이 이 환경에서 github: 설치를 EALLOWGIT로 막으므로 형제 클론에서 npm ci를 먼저 돌리고, 추적된 gamewiki dist/가 prepare 없이도 CLI를 준다.
+
+출력은 둘이고 한 명령이 둘 다 만든다. `npm run wiki`가 check 뒤에 embed를 `web/wiki/dist`에, build를 `web/wiki/site`에 --clean으로 쓴다. dist는 게임 안 패널이 읽는 네 데이터 파일과 매니페스트이고 site는 Pages가 /gtg-demo/web/wiki/site 아래에서 내는 정적 HTML이라 --base가 그 경로다. 둘 다 원본과 같이 커밋한다. 정적 서버는 빌드를 하지 않고, --clean은 자기 gamewiki.json 매니페스트가 있는 출력만 비운다. 원본과 출력은 형제 디렉터리여야 한다.
+
+valueFrom은 코드 상수의 이름이다. `wiki.mjs`가 식을 평가하지 않고 그 상수를 읽어 {{value}}에 넣고, 배열과 파생값은 코드가 그리는 표로 남는다. JSON 모듈 import가 빌드된 폴백이고 pages.json fetch 한 번이 패널을 새로 그린다. 본문에는 숫자를 쓰지 않는다. wikisrc 게이트가 원본과 dist와 화면 셋의 동일을 묻고 wikisite 게이트가 원본과 site의 동일과 base 경로와 패널·사이트 사이의 링크 둘을 묻는다.
+
 ## 계기
 
 게이트는 `tools/<이름>-gate.mjs`이고 통과와 실패를 스스로 출력한다. 절대경로로만 만든다. 상대경로로 만들면 엉뚱한 레포 루트에 떨어져 추적되지 않고, 한 번도 안 돈 게이트는 빨간불도 파란불도 내지 않아 어떤 보고에도 안 나타난다.
+
+`live-gate`가 배포를 잰다. 배포된 Pages 파일 다섯이 HEAD와 SHA-256으로 같고, 새 폰 가로 브라우저가 터치만으로 다섯 구를 끝내고 결과를 콘솔 오류 없이 띄우며, 404는 같은 흐름을 못 끝내고, 시작만으로 빈 계정 칸과 이동과 쿠키 없이 판에 들어간다. 계정을 요구하는 타이틀이 끼어들면 그 로그인 축이 빨강이다. 240초 안에 자원 대기와 결과 PNG를 `.omo/evidence/`에 남긴다.
 
 문턱은 낮추지 않는다. 실측이 문턱 아래면 대상을 고치고, 못 고치면 실패로 두고 보고한다.
 

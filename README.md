@@ -1,19 +1,22 @@
-# GTG demo
+# 골키퍼 키우기 3D
 
-The game runs from the static web/ tree.
+축구를 하는 게임이 아니라 골키퍼가 되는 게임. 슛 하나가 끝날 때까지 결과가 몇 번이나 뒤집힌다. 흙바닥 동네 운동장에서 시작해 훈련하고, 장비를 사고, 팔로워를 모은다.
 
-## Wiki
+플레이: https://lilmgenius.github.io/gtg-demo/
 
-Clone the MIT-licensed gamewiki tool beside this repository and install its locked dependencies with npm ci in that clone. In this repository run npm install; the devDependency is gamewiki: file:../gamewiki. npm blocks github: installs with EALLOWGIT in this environment. The tracked gamewiki dist/ supplies the CLI even when npm blocks prepare.
+위키: https://lilmgenius.github.io/gtg-demo/web/wiki/site/ (게임 안 위키 패널과 같은 글이다)
 
-Wiki prose lives in web/wiki/src as GFM with gamewiki wikilinks, JSON schemas and named relations. Run npm run wiki:build to rebuild web/wiki/dist in place. The command uses --clean and refuses to clear a nonempty output without its gamewiki.json manifest. Commit the four data files and manifest with their sources: the static server performs no build. The source and output directories must be siblings.
+## 로컬에서 돌리기
 
-Each valueFrom field names an imported code constant. wiki.mjs resolves it without evaluating expressions; arrays and the derived top reward remain code-owned tables. JSON module imports provide the built fallback while a single pages.json fetch refreshes the panel.
+Node 22 이상. 서버 없이 정적 파일만 있으면 된다.
 
-Run node tools/wikisrc-gate.mjs against the static server to check fresh-build hashes, category sources, number-free prose, rendered bodies and controls.
+```
+npm install
+npm run serve
+```
 
-## Gates
+브라우저에서 http://127.0.0.1:10310/web/index.html 을 연다. 가로 화면이 기본이고 탭이 좌우, 홀드가 깊이를 정한다. 조작 전체는 위키의 조작 페이지에 있다.
 
-| Gate | What it proves |
-| --- | --- |
-| `node tools/live-gate.mjs` | Five deployed GitHub Pages files match HEAD by SHA-256; a fresh phone landscape browser completes five balls through touch input and displays the round result without console errors; a 404 cannot complete the same flow; Start alone enters play with untouched empty credentials, no navigation and no cookies. An intercepted title that requires an account must fail that login axis. The 240-second gate records resource waits and a result PNG under `.omo/evidence/`. |
+## 라이선스
+
+코드는 비공개 저작물이다. 에셋 출처와 권리는 `web/assets/ledger.json`이 갖는다.
