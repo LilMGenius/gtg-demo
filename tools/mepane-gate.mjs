@@ -98,6 +98,18 @@ try {
   await p.waitForTimeout(420);
   await standDown(true);
   await p.waitForTimeout(200);
+  // Like inkProbe below, plant geometry rather than require incidental HUD overlap.
+  // Keep the live caption's opacity untouched: the product must hide its ink.
+  const capPosition = await p.evaluate(() => {
+    const e = document.getElementById("caption");
+    const cap = e.getBoundingClientRect();
+    const h4 = document.querySelector("#me h4").getBoundingClientRect();
+    const originalTop = e.style.top;
+    const into = +(Math.min(cap.bottom, h4.bottom) - Math.max(cap.top, h4.top)).toFixed(1);
+    e.style.top = (parseFloat(getComputedStyle(e).top) + h4.top - cap.top) + "px";
+    return { originalTop, into };
+  });
+  await p.waitForTimeout(90);
   const capSeen = await p.evaluate(() => {
     const cap = document.getElementById("caption").getBoundingClientRect();
     const h4 = document.querySelector("#me h4").getBoundingClientRect();
@@ -125,6 +137,7 @@ try {
   await p.waitForTimeout(90);
   const capPlanted = await inkShot(capClip);
   await p.evaluate(() => { const q = document.getElementById("inkProbe"); if (q) q.remove(); });
+  await p.evaluate((top) => { document.getElementById("caption").style.top = top; }, capPosition.originalTop);
   await standDown(false);
   await p.evaluate(() => window.__me(false));
   await p.waitForTimeout(160);
@@ -132,7 +145,8 @@ try {
   const capInk = await inkMoved(capOn, capOff);
   const capCaught = await inkMoved(capOn, capPlanted);
   check("instrument:a-live-caption-stood-behind-the-header", capSeen.text.length > 0 && capSeen.into > 0,
-    JSON.stringify(capSeen.text) + " reaches " + capSeen.into + "px into the header box, caption opacity " + capSeen.op);
+    JSON.stringify(capSeen.text) + " naturally reaches " + capPosition.into + "px, planted at "
+    + capSeen.into + "px into the header box, caption opacity " + capSeen.op);
   check("control:the-ink-comparator-catches-a-planted-layer", capCaught.moved >= capCaught.all * 0.98,
     capCaught.moved + " of " + capCaught.all + "px caught under a planted layer");
   check("mepane:the-header-carries-no-caption-ink-at-1280x720", capInk.moved === 0 && capStill.moved === 0,
