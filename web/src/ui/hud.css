@@ -826,7 +826,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
      창은 inset:0이라 첫 단이 화면 맨 위, 곧 띠와 같은 자리에서 시작해서 실측 740x360에서 초상과 이름이
      띠 아래끝 66.2px보다 61.8px 위에 서고 캐시 칩을 통째로 덮었다. 여기서 첫 단은 실측 71.4px에 서고,
      길어진 만큼은 창이 제 스크롤로 받는다(숨은 높이 436px에서 503px). */
-  #me{padding-top:calc(var(--strip-b) + var(--lift) + var(--gap-2) + env(safe-area-inset-top));gap:var(--gap-2)}
+  #me{padding-top:calc(var(--strip-b) + var(--lift) + var(--gap-1) + env(safe-area-inset-top));gap:var(--gap-1)}
   #me .card{max-height:none;gap:var(--gap-1)}
   #me .pane{max-height:none;gap:var(--gap-1);padding-top:0}
   /* 걸친 것은 맨 아래로 간다. 창을 연 이유는 탭 안의 답이고 걸친 것은 그 답이 아닌데,
