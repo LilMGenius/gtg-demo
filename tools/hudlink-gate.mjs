@@ -8,7 +8,7 @@ import { HUD_LINKS } from '../web/src/ui/links.mjs';
 const ROOT = new URL('../', import.meta.url);
 const BASE = 'http://127.0.0.1:10310/web/index.html';
 const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
-const evidence = new URL('.omo/evidence/', ROOT);
+const evidence = new URL(process.env.GTG_EVIDENCE_DIR || '.omo/evidence/', ROOT);
 mkdirSync(evidence, { recursive: true });
 const timer = setTimeout(() => { console.log('WATCHDOG'); process.exit(1); }, 90000);
 timer.unref();
@@ -17,7 +17,7 @@ const check = (name, ok, detail) => {
   console.log((ok ? 'GREEN ' : 'RED ') + name + ' ' + JSON.stringify(detail));
   if (!ok) failures.push(name);
 };
-const parent = (path) => execFileSync('git', ['show', '1e46fcd:' + path], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1024 * 1024 });
+const parent = (path, ref = '1e46fcd') => execFileSync('git', ['show', ref + ':' + path], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1024 * 1024 });
 const hidden = (p, id) => p.locator('#' + id).evaluate((e) => e.hidden);
 const target = async (p, row) => await p.locator('#' + row.panel).isVisible()
   && (!row.cat || await p.locator('#wiki [aria-current="true"]').getAttribute('data-cat') === row.cat);
@@ -40,7 +40,8 @@ try {
     if (mode) {
       const paths = mode === 'baseline' ? ['web/index.html', 'web/src/main.mjs', 'web/src/ui/hud.css'] : ['web/src/main.mjs'];
       for (const path of paths) {
-        const body = parent(path);
+        // The 24px target floor owns geometry; the older routing failure remains the behavior control.
+        const body = parent(path, mode === 'baseline' ? 'e373e2f' : '1e46fcd');
         await p.route('**/' + path + (path.endsWith('.html') ? '*': ''), (route) => route.fulfill({
           contentType: path.endsWith('.html') ? 'text/html' : path.endsWith('.css') ? 'text/css' : 'text/javascript', body
         }));
