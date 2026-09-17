@@ -17,7 +17,7 @@
     "gate:perf": "node tools/perf-gate.mjs",
     "gate:version": "node tools/version-gate.mjs",
     "test": "node --test test/contract.test.mjs",
-    "wiki:build": "gamewiki check web/wiki/src && gamewiki embed web/wiki/src --out web/wiki/dist --clean"
+    "wiki": "gamewiki check web/wiki/src && gamewiki embed web/wiki/src --out web/wiki/dist --clean && gamewiki build web/wiki/src --out web/wiki/site --clean --base /gtg-demo/web/wiki/site"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.4.2",

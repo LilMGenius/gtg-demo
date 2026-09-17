@@ -40,6 +40,7 @@ const table = (heads, list) => '<table><thead><tr>'
 // JSON modules provide a synchronous built fallback; one fetch refreshes the pages.
 import builtPages from '../../wiki/dist/pages.json' with { type: 'json' };
 import entities from '../../wiki/dist/entities.json' with { type: 'json' };
+const SITE_URL = new URL('../../wiki/site/index.html', import.meta.url).href;
 const CONSTANTS = {
   wallet: { COIN_SAVE, COIN_CONCEDED, COIN_DRILL, CASH_RATE },
   roster: { PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP },
@@ -63,7 +64,7 @@ export const wikiReady = typeof window === 'undefined' ? Promise.resolve() : fet
 
 const TABLES = {
   game: () => [table(['자리', '값'], [['버전', 'v' + VERSION], ['빌드', 'v' + VERSION + '+…']]),
-    '<button class="copy" type="button">복사</button>'],
+    '<button class="copy" type="button">복사</button> <a class="site" href="' + SITE_URL + '" target="_blank" rel="noopener">브라우저에서 위키 열기</a>'],
   hand: (ctx) => [
       (typeof document !== 'undefined' && !document.fullscreenEnabled && !document.documentElement.webkitRequestFullscreen) ? '<p>iPhone에서는 공유 메뉴에서 홈 화면에 추가한 뒤 실행하면 전체 화면으로 플레이할 수 있다.</p>' : '',
       table(['키', '하는 일'], KEY_MAP.map(({ label, note }) => [label, note])),
