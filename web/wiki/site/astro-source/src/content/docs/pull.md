@@ -6,6 +6,8 @@ title: "이적시장"
 
 <p>이용권은 완봉으로 쌓인다</p>
 <p>보유한 키퍼는 제외하므로 현재 확률은 상점의 확률 표를 따른다.</p>
+<table><thead><tr><th>자리</th><th>값</th></tr></thead><tbody><tr><th scope="row">한 장</th><td>380</td></tr><tr><th scope="row">묶음</th><td>10</td></tr><tr><th scope="row">묶음 보상</th><td>1</td></tr><tr><th scope="row">이용권 한도</th><td>40</td></tr></tbody></table>
+<table><thead><tr><th>종류</th><th>설명</th></tr></thead><tbody><tr><th scope="row">동네 이적시장</th><td>아직 없는 키퍼 중 한 장이 나온다</td></tr><tr><th scope="row">전설 이적시장</th><td>명성 9 이상만 나온다. 이용권은 안 받는다</td></tr></tbody></table>
 
 <h2 id="related-entries">Related entries</h2>
 

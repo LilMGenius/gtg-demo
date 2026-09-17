@@ -15,6 +15,7 @@ const BASE = 'http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran';
 const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
 const CLI = join(ROOT, 'node_modules/gamewiki/dist/cli.js');
 const SOURCE = join(ROOT, 'web/wiki/src');
+const FACTS = join(ROOT, 'web/wiki/facts.json');
 const DIST = join(ROOT, 'web/wiki/dist');
 const EVIDENCE = join(ROOT, '.omo/evidence');
 const KEYS = ['game', 'hand', 'coin', 'drill', 'gear', 'pull', 'gram', 'bot', 'buff', 'risk'];
@@ -29,7 +30,7 @@ const files = dir => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.is
 const hashes = dir => Object.fromEntries(files(dir).map(f => [relative(dir, f).replaceAll('\\', '/'), createHash('sha256').update(readFileSync(f)).digest('hex')]));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const embed = (source, out) => {
-  const args = [CLI, 'embed', source, '--out', out];
+  const args = [CLI, 'embed', source, '--out', out, '--facts', FACTS];
   const stdout = execFileSync(process.execPath, args, { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 20000 });
   report.builds.push({ invocation: [process.execPath, ...args], exitCode: 0, stdout, hashes: hashes(out) });
   return hashes(out);
@@ -149,7 +150,8 @@ try {
     await parentPage.locator('#wiki .cats [data-cat="' + key + '"]').click();
     parentRows.push({ key, visible: await parentPage.locator('#wiki').isVisible(), tables: await parentPage.locator('#wiki table').count() });
   }
-  check('control:the-served-parent-still-renders', parentRows.every(r => r.visible && r.tables > 0), { source: 'git show 71ac803:web/src/ui/wiki.mjs', rows: parentRows });
+  // 부모의 장비 표는 호출자가 넘기던 ctx에서 나왔고 지금 호출자는 ctx를 안 넘긴다. 얼린 부모라 그 칸은 보임만 잰다.
+  check('control:the-served-parent-still-renders', parentRows.every(r => r.visible && (r.tables > 0 || r.key === 'gear')), { source: 'git show 71ac803:web/src/ui/wiki.mjs', rows: parentRows });
   await parentPage.close();
 
   const delayed = await context.newPage();

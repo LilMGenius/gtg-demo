@@ -3,7 +3,7 @@
     "backlinks": [
       "gram"
     ],
-    "bodyHtml": "<p>봇이 대신 막은 슛에는 팔로워가 안 붙는다</p>\n<p>판단력만 봇 값으로 바뀐다</p>\n<p>크레딧은 여섯 시간까지만 쌓인다</p>\n<p>봇은 판마다 얻는 훈련 두 회와 오프라인 적립을 핸들링부터 세이브에 도움이 되는 순서로 훈련하는 데 쓴다.</p>",
+    "bodyHtml": "<p>봇이 대신 막은 슛에는 팔로워가 안 붙는다</p>\n<p>판단력만 봇 값으로 바뀐다</p>\n<p>크레딧은 여섯 시간까지만 쌓인다</p>\n<p>봇은 판마다 얻는 훈련 두 회와 오프라인 적립을 핸들링부터 세이브에 도움이 되는 순서로 훈련하는 데 쓴다.</p>\n<table><thead><tr><th>이름</th><th>판단력</th><th>분</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">중고 훈련용 더미</th><td>3</td><td>20</td><td>150</td></tr><tr><th scope=\"row\">동네 공업사 클론</th><td>6</td><td>45</td><td>390</td></tr><tr><th scope=\"row\">연구소 유출 피지컬 AI</th><td>9</td><td>90</td><td>840</td></tr></tbody></table>",
     "categories": [
       "bot"
     ],
@@ -16,7 +16,7 @@
     "backlinks": [
       "bot"
     ],
-    "bodyHtml": "<p>시간이 아니라 슛으로 닳는다. 한 번에 한 종류만 든다</p>\n<p>한 종류를 다 쓰기 전에는 다른 종류를 못 산다</p>\n<p>쌓아 둘 수 있는 슛에는 한도가 있다</p>",
+    "bodyHtml": "<p>시간이 아니라 슛으로 닳는다. 한 번에 한 종류만 든다</p>\n<p>한 종류를 다 쓰기 전에는 다른 종류를 못 산다</p>\n<p>쌓아 둘 수 있는 슛에는 한도가 있다</p>\n<table><thead><tr><th>이름</th><th>효과</th><th>슛</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">자양강장제</th><td>한눈팔기와 수다가 반으로 준다. 수다로 버는 팔로워가 반으로 준다</td><td>12</td><td>220</td></tr><tr><th scope=\"row\">바이럴 떡밥</th><td>소문이 1.5배로 퍼진다. 막는 실력과는 무관하다</td><td>8</td><td>260</td></tr><tr><th scope=\"row\">송진 스프레이</th><td>장갑 한 등급이 손에 더 붙는다. 3등급도 이득이다</td><td>10</td><td>300</td></tr></tbody></table>",
     "categories": [
       "buff"
     ],
@@ -45,7 +45,7 @@
       "coin-save",
       "hand"
     ],
-    "bodyHtml": "<p>골드와 캐시는 나중에 바꿀 수 있는 임시 일반 재화 이름이다.</p>\n<p>캐시 값은 골드 값을 환산 표 하나에서 유도한 대안 결제이고 환산 비율은 시험값이다.</p>\n<p>유명한 키커일수록 막았을 때 더 붙는다</p>\n<p>세이브 다섯 칸은 이번 판의 슛 결과다: 초록은 세이브, 빨강은 실점, 노랑은 진행 중이다</p>",
+    "bodyHtml": "<p>골드와 캐시는 나중에 바꿀 수 있는 임시 일반 재화 이름이다.</p>\n<p>캐시 값은 골드 값을 환산 표 하나에서 유도한 대안 결제이고 환산 비율은 시험값이다.</p>\n<p>유명한 키커일수록 막았을 때 더 붙는다</p>\n<p>세이브 다섯 칸은 이번 판의 슛 결과다: 초록은 세이브, 빨강은 실점, 노랑은 진행 중이다</p>\n<table><thead><tr><th>자리</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">막으면</th><td>12</td></tr><tr><th scope=\"row\">최상급</th><td>30</td></tr><tr><th scope=\"row\">먹혀도</th><td>4</td></tr><tr><th scope=\"row\">훈련 대신</th><td>12</td></tr><tr><th scope=\"row\">캐시 한 단위</th><td>10</td></tr></tbody></table>",
     "categories": [
       "coin"
     ],
@@ -85,7 +85,7 @@
       "coin",
       "drill"
     ],
-    "bodyHtml": "<p>판이 끝나면 훈련 두 회가 쌓인다</p>\n<p><a class=\"internal new\" href=\"./drill.html\">훈련</a>은 능력 한 칸을 올린다</p>\n<p>올릴 칸이 없으면 훈련 한 회가 {{value}} 골드로 바뀐다</p>",
+    "bodyHtml": "<p>판이 끝나면 훈련 두 회가 쌓인다</p>\n<p><a class=\"internal new\" href=\"./drill.html\">훈련</a>은 능력 한 칸을 올린다</p>\n<p>올릴 칸이 없으면 훈련 한 회가 12 골드로 바뀐다</p>\n<table><thead><tr><th>자리</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">훈련 대신</th><td>12</td></tr></tbody></table>",
     "categories": [
       "drill"
     ],
@@ -98,7 +98,7 @@
   },
   {
     "backlinks": [],
-    "bodyHtml": "<p>동네 운동장 방치형</p>\n<p>막아도 안 끝난다. 끝까지 봐야 안다</p>\n<p>조작은 <a class=\"internal new\" href=\"./hand.html\">조작</a> 페이지가 갖는다</p>\n<p><a href=\"../../index.html\">게임으로 돌아가기</a></p>",
+    "bodyHtml": "<p>동네 운동장 방치형</p>\n<p>막아도 안 끝난다. 끝까지 봐야 안다</p>\n<p>조작은 <a class=\"internal new\" href=\"./hand.html\">조작</a> 페이지가 갖는다</p>",
     "categories": [
       "game"
     ],
@@ -113,7 +113,7 @@
     "backlinks": [
       "drill"
     ],
-    "bodyHtml": "",
+    "bodyHtml": "\n<h3>장갑</h3><table><thead><tr><th>이름</th><th>효과</th></tr></thead><tbody><tr><th scope=\"row\">장터 목장갑</th><td>아무것도 안 샀을 때 끼고 있는 것</td></tr><tr><th scope=\"row\">고무코팅 목장갑</th><td>젖은 공을 한 번은 붙잡는다</td></tr><tr><th scope=\"row\">송진 범벅 장갑</th><td>손에서 공이 잘 안 떨어진다</td></tr><tr><th scope=\"row\">문어 빨판 장갑</th><td>안 떨어진다. 벗겨지지도 않는다</td></tr></tbody></table>\n<h3>축구화</h3><table><thead><tr><th>이름</th><th>효과</th></tr></thead><tbody><tr><th scope=\"row\">학교 앞 실내화</th><td>아무것도 안 샀을 때 신고 있는 것</td></tr><tr><th scope=\"row\">바닥 닳은 조기축구화</th><td>그래도 미끄러지지는 않는다</td></tr><tr><th scope=\"row\">스터드 여섯 개 축구화</th><td>흙을 물고 첫 발이 빨리 뜬다</td></tr><tr><th scope=\"row\">육상용 스파이크</th><td>축구화는 아니다. 제일 빨리 뜬다</td></tr></tbody></table>\n<h3>유니폼</h3><table><thead><tr><th>이름</th><th>효과</th></tr></thead><tbody><tr><th scope=\"row\">아빠 옷장 면티</th><td>아무것도 안 샀을 때 입고 있는 것</td></tr><tr><th scope=\"row\">학교 체육복 상의</th><td>적어도 땀은 먹는다</td></tr><tr><th scope=\"row\">조기회 단체복</th><td>등에 동네 철물점 이름이 박혀 있다</td></tr><tr><th scope=\"row\">패드 박은 골키퍼 저지</th><td>어깨에 스펀지가 들었다. 밀려도 덜 밀린다</td></tr></tbody></table>\n<h3>양말</h3><table><thead><tr><th>이름</th><th>효과</th></tr></thead><tbody><tr><th scope=\"row\">목 늘어난 흰 양말</th><td>아무것도 안 샀을 때 신고 있는 것</td></tr><tr><th scope=\"row\">축구 스타킹</th><td>적어도 흘러내리지는 않는다</td></tr><tr><th scope=\"row\">정강이 보호대 낀 스타킹</th><td>까져도 덜 아파서 덜 눕는다</td></tr><tr><th scope=\"row\">미끄럼방지 그립 양말</th><td>발이 신발 안에서 안 논다. 넘어져도 금방 선다</td></tr></tbody></table>\n<h3>골대</h3><table><thead><tr><th>이름</th><th>효과</th></tr></thead><tbody><tr><th scope=\"row\">기울어진 동네 철골대</th><td>아무것도 안 샀을 때 뒤에 서 있는 것</td></tr><tr><th scope=\"row\">구멍 기운 나일론 그물</th><td>뚫린 데는 없다. 그게 전부다</td></tr><tr><th scope=\"row\">팽팽하게 당겨 맨 그물</th><td>맞으면 팅 소리가 난다</td></tr><tr><th scope=\"row\">공을 먹는 촘촘한 겹그물</th><td>들어간 공이 안 나온다. 튄 공도 안 나온다</td></tr></tbody></table>\n<h3>동네</h3><table><thead><tr><th>이름</th><th>효과</th></tr></thead><tbody><tr><th scope=\"row\">동네 뒷산 공터</th><td>아무것도 안 샀을 때 서 있는 곳. 지나가는 사람이 거의 없다</td></tr><tr><th scope=\"row\">학교 앞 흙 운동장</th><td>하교 시간에 사람이 지나간다. 가끔 고개가 돌아간다</td></tr><tr><th scope=\"row\">역세권 풋살장</th><td>유동인구가 많다. 막으면 소문이 빨리 난다</td></tr><tr><th scope=\"row\">번화가 한복판 코트</th><td>사방이 사람이다. 팔로워도 실점도 같이 는다</td></tr></tbody></table>\n<h3>헤어</h3><table><thead><tr><th>이름</th><th>효과</th></tr></thead><tbody><tr><th scope=\"row\">엄마가 깎아준 머리</th><td>아무것도 안 샀을 때 머리</td></tr><tr><th scope=\"row\">동네 미용실 투블럭</th><td>적어도 단정하다</td></tr><tr><th scope=\"row\">탈색한 노란 머리</th><td>멀리서도 누군지 보인다</td></tr><tr><th scope=\"row\">불붙은 빨간 모히칸</th><td>관중석이 먼저 알아본다</td></tr></tbody></table>\n<h3>타투</h3><table><thead><tr><th>이름</th><th>효과</th></tr></thead><tbody><tr><th scope=\"row\">맨살</th><td>아무것도 안 새겼을 때 팔</td></tr><tr><th scope=\"row\">지워지는 문신 스티커</th><td>땀에 번진다. 그래도 있어 보인다</td></tr><tr><th scope=\"row\">팔뚝에 새긴 이름 석 자</th><td>누구 이름인지는 안 밝힌다</td></tr><tr><th scope=\"row\">어깨까지 채운 먹토시</th><td>반팔을 입으면 소매가 하나 더 있다</td></tr></tbody></table>",
     "categories": [
       "gear"
     ],
@@ -131,7 +131,7 @@
       "pull",
       "selfie-base"
     ],
-    "bodyHtml": "<p>막은 슛이 소문이 되어 팔로워가 붙는다</p>\n<p>맞팔은 소문을 조금씩 넓힌다</p>\n<p>동네 등급이 오르면 같은 슛에 더 붙는다</p>",
+    "bodyHtml": "<p>막은 슛이 소문이 되어 팔로워가 붙는다</p>\n<p>맞팔은 소문을 조금씩 넓힌다</p>\n<p>동네 등급이 오르면 같은 슛에 더 붙는다</p>\n<table><thead><tr><th>자리</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">좋아요</th><td>3</td></tr><tr><th scope=\"row\">동네 한 등급</th><td>4</td></tr><tr><th scope=\"row\">맞팔 한 명</th><td>0.03</td></tr><tr><th scope=\"row\">맞팔 한도</th><td>1.3</td></tr><tr><th scope=\"row\">같이 한 장</th><td>120</td></tr></tbody></table>",
     "categories": [
       "gram"
     ],
@@ -145,7 +145,7 @@
       "game",
       "risk"
     ],
-    "bodyHtml": "<p>화면 세 칸을 누른다. 공이 올 곳을 찍는다</p>\n<p>너무 빠르면 역동작, 너무 늦으면 손이 안 닿는다</p>\n<p>마우스도 같은 세 칸이고 키보드도 된다</p>\n<p>컨디션은 이번 판의 능력에 더해지는 보정이다</p>",
+    "bodyHtml": "<p>화면 세 칸을 누른다. 공이 올 곳을 찍는다</p>\n<p>너무 빠르면 역동작, 너무 늦으면 손이 안 닿는다</p>\n<p>마우스도 같은 세 칸이고 키보드도 된다</p>\n<p>컨디션은 이번 판의 능력에 더해지는 보정이다</p>\n<table><thead><tr><th>키</th><th>하는 일</th></tr></thead><tbody><tr><th scope=\"row\">Escape</th><td>창 닫기, 개봉은 순서대로 확인</td></tr><tr><th scope=\"row\">Tab / Shift+Tab</th><td>카테고리 다음 / 이전</td></tr><tr><th scope=\"row\">F6 / Shift+F6</th><td>창 안 버튼 다음 / 이전</td></tr><tr><th scope=\"row\">W / S / G / R / M / F</th><td>위키 / 상점 / 훈련장 / 선수 명단 / 내 정보 / 아웃문그램</td></tr><tr><th scope=\"row\">V</th><td>전체 화면 전환</td></tr><tr><th scope=\"row\">A</th><td>자동 조작</td></tr><tr><th scope=\"row\">D</th><td>돌진</td></tr><tr><th scope=\"row\">← / ↑ / →</th><td>왼쪽 / 가운데 / 오른쪽 다이빙</td></tr><tr><th scope=\"row\">Space</th><td>선택한 버튼 실행, 경기장에서는 가운데 다이빙</td></tr><tr><th scope=\"row\">Enter</th><td>선택한 버튼 실행</td></tr></tbody></table>\n<table><thead><tr><th>버튼</th><th>하는 일</th></tr></thead><tbody><tr><th scope=\"row\">돌진</th><td>각을 좁히러 나간다. 뚫리면 골대가 빈다</td></tr></tbody></table>",
     "categories": [
       "hand"
     ],
@@ -214,7 +214,7 @@
       "pull-cost",
       "ticket-cap"
     ],
-    "bodyHtml": "<p>이용권은 완봉으로 쌓인다</p>\n<p>보유한 키퍼는 제외하므로 현재 확률은 상점의 확률 표를 따른다.</p>",
+    "bodyHtml": "<p>이용권은 완봉으로 쌓인다</p>\n<p>보유한 키퍼는 제외하므로 현재 확률은 상점의 확률 표를 따른다.</p>\n<table><thead><tr><th>자리</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">한 장</th><td>380</td></tr><tr><th scope=\"row\">묶음</th><td>10</td></tr><tr><th scope=\"row\">묶음 보상</th><td>1</td></tr><tr><th scope=\"row\">이용권 한도</th><td>40</td></tr></tbody></table>\n<table><thead><tr><th>종류</th><th>설명</th></tr></thead><tbody><tr><th scope=\"row\">동네 이적시장</th><td>아직 없는 키퍼 중 한 장이 나온다</td></tr><tr><th scope=\"row\">전설 이적시장</th><td>명성 9 이상만 나온다. 이용권은 안 받는다</td></tr></tbody></table>",
     "categories": [
       "pull"
     ],
@@ -266,7 +266,7 @@
     "backlinks": [
       "buff"
     ],
-    "bodyHtml": "<p>입력 셋이 어긋나면 그 슛은 거기서 갈린다</p>",
+    "bodyHtml": "<p>입력 셋이 어긋나면 그 슛은 거기서 갈린다</p>\n<table><thead><tr><th>입력</th><th>무엇</th></tr></thead><tbody><tr><th scope=\"row\">방향</th><td>고른 자리</td></tr><tr><th scope=\"row\">타이밍</th><td>누른 때</td></tr><tr><th scope=\"row\">욕심</th><td>나간 거리</td></tr></tbody></table>\n<table><thead><tr><th>사고</th><th>깎는 선반</th></tr></thead><tbody><tr><th scope=\"row\">장갑이 벗겨지는 사고</th><td>장갑</td></tr><tr><th scope=\"row\">손에서 흘리는 사고</th><td>장갑</td></tr><tr><th scope=\"row\">첫 발이 뜨는 데 걸리는 시간</th><td>축구화</td></tr><tr><th scope=\"row\">정면 강슛에 같이 밀려 들어가는 사고</th><td>유니폼</td></tr><tr><th scope=\"row\">착지에 실패하는 사고</th><td>양말</td></tr></tbody></table>",
     "categories": [
       "risk"
     ],

@@ -8,6 +8,8 @@ title: "세 칸과 타이밍"
 <p>너무 빠르면 역동작, 너무 늦으면 손이 안 닿는다</p>
 <p>마우스도 같은 세 칸이고 키보드도 된다</p>
 <p>컨디션은 이번 판의 능력에 더해지는 보정이다</p>
+<table><thead><tr><th>키</th><th>하는 일</th></tr></thead><tbody><tr><th scope="row">Escape</th><td>창 닫기, 개봉은 순서대로 확인</td></tr><tr><th scope="row">Tab / Shift+Tab</th><td>카테고리 다음 / 이전</td></tr><tr><th scope="row">F6 / Shift+F6</th><td>창 안 버튼 다음 / 이전</td></tr><tr><th scope="row">W / S / G / R / M / F</th><td>위키 / 상점 / 훈련장 / 선수 명단 / 내 정보 / 아웃문그램</td></tr><tr><th scope="row">V</th><td>전체 화면 전환</td></tr><tr><th scope="row">A</th><td>자동 조작</td></tr><tr><th scope="row">D</th><td>돌진</td></tr><tr><th scope="row">← / ↑ / →</th><td>왼쪽 / 가운데 / 오른쪽 다이빙</td></tr><tr><th scope="row">Space</th><td>선택한 버튼 실행, 경기장에서는 가운데 다이빙</td></tr><tr><th scope="row">Enter</th><td>선택한 버튼 실행</td></tr></tbody></table>
+<table><thead><tr><th>버튼</th><th>하는 일</th></tr></thead><tbody><tr><th scope="row">돌진</th><td>각을 좁히러 나간다. 뚫리면 골대가 빈다</td></tr></tbody></table>
 
 <h2 id="related-entries">Related entries</h2>
 

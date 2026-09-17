@@ -7,7 +7,6 @@ title: "이 게임"
 <p>동네 운동장 방치형</p>
 <p>막아도 안 끝난다. 끝까지 봐야 안다</p>
 <p>조작은 <a class="internal new" href="./hand.html">조작</a> 페이지가 갖는다</p>
-<p><a href="../../index.html">게임으로 돌아가기</a></p>
 
 <h2 id="related-entries">Related entries</h2>
 
