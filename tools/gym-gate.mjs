@@ -202,7 +202,7 @@ try {
       return Math.round(h * 100) / 100;
     })()
   });
-  const shallow = await b.newContext({ viewport: { width: 740, height: 400 }, deviceScaleFactor: 2 });
+  const shallow = await b.newContext({ viewport: { width: 740, height: 360 }, deviceScaleFactor: 2 });
   const sp = await shallow.newPage();
   sp.on("pageerror", (e) => errs.push(String(e)));
   sp.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
@@ -210,7 +210,17 @@ try {
   await sp.mouse.move(2, 2);
   await sp.waitForTimeout(150);
   const lip = (await sp.evaluate(lipOf)).probe;
+  // Reuse column's scrollHeight - clientHeight measurement at the same maxed preset.
+  // Adding overflow minus half the shade keeps this fixture shallow as the HUD grows.
+  const shallowBase = await column(sp);
+  const shallowHeight = Math.round(shallowBase.ih + shallowBase.over - lip / 2);
+  await sp.setViewportSize({ width: 740, height: shallowHeight });
+  await sp.waitForTimeout(300);
   const thin = await column(sp);
+  check("instrument:the-derived-viewport-hides-less-than-a-shade",
+    thin.over > 0 && thin.over <= lip,
+    "base 740x" + shallowBase.ih + " hides " + shallowBase.over + "px, shade " + lip
+    + "px, derived 740x" + shallowHeight + " hides " + thin.over + "px");
   /* 굴린 뒤의 닫기. 얕은 띠에서도 사람이 나갈 길이 있다는 것을 이 한 줄이 잰다. */
   await sp.evaluate(() => { const g = document.getElementById("gym"); g.scrollTop = g.scrollHeight; });
   await sp.waitForTimeout(200);
