@@ -105,6 +105,6 @@ valueFrom은 코드 상수의 이름이다. `wiki.mjs`가 식을 평가하지 �
 
 실측과 갈래와 판단 근거는 지식 레포 https://github.com/DaedalGames/daedal-games 의 `feat/gtg` 브랜치가 소유한다. 여기가 갖는 것은 이름뿐이다. 근거를 같이 쓰면 두 곳이 같은 글을 들고 있다가 한쪽이 낡고, 낡은 쪽을 읽은 랩이 이미 답이 난 질문을 다시 연다. 목록을 따로 파일로 떼지 않는 이유도 같다. 파일이 하나 늘면 그 파일이 소유하는 것이 무엇인지를 또 적어야 하고, 이 문서가 이미 그 규칙을 소유하고 있다.
 
-대기 중인 게이트는 `version` 하나다. 태그 v0.4.0부터 v0.7.0이 트랙 경계에 붙었고 매니페스트는 0.4.0에 서 있어 빨강 다섯 줄이 나는데, 정렬은 경계 커밋마다 범프를 끼워 넣는 이력 수술이라 파운더 승인을 기다린다. 이 게이트를 범프 커밋 하나로 초록으로 만들면 태그 넷이 가리키는 트리는 그대로 0.4.0이라 좌표가 안 맞는다. 구매 효과 부착 여섯(gear-effect, bot-effect, lategear, rapport, offball, corr)은 e243bd7이, 원장 권리는 774c39b가 닫았고, `balance`는 정본 docs/gamedev/balance.md대로 기준선 이동 감시라 답한 이동 뒤에 기준선을 다시 박는다. 편중(핸들링의 한계 세이브 가치가 2위의 5.2배)은 후보 스물여덟이 가드에 걸려 REJECT로 기록됐고(.omo/evidence/ai-balance-lap-2.txt) 다음 밸런스 랩의 문제다. `crowd`는 초록이라 이 목록의 대조군이다.
+대기 중인 게이트는 지금 없다. 구매 효과 부착 여섯(gear-effect, bot-effect, lategear, rapport, offball, corr)은 0cdd5ce이, 원장 권리는 1f8c32d가 닫았고, `balance`는 정본 docs/gamedev/balance.md대로 기준선 이동 감시라 답한 이동 뒤에 기준선을 다시 박는다. 편중(핸들링의 한계 세이브 가치가 2위의 5.2배)은 후보 스물여덟이 가드에 걸려 REJECT로 기록됐고(.omo/evidence/ai-balance-lap-2.txt) 다음 밸런스 랩의 문제다. `crowd`는 초록이라 이 목록의 대조군이다.
 
 계기는 브라우저를 여는 것과 시드만 돌리는 것 둘로 나뉘지만 폴더는 하나다. 판정 계기를 따로 두면 게이트를 셀 때 한쪽이 빠지고, 빠진 쪽은 아무도 안 돌린다. `cause-gate`와 `physique-gate`는 원인 귀속과 체격 방향을 재고 `growth-gate`와 `tempo-gate`는 성장과 회전이 화면을 바꾸는지 재는 트립와이어다. 넷 다 브라우저 없이 돈다.
