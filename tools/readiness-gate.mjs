@@ -4,6 +4,7 @@ import { dirname, resolve, relative, extname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { crc32, inflateSync } from 'node:zlib';
 import assert from 'node:assert/strict';
+import { runInNewContext } from 'node:vm';
 import { KEEPERS, pullWeight } from '../src/roster.mjs';
 
 // Repository gate shape; WCAG formula: https://www.w3.org/TR/WCAG22/#dfn-relative-luminance
@@ -153,12 +154,24 @@ axis('ftue-ordered-ids', () => {
 axis('wiki-searchable-odds', () => {
   const pages = JSON.parse(read('web/wiki/dist/pages.json'));
   const page = pages.find(p => p.id === 'pull' && p.categories.includes('pull'));
-  assert(page); const text = page.bodyHtml.replace(/<[^>]*>/g, ' ');
-  const total = KEEPERS.reduce((n, k) => n + pullWeight(k), 0);
-  const odds = [k => k.fame >= 10, k => k.fame === 9, k => k.fame <= 8].map(f => (KEEPERS.filter(f).reduce((n, k) => n + pullWeight(k), 0) / total * 100).toFixed(2) + '%');
-  lines.push('POOL_ODDS ' + JSON.stringify({ population: KEEPERS.length, totalWeight: total, odds }));
-  assert(odds.every(n => text.includes(n) && read('web/wiki/src/pull.md').includes(n)), 'Built pull text lacks full-roster reference odds: ' + odds.join(', '));
-  assert(/<table\b/i.test(page.bodyHtml) && !/<canvas\b/i.test(page.bodyHtml)); return 'searchable full-roster reference ' + odds.join(', ') + '; current unowned pool belongs to pull gate';
+  assert(page && !/[0-9]/.test(page.bodyHtml.replace(/<[^>]*>/g, ' ')));
+  // Execute the product's pure HTML formatter with Node vm; browser visibility remains pull-gate's axis.
+  const bands = [...main.matchAll(/const ODDS_BANDS = \[[\s\S]*?\n\];/g)];
+  const formatters = [...main.matchAll(/function shopOdds\(pool\) \{[\s\S]*?\n\}/g)];
+  assert.equal(bands.length, 1); assert.equal(formatters.length, 1);
+  assert(main.includes("+ shopOdds(pool) + '</em></details>'"));
+  for (const pool of [KEEPERS, KEEPERS.slice(1)]) {
+    const rendered = runInNewContext(bands[0][0] + '\n' + formatters[0][0] + '\nshopOdds(pool)', { pool, pullWeight }, { timeout: 1000 });
+    const parsed = [...rendered.matchAll(/<span><i>([^<]+)<\/i><b>([\d.]+%)<\/b><u>(\d+)<\/u><\/span>/g)].map(m => [m[2], Number(m[3])]);
+    const total = pool.reduce((n, k) => n + pullWeight(k), 0);
+    const expected = [k => k.fame >= 10, k => k.fame === 9, k => k.fame <= 8].map(f => {
+      const group = pool.filter(f);
+      return [(group.reduce((n, k) => n + pullWeight(k), 0) / total * 100).toFixed(1) + '%', group.length];
+    });
+    assert.deepEqual(parsed, expected); assert(!/<canvas\b/i.test(rendered));
+    lines.push('POOL_ODDS ' + JSON.stringify({ population: pool.length, totalWeight: total, odds: parsed, text: rendered.replace(/<[^>]*>/g, ' ') }));
+  }
+  return 'actual shopOdds HTML text matches full and reduced pools; wiki has prose only; browser visibility owned by pull gate';
 });
 axis('currency-placeholder', () => {
   assert(read('web/wiki/src/cash-rate.md').includes('[[coin]]'));
