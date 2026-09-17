@@ -15,6 +15,8 @@ import { currentId } from './state/account.mjs';
 import { coinGain, readWallet, COIN_DRILL, cashPrice, pay } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
+import { AXIS_WORD, AXIS_UNIT, SHELF_NOTES_FOR_WIKI } from './state/shelf.mjs';
+export { SHELF_NOTES_FOR_WIKI };
 import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
 import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds, photoOdds, selfieFans,
   DM_MOVES, dmOdds, dmOutcome, dmClock, dmWaiting, applyDm } from './state/gram.mjs';
@@ -1285,8 +1287,7 @@ window.addEventListener('wiki-ready', () => { if (el('wiki') && !el('wiki').hidd
 function paintWiki() {
   const box = el('wiki');
   box.innerHTML = wikiUI.wikiHTML(wikiAt);
-  box.querySelector('.body').innerHTML = wikiUI.wikiBody(wikiAt,
-    { notices: SHOP_NOTICES_FOR_WIKI, shelves: SHELF_NOTES_FOR_WIKI, mishaps: MISHAP_SHELF });
+  box.querySelector('.body').innerHTML = wikiUI.wikiBody(wikiAt);
   wikiUI.mountWikiBuild?.(box);
   for (const b of box.querySelectorAll('.cats [data-cat]')) b.onclick = () => { wikiAt = b.dataset.cat; paintWiki(); };
   box.querySelector('.close').onclick = closeWiki;
@@ -1724,26 +1725,7 @@ const TONIC_FOCUS = 0.5;
 // 바이럴 떡밥이 소문에 곱하는 값. 판정 밖 축이라 팔로워에만 붙는다.
 const HYPE_BOOST = 1.5;
 
-const AXIS_WORD = {
-  tear: '장갑이 벗겨지는 사고',
-  spill: '손에서 흘리는 사고',
-  delay: '첫 발이 뜨는 데 걸리는 시간',
-  carry: '정면 강슛에 같이 밀려 들어가는 사고',
-  landing: '착지에 실패하는 사고',
-  neteat: '그물이 공을 먼저 먹는 확률',
-  gaze: '눈에 띄는 행인이 지나갈 확률',
-  passer: '동네에 서 있는 행인 수',
-  crowd: '소문이 퍼지는 배율'
-};
-// 축마다 단위가 다르다. 확률은 %p, 시간은 ms, 사람은 명이다.
-const AXIS_UNIT = { delay: 'ms', passer: '명', crowd: '%', tear: '%p', spill: '%p', carry: '%p', landing: '%p', neteat: '%p' };
 
-/* 사고를 깎는 선반. 축 이름과 선반 이름을 코드에서 맞대므로 위키가 짝을 옮겨 적지 않는다.
-   오르는 축인 그물과 동네는 사고가 아니라 이득이라 빠지고, 남는 것은 다섯 줄이다. */
-const MISHAP_SHELF = Object.keys(SHELVES)
-  .map((k) => [SHELVES[k].field, SHELVES[k].head])
-  .filter((p) => GEAR_STEP[p[0]])
-  .flatMap((p) => GEAR_STEP[p[0]].filter((st) => !st.up).map((st) => [AXIS_WORD[st.axis], p[1]]));
 
 /* 효과 한 줄을 항목과 값으로 가른다. 표는 칸이 둘이라 표이고, 이어 붙인 한 줄은 문장이다.
    가르는 자리를 여기 하나로 두어야 선반 카드가 쓰는 한 줄과 효과 표가 같은 수를 말한다. */
@@ -1821,19 +1803,7 @@ function clearSpec() {
   box.dataset.at = '';
 }
 
-// 상점 안내문은 다음 위키 화면이 가져갈 원문이다. 상점에는 안내문을 그리지 않는다.
-export const SHOP_NOTICES_FOR_WIKI = ['봇이 대신 막은 슛에는 팔로워가 안 붙는다', '시간이 아니라 슛으로 닳는다. 한 번에 한 종류만 든다'];
 
-/* 선반 카드가 들고 있던 설명 문장. 카드는 이제 효과 한 줄만 들으므로 이 문장들은 화면에서 내려왔고,
-   위의 상점 안내문과 같은 자리에 같은 형태로 선다. 다음 주인은 위키 화면이다.
-   문장을 여기 옮겨 적지 않고 선반 표에서 뽑는다. 옮겨 적으면 등급이 하나 늘어난 날
-   선반은 늘고 이 줄은 옛 수를 말한다. 그때까지 이 export가 서른두 줄의 유일한 독자이고,
-   rack 게이트의 축 하나가 선반 데이터와 이 값을 맞대 한 줄도 안 빠졌는지 센다. */
-export const SHELF_NOTES_FOR_WIKI = Object.keys(SHELVES).map((k) => ({
-  tab: k,
-  head: SHELVES[k].head,
-  rows: SHELVES[k].list.map((g) => ({ name: g.name, note: g.note }))
-}));
 
 // 탈의실. 지금 내 모습과 걸쳐 본 것을 한 자리에서 보여 준다.
 // 값을 치르기 전에 자기 몸에서 확인할 수 있어야 꾸미는 재미가 산다.

@@ -188,6 +188,13 @@ export default defineConfig({ base: "/gtg-demo/web/wiki/site", build: { format: 
       "label": "risk"
     }
   ],
+  "social": [
+    {
+      "href": "../../index.html",
+      "icon": "left-arrow",
+      "label": "Back to gtg"
+    }
+  ],
   "title": "gtg Wiki"
 }
 )] });

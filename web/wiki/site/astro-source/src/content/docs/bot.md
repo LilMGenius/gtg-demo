@@ -8,6 +8,7 @@ title: "봇"
 <p>판단력만 봇 값으로 바뀐다</p>
 <p>크레딧은 여섯 시간까지만 쌓인다</p>
 <p>봇은 판마다 얻는 훈련 두 회와 오프라인 적립을 핸들링부터 세이브에 도움이 되는 순서로 훈련하는 데 쓴다.</p>
+<table><thead><tr><th>이름</th><th>판단력</th><th>분</th><th>값</th></tr></thead><tbody><tr><th scope="row">중고 훈련용 더미</th><td>3</td><td>20</td><td>150</td></tr><tr><th scope="row">동네 공업사 클론</th><td>6</td><td>45</td><td>390</td></tr><tr><th scope="row">연구소 유출 피지컬 AI</th><td>9</td><td>90</td><td>840</td></tr></tbody></table>
 
 <h2 id="related-entries">Related entries</h2>
 
