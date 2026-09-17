@@ -415,6 +415,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 /* 복사도 위키의 버튼 재료를 쓰되 표의 값과 별도 조작으로 선다. */
 #wiki .copy{font-family:var(--body);font-size:var(--fs-body);color:var(--ink);background:var(--panel);
   border:var(--line) solid var(--edge);padding:.3em .8em;cursor:pointer}
+#wiki .site{font-family:var(--body);font-size:var(--fs-body);color:#ffd83d;margin-left:.8em}
 #wiki h4{font-family:var(--disp);font-weight:400;font-size:var(--fs-title);color:#ffd83d}
 #wiki h5{font-family:var(--body);font-weight:700;font-size:var(--fs-body);color:var(--ink)}
 #wiki .wiki-prose{display:contents}

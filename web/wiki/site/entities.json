@@ -1,0 +1,366 @@
+[
+  {
+    "aliases": [
+      "bot"
+    ],
+    "categories": [
+      "bot"
+    ],
+    "game": "gtg",
+    "id": "bot",
+    "relations": {
+      "relatedTo": [
+        "buff"
+      ]
+    },
+    "title": "봇",
+    "type": "guide"
+  },
+  {
+    "aliases": [
+      "buff"
+    ],
+    "categories": [
+      "buff"
+    ],
+    "game": "gtg",
+    "id": "buff",
+    "relations": {
+      "relatedTo": [
+        "risk"
+      ]
+    },
+    "title": "버프",
+    "type": "guide"
+  },
+  {
+    "aliases": [],
+    "categories": [
+      "coin"
+    ],
+    "game": "gtg",
+    "id": "cash-rate",
+    "relations": {
+      "explainedBy": [
+        "coin"
+      ]
+    },
+    "title": "환산",
+    "type": "value",
+    "valueFrom": "wallet.CASH_RATE"
+  },
+  {
+    "aliases": [
+      "coin"
+    ],
+    "categories": [
+      "coin"
+    ],
+    "game": "gtg",
+    "id": "coin",
+    "relations": {
+      "relatedTo": [
+        "drill"
+      ]
+    },
+    "title": "버는 법",
+    "type": "guide"
+  },
+  {
+    "aliases": [],
+    "categories": [
+      "coin"
+    ],
+    "game": "gtg",
+    "id": "coin-conceded",
+    "relations": {
+      "explainedBy": [
+        "coin"
+      ]
+    },
+    "title": "먹혀도",
+    "type": "value",
+    "valueFrom": "wallet.COIN_CONCEDED"
+  },
+  {
+    "aliases": [],
+    "categories": [
+      "coin"
+    ],
+    "game": "gtg",
+    "id": "coin-save",
+    "relations": {
+      "explainedBy": [
+        "coin"
+      ]
+    },
+    "title": "막으면",
+    "type": "value",
+    "valueFrom": "wallet.COIN_SAVE"
+  },
+  {
+    "aliases": [
+      "drill"
+    ],
+    "categories": [
+      "drill"
+    ],
+    "game": "gtg",
+    "id": "drill",
+    "relations": {
+      "relatedTo": [
+        "gear"
+      ]
+    },
+    "title": "능력",
+    "type": "guide",
+    "valueFrom": "wallet.COIN_DRILL"
+  },
+  {
+    "aliases": [
+      "game",
+      "about"
+    ],
+    "categories": [
+      "game"
+    ],
+    "game": "gtg",
+    "id": "game",
+    "relations": {
+      "relatedTo": [
+        "hand"
+      ]
+    },
+    "title": "이 게임",
+    "type": "guide"
+  },
+  {
+    "aliases": [
+      "gear"
+    ],
+    "categories": [
+      "gear"
+    ],
+    "game": "gtg",
+    "id": "gear",
+    "relations": {
+      "relatedTo": [
+        "pull"
+      ]
+    },
+    "title": "장비",
+    "type": "guide"
+  },
+  {
+    "aliases": [
+      "gram"
+    ],
+    "categories": [
+      "gram"
+    ],
+    "game": "gtg",
+    "id": "gram",
+    "relations": {
+      "relatedTo": [
+        "bot"
+      ]
+    },
+    "title": "팔로워와 맞팔",
+    "type": "guide"
+  },
+  {
+    "aliases": [
+      "hand"
+    ],
+    "categories": [
+      "hand"
+    ],
+    "game": "gtg",
+    "id": "hand",
+    "relations": {
+      "relatedTo": [
+        "coin"
+      ]
+    },
+    "title": "세 칸과 타이밍",
+    "type": "guide"
+  },
+  {
+    "aliases": [],
+    "categories": [
+      "gram"
+    ],
+    "game": "gtg",
+    "id": "like-base",
+    "relations": {
+      "explainedBy": [
+        "gram"
+      ]
+    },
+    "title": "좋아요",
+    "type": "value",
+    "valueFrom": "gram.LIKE_BASE"
+  },
+  {
+    "aliases": [],
+    "categories": [
+      "gram"
+    ],
+    "game": "gtg",
+    "id": "like-per-city",
+    "relations": {
+      "explainedBy": [
+        "gram"
+      ]
+    },
+    "title": "동네 한 등급",
+    "type": "value",
+    "valueFrom": "gram.LIKE_PER_CITY"
+  },
+  {
+    "aliases": [],
+    "categories": [
+      "gram"
+    ],
+    "game": "gtg",
+    "id": "mutual-cap",
+    "relations": {
+      "explainedBy": [
+        "gram"
+      ]
+    },
+    "title": "맞팔 한도",
+    "type": "value",
+    "valueFrom": "gram.MUTUAL_CAP"
+  },
+  {
+    "aliases": [],
+    "categories": [
+      "gram"
+    ],
+    "game": "gtg",
+    "id": "mutual-step",
+    "relations": {
+      "explainedBy": [
+        "gram"
+      ]
+    },
+    "title": "맞팔 한 명",
+    "type": "value",
+    "valueFrom": "gram.MUTUAL_STEP"
+  },
+  {
+    "aliases": [
+      "pull"
+    ],
+    "categories": [
+      "pull"
+    ],
+    "game": "gtg",
+    "id": "pull",
+    "relations": {
+      "relatedTo": [
+        "gram"
+      ]
+    },
+    "title": "이적시장",
+    "type": "guide"
+  },
+  {
+    "aliases": [],
+    "categories": [
+      "pull"
+    ],
+    "game": "gtg",
+    "id": "pull-bonus",
+    "relations": {
+      "explainedBy": [
+        "pull"
+      ]
+    },
+    "title": "묶음 보상",
+    "type": "value",
+    "valueFrom": "roster.PULL_BONUS"
+  },
+  {
+    "aliases": [],
+    "categories": [
+      "pull"
+    ],
+    "game": "gtg",
+    "id": "pull-bulk",
+    "relations": {
+      "explainedBy": [
+        "pull"
+      ]
+    },
+    "title": "묶음",
+    "type": "value",
+    "valueFrom": "roster.PULL_BULK"
+  },
+  {
+    "aliases": [],
+    "categories": [
+      "pull"
+    ],
+    "game": "gtg",
+    "id": "pull-cost",
+    "relations": {
+      "explainedBy": [
+        "pull"
+      ]
+    },
+    "title": "한 장",
+    "type": "value",
+    "valueFrom": "roster.PULL_COST"
+  },
+  {
+    "aliases": [
+      "risk"
+    ],
+    "categories": [
+      "risk"
+    ],
+    "game": "gtg",
+    "id": "risk",
+    "relations": {
+      "relatedTo": [
+        "hand"
+      ]
+    },
+    "title": "사고",
+    "type": "guide"
+  },
+  {
+    "aliases": [],
+    "categories": [
+      "gram"
+    ],
+    "game": "gtg",
+    "id": "selfie-base",
+    "relations": {
+      "explainedBy": [
+        "gram"
+      ]
+    },
+    "title": "같이 한 장",
+    "type": "value",
+    "valueFrom": "gram.SELFIE_BASE"
+  },
+  {
+    "aliases": [],
+    "categories": [
+      "pull"
+    ],
+    "game": "gtg",
+    "id": "ticket-cap",
+    "relations": {
+      "explainedBy": [
+        "pull"
+      ]
+    },
+    "title": "이용권 한도",
+    "type": "value",
+    "valueFrom": "roster.TICKET_CAP"
+  }
+]

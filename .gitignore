@@ -37,3 +37,4 @@ cmsg.txt
 
 # Built wiki data is served directly with web/.
 !web/wiki/dist/
+!web/wiki/site/

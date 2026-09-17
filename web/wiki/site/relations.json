@@ -1,0 +1,112 @@
+[
+  {
+    "field": "explainedBy",
+    "source": "cash-rate",
+    "target": "coin"
+  },
+  {
+    "field": "explainedBy",
+    "source": "coin-conceded",
+    "target": "coin"
+  },
+  {
+    "field": "explainedBy",
+    "source": "coin-save",
+    "target": "coin"
+  },
+  {
+    "field": "explainedBy",
+    "source": "like-base",
+    "target": "gram"
+  },
+  {
+    "field": "explainedBy",
+    "source": "like-per-city",
+    "target": "gram"
+  },
+  {
+    "field": "explainedBy",
+    "source": "mutual-cap",
+    "target": "gram"
+  },
+  {
+    "field": "explainedBy",
+    "source": "mutual-step",
+    "target": "gram"
+  },
+  {
+    "field": "explainedBy",
+    "source": "pull-bonus",
+    "target": "pull"
+  },
+  {
+    "field": "explainedBy",
+    "source": "pull-bulk",
+    "target": "pull"
+  },
+  {
+    "field": "explainedBy",
+    "source": "pull-cost",
+    "target": "pull"
+  },
+  {
+    "field": "explainedBy",
+    "source": "selfie-base",
+    "target": "gram"
+  },
+  {
+    "field": "explainedBy",
+    "source": "ticket-cap",
+    "target": "pull"
+  },
+  {
+    "field": "relatedTo",
+    "source": "bot",
+    "target": "buff"
+  },
+  {
+    "field": "relatedTo",
+    "source": "buff",
+    "target": "risk"
+  },
+  {
+    "field": "relatedTo",
+    "source": "coin",
+    "target": "drill"
+  },
+  {
+    "field": "relatedTo",
+    "source": "drill",
+    "target": "gear"
+  },
+  {
+    "field": "relatedTo",
+    "source": "game",
+    "target": "hand"
+  },
+  {
+    "field": "relatedTo",
+    "source": "gear",
+    "target": "pull"
+  },
+  {
+    "field": "relatedTo",
+    "source": "gram",
+    "target": "bot"
+  },
+  {
+    "field": "relatedTo",
+    "source": "hand",
+    "target": "coin"
+  },
+  {
+    "field": "relatedTo",
+    "source": "pull",
+    "target": "gram"
+  },
+  {
+    "field": "relatedTo",
+    "source": "risk",
+    "target": "hand"
+  }
+]
