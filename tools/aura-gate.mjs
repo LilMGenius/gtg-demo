@@ -68,6 +68,7 @@ try {
   const seen = {};
   for (const spec of BUFFS) {
     await open();
+    if (spec.kind === "tonic") await p.evaluate(() => window.__lockRound());
     await p.evaluate(() => window.__shop(true));
     await p.waitForTimeout(280);
     await p.click('#shop .tab[data-tab="buff"]', { force: true });
@@ -77,6 +78,18 @@ try {
     await p.evaluate(() => window.__shop(false));
     await p.waitForTimeout(320);
     seen[spec.kind] = await read();
+    if (spec.kind === "tonic") {
+      await p.evaluate(() => window.__resumeRound());
+      await p.locator('.zone[data-dive="-1"]').dispatchEvent("pointerdown");
+      await p.waitForFunction(() => document.querySelector('#aura .tag[data-kind="tonic"] b')?.textContent === "11",
+        null, { timeout: 24000 });
+      const after = await p.evaluate(() => ({ applied: window.__lastBuff, remaining: window.__buff().shots,
+        badge: Number(document.querySelector('#aura .tag[data-kind="tonic"] b')?.textContent) }));
+      check("aura:the-badge-count-after-a-shot-is-the-shots-still-to-come",
+        after.applied?.kind === "tonic" && after.applied.shots === 12 && after.remaining === 11 && after.badge === 11,
+        JSON.stringify(after));
+      await p.evaluate(() => window.__lockRound());
+    }
   }
 
   const kinds = BUFFS.map((s) => s.kind);
