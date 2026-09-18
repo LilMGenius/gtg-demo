@@ -83,7 +83,7 @@ HUD와 패널은 DOM이다. 캔버스는 경기장만 그린다. 패널이 열�
 
 출력은 둘이고 한 명령이 둘 다 만든다. `npm run wiki`가 `tools/wiki-facts.mjs`로 코드 상수에서 `web/wiki/facts.json`을 뽑고, check 뒤에 embed를 `web/wiki/dist`에, build를 `web/wiki/site`에 --clean으로 쓴다. 둘 다 같은 facts를 받으므로 pages.json의 본문 바이트가 같고, dist는 게임 안 패널이 읽는 네 데이터 파일과 매니페스트이며 site는 Pages가 /gtg-demo/web/wiki/site 아래에서 내는 정적 HTML이라 --base가 그 경로다. 사이트의 게임으로 돌아가는 링크는 --home이 머리에 세우고 원본 글에는 없다. 원본의 상대 링크는 패널에서는 게임 주소 기준으로, 사이트에서는 사이트 주소 기준으로 풀려 한쪽이 404가 되므로 원본에는 위키링크만 쓴다. 셋 다 원본과 같이 커밋한다. 정적 서버는 빌드를 하지 않고, --clean은 자기 gamewiki.json 매니페스트가 있는 출력만 비운다. 원본과 출력은 형제 디렉터리여야 한다.
 
-표는 코드에서 한 번 뽑힌다. 값 상수와 KEY_MAP과 선반 목록과 BOTS와 BUFFS와 PULL_KINDS와 사고 짝은 `tools/wiki-facts.mjs`가 facts로 내고, 선반 어휘와 사고 짝은 `web/src/state/shelf.mjs`가 DOM 없이 갖는다. `wiki.mjs`는 pages.json의 본문을 그대로 그리고 화면에서만 참인 것(버전 좌표, 사이트 링크, iPhone 안내)만 얹는다. 본문에는 숫자를 쓰지 않는다. wikisrc 게이트가 원본과 dist와 화면 셋의 동일을 묻고 wikisite 게이트가 원본과 site의 동일과 base 경로와 머리의 홈 링크와 두 출력의 본문 바이트 동일과 원본에 소비자별로 다르게 풀리는 링크가 없음을 묻는다.
+표는 코드에서 한 번 뽑힌다. 값 상수와 KEY_MAP과 선반 목록과 BOTS와 BUFFS와 PULL_KINDS와 사고 짝은 `tools/wiki-facts.mjs`가 facts로 내고, 선반 어휘와 사고 짝은 `web/src/state/shelf.mjs`가 DOM 없이 갖는다. `web/src/ui/wiki.mjs`는 pages.json의 본문을 그대로 그리고 화면에서만 참인 것(버전 좌표, 사이트 링크, iPhone 안내)만 얹는다. 본문에는 숫자를 쓰지 않는다. wikisrc 게이트가 원본과 dist와 화면 셋의 동일을 묻고 wikisite 게이트가 원본과 site의 동일과 base 경로와 머리의 홈 링크와 두 출력의 본문 바이트 동일과 원본에 소비자별로 다르게 풀리는 링크가 없음을 묻는다.
 
 ## 계기
 
