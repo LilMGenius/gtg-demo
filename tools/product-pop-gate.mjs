@@ -1,6 +1,6 @@
 import { makeRng, newKeeper, keeperAtLevel, rollForm, buildSet, resolve, autoInput } from '../src/chain.mjs';
 import { GROWABLE } from '../src/ledger.mjs';
-import { autoTrain, trainStat } from '../web/src/state/coach.mjs';
+import { autoTrain, trainStat, TRAINING_PRIORITY } from '../web/src/state/coach.mjs';
 
 // Reuses this repository's product-pop.local.mjs population/seed mechanism and
 // corr-gate sampling; paired shot replay replaces independent bump reruns.
@@ -16,17 +16,16 @@ if (!Number.isSafeInteger(BALLS) || BALLS < 5 || BALLS % 5 !== 0) {
 }
 // HOTL hypothesis 2026-09-18
 const TOLERANCE = 1.5, HORIZONS = [5, 13, 21], N_SETS = 10, LADDER_FLOOR = 1;
+const DEAD_UPPER = 0.1;
 const LEVELS = [1, ...HORIZONS];
 const MANUAL = ['lowest', 'random', 'greedy'];
 const POLICIES = ['reference', 'coach', ...MANUAL];
 const PATH = GROWABLE.filter(s => !['goalKick', 'throwing', 'mischief', 'communication'].includes(s));
 const f = n => Number.isFinite(n) ? n.toFixed(2) : 'unavailable';
 const unresolved = g => !g.tested || g.d - g.hw <= 0 && g.d + g.hw >= 0;
-let passes = 0, fails = 0, insufficient = 0;
+const counts = { FAIL: 0, PASS: 0, 'INSUFFICIENT EVIDENCE': 0, HITL: 0, DIAGNOSTIC: 0 };
 function verdict(name, status, detail) {
-  if (status === 'FAIL') fails++;
-  else if (status === 'PASS') passes++;
-  else insufficient++;
+  counts[status]++;
   console.log(`${status} ${name} ${detail}`);
 }
 
@@ -112,51 +111,68 @@ function measure(policy, level, mode, contrast = null) {
 console.log(`product-pop balls=${BALLS}/cell keepers=${BALLS / 5} shots/keeper=5 seed=1000003 + s + level*7919; s starts at 0`);
 console.log('population: newKeeper; 2 points/set; 1 set/level; level raised before training; coach=autoTrain; manual=lowest/random/greedy; uncapped only; ties=GROWABLE order; random=seeded uniform');
 console.log(`GROWABLE order: ${GROWABLE.join(',')}; body=178-198 / 74-94; no gear/recruitment`);
+console.log(`coach fixed TRAINING_PRIORITY order: ${TRAINING_PRIORITY.join(',')}`);
 console.log('reference=keeperAtLevel, three-of-N, 3 pts/level; kicker ramp=buildSet(rng, level), follows keeper level (balance-gate uses level 5)');
 console.log('pairing: perfect x manual policies + coach; auto x coach; pref {-1,0,+1} x untrained (points unspent); auto x manual and reference are comparison controls');
 console.log('input: perfect={dive:shot.side,errMs:0,advance:0,auto:false}; auto=resolve without input, bare autoInput bot floor, not botKeeper; pref={dive:state.pref,errMs:0,advance:0,auto:false}');
 console.log('denominators: nonconcession=100*(balls-conceded)/balls; tested-save=100*(tested-conceded)/tested; tested excludes r.untested');
 console.log('marginals: eligible keeper stat<10; baseline restricted to same keepers; paired common shot/input/resolution streams; set streak evolves separately; tested membership asserted identical');
+console.log('eligibility: stats capped in more than 50% of keepers are excluded from ranking and dead verdicts; marginals are still printed with their eligibility');
 console.log(`HOTL hypothesis 2026-09-18: tolerance=${TOLERANCE}pp horizons=${HORIZONS} N=${N_SETS} sets ladder floor=${LADDER_FLOOR}pp/5 levels; N milestone timing and human intended experience are not measured here`);
+console.log(`HOTL hypothesis 2026-09-18 instrument choices: DEAD_UPPER=${DEAD_UPPER}pp; 50% majority eligibility filter`);
 const rows = [];
 for (const mode of ['perfect', 'auto', 'pref:-1', 'pref:0', 'pref:1']) {
   for (const level of LEVELS) for (const policy of mode.startsWith('pref:') ? ['untrained'] : POLICIES) {
     const r = measure(policy, level, mode);
     rows.push(r);
     console.log(`CELL ${mode} Lv${level} ${policy} nonconcession=${f(r.nonconcession)} tested-save=${f(r.testedSave)} balls=${BALLS} tested=${r.tested} conceded=${r.conceded}`);
-    for (const g of r.gains) console.log(`  marginal ${g.stat} eligibility=${g.eligible}/${BALLS / 5} (${f(100 * g.eligibility)}%) tested=${g.tested} baseSaved=${g.baseSaved} bumpSaved=${g.bumpSaved} n10=${g.n10} n01=${g.n01} delta=${f(g.d)} +/-${f(g.hw)}pp ${unresolved(g) ? 'unresolved' : 'resolved'}`);
+    for (const g of r.gains) console.log(`  marginal ${g.stat} eligibility=${g.eligible}/${BALLS / 5} (${f(100 * g.eligibility)}%) tested=${g.tested} baseSaved=${g.baseSaved} bumpSaved=${g.bumpSaved} n10=${g.n10} n01=${g.n01} delta=${f(g.d)} +/-${f(g.hw)}pp ${unresolved(g) ? 'unresolved' : 'resolved'}${mode.startsWith('pref:') ? ' input-limited diagnostic' : ''}`);
   }
 }
 
+const precision = [];
 for (const mode of ['perfect', 'auto', 'pref:-1', 'pref:0', 'pref:1']) {
   for (const policy of mode.startsWith('pref:') ? ['untrained'] : POLICIES) {
     const group = HORIZONS.map(level => rows.find(r => r.mode === mode && r.policy === policy && r.level === level));
     const tops = group.map(r => r.gains.filter(g => g.eligibility >= 0.5).sort((a, b) => b.d - a.d));
     const uncertain = tops.some(rank => rank.length < 2 || unresolved(rank[0]) || unresolved(rank[1]));
     const dominant = !uncertain && tops.every(rank => rank[0].stat === tops[0][0].stat && rank[0].d - rank[1].d > TOLERANCE);
-    verdict('dominance:the-same-eligible-stat-is-not-best-at-every-horizon', uncertain ? 'INSUFFICIENT EVIDENCE' : dominant ? 'FAIL' : 'PASS', `${mode}/${policy} ` + tops.map((rank, i) => `Lv${HORIZONS[i]} ${rank[0]?.stat}/${rank[1]?.stat} gap=${f(rank[0]?.d - rank[1]?.d)}pp`).join('; '));
+    // The two marginals share the baseline, so the gap's uncertainty is bounded
+    // by the sum of their half-widths (variance by its square): conservative, not exact.
+    const gapWidths = tops.map((rank, i) => {
+      const hw = rank[0]?.hw + rank[1]?.hw;
+      precision.push({ row: `dominance ${mode}/${policy} Lv${HORIZONS[i]}`, hw });
+      return hw;
+    });
+    verdict('dominance:the-same-eligible-stat-is-not-best-at-every-horizon', uncertain ? 'INSUFFICIENT EVIDENCE' : dominant ? 'FAIL' : 'PASS', `${mode}/${policy} ` + tops.map((rank, i) => `Lv${HORIZONS[i]} ${rank[0]?.stat}/${rank[1]?.stat} gap=${f(rank[0]?.d - rank[1]?.d)} +/-${f(gapWidths[i])}pp (conservative)`).join('; '));
+    // The canon's offered cells are stats the growth screen offers and a policy
+    // can buy. Saved-direction populations buy nothing; fixed input disables
+    // branches (center disables balance's landing branch; a wrong side makes
+    // diving's reach irrelevant). A zero there describes the input, not the stat.
+    const inputLimited = mode.startsWith('pref:');
     let dead = false, unknown = false;
     const details = [];
     for (const stat of PATH) {
       const eligible = group.map(r => ({ r, g: r.gains.find(g => g.stat === stat) })).filter(({ g }) => g.eligibility >= 0.5);
       if (!eligible.length) { details.push(`${stat}=not-offered`); continue; }
-      const candidate = eligible.every(({ g }) => g.d + g.hw < 0.1);
+      const candidate = eligible.every(({ g }) => g.d + g.hw < DEAD_UPPER);
       if (candidate) {
         const contrasts = eligible.map(({ r }) => measure(policy, r.level, mode, stat).gains[0]);
         for (let i = 0; i < contrasts.length; i++) {
           const g = contrasts[i];
           console.log(`CONTRAST 3->10 (population value->10) ${mode}/${policy} Lv${eligible[i].r.level} ${stat} eligibility=${g.eligible}/${BALLS / 5} tested=${g.tested} baseSaved=${g.baseSaved} bumpSaved=${g.bumpSaved} n10=${g.n10} n01=${g.n01} delta=${f(g.d)} +/-${f(g.hw)}pp`);
         }
-        const confirmed = contrasts.every(g => g.d + g.hw < 0.1);
+        if (inputLimited) continue;
+        const confirmed = contrasts.every(g => g.d + g.hw < DEAD_UPPER);
         dead ||= confirmed;
-        unknown ||= !confirmed && !contrasts.some(g => g.d - g.hw >= 0.1);
+        unknown ||= !confirmed && !contrasts.some(g => g.d - g.hw >= DEAD_UPPER);
         details.push(`${stat}=${confirmed ? 'dead' : 'contrast-not-dead'}`);
-      } else if (!eligible.some(({ g }) => g.d - g.hw >= 0.1)) {
+      } else if (!inputLimited && !eligible.some(({ g }) => g.d - g.hw >= DEAD_UPPER)) {
         unknown = true;
         details.push(`${stat}=unresolved`);
       }
     }
-    verdict('dead:every-eligible-save-path-stat-pays-at-some-horizon', dead ? 'FAIL' : unknown ? 'INSUFFICIENT EVIDENCE' : 'PASS', `${mode}/${policy} ${details.join(',') || 'all eligible stats pay'}`);
+    verdict('dead:every-offered-save-path-stat-pays-at-some-horizon', inputLimited ? 'DIAGNOSTIC' : dead ? 'FAIL' : unknown ? 'INSUFFICIENT EVIDENCE' : 'PASS', inputLimited ? `${mode}/${policy} not applicable: points unspent, nothing is offered on this population; marginals are input-limited` : `${mode}/${policy} ${details.join(',') || 'all eligible stats pay'}`);
   }
 }
 for (const mode of ['perfect', 'auto']) for (const level of HORIZONS) {
@@ -166,20 +182,26 @@ for (const mode of ['perfect', 'auto']) for (const level of HORIZONS) {
   const p1 = best.nonconcession / 100, p2 = coach.nonconcession / 100;
   const hw = 1.96 * Math.sqrt((p1 * (1 - p1) + p2 * (1 - p2)) / BALLS) * 100;
   const regret = best.nonconcession - coach.nonconcession;
+  precision.push({ row: `coach ${mode} Lv${level}`, hw });
   verdict('coach:regret-vs-best-manual-policy-is-inside-tolerance', regret > TOLERANCE && regret - hw > 0 ? 'FAIL' : regret + hw <= TOLERANCE ? 'PASS' : 'INSUFFICIENT EVIDENCE', `${mode} Lv${level} best=${best.policy} best=${f(best.nonconcession)} coach=${f(coach.nonconcession)} regret=${f(regret)} +/-${f(hw)}pp`);
 }
 const ladder = HORIZONS.map(level => rows.find(r => r.mode === 'perfect' && r.policy === 'coach' && r.level === level));
-verdict('ladder:coach-gains-at-least-the-floor-per-five-levels', ladder.slice(1).every((r, i) => r.nonconcession - ladder[i].nonconcession >= LADDER_FLOOR * (r.level - ladder[i].level) / 5) ? 'PASS' : 'FAIL', ladder.map(r => `Lv${r.level}=${f(r.nonconcession)}`).join(' -> ') + '; floor=1.60pp per 8 levels');
+// deadend:the-next-meaningful-decision-is-within-N-sets has ladder and economy halves.
+verdict('deadend:coach-ladder-gains-at-least-the-floor-per-five-levels', ladder.slice(1).every((r, i) => r.nonconcession - ladder[i].nonconcession >= LADDER_FLOOR * (r.level - ladder[i].level) / 5) ? 'PASS' : 'FAIL', ladder.map(r => `Lv${r.level}=${f(r.nonconcession)}`).join(' -> ') + '; floor=1.60pp per 8 levels');
+verdict('deadend:the-next-purchase-or-unlock-is-within-N-sets', 'INSUFFICIENT EVIDENCE', `N=${N_SETS} sets; needs gold per set and shelf prices on the product economy; owned by the economy lap, not measured here`);
+verdict('experience:intended-experience-is-human-judged', 'HITL', 'absent; recorded 2026-09-18; a play session is scheduled by the loop and the row never blocks a lap');
+const imprecise = precision.filter(({ hw }) => !(hw < TOLERANCE));
+verdict('precision:every-verdict-row-resolves-the-tolerance', imprecise.length ? 'INSUFFICIENT EVIDENCE' : 'PASS', `max half-width=${f(Math.max(...precision.map(({ hw }) => hw)))}pp tolerance=${TOLERANCE}pp balls=${BALLS}/cell; ` + (imprecise.length ? imprecise.map(({ row, hw }) => `${row} +/-${f(hw)}pp`).join('; ') : 'all dominance conservative gaps and coach independent-sample intervals resolve the tolerance'));
 for (const r of rows.filter(r => r.policy === 'coach')) {
   const top = Object.entries(r.causes).sort((a, b) => b[1] - a[1])[0];
-  console.log(`INSUFFICIENT EVIDENCE cause:the-concession-label-is-not-one-stat-on-the-coach-population diagnostic ${r.mode} Lv${r.level} top=${top?.[0] || 'none'} share=${f(100 * (top?.[1] || 0) / r.conceded)}% (no threshold)`);
+  verdict('cause:the-concession-label-is-not-one-stat-on-the-coach-population', 'DIAGNOSTIC', `${r.mode} Lv${r.level} top=${top?.[0] || 'none'} share=${f(100 * (top?.[1] || 0) / r.conceded)}%`);
 }
 for (const mode of ['perfect', 'auto', 'pref:-1', 'pref:0', 'pref:1']) for (const level of LEVELS) {
   const group = rows.filter(r => r.mode === mode && r.level === level);
   const ordered = key => [...group].sort((a, b) => b[key] - a[key]).map(r => r.policy).join('>');
   // Compare pairwise signs too: a tie in only one denominator is disagreement.
   const agrees = group.every(a => group.every(b => Math.sign(a.nonconcession - b.nonconcession) === Math.sign(a.testedSave - b.testedSave)));
-  verdict('denominators:both-denominators-are-printed-and-agree-in-ordering', agrees ? 'PASS' : 'FAIL', `${mode} Lv${level} nonconcession=${ordered('nonconcession')} tested-save=${ordered('testedSave')}`);
+  verdict('instrument:both-denominators-agree-in-ordering', agrees ? 'PASS' : 'FAIL', `${mode} Lv${level} nonconcession=${ordered('nonconcession')} tested-save=${ordered('testedSave')}`);
 }
-console.log(`product-pop ${fails ? 'FAIL' : 'PASS'} ${fails} failures; ${passes} PASS; ${insufficient} INSUFFICIENT EVIDENCE; cause diagnostic only; elapsed=${f((Date.now() - started) / 1000)}s`);
-process.exitCode = fails ? 1 : 0;
+console.log(`product-pop ${Object.entries(counts).map(([status, count]) => `${status} ${count}`).join('; ')}; elapsed=${f((Date.now() - started) / 1000)}s`);
+process.exitCode = counts.FAIL ? 1 : 0;
