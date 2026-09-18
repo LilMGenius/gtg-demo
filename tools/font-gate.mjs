@@ -96,7 +96,8 @@ const seen = new Set();
 for (const f of walk(ROOT, [])) for (const ch of readFileSync(f, "utf8")) seen.add(ch);
 for (let c = 0x20; c < 0x7f; c += 1) seen.add(String.fromCharCode(c));
 // 코퍼스 글자 수와 지문은 매니페스트가 없어도 요약 줄이 찍어야 하므로 try 밖에서 잰다.
-const kept = [...seen].filter((c) => c.trim() !== "" || c === " ").sort();
+// The builder's Python str.isprintable() owns the rule; this gate mirrors it.
+const kept = [...seen].filter((c) => c === " " || !/\p{Cc}|\p{Cf}|\p{Zl}|\p{Zp}|\p{Cs}|\p{Co}|\p{Cn}|\p{Zs}/u.test(c)).sort();
 const sig = createHash("sha256").update(kept.join(""), "utf8").digest("hex");
 let bodyOk = false;
 let bodyWhy = "manifest missing";
