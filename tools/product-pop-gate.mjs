@@ -1,6 +1,11 @@
 import { makeRng, newKeeper, keeperAtLevel, rollForm, buildSet, resolve, autoInput } from '../src/chain.mjs';
 import { GROWABLE } from '../src/ledger.mjs';
 import { autoTrain, trainStat, TRAINING_PRIORITY } from '../web/src/state/coach.mjs';
+import { coinGain } from '../web/src/state/wallet.mjs';
+import { GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, TATTOOS } from '../web/src/state/gear.mjs';
+import { PULL_COST } from '../src/roster.mjs';
+import { BOTS } from '../web/src/state/bot.mjs';
+import { BUFFS } from '../web/src/state/buff.mjs';
 
 // Reuses this repository's product-pop.local.mjs population/seed mechanism and
 // corr-gate sampling; paired shot replay replaces independent bump reruns.
@@ -40,7 +45,8 @@ function population(policy, level, rng) {
       const pool = GROWABLE.filter(s => keeper[s] < 10);
       if (!pool.length) break;
       let pick = pool[0];
-      if (policy === 'random') pick = pool[Math.floor(rng() * pool.length)];
+      if (policy === 'fixed-order') pick = TRAINING_PRIORITY.find(s => keeper[s] < 10);
+      else if (policy === 'random') pick = pool[Math.floor(rng() * pool.length)];
       else for (const s of pool) if (policy === 'lowest' ? keeper[s] < keeper[pick] : keeper[s] > keeper[pick]) pick = s;
       keeper = trainStat(keeper, pick, rng).keeper;
     }
@@ -51,8 +57,8 @@ function population(policy, level, rng) {
 }
 
 function measure(policy, level, mode, contrast = null) {
-  const gains = (contrast ? [contrast] : PATH).map(stat => ({ stat, eligible: 0, tested: 0, baseSaved: 0, bumpSaved: 0, n10: 0, n01: 0 }));
-  let conceded = 0, tested = 0;
+  const gains = (policy === 'fixed-order' ? [] : contrast ? [contrast] : PATH).map(stat => ({ stat, eligible: 0, tested: 0, baseSaved: 0, bumpSaved: 0, n10: 0, n01: 0 }));
+  let conceded = 0, tested = 0, gold = 0;
   const causes = {};
   for (let s = 0; s < BALLS / 5; s++) {
     if (Date.now() - started >= WATCHDOG) { console.error('product-pop FAIL watchdog'); process.exit(1); }
@@ -76,6 +82,7 @@ function measure(policy, level, mode, contrast = null) {
       const start = cursor;
       const input = mode === 'auto' ? undefined : { dive: mode === 'perfect' ? shot.side : Number(mode.slice(5)), errMs: 0, advance: 0, auto: false };
       const base = resolve({ keeper, shot, rng, input });
+      if (policy === 'coach' && !contrast) gold += coinGain(base.conceded, base.fame, base.untested);
       if (!base.untested) tested++;
       if (base.conceded) { conceded++; causes[base.cause] = (causes[base.cause] || 0) + 1; }
       let chainStart = start;
@@ -105,7 +112,7 @@ function measure(policy, level, mode, contrast = null) {
     // 1.96 * sqrt(n10 + n01) / tested * 100 (discordant tested balls).
     g.hw = g.tested ? 1.96 * Math.sqrt(g.n10 + g.n01) / g.tested * 100 : NaN;
   }
-  return { policy, level, mode, conceded, tested, nonconcession: 100 * (BALLS - conceded) / BALLS, testedSave: 100 * (tested - conceded) / tested, gains, causes };
+  return { policy, level, mode, conceded, tested, nonconcession: 100 * (BALLS - conceded) / BALLS, testedSave: 100 * (tested - conceded) / tested, gains, causes, goldPerSet: gold / (BALLS / 5) };
 }
 
 console.log(`product-pop balls=${BALLS}/cell keepers=${BALLS / 5} shots/keeper=5 seed=1000003 + s + level*7919; s starts at 0`);
@@ -118,7 +125,7 @@ console.log('input: perfect={dive:shot.side,errMs:0,advance:0,auto:false}; auto=
 console.log('denominators: nonconcession=100*(balls-conceded)/balls; tested-save=100*(tested-conceded)/tested; tested excludes r.untested');
 console.log('marginals: eligible keeper stat<10; baseline restricted to same keepers; paired common shot/input/resolution streams; set streak evolves separately; tested membership asserted identical');
 console.log('eligibility: stats capped in more than 50% of keepers are excluded from ranking and dead verdicts; marginals are still printed with their eligibility');
-console.log(`HOTL hypothesis 2026-09-18: tolerance=${TOLERANCE}pp horizons=${HORIZONS} N=${N_SETS} sets ladder floor=${LADDER_FLOOR}pp/5 levels; N milestone timing and human intended experience are not measured here`);
+console.log(`HOTL hypothesis 2026-09-18: tolerance=${TOLERANCE}pp horizons=${HORIZONS} N=${N_SETS} sets ladder floor=${LADDER_FLOOR}pp/5 levels; N milestone timing uses the purchase walk; human intended experience is not measured here`);
 console.log(`HOTL hypothesis 2026-09-18 instrument choices: DEAD_UPPER=${DEAD_UPPER}pp; 50% majority eligibility filter`);
 const rows = [];
 for (const mode of ['perfect', 'auto', 'pref:-1', 'pref:0', 'pref:1']) {
@@ -187,8 +194,44 @@ for (const mode of ['perfect', 'auto']) for (const level of HORIZONS) {
 }
 const ladder = HORIZONS.map(level => rows.find(r => r.mode === 'perfect' && r.policy === 'coach' && r.level === level));
 // deadend:the-next-meaningful-decision-is-within-N-sets has ladder and economy halves.
-verdict('deadend:coach-ladder-gains-at-least-the-floor-per-five-levels', ladder.slice(1).every((r, i) => r.nonconcession - ladder[i].nonconcession >= LADDER_FLOOR * (r.level - ladder[i].level) / 5) ? 'PASS' : 'FAIL', ladder.map(r => `Lv${r.level}=${f(r.nonconcession)}`).join(' -> ') + '; floor=1.60pp per 8 levels');
-verdict('deadend:the-next-purchase-or-unlock-is-within-N-sets', 'INSUFFICIENT EVIDENCE', `N=${N_SETS} sets; needs gold per set and shelf prices on the product economy; owned by the economy lap, not measured here`);
+// AUTONOMY, Gate axis correction: the ramped roster sits inside nonconcession;
+// tested-save is the keeper's rate against that same ramp. Keep floor and horizons.
+verdict('deadend:coach-ladder-gains-at-least-the-floor-per-five-levels', ladder.slice(1).every((r, i) => r.testedSave - ladder[i].testedSave >= LADDER_FLOOR * (r.level - ladder[i].level) / 5) ? 'PASS' : 'FAIL', `perfect Lv${HORIZONS.join('/')} tested-save ${ladder.map(r => f(r.testedSave)).join(' -> ')}; nonconcession ${ladder.map(r => f(r.nonconcession)).join(' -> ')}; floor=1.60pp per 8 levels`);
+const control = HORIZONS.map(level => measure('fixed-order', level, 'perfect'));
+console.log(`control:the-fixed-order-coach-on-the-same-column perfect Lv${HORIZONS.join('/')} tested-save ${control.map(r => f(r.testedSave)).join(' -> ')}; gains ${control.slice(1).map((r, i) => f(r.testedSave - control[i].testedSave)).join(',')}pp; first uncapped TRAINING_PRIORITY, 2 points/set; informative second population, not a verdict`);
+
+// Reuses tools/deadend.local.mjs's cheapest-unbought walk, with shipped prices
+// and base-cell gold instead of fresh per-level simulations. Each offer is bought
+// once; purchases do not change the coach population or its measured earnings.
+const purchases = [
+  ...Object.entries({ GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, TATTOOS }).flatMap(([shelf, ranks]) => ranks.filter(r => r.cost > 0).map((r, i) => ({ name: `${shelf}/rank${i + 1}`, cost: r.cost }))),
+  { name: 'pull', cost: PULL_COST },
+  ...BOTS.map(b => ({ name: `bot/${b.tier}`, cost: b.cost })),
+  ...BUFFS.map(b => ({ name: `buff/${b.kind}`, cost: b.cost }))
+].sort((a, b) => a.cost - b.cost);
+for (const mode of ['perfect', 'auto']) {
+  const anchors = LEVELS.map(level => rows.find(r => r.mode === mode && r.policy === 'coach' && r.level === level));
+  console.log(`gold-per-set: ${mode}/coach ${anchors.map(r => `L${r.level}=${f(r.goldPerSet)}`).join(' ')}; linear between anchors, last slope extended to L30; coinGain(conceded,fame,untested) over 5 shots`);
+  let gold = 0, bought = 0, lastBuySet = 0, longest = null;
+  const gaps = [];
+  for (let set = 1; set <= 400 && bought < purchases.length; set++) {
+    const level = Math.min(set + 1, 30);
+    const upper = anchors.findIndex(r => r.level >= level);
+    const i = upper < 0 ? anchors.length - 1 : Math.max(1, upper);
+    const lo = anchors[i - 1], hi = anchors[i];
+    gold += lo.goldPerSet + (hi.goldPerSet - lo.goldPerSet) * (level - lo.level) / (hi.level - lo.level);
+    while (bought < purchases.length && gold >= purchases[bought].cost) {
+      const purchase = purchases[bought++];
+      gold -= purchase.cost;
+      const gap = set - lastBuySet;
+      gaps.push(gap);
+      if (!longest || gap > longest.gap) longest = { gap, from: lastBuySet, set, purchase };
+      lastBuySet = set;
+    }
+  }
+  const status = bought < purchases.length ? 'INSUFFICIENT EVIDENCE' : gaps.every(gap => gap <= N_SETS) ? 'PASS' : 'FAIL';
+  verdict('deadend:the-next-purchase-or-unlock-is-within-N-sets', status, `${mode} N=${N_SETS} sets; purchases=${bought}/${purchases.length} within 400 sets; gaps=${gaps.join(',')}; longest=${longest?.gap ?? 'unavailable'} sets${longest ? ` at sets ${longest.from}->${longest.set} ${longest.purchase.name} cost=${longest.purchase.cost}` : ''}; HOTL hypothesis, lap record decides the red`);
+}
 verdict('experience:intended-experience-is-human-judged', 'HITL', 'absent; recorded 2026-09-18; a play session is scheduled by the loop and the row never blocks a lap');
 const imprecise = precision.filter(({ hw }) => !(hw < TOLERANCE));
 verdict('precision:every-verdict-row-resolves-the-tolerance', imprecise.length ? 'INSUFFICIENT EVIDENCE' : 'PASS', `max half-width=${f(Math.max(...precision.map(({ hw }) => hw)))}pp tolerance=${TOLERANCE}pp balls=${BALLS}/cell; ` + (imprecise.length ? imprecise.map(({ row, hw }) => `${row} +/-${f(hw)}pp`).join('; ') : 'all dominance conservative gaps and coach independent-sample intervals resolve the tolerance'));
