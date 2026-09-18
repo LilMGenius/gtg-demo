@@ -4,6 +4,7 @@ import { passerAt } from "../web/src/state/passer.mjs";
 
 // 저장 게이트. 탭을 닫아도 키퍼가 남는가, 자리를 비운 시간이 상한 안에서만 쌓이는가.
 // 대조군 셋: 저장이 비었을 때 0, 시계를 되돌렸을 때 0, 몇 달 비웠을 때도 상한.
+// 표본 범위: 코치 복원은 신인 두 포인트, 훈련 상한은 전 스탯 만렙 저장으로 잰다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const URL = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const FACE_SRC = import.meta.dirname + "/../web/src/state/passer.mjs";
@@ -338,6 +339,31 @@ try {
       pinned.fk.length === 1 && pinned.fk[0] !== FAR_KEY && pinned.cm !== farCm,
       "the clamped copy moved the follow to " + JSON.stringify(pinned.fk) + " and the post record to "
       + pinned.cm + ", neither of which is " + FAR_KEY);
+  }
+  for (const coach of [true, false]) {
+    await p.evaluate(async (enabled) => {
+      const { newKeeper } = await import('/src/chain.mjs');
+      const s = JSON.parse(localStorage.getItem(window.__saveKey()));
+      s.squad = [newKeeper()];
+      s.pick = 0;
+      s.keeper = s.squad[0];
+      s.auto = true;
+      s.bot = { tier: 0, ms: 0 };
+      s.points = 2;
+      s.at = Date.now();
+      if (enabled) s.coach = true;
+      else delete s.coach;
+      localStorage.setItem(window.__saveKey(), JSON.stringify(s));
+    }, coach);
+    await p.reload({ waitUntil: "load" });
+    const restored = await p.evaluate(() => {
+      window.__persist();
+      return { coach: window.__coach(), points: window.__points(), saved: JSON.parse(localStorage.getItem(window.__saveKey())) };
+    });
+    check(coach ? "save:coach-spends-after-credit-expiry-and-round-trips" : "control:legacy-auto-does-not-enable-the-coach",
+      restored.coach === coach && restored.saved.coach === coach && restored.saved.auto === false
+      && restored.points === (coach ? 0 : 2),
+      JSON.stringify({ coach: restored.coach, savedCoach: restored.saved.coach, auto: restored.saved.auto, points: restored.points }));
   }
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
 

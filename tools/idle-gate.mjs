@@ -42,6 +42,33 @@ const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 const F = (x) => Number(x).toFixed(2);
 
+function creditExpiry(oldFlag) {
+  const state = { keeper: newKeeper(), points: 0, auto: true, coach: true };
+  const rng = makeRng(19);
+  let earned = 0, spent = 0;
+  for (let set = 0; set < 13; set += 1) {
+    if (set === 5) state.auto = false;
+    state.keeper.level += 1;
+    state.points += POINTS_PER_SET;
+    earned += POINTS_PER_SET;
+    if (oldFlag ? state.auto : state.coach) {
+      const trained = autoTrain(state.keeper, state.points, rng);
+      state.keeper = trained.keeper;
+      state.points -= trained.spent;
+      spent += trained.spent;
+    }
+  }
+  return { earned, spent, points: state.points, level: state.keeper.level, auto: state.auto, coach: state.coach };
+}
+const expired = creditExpiry(false);
+const oldFlag = creditExpiry(true);
+check("idle:the-coach-keeps-spending-after-the-credit-ends",
+  expired.earned === 26 && expired.spent === expired.earned && expired.points === 0 && expired.level === 14 && !expired.auto && expired.coach,
+  JSON.stringify(expired));
+check("control:the-old-flag-left-the-points-unspent",
+  oldFlag.earned === 26 && oldFlag.spent === 10 && oldFlag.points === 16 && oldFlag.level === 14,
+  JSON.stringify(oldFlag));
+
 const base = Object.freeze(Object.assign(newKeeper(), Object.fromEntries(GROWABLE.map((k) => [k, 3]))));
 const first = autoTrain(base, 2, () => 0.99);
 check("coach:save-priority-before-lowest", first.spent === 2 && first.keeper[TRAINING_PRIORITY[0]] === 5 && first.lines.every(l => l.stat === TRAINING_PRIORITY[0]), JSON.stringify(first.lines));

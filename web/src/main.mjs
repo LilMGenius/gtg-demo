@@ -77,6 +77,9 @@ const squad = (restored.squad.length ? restored.squad : [null]).map((k) => {
 });
 // state.keeper와 state.squad[state.pick]은 같은 객체다. 값을 복사하면 성장이 보유 목록에 안 남는다.
 const state = { squad, pick: Math.min(restored.pick, squad.length - 1), shots: [], i: 0, results: [], phase: 'idle', auto: Boolean(saved?.auto), points: 0 };
+// 크레딧은 손가락을 사는 것이고 코치는 번 포인트를 쓰는 것이다.
+// 크레딧이 끝났다고 훈련이 멈추면 레벨은 오르는데 스탯이 3에 머무는 방치 결함이 다시 온다.
+state.coach = Boolean(saved?.coach);
 state.keeper = state.squad[state.pick];
 // 옛 저장과 세 패드 밖의 값은 가운데를 선호해야 다음 구도 안전하게 이어진다.
 state.pref = [-1, 0, 1].includes(Number(saved?.pref)) ? Number(saved.pref) : 0;
@@ -153,6 +156,7 @@ window.__points = () => state.points;
 window.__wallet = () => state.wallet;
 // 버프가 몇 구 남아 판정에 들어갔는지도 상태로 재야 한다. 배지 숫자는 증거가 아니다.
 window.__buff = () => state.buff;
+window.__coach = () => state.coach;
 // 기복은 판당 한 번 굴러서 계기가 원하는 쪽을 기다릴 수 없다. 값을 넣으면 그 값으로 다시 그린다.
 window.__form = (v) => {
   if (v !== undefined) { state.form = Number(v); formChip(); aura(); }
@@ -469,7 +473,7 @@ function markPref() {
 
 // 저장은 항상 보유 목록 전체로 나간다. 뛰는 키퍼만 저장하면 나머지가 다음 저장에서 지워진다.
 function persist() {
-save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets, state.social, state.kickers, state.eleven, state.onboard, state.pref);
+save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets, state.social, state.kickers, state.eleven, state.onboard, state.pref, state.coach);
 }
 
 // 봇 크레딧은 실시간으로 줄어든다. 구 수로 세면 탭을 열어두고 안 누르는 쪽이 이득이 된다.
@@ -774,7 +778,7 @@ function endSet() {
   state.points += 2;
   // 완봉이면 이적시장 이용권 한 장. 규칙은 판정이 소유하고 화면은 그 답을 받는다.
   state.tickets = ticketGain(state.results, state.tickets);
-  if (state.auto) trainKeeper();
+  if (state.coach) trainKeeper();
   persist();
   pips();
   timer = stage.after(0.9, () => countdown(setBreak(), '한숨 돌리는 중', nextSet));
@@ -2402,6 +2406,7 @@ function bindBot(box) {
       const spec = botAt(b.dataset.bot);
       if (!spec || !purchase(spec.cost)) return;
       state.bot.tier = spec.tier;
+      state.coach = true;
       // 6시간 상한. 무한 적립이면 방치가 아니라 영구 봇이 된다.
       state.bot.ms = Math.min(BOT_CAP, state.bot.ms + spec.minutes * 60000);
       persist();
@@ -2587,6 +2592,7 @@ autoBtn.onpointerdown = () => {
     return;
   }
   state.auto = !state.auto;
+  if (state.auto) state.coach = true;
   // 켠 순간부터 재야 한다. 꺼져 있던 시간까지 차감되면 산 분이 사라진다.
   if (state.auto) botStamp = performance.now();
   autoBtn.classList.toggle('on', state.auto);
@@ -2793,7 +2799,7 @@ addEventListener('keydown', (e) => {
   if (state.phase === 'caption' && state.skip) state.skip();
 });
 
-if (state.auto) trainKeeper();
+if (state.coach) trainKeeper();
 markDive(state.pref, false);
 pips();
 mountTitle(() => {
