@@ -1,11 +1,12 @@
 import { modifierContract } from "./modifier-contract.mjs";
-import { makeRng, buildSet, resolve, newKeeper } from "../src/chain.mjs";
+import { makeRng, buildSet, resolve, newKeeper, autoInput } from "../src/chain.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 import { BOTS, botKeeper } from "../web/src/state/bot.mjs";
 
 // 봇 선반 효과 게이트. 클론 세 등급이 값을 치른 만큼 실제로 대신 막아주는가.
 // 상거래도 효과도 어떤 게이트도 이 선반을 안 봤다. 등급과 가격이 있으면 사다리와 값당을 잰다.
 // 브라우저를 안 띄운다. 판정은 src/chain.mjs 순수 함수고 봇은 judgement 한 칸만 갈아끼운다.
+// The bot shapes the input, not the keeper, per main.mjs:613 and judgement.md 계측 모집단.
 
 // 2000시드 x 5구 = 10000구. gear-effect-gate와 같은 표본이라 수치를 나란히 읽을 수 있다.
 const SEEDS = 2000;
@@ -22,16 +23,17 @@ function sweep(opt) {
   const o = opt || {};
   // 표본을 밖에서 넘길 수 있어야 한다. 고정되어 있으면 만렘 축을 붙여도 신인만 재고 조용히 초록을 낸다.
   const who = o.keeper || base;
-  const keeper = o.tier ? botKeeper(who, { tier: o.tier }) : who;
+  const inputKeeper = o.tier ? botKeeper(who, { tier: o.tier }) : who;
+  const keeper = o.oldPopulation ? inputKeeper : who;
   let saved = 0, shots = 0;
   for (let s = 0; s < SEEDS; s++) {
     const set = buildSet(makeRng(s + 1), 5, 0);
     const rng = makeRng(s + 90001);
     for (const shot of set) {
       const arg = { keeper, shot, rng };
-      // input을 빼면 chain이 autoInput을 돌린다. 봇 축은 자동 경로를 재는 자리다.
       // advance 0 고정은 실제 손 조작이 아니었다. 돌진 버튼의 0.9를 쓰되 칩에는 나가지 않는다.
       if (o.hand) arg.input = { dive: shot.side, errMs: 0, advance: shot.chip ? 0 : 0.9, auto: false };
+      else arg.input = autoInput(inputKeeper, shot, rng);
       const r = resolve(arg);
       shots++;
       if (!r.conceded) saved++;
@@ -51,6 +53,12 @@ const RANKS = [0, 1, 2, 3];
 const rungs = RANKS.map((t) => sweep({ tier: t }));
 const rate = RANKS.map((t) => Number(rungs[t].rate.toFixed(4)));
 const line = rate.map(F).join(" -> ");
+const oldRate = RANKS.map(t => sweep({ tier: t, oldPopulation: true }).rate);
+console.log("ladder live " + line);
+console.log("ladder old-population " + oldRate.map(F).join(" -> "));
+check("control:the-old-population-read-the-bot-into-the-judgement",
+  Math.abs(oldRate[3] - rungs[3].rate) > 0,
+  "tier3 old " + F(oldRate[3]) + " live " + F(rungs[3].rate));
 
 // tier 0과 tier 1은 judgement가 둘 다 3이다. 코드 사실이라 동률을 허용한다.
 // 문턱을 내린 것이 아니라 1등급 봇이 맨몸 자동과 같은 판단력이라는 사실을 그대로 적은 것이다.
