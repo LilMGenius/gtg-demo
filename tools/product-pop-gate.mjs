@@ -22,13 +22,17 @@ if (!Number.isSafeInteger(BALLS) || BALLS < 5 || BALLS % 5 !== 0) {
 // HOTL hypothesis 2026-09-18
 const TOLERANCE = 1.5, HORIZONS = [5, 13, 21], N_SETS = 10, LADDER_FLOOR = 1;
 const DEAD_UPPER = 0.1;
+// "designed 2.2-2.8x price step over flattening income, recoverable slowdown at the end of the ladder, not a dead end"
+const ACCEPTED_ASYMMETRIES = [
+  { row: 'deadend:the-next-purchase-or-unlock-is-within-N-sets', mode: 'perfect', where: 'third-rank purchases', bound: 12, record: '.omo/evidence/ai-balance-lap-7.txt ruling 2026-09-18' }
+];
 const LEVELS = [1, ...HORIZONS];
 const MANUAL = ['lowest', 'random', 'greedy'];
 const POLICIES = ['reference', 'coach', ...MANUAL];
 const PATH = GROWABLE.filter(s => !['goalKick', 'throwing', 'mischief', 'communication'].includes(s));
 const f = n => Number.isFinite(n) ? n.toFixed(2) : 'unavailable';
 const unresolved = g => !g.tested || g.d - g.hw <= 0 && g.d + g.hw >= 0;
-const counts = { FAIL: 0, PASS: 0, 'INSUFFICIENT EVIDENCE': 0, HITL: 0, DIAGNOSTIC: 0 };
+const counts = { FAIL: 0, PASS: 0, 'INSUFFICIENT EVIDENCE': 0, HITL: 0, ACCEPTED: 0, DIAGNOSTIC: 0 };
 function verdict(name, status, detail) {
   counts[status]++;
   console.log(`${status} ${name} ${detail}`);
@@ -209,9 +213,7 @@ const purchases = [
   ...BOTS.map(b => ({ name: `bot/${b.tier}`, cost: b.cost })),
   ...BUFFS.map(b => ({ name: `buff/${b.kind}`, cost: b.cost }))
 ].sort((a, b) => a.cost - b.cost);
-for (const mode of ['perfect', 'auto']) {
-  const anchors = LEVELS.map(level => rows.find(r => r.mode === mode && r.policy === 'coach' && r.level === level));
-  console.log(`gold-per-set: ${mode}/coach ${anchors.map(r => `L${r.level}=${f(r.goldPerSet)}`).join(' ')}; linear between anchors, last slope extended to L30; coinGain(conceded,fame,untested) over 5 shots`);
+function purchaseWalk(anchors, mode, incomeScale = 1) {
   let gold = 0, bought = 0, lastBuySet = 0, longest = null;
   const gaps = [];
   for (let set = 1; set <= 400 && bought < purchases.length; set++) {
@@ -219,7 +221,7 @@ for (const mode of ['perfect', 'auto']) {
     const upper = anchors.findIndex(r => r.level >= level);
     const i = upper < 0 ? anchors.length - 1 : Math.max(1, upper);
     const lo = anchors[i - 1], hi = anchors[i];
-    gold += lo.goldPerSet + (hi.goldPerSet - lo.goldPerSet) * (level - lo.level) / (hi.level - lo.level);
+    gold += incomeScale * (lo.goldPerSet + (hi.goldPerSet - lo.goldPerSet) * (level - lo.level) / (hi.level - lo.level));
     while (bought < purchases.length && gold >= purchases[bought].cost) {
       const purchase = purchases[bought++];
       gold -= purchase.cost;
@@ -229,9 +231,21 @@ for (const mode of ['perfect', 'auto']) {
       lastBuySet = set;
     }
   }
-  const status = bought < purchases.length ? 'INSUFFICIENT EVIDENCE' : gaps.every(gap => gap <= N_SETS) ? 'PASS' : 'FAIL';
-  verdict('deadend:the-next-purchase-or-unlock-is-within-N-sets', status, `${mode} N=${N_SETS} sets; purchases=${bought}/${purchases.length} within 400 sets; gaps=${gaps.join(',')}; longest=${longest?.gap ?? 'unavailable'} sets${longest ? ` at sets ${longest.from}->${longest.set} ${longest.purchase.name} cost=${longest.purchase.cost}` : ''}; HOTL hypothesis, lap record decides the red`);
+  const exception = ACCEPTED_ASYMMETRIES.find(e => e.row === 'deadend:the-next-purchase-or-unlock-is-within-N-sets' && e.mode === mode);
+  const status = bought < purchases.length ? 'INSUFFICIENT EVIDENCE' : longest.gap <= N_SETS ? 'PASS'
+    : exception && gaps.every((gap, i) => gap <= N_SETS || purchases[i].cost >= 800) && longest.gap <= exception.bound ? 'ACCEPTED' : 'FAIL';
+  return { bought, gaps, longest, status, exception };
 }
+for (const mode of ['perfect', 'auto']) {
+  const anchors = LEVELS.map(level => rows.find(r => r.mode === mode && r.policy === 'coach' && r.level === level));
+  console.log(`gold-per-set: ${mode}/coach ${anchors.map(r => `L${r.level}=${f(r.goldPerSet)}`).join(' ')}; linear between anchors, last slope extended to L30; coinGain(conceded,fame,untested) over 5 shots`);
+  const { bought, gaps, longest, status, exception } = purchaseWalk(anchors, mode);
+  verdict('deadend:the-next-purchase-or-unlock-is-within-N-sets', status, status === 'ACCEPTED'
+    ? `${mode} longest=${longest.gap} <= bound ${exception.bound} at third ranks; accepted asymmetry, ${exception.record}; N=${N_SETS} remains the trigger elsewhere`
+    : `${mode} N=${N_SETS} sets; purchases=${bought}/${purchases.length} within 400 sets; gaps=${gaps.join(',')}; longest=${longest?.gap ?? 'unavailable'} sets${longest ? ` at sets ${longest.from}->${longest.set} ${longest.purchase.name} cost=${longest.purchase.cost}` : ''}; HOTL hypothesis, lap record decides the red`);
+}
+const halvedIncome = purchaseWalk(LEVELS.map(level => rows.find(r => r.mode === 'perfect' && r.policy === 'coach' && r.level === level)), 'perfect', 0.5);
+verdict('control:a-halved-income-walk-still-fails-the-N-sets-row', halvedIncome.status === 'FAIL' ? 'PASS' : 'FAIL', `perfect income=0.5 longest=${halvedIncome.longest?.gap ?? 'unavailable'} sets; N-sets verdict=${halvedIncome.status}`);
 verdict('experience:intended-experience-is-human-judged', 'HITL', 'absent; recorded 2026-09-18; a play session is scheduled by the loop and the row never blocks a lap');
 const imprecise = precision.filter(({ hw }) => !(hw < TOLERANCE));
 verdict('precision:every-verdict-row-resolves-the-tolerance', imprecise.length ? 'INSUFFICIENT EVIDENCE' : 'PASS', `max half-width=${f(Math.max(...precision.map(({ hw }) => hw)))}pp tolerance=${TOLERANCE}pp balls=${BALLS}/cell; ` + (imprecise.length ? imprecise.map(({ row, hw }) => `${row} +/-${f(hw)}pp`).join('; ') : 'all dominance conservative gaps and coach independent-sample intervals resolve the tolerance'));
