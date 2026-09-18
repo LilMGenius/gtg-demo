@@ -4,7 +4,7 @@ import { makeRng, buildSet, resolve, newKeeper, keeperAtLevel } from "../src/cha
 // 켜 두고 자리를 비우면 레벨이 오르고 키커가 세지는데 스탯은 그대로 남는다.
 // 그 상태가 실제로 어떻게 되는지는 스탯을 고정하고 레벨만 올려야 보인다.
 
-import { autoTrain, trainStat, TRAINING_PRIORITY } from "../web/src/state/coach.mjs";
+import { autoTrain, trainStat, TRAINING_PRIORITY, SAVE_PATH, LAG } from "../web/src/state/coach.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 import { readFileSync } from "node:fs";
 import { COIN_DRILL } from "../web/src/state/wallet.mjs";
@@ -58,6 +58,26 @@ check("coach:zero-budget-does-not-roll", empty.spent === 0 && emptyRolls === 0 &
 const manual = trainStat(base, TRAINING_PRIORITY[0], makeRng(19));
 const automatic = autoTrain(base, 1, makeRng(19));
 check("coach:manual-and-auto-share-growth", JSON.stringify(manual) === JSON.stringify(automatic), JSON.stringify(automatic.lines));
+
+// Handling is excluded because rule (a) deliberately front-loads it to 10.
+// The bound adds 2 because growthGain can roll two points on an eligible stat.
+const spreadRuns = [];
+for (const policy of ["coach", "first-uncapped-control"]) {
+  let keeper = newKeeper();
+  const rng = makeRng(19);
+  const violations = [];
+  for (let point = 1; point <= 40; point += 1) {
+    keeper = policy === "coach" ? autoTrain(keeper, 1, rng).keeper
+      : trainStat(keeper, TRAINING_PRIORITY.find(stat => keeper[stat] < 10), rng).keeper;
+    const values = SAVE_PATH.filter(stat => stat !== "handling" && keeper[stat] < 10).map(stat => keeper[stat]);
+    const spread = values.length ? Math.max(...values) - Math.min(...values) : 0;
+    if (spread > LAG + 2) violations.push({ point, handling: keeper.handling, spread });
+  }
+  spreadRuns.push({ policy, violations });
+}
+check("coach:no-save-path-stat-lags-more-than-one-behind-the-lowest",
+  spreadRuns[0].violations.length === 0 && spreadRuns[1].violations.length > 0,
+  JSON.stringify({ bound: LAG + 2, points: 40, runs: spreadRuns }));
 
 /* keeperAtLevel의 세 후보와 절반씩 나뉜 높은 칸/낮은 칸 선택을 재사용한다.
    배분량은 실제 endSet의 판당 보상을 읽으며 한 포인트마다 손 훈련과 같은 성장 굴림을 쓴다.

@@ -16,8 +16,16 @@ import { GROWABLE } from '../../../src/ledger.mjs';
    throwing: 레벨 5 0.00, 레벨 13 0.00 퍼센트포인트.
    offball: 레벨 5 0.21, 레벨 13 -0.02 퍼센트포인트.
    communication: 레벨 5 -0.34, 레벨 13 -0.14 퍼센트포인트.
-   mischief: 레벨 5 -0.91, 레벨 13 -0.74 퍼센트포인트. */
+   mischief: 레벨 5 -0.91, 레벨 13 -0.74 퍼센트포인트.
+   The list is the tie-break order and the post-cap order.
+   Selection is state-dependent: handling first, then lag-capped lowest save-path stats in list order.
+   Precedents: eFootball Auto Development recalculates at each level-up; Antimatter Dimensions and Frozen Cookies exclude capped and order eligible; Thousand Floors replaced a fixed list with lowest-first because later skills starved. */
 export const TRAINING_PRIORITY = ["handling","reflex","strength","balance","agility","composure","resilience","focus","diving","judgement","goalKick","throwing","offball","communication","mischief"];
+// The four are restart and follower slots: corr's RESTART and FAME sets.
+const NON_SAVE = ["goalKick", "throwing", "mischief", "communication"];
+export const SAVE_PATH = GROWABLE.filter(stat => !NON_SAVE.includes(stat));
+// HOTL hypothesis 2026-09-18: a stat is not raised while it is more than one point above the lowest uncapped save-path stat; STATS 15절 says a stat raised alone becomes its own accident
+export const LAG = 1;
 
 // 손 훈련의 growthGain을 그대로 쓴다. 한 번 굴릴 때 한 포인트만 쓴다.
 export function trainStat(keeper, stat, rng) {
@@ -31,7 +39,11 @@ export function autoTrain(keeper, points, rng) {
   let trained = keeper;
   const lines = [];
   for (let spent = 0; spent < Math.floor(points); spent += 1) {
-    const stat = TRAINING_PRIORITY.find(stat => trained[stat] < 10);
+    const pool = SAVE_PATH.filter(stat => trained[stat] < 10);
+    const minV = Math.min(...pool.map(stat => trained[stat]));
+    const stat = trained.handling < 10 ? "handling"
+      : pool.length ? TRAINING_PRIORITY.find(stat => pool.includes(stat) && trained[stat] <= minV + LAG)
+        : TRAINING_PRIORITY.find(stat => trained[stat] < 10);
     if (stat === undefined) break;
     const result = trainStat(trained, stat, rng);
     trained = result.keeper;
