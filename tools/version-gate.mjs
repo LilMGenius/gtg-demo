@@ -52,8 +52,8 @@ else console.log('  ok version:the-screen-label-matches-the-manifest ' + VERSION
 const tagged = tags.filter((t) => !NO_MANIFEST.has(t)).map((t) => t.slice(1));
 const top = tagged.sort((a, b) => rank(b) - rank(a))[0];
 
-// 열려 있는 칸은 마지막으로 닫은 칸보다 높아야 한다. 같으면 범프를 빠뜨린 것이다.
-if (top && rank(head) <= rank(top)) fails.push('manifest ' + head + ' did not rise above tag v' + top);
+// 배포된 바이트가 말하는 버전은 마지막 태그와 같아야 한다. 매니페스트는 태그가 붙는 커밋에서 오른다.
+if (top && rank(head) !== rank(top)) fails.push('manifest ' + head + ' is not the highest tag v' + top);
 
 for (const row of rows) console.log('  ' + row);
 console.log('  manifest ' + head + ' vs highest tag v' + (top || 'none'));
