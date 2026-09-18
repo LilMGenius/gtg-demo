@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { makeRng, buildSet, resolve, newKeeper, followerGain } from "../src/chain.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 import { newBuff, addBuff, spendBuff, readBuff, BUFF_CAP, BUFFS } from "../web/src/state/buff.mjs";
@@ -121,6 +122,35 @@ check("cap", stack.shots === BUFF_CAP,
   "9 x 12 -> " + stack.shots);
 check("read-halfstate", readBuff({ kind: "tonic", shots: 0 }).kind === "",
   "kind without shots dies");
+
+const durations = BUFFS.map((spec) => {
+  let buff = addBuff(newBuff(), spec.kind), effective = 0;
+  for (let i = 0; i < spec.shots + 5; i++) {
+    const applied = buff;
+    buff = spendBuff(buff);
+    effective += applied.kind === spec.kind;
+  }
+  let oldBuff = addBuff(newBuff(), spec.kind), oldEffective = 0;
+  for (let i = 0; i < spec.shots + 5; i++) {
+    oldBuff = spendBuff(oldBuff);
+    oldEffective += oldBuff.kind === spec.kind;
+  }
+  return { kind: spec.kind, sold: spec.shots, effective, oldEffective };
+});
+check("buff:the-shots-sold-are-the-shots-with-the-effect",
+  durations.every((d) => d.effective === d.sold), JSON.stringify(durations));
+check("control:deplete-then-read-loses-the-last-shot",
+  durations.every((d) => d.oldEffective === d.sold - 1), JSON.stringify(durations));
+
+const main = readFileSync(new URL("../web/src/main.mjs", import.meta.url), "utf8");
+const commitStart = main.indexOf("function commit(dive) {");
+const commitEnd = main.indexOf("\nfunction chooseDive(", commitStart);
+const commit = main.slice(commitStart, commitEnd);
+const captureAt = commit.indexOf("const applied = state.buff");
+const depleteAt = commit.indexOf("state.buff = spendBuff(state.buff)");
+check("buff:main-reads-the-applied-buff-before-it-depletes",
+  commitStart >= 0 && commitEnd > commitStart && captureAt >= 0 && depleteAt > captureAt,
+  "capture " + captureAt + " before deplete " + depleteAt);
 
 for (const n of notes) console.log("ok  " + n);
 for (const f of fails) console.log("BAD " + f);

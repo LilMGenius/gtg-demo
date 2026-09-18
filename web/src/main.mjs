@@ -17,7 +17,7 @@ import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { AXIS_WORD, AXIS_UNIT, SHELF_NOTES_FOR_WIKI } from './state/shelf.mjs';
 export { SHELF_NOTES_FOR_WIKI };
-import { BUFFS, BUFF_CAP, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
+import { BUFFS, BUFF_CAP, newBuff, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
 import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds, photoOdds, selfieFans,
   DM_MOVES, dmOdds, dmOutcome, dmClock, dmWaiting, applyDm } from './state/gram.mjs';
 import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost } from './state/rapport.mjs';
@@ -605,6 +605,9 @@ function commit(dive) {
   const ran = dive === null && state.auto && state.bot.ms > 0;
   state.botRan = ran;
   botTick();
+  // 이 구에 적용되는 버프를 먼저 읽고 그 뒤에 닳는다; 닳고 나서 읽으면 마지막 구가 효과 없이 굴러 판 만큼보다 하나 적다
+  const applied = state.buff;
+  shotBuff = applied;
   // 버프는 실제로 굴린 구에서만 닳는다. 시간으로 닳으면 상점에 둔 채로 증발한다.
   state.buff = spendBuff(state.buff);
   const input = dive === null && !ran
@@ -614,10 +617,11 @@ function commit(dive) {
       : { dive, errMs: performance.now() - pressAt, advance, auto: false };
   // 실제 판정에 넘긴 한 덩어리를 남겨 계기가 표시나 로그가 아닌 입력을 읽는다.
   window.__lastInput = input;
+  window.__lastBuff = { kind: applied.kind, shots: applied.shots };
   // 판정이 고른 쪽까지 정해진 뒤에 표시한다. 누른 값으로 표시하면 안 누른 구가 빈 채로 남는다.
   markDive(input.dive, input.auto);
   stage.diving = state.keeper.diving;
-  const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads, socks: state.gear.socks, frame: state.gear.frame, focusAid: state.buff.kind === 'tonic' ? TONIC_FOCUS : 1, rosin: state.buff.kind === 'rosin', gazeAid: rapportGazeAid(state.rapport, state.gear.city, shot.passer) });
+  const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads, socks: state.gear.socks, frame: state.gear.frame, focusAid: applied.kind === 'tonic' ? TONIC_FOCUS : 1, rosin: applied.kind === 'rosin', gazeAid: rapportGazeAid(state.rapport, state.gear.city, shot.passer) });
   state.results[state.i] = result.conceded;
   // 판정 결과에는 키커 이름이 없다. 장부는 이 자리에서만 이름을 알 수 있다.
   tally(shot.kicker.name, result.conceded);
@@ -675,7 +679,7 @@ function rollCaptions(result) {
       state.skip = null;
       // 팔로워는 구마다 오른다. 먹혀도 오르고, 막으면 더 오른다.
       // 봇이 뛴 구는 사고가 안 나서 아무도 안 본다. 성장은 남고 화제만 안 남는다.
-      const gain = state.botRan ? 0 : followerGain(state.keeper, result, state.gear.city, lookBoost(state.gear), state.buff.kind === 'hype' ? HYPE_BOOST : 1, rapportBoost(state.rapport, state.gear.city, state.shots[state.i].passer), mutualBoost(state.social));
+      const gain = state.botRan ? 0 : followerGain(state.keeper, result, state.gear.city, lookBoost(state.gear), shotBuff.kind === 'hype' ? HYPE_BOOST : 1, rapportBoost(state.rapport, state.gear.city, state.shots[state.i].passer), mutualBoost(state.social));
       state.fans += gain;
       // 라포는 말을 섞은 구에서만 쌓인다. 스쳐 지나간 얼굴은 다음에도 남이다.
       // 봇이 뛴 구는 팔로워와 같은 규칙으로 0이다. 봇이 서 있었으니 얼굴이 익을 리 없다.
@@ -780,6 +784,7 @@ function endSet() {
    내 정보와 위키가 각자 제 상자에 두고 있는 그것이고, 구르는 창 중에 훈련장만 없었다. */
 let gymWatch = null;
 let lastAutoTraining = '';
+let shotBuff = newBuff();
 
 // 손과 자동은 같은 성장 굴림과 저장, 외형 갱신을 쓴다. 예산은 쌓인 훈련 포인트뿐이다.
 function trainKeeper(stat) {
