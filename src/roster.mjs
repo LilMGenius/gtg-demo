@@ -351,11 +351,14 @@ export function faceOf(name) {
   return Object.assign(base, FACE_OVERRIDE[name] || {});
 }
 
-/* 포지션과 정원. 주전은 열하나이고 골키퍼는 그 밖에서 따로 한 명이 선다.
-   축구가 쓰는 4-4-3 그대로다. 이 표가 정원의 정본이라 화면과 판정이 같은 수를 읽는다. */
+/* IFAB 경기 규칙 3.1: 선발 열하나 = 골키퍼 하나 + 필드 열 명. 조문은 TEAM_RULE이 소유한다.
+   포메이션은 골키퍼를 빼고 센다: https://en.wikipedia.org/wiki/Formation_(association_football) */
+import { TEAM_RULE } from './reality.mjs';
 export const ROLES = ['수비수', '미드필더', '공격수'];
-export const ROLE_SLOTS = { 수비수: 4, 미드필더: 4, 공격수: 3 };
-export const ELEVEN = 11;
+// 수비와 공격 자리를 유지하면서 필드 열 명을 채우는 4-3-3을 쓴다.
+export const ROLE_SLOTS = { 수비수: 4, 미드필더: 3, 공격수: 3 };
+export const ELEVEN = TEAM_RULE.values.maximum;
+export const FIELD = ELEVEN - TEAM_RULE.values.goalkeepers;
 
 export function kickerByName(name) {
   return KICKERS.find((k) => k.name === name) || null;
@@ -370,7 +373,7 @@ export function kickerCost(k) {
   return COST_BASE + sum * COST_PER_STAT + (Number(k.fame) || 0) * COST_PER_FAME;
 }
 
-/* 시작 주전. 정원대로 각 포지션에서 가장 싼 쪽부터 채운다. 명성이 높은 열하나로 시작하면
+/* 시작 필드 열 명. 정원대로 각 포지션에서 가장 싼 쪽부터 채운다. 명성이 높은 열 명으로 시작하면
    영입이 살 것을 안 판다. 이름이 같은 값이면 명단 순서로 갈라 회차마다 안 흔들린다. */
 export function defaultEleven() {
   const out = [];

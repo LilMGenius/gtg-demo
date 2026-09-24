@@ -1,8 +1,9 @@
 import { chromium } from "playwright";
-import { PULL_BULK, PULL_BONUS, pullYield, ELEVEN, ROLES, ROLE_SLOTS, kickerByName } from "../src/roster.mjs";
+import { PULL_BULK, PULL_BONUS, pullYield, ROLES, ROLE_SLOTS, kickerByName } from "../src/roster.mjs";
+import { TEAM_RULE } from "../src/reality.mjs";
 import { STAGE_LAST, pressOpen, tapClose } from "./draw.mjs";
 
-// 첫 진입의 자. 가입 직후 아무것도 안 뽑고 판이 열렸다. 첫 키퍼와 주전 열하나가 조용히 배정돼서
+// 첫 진입의 자. 가입 직후 아무것도 안 뽑고 판이 열렸다. 첫 키퍼와 필드 열 명이 조용히 배정돼서
 // 플레이어는 자기가 무엇을 들고 시작하는지를 본 적이 없었고, 이 장르가 파는 첫 순간이 통째로 없었다.
 //
 // 축은 다섯이다. 처음 온 사람에게 카드가 열리는가, 봉인된 채로 짧게 누르면 닫히지 않고 한 단이 오르는가,
@@ -16,6 +17,11 @@ t.unref();
 
 const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
+const rule = TEAM_RULE.values;
+const legal = (slots) => rule.goalkeepers + Object.values(slots).reduce((a, b) => a + b) === rule.maximum;
+check("onboard:formation-obeys-law-3.1", legal(ROLE_SLOTS), TEAM_RULE.source.clause);
+// 골키퍼를 뺀 채 열한 명을 세우던 4-4-3 오류를 대조군으로 둔다.
+check("control:4-4-3-plus-keeper-is-rejected", !legal({ 수비수: 4, 미드필더: 4, 공격수: 3 }), "4-4-3 rejected");
 
 check("instrument:the-bulk-draw-yields-one-more-than-it-charges",
   pullYield(PULL_BULK) === PULL_BULK + PULL_BONUS && pullYield(1) === 1,
@@ -109,7 +115,7 @@ try {
     after.kickers.length + " owned");
   // 뽑았는데 아무도 안 뛰면 그 열한 장이 무엇을 산 것인지 화면에 없다.
   const mineInEleven = after.eleven.filter((n) => after.kickers.indexOf(n) >= 0).length;
-  check("onboard:the-drawn-kickers-actually-take-the-field", mineInEleven > 0 && after.eleven.length === ELEVEN,
+  check("onboard:the-drawn-kickers-actually-take-the-field", mineInEleven > 0 && after.eleven.length === rule.maximum - rule.goalkeepers,
     mineInEleven + " of " + after.eleven.length + " starters came from the draw");
   const perRole = {};
   for (const n of after.eleven) { const k = kickerByName(n); if (k) perRole[k.role] = (perRole[k.role] || 0) + 1; }

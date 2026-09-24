@@ -77,7 +77,7 @@ export function load() {
 // 라포도 같이 나간다. 얼굴을 익힌 행인이 탭을 닫을 때 지워지면 반복해서 마주친 보람이 사라진다.
 // 이적시장 이용권도 같이 나간다. 완봉으로 받은 장이 탭을 닫을 때 사라지면 그 판을 다시 이겨야 한다.
 // 팔로우도 같이 나간다. 선팔과 맞팔이 탭을 닫을 때 지워지면 사람을 다시 처음부터 따라가야 한다.
-// 키커 보유와 주전 열하나도 같이 나간다. 영입한 사람이 탭을 닫을 때 사라지면 그 골드가 증발한다.
+// 키커 보유와 필드 열 명도 같이 나간다. eleven은 필드이고 골키퍼는 state.keeper에 선다.
 export function save(squad, pick, auto, fans, points, wallet, posts, record, gear, bot, buff, rapport, tickets, social, kickers, eleven, onboard, _retiredPref, coach = false) {
   try {
     const i = Number(pick) || 0;
@@ -121,17 +121,24 @@ export const OFFLINE_MS = 20 * 60 * 1000;
 
 /* 저장에서 키커 보유와 주전을 꺼낸다. 이전 배포본 저장에는 이 칸이 없고, 그때는 시작 주전으로 연다.
    명단에 없는 이름은 버린다. 로스터가 바뀐 뒤에도 저장이 유령을 판에 세우면 안 된다.
-   주전이 정원을 안 채우면 보유에서 채워 넣는다. 열 명으로 도는 판은 없다. */
-export function readSquadKickers(saved, all, fallback, cap) {
+   포지션 초과는 벤치에 남기고, 빈자리는 시작 명단 다음 보유 명단 순서로 채운다. */
+export function readSquadKickers(saved, all, fallback, cap, roleOf, slots) {
   const own = new Set(fallback);
   if (Array.isArray(saved?.kickers)) for (const n of saved.kickers) if (all.includes(n)) own.add(n);
   const kickers = [...own];
   const seen = [];
-  if (Array.isArray(saved?.eleven)) {
-    for (const n of saved.eleven) if (own.has(n) && seen.indexOf(n) < 0 && seen.length < cap) seen.push(n);
-  }
-  for (const n of fallback) { if (seen.length >= cap) break; if (seen.indexOf(n) < 0) seen.push(n); }
-  for (const n of kickers) { if (seen.length >= cap) break; if (seen.indexOf(n) < 0) seen.push(n); }
+  const counts = {};
+  const add = (n) => {
+    const role = roleOf(n);
+    if (!own.has(n) || seen.includes(n) || seen.length >= cap || !(counts[role] < slots[role])) return;
+    seen.push(n);
+    counts[role] += 1;
+  };
+  // 빈 포지션은 영 명에서 시작해야 첫 선수를 받을 수 있다.
+  for (const role of Object.keys(slots)) counts[role] = 0;
+  if (Array.isArray(saved?.eleven)) for (const n of saved.eleven) add(n);
+  for (const n of fallback) add(n);
+  for (const n of kickers) add(n);
   return { kickers, eleven: seen };
 }
 export const OFFLINE_CAP = 12;
