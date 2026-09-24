@@ -360,8 +360,8 @@ function wornCamera(kind, body, yaw) {
   const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
   const viewPoints = points.map(p => new THREE.Vector3(p.dot(right), p.y, p.dot(forward)));
   if (kind === "pads") {
-    // 척추에서 목까지의 아래 사분점도 담아 저지와 어깨가 얼굴 아래에 남게 한다.
-    const chest = j.spine.getWorldPosition(new THREE.Vector3()).lerp(j.neck.getWorldPosition(new THREE.Vector3()), 0.25);
+    // 짧은 몸에서도 얼굴 밑에 저지가 남도록 골반의 척추 원점까지 담는다.
+    const chest = j.spine.getWorldPosition(new THREE.Vector3()).lerp(j.neck.getWorldPosition(new THREE.Vector3()), 0.15); // 아래 15% 지점까지 담아 턱 여백과 헐렁한 면티의 밑단을 함께 보존한다.
     viewPoints.push(new THREE.Vector3(chest.dot(right), chest.y, chest.dot(forward)));
   }
   if (kind === "hair") {
@@ -380,7 +380,7 @@ function wornCamera(kind, body, yaw) {
     const q = p.clone().sub(center);
     distance = Math.max(distance, q.z + Math.max(Math.abs(q.x) / tanX, Math.abs(q.y) / tanY));
   }
-  distance *= 1.04; // 실제 정점 봉투에 4퍼센트만 더해 화소 반올림 여백을 남긴다.
+  distance *= kind === "pads" ? 1.12 : 1.04; // 상의는 큰 키의 턱과 회전한 어깨 상자를 12% 여백으로 담고 나머지는 기존 4%를 유지한다.
   cam.position.copy(at).addScaledVector(forward, distance);
   cam.lookAt(at);
   cam.userData.distance = distance;
