@@ -1,5 +1,5 @@
 // 위치 경로의 네 입력 모드에서 기존 문턱을 그대로 재며, 옛 완벽/자동/저장 방향은 모집단에서 제외한다.
-import { makeRng, newKeeper, keeperAtLevel, rollForm, buildSet, resolve, autoInput, positionInput, MODES } from './position-pop.mjs';
+import { makeRng, newKeeper, keeperAtLevel, rollForm, buildSet, resolve, positionInput, MODES } from './position-pop.mjs';
 import { GROWABLE } from '../src/ledger.mjs';
 import { autoTrain, trainStat, TRAINING_PRIORITY } from '../web/src/state/coach.mjs';
 import { coinGain } from '../web/src/state/wallet.mjs';

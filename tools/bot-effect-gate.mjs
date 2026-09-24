@@ -1,6 +1,6 @@
-// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+// 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { modifierContract } from "./modifier-contract.mjs";
-import { makeRng, buildSet, resolve, newKeeper, autoInput, positionInput } from "./position-pop.mjs";
+import { makeRng, buildSet, resolve, newKeeper, positionInput } from "./position-pop.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 import { BOTS, botKeeper } from "../web/src/state/bot.mjs";
 
@@ -19,7 +19,7 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 const base = newKeeper();
 
 // tier 0은 봇 없이 도는 자동이다. 사람이 안 누를 때의 바닥이 사다리의 첫 칸이다.
-// hand는 고정 최적 입력이다. 자동이 절대 넘으면 안 되는 천장을 재려고 둔다.
+// hand는 공유 손 반응 정책이다. 봇과 같은 정보로 움직이는 손의 성과를 잰다.
 function sweep(opt) {
   const o = opt || {};
   // 표본을 밖에서 넘길 수 있어야 한다. 고정되어 있으면 만렘 축을 붙여도 신인만 재고 조용히 초록을 낸다.
@@ -32,10 +32,10 @@ function sweep(opt) {
     const rng = makeRng(s + 90001);
     for (const shot of set) {
       const arg = { keeper, shot, rng };
-      // advance 0 고정은 실제 손 조작이 아니었다. 돌진 버튼의 0.9를 쓰되 칩에는 나가지 않는다.
+      // 손은 공유 반응 정책을 쓰고 전진과 다이빙은 제품 판정이 결정한다.
       if (o.centre) arg.input = positionInput(who, shot, rng, "hand-centre");
-      else if (o.hand) arg.input = { dive: shot.side, errMs: 0, advance: shot.chip ? 0 : 0.9, auto: false };
-      else arg.input = autoInput(inputKeeper, shot, rng);
+      else if (o.hand) arg.mode = 'hand-react';
+      else arg.input = positionInput(inputKeeper, shot, rng, 'bot');
       const r = resolve(arg);
       shots++;
       if (!r.conceded) saved++;

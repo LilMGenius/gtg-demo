@@ -1,4 +1,4 @@
-// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+// 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 // 이 게이트의 모집단은 keeperAtLevel 기준 모집단(N칸 중 셋, 레벨당 3포인트)이며 제품 모집단은 tools/product-pop-gate.mjs가 잰다.
 // 성장 트립와이어. 성장 선택지 어느 것을 골라도 다음 판 화면에서 달라지는 것이 있는가.
 // 같은 씨드로 같은 구를 두 번 돌린다. 한 번은 그대로, 한 번은 칸 하나를 +1 해서.

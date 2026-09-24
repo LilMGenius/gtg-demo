@@ -1,4 +1,4 @@
-// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+// 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 // 헛구의 자. 모든 슛이 골문 안으로 갔다. 키커는 절대 빗나가지 않는 존재였고,
 // 그래서 필드 열 명을 고르는 일이 난도만 정하고 판의 밀도는 안 정했다.
 // 못 차는 키커를 세우면 막기는 쉬운데 그 쉬움에 대가가 없었다.
@@ -8,7 +8,7 @@
 // 선수단 화면이 거꾸로 선다.
 // 표본 범위: 키퍼는 한 사람으로 고정한다. 재는 것은 키커 쪽 확률이라 키퍼가 결론을 안 바꾼다.
 
-import { makeRng, resolve, keeperAtLevel, autoInput, followerGain } from "./position-pop.mjs";
+import { makeRng, resolve, positionInput, keeperAtLevel, followerGain } from "./position-pop.mjs";
 import { KICKERS, FIELD, kickerByName, defaultEleven } from "../src/roster.mjs";
 import { coinGain, COIN_SAVE, COIN_CONCEDED, COIN_WIDE } from "../web/src/state/wallet.mjs";
 
@@ -26,7 +26,7 @@ function run(pool) {
     const shot = { aimX: 0.8, aimY: 0.9, course: "상단", strong: false, chip: false, gaze: false, bend: 0,
       flight: 0.62, side: 1, forced: false, kicker: pool[Math.floor(rng() * pool.length)], passer: 0 };
     balls += 1;
-    const r = resolve({ keeper: k, shot, rng, input: autoInput(k, shot, rng),
+    const r = resolve({ keeper: k, shot, rng, input: positionInput(k, shot, rng, 'bot'),
       grip: 0, studs: 0, pads: 0, socks: 0, frame: 0, focusAid: 1, rosin: false, gazeAid: 1 });
     if (r.untested) wide += 1;
     if (r.conceded) conceded += 1;

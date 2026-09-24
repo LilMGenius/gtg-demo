@@ -1,4 +1,4 @@
-// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+// 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { modifierContract } from "./modifier-contract.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 import { makeRng, buildSet, resolve, newKeeper, followerGain } from "./position-pop.mjs";
@@ -26,9 +26,8 @@ function sweep(opt) {
     const set = buildSet(makeRng(s + 1), 5, 0);
     const rng = makeRng(s + 90001);
     for (const shot of set) {
-      const input = { dive: shot.side, errMs: 0, advance: 0, auto: false };
       const r = resolve({
-        keeper: opt.keeper || base, shot, rng, input,
+        keeper: opt.keeper || base, shot, rng, mode: 'hand-react',
         grip: 0, studs: 0, pads: 0, socks: 0, frame: 0,
         focusAid: 1, rosin: false,
         // gazeAid는 resolve 인자 최상위다(chain.mjs 357). raw input 안에 넣으면 안 읽힌다.

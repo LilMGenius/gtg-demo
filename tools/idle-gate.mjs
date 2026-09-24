@@ -1,4 +1,4 @@
-// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+// 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { makeRng, buildSet, resolve, newKeeper, keeperAtLevel } from "./position-pop.mjs";
 
 // 방치형에서 방치가 벌이면 안 된다. 훈련 없는 대조군은 손가락만 대신하므로,
@@ -138,7 +138,7 @@ const at = (lv, grow, stats) => {
     }
     if (stats) Object.assign(k, stats);
     for (const shot of buildSet(makeRng(s + 1), lv, 0)) {
-      const r = resolve({ keeper: k, shot, rng, input: { dive: shot.side, errMs: 0, advance: 0, auto: false } });
+      const r = resolve({ keeper: k, shot, rng, mode: 'hand-react' });
       shots += 1;
       if (!r.conceded) saved += 1;
     }

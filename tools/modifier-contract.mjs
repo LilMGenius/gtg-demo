@@ -1,4 +1,4 @@
-// Shared paired-shot measurement; callers supply their actual resolver so parent controls use the same instrument.
+// 호출자가 준 엔진으로 짝 표본을 잰다. 부모 대조는 부모 소스와 그 입력 계약을 함께 제공한다.
 export function modifierContract({ gate, fields, engine, growable, botKeeper, check }) {
   const { makeRng, buildSet, resolve, newKeeper } = engine;
   const measure = (level, field) => {
@@ -11,7 +11,7 @@ export function modifierContract({ gate, fields, engine, growable, botKeeper, ch
       const rng = makeRng(seed + 90001);
       for (const shot of buildSet(makeRng(seed + 1), 5, 0)) {
         const arg = { keeper: who, shot, rng };
-        if (gate !== 'bot-effect') arg.input = { dive: shot.side, errMs: 0, advance: 0, auto: false };
+        arg.mode = gate === 'bot-effect' ? 'bot' : 'hand-react';
         if (field === 'rapport') arg.gazeAid = 0.7;
         else if (field === 'rosin') arg.rosin = true;
         else if (field && !bot) arg[field] = 3;
