@@ -45,13 +45,8 @@ try {
     const chip = document.querySelector("#purse .cur u");
     const chipGlyph = chip && chip.parentElement.querySelector("svg") ? chip.parentElement.querySelector("svg").innerHTML : "";
     const arrow = document.querySelector("#form .up") ? "up" : document.querySelector("#form .dn") ? "dn" : "";
-    // 박자 띠는 구가 굴러야 뜬다. 접힌 상자를 재면 0,0,0,0이 나오고 그 거리는 아무것도 안 말한다.
-    // 자리만 재는 것이므로 잠깐 펴서 재고 도로 접는다.
-    const lane = document.getElementById("beat");
-    const was = lane.hidden;
-    lane.hidden = false;
-    const beat = lane.getBoundingClientRect();
-    lane.hidden = was;
+    // 효과 배지가 엄지 화살표와 그림자 폭 이상 떨어져 있는지 실제 상자로 잰다.
+    const beat = document.querySelector('.move-arrow').getBoundingClientRect();
     const r = box.getBoundingClientRect();
     const lift = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--lift")) || 0;
     return { hidden: box.hidden, tags, chipGlyph, arrow, shots: window.__buff().shots, kind: window.__buff().kind,
@@ -80,7 +75,7 @@ try {
     seen[spec.kind] = await read();
     if (spec.kind === "tonic") {
       await p.evaluate(() => window.__resumeRound());
-      await p.locator('.zone[data-dive="-1"]').dispatchEvent("pointerdown");
+      await p.locator('.move-arrow[data-move="-1"]').dispatchEvent("pointerdown");
       await p.waitForFunction(() => document.querySelector('#aura .tag[data-kind="tonic"] b')?.textContent === "11",
         null, { timeout: 24000 });
       const after = await p.evaluate(() => ({ applied: window.__lastBuff, remaining: window.__buff().shots,
@@ -116,7 +111,7 @@ try {
   check("aura:the-badge-carries-no-condition",
     kinds.every((k) => seen[k].tags.every((x) => String(x.kind).indexOf("form") !== 0)),
     kinds.map((k) => k + " chip " + (seen[k].arrow || "flat")).join(", "));
-  check("aura:the-badges-clear-the-beat-lane",
+  check("aura:the-badges-clear-the-movement-arrows",
     kinds.every((k) => seen[k].gap >= seen[k].lift && seen[k].onScreen),
     kinds.map((k) => k + " " + seen[k].gap.toFixed(1) + "px").join(", ") + " over " + bare.lift + "px");
 

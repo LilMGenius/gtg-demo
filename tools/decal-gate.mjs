@@ -66,7 +66,7 @@ const waitFrames = (page, n) => page.evaluate((k) => new Promise((done) => {
    그 누름은 선호만 옮기고, 키퍼가 제자리에 선 채로 여섯 사건이 같은 흙에 겹쳐 칠해진다.
    실측: 패드를 안 보고 누르면 클러스터가 회차마다 1과 3으로 갈렸다. walkback-gate.mjs의 padOpen과 같은 자다. */
 const padOpen = (page) => page.waitForFunction(() => {
-  const z = document.querySelector(".zone");
+  const z = document.querySelector(".move-arrow");
   return Boolean(z) && z.classList.contains("live");
 }, null, { timeout: 120000, polling: "raf" });
 

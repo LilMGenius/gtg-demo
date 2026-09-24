@@ -207,24 +207,27 @@ async function sample(browser, routed, kind, side, walkOff) {
   for (const [f, body] of routed) {
     await page.route("**/" + f, (r) => r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body }));
   }
+  // 기존 stage.play를 재사용하며 판정·키보드와 독립된 복귀 시작 자세만 고정한다.
+  const main = readFileSync(ROOT + 'web/src/main.mjs', 'utf8');
+  await page.route('**/web/src/main.mjs', r => r.fulfill({contentType:'text/javascript; charset=utf-8',body:main + `
+window.__returnIdle = () => { window.__lockRound(); stage.reset(); };
+window.__returnShot = side => {
+  const shot = {aimX:side,aimY:0.3,strong:false,chip:false,gaze:false,bend:0,flight:0.8,kicker:{power:5,name:'복귀'},side,course:'low',index:0};
+  const input = {dive:side,advance:false}; window.__lastInput=input;
+  stage.play(shot,input,{conceded:false,cause:'returnTest',events:[],stage:'',rolls:[],fame:0},()=>stage.act('save'));
+  return true;
+};` }));
   await page.goto(BASE + (walkOff ? "&walk=0" : ""), { waitUntil: "load" });
   await page.waitForSelector("#go", { timeout: 15000 });
   await page.click("#go", { force: true });
   await clearDraw(page);
   // 흔들림 위상을 못 박는다. 안 박으면 같은 프레임의 몸이 회차마다 조금 다른 자리에 선다.
   const pinned = await page.evaluate(() => (window.__swayPin ? window.__swayPin(0) : -1));
-  // 준비 자세의 기준 실루엣. 일어서기가 끝났는지는 이 벡터와의 거리로만 물을 수 있다.
+  // 화살표는 hand 게이트가 잰다. 복귀 자는 같은 착지 거리의 좌우 구를 재생해 보폭 분모를 고정한다.
+  await page.evaluate(() => window.__returnIdle());
+  await waitFrames(page, 30);
   const ref = await page.evaluate(() => window.__poseVis().v);
-  /* 방향키는 대기 마디에서만 먹고 그 자리에서 구를 날린다. 정해진 횟수만 누르면 누르는 동안 판이
-     비행이나 자막이던 회차에서 아무 구도 안 뛰고, 그 표본은 x가 0인 채로 복귀를 잰다(실측 travel 0.00).
-     그래서 횟수가 아니라 판정에 들어간 입력을 보고 멈춘다. */
-  let dove = false;
-  for (let i = 0; i < 40 && !dove; i += 1) {
-    await padOpen(page);
-    await page.keyboard.press(side < 0 ? "ArrowLeft" : "ArrowRight");
-    await waitFrames(page, 12);
-    dove = await page.evaluate((s) => Boolean(window.__lastInput) && window.__lastInput.dive === s, side);
-  }
+  const dove = await page.evaluate(s => window.__returnShot(s), side);
   // 그 구의 사건이 열리는 프레임을 기다린다. 그 프레임의 키퍼는 다이빙을 마치고 착지해 있다.
   await page.waitForFunction(() => window.__tailKind() !== null, null, { timeout: 40000, polling: "raf" });
   const open = await page.evaluate(([k, stop]) => {
@@ -267,7 +270,7 @@ const waitFrames = (page, n) => page.evaluate((k) => new Promise((done) => {
 /* 방향키가 이 구의 판정에 들어가는 것은 대기 마디뿐이다. 그 마디가 열렸는지는 다이브 패드의 zone 단추가 열려 있는지로
    읽는다(main.mjs setPad). 패드가 열린 프레임에 눌러야 그 누름이 판정에 들어가고, 닫힌 프레임의 누름은 선호만 옮긴다. */
 const padOpen = (page) => page.waitForFunction(() => {
-  const z = document.querySelector(".zone");
+  const z = document.querySelector(".move-arrow");
   return Boolean(z) && z.classList.contains("live");
 }, null, { timeout: 60000, polling: "raf" });
 
@@ -292,9 +295,10 @@ async function carrySample(browser, routed, seed, dir, home) {
   let pref = dir === 0;
   for (let i = 0; i < 40 && !pref; i += 1) {
     await padOpen(page);
-    await page.keyboard.press(dir < 0 ? "ArrowLeft" : "ArrowRight");
-    await waitFrames(page, 12);
-    pref = await page.evaluate((d) => Boolean(window.__lastInput) && window.__lastInput.dive === d, dir);
+    await page.keyboard.down(dir < 0 ? "ArrowLeft" : "ArrowRight");
+    await waitFrames(page, 30);
+    await page.keyboard.up(dir < 0 ? "ArrowLeft" : "ArrowRight");
+    pref = await page.evaluate((d) => Math.sign(window.__position().x) === d, dir);
   }
   await page.evaluate((centre) => {
     window.__w14c = [];
@@ -304,13 +308,10 @@ async function carrySample(browser, routed, seed, dir, home) {
     const tick = () => {
       const k = window.__keeperPos();
       const b = window.__ballPos();
-      const zone = document.querySelector(".zone");
+      const zone = document.querySelector(".move-arrow");
       const open = Boolean(zone) && zone.classList.contains("live");
-      if (centre && open && !armed) {
-        const out = document.getElementById("out");
-        if (out && !out.classList.contains("on")) out.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
-        armed = true;
-      }
+      // 전진은 위치 판정이 자동으로 고른다. 자연 판의 깊이 복귀를 그대로 기록한다.
+      if (centre && open && !armed) armed = true;
       if (!open) armed = false;
       const bv = window.__backVis ? window.__backVis() : null;
       window.__w14c.push({ f: window.__frames(), k: window.__tailKind(), a: window.__tailAge(), x: k.x, z: k.z, bz: b.z,

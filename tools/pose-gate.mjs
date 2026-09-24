@@ -260,8 +260,10 @@ try {
     const response = await fetch(new URL("/" + file, BASE));
     if (!response.ok) throw new Error("swing source HTTP " + response.status);
     liveSwingSources.set(file, routed.get(file) || await response.text());
-    parentSwingSources.set(file, execFileSync("git", ["show", "c2c66a7:" + file],
-      { cwd: ROOT, encoding: "utf8", maxBuffer: 32000000 }));
+    // 과거 발 관절을 현재 장면에 넣어 위치 입력 API와 무관하게 킥 역방향을 검출한다.
+    parentSwingSources.set(file, file.endsWith('/scene.mjs') ? liveSwingSources.get(file)
+      : execFileSync("git", ["show", "c2c66a7:" + file],
+        { cwd: ROOT, encoding: "utf8", maxBuffer: 32000000 }));
   }
   const swing = await sampleSwing(b, BASE, liveSwingSources, process.argv.find((a) => a.startsWith("--screens="))?.slice(10));
   say("kick:the-swing-runs-from-behind-the-ball-toward-the-camera",

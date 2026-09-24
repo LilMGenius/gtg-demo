@@ -91,7 +91,7 @@ try {
   const touch = await p.evaluate(() => {
     const cap = document.getElementById("caption");
     const capRect = cap.getBoundingClientRect();
-    const targets = [...document.querySelectorAll(".zone svg"), document.getElementById("out"), document.getElementById("auto")];
+    const targets = [...document.querySelectorAll(".move-arrow"), document.getElementById("auto")];
     let boxHit = 0;
     let stolen = 0;
     for (const el of targets) {

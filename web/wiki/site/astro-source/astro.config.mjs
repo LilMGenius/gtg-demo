@@ -139,7 +139,7 @@ export default defineConfig({ base: "/gtg-demo/web/wiki/site", build: { format: 
           "link": "/category-68616e64.html"
         },
         {
-          "label": "세 칸과 타이밍",
+          "label": "좌우 이동",
           "link": "/hand.html"
         }
       ],

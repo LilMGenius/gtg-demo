@@ -945,7 +945,7 @@ const TOUCHED = new Set(['contact']);
      같은 곱이 프레임마다 쌓였다. 실측으로 1.4초를 쓰라고 적어 둔 복귀가 0.43초에 끝났다.
      그래서 섞지 않고 착지점과 집 사이의 절대 좌표를 쓴다. */
   function applyBack(b) {
-    keeper.position.x = b.from.x * b.hb;
+    if (!returnHeld?.()) keeper.position.x = b.from.x * b.hb;
     keeper.position.z = KEEPER_Z + (b.from.z - KEEPER_Z) * b.hb;
     keeper.rotation.y = b.from.ry * b.hb;
     // 기운 몸으로 걸으면 걷는 것이 아니라 기울어진 채 미끄러지는 것이다. 일어서는 동안 세운다.
@@ -1220,7 +1220,23 @@ const TOUCHED = new Set(['contact']);
     // 실점은 화면이 한 번 하얗게 튄 다음 색이 빠진다. 결과를 글자로만 알리면 글자를 안 읽는다.
     if (CONCEDE.has(kind)) flash(kind);
   }
+  let positionFrame = null, returnHeld = null;
+  let controlledX = null, controlledVx = 0, shuffleDistance = 0;
+  function setKeeperX(x, vx) {
+    const world = VIEW_X * x * SX;
+    shuffleDistance += Math.abs(world - (controlledX ?? keeper.position.x));
+    controlledX = world;
+    controlledVx = vx;
+  }
+  // 기존 재생을 준비 상태로 열고 접촉 때 조준, 자동 다이빙 때 판정을 받는다.
+  function prepareShot(shot, seconds, timeline, onEnd) {
+    play(shot, { dive: 0, advance: 0 }, { events: [] }, onEnd);
+    cue.t0 += seconds;
+    cue.contact = () => timeline('contact');
+    cue.think = () => timeline('frame');
+  }
   function play(shot, input, result, onEnd) {
+    controlledX = null;
     tail = null;
     pendingBurst = null;
    // deflect는 철봉 접촉이 정한 밀림 벡터다. 접촉 전에는 null이라 비행 코드가 통째로 건너뛴다.
@@ -1296,6 +1312,7 @@ const TOUCHED = new Set(['contact']);
     // 0.004는 한 바퀴에 4분이 조금 넘는다. 눈에 띄면 배경이 주인공을 뺏는다.
     pitch.drift.value = vnow * 0.004;
     runTimers();
+    if (positionFrame) positionFrame(dt, vnow);
     actor.keeper = keeper;
     actor.kicker = kicker;
     // 이번 프레임에 무엇을 연기할지. 결과는 이미 확정됐고 여기서는 각도만 고른다.
@@ -1313,8 +1330,28 @@ const TOUCHED = new Set(['contact']);
     let hover = 0;
     if (cue) {
       const t = vnow - cue.t0;
-      const { shot, input, result } = cue;
+      // 기존 킥의 도움닫기 550ms를 준비 입력과 같은 세계시계로 잰다.
       const runup = 0.55;
+      if (cue.contact && t >= runup) {
+        const resolved = cue.contact();
+        cue.contact = null;
+        if (resolved?.shot) cue.shot = resolved.shot;
+        if (resolved?.input) cue.pending = resolved;
+      }
+      if (cue.think && t >= runup) {
+        const resolved = cue.pending || cue.think();
+        if (resolved) {
+          cue.shot = resolved.shot;
+          cue.input = resolved.input;
+          cue.result = resolved;
+          cue.startX = controlledX ?? keeper.position.x;
+          cue.wait = TOUCHED.has(resolved.events.find(e => e.t !== 'result')?.t) ? 0 : 0.9;
+          cue.diveAt = t;
+          cue.think = null;
+          controlledX = null;
+        }
+      }
+      const { shot, input, result } = cue;
       const flight = shot.flight;
 
       const diveSide = Math.sign(VIEW_X * input.dive);
@@ -1330,7 +1367,7 @@ const TOUCHED = new Set(['contact']);
       // 예비는 킥 종류가 소유한다. 한 장으로 두면 칩과 강슛이 같은 몸에서 감기 시작한다.
       if (kkId === POSES.windup && cue.wind) kk = cue.wind;
       if (t < runup) {
-        const p = t / runup;
+        const p = Math.max(0, t / runup);
         kicker.position.z = lerp(11.2, 10.55, ease(p));
         kicker.position.x = lerp(kicker.userData.startX ?? KICKER_OFF, VIEW_X * shot.aimX * SX * 0.2 + KICKER_OFF * 0.45, ease(p));
         kicker.rotation.z = Math.sin(p * 14) * 0.14;
@@ -1478,10 +1515,13 @@ const TOUCHED = new Set(['contact']);
         // 키퍼는 판정된 방향으로 몸을 던진다. 늦게 출발하면 늦게 보인다.
         // 뻗는 거리는 골포스트 안쪽까지다. 화면 밖으로 나가면 결과가 안 보인다.
         // 꼬리가 시작되면 키퍼의 몸은 꼬리 것이다. 큐가 계속 밀면 일어서라는 코드가 있어도 그 자리에 눌려 있는다.
-        if (!tail) {
-          const dp = Math.min(1, Math.max(0, (t - runup - flight * 0.28) / (flight * 0.7)));
+        if (!tail && !cue.think) {
+          // 위치 경로는 발동 뒤 남은 비행시간에 뻗고 기존 강제 재생은 원래 박자를 쓴다.
+          const dp = cue.diveAt === undefined
+            ? Math.min(1, Math.max(0, (t - runup - flight * 0.28) / (flight * 0.7)))
+            : Math.min(1, Math.max(0, (t - cue.diveAt) / Math.max(Number.EPSILON, runup + flight - cue.diveAt)));
           const span = Math.min(R_HALF_W - 0.5, 1.05 + 0.06 * cueKeeperDiving());
-          keeper.position.x = lerp(0, VIEW_X * input.dive * span, ease(dp));
+          keeper.position.x = lerp(cue.startX ?? 0, (cue.startX ?? 0) + VIEW_X * input.dive * span, ease(dp));
           keeper.position.z = lerp(KEEPER_Z, KEEPER_Z + input.advance, ease(Math.min(1, dp * 1.4)));
           // 관절이 뻗는 방향을 이미 보여주므로 몸통 회전은 거들기만 한다.
           keeper.rotation.z = lerp(0, VIEW_X * -input.dive * 0.86, ease(dp));
@@ -1874,7 +1914,8 @@ const TOUCHED = new Set(['contact']);
           /* 공을 키퍼 뒤에 두면 카메라가 골대 뒤에 있으므로 몸에 가린다.
              실측으로 스물다섯 프레임 중 스무 프레임이 그렇게 가려졌다.
              돌진 갈래가 이미 쓰는 자리를 그대로 쓴다. 카메라 쪽으로 0.9, 옆으로 0.78이다. */
-          ball.position.set(keeper.position.x + 0.78, 0.14, keeper.position.z - 0.9);
+          // 위치 경로의 제치기에서 z=9.1의 공이 가로대에 250프레임 가렸다. 1.8m 앞은 그 투영 띠 아래다.
+          ball.position.set(keeper.position.x + 0.78, 0.14, keeper.position.z - 1.8);
           kicker.rotation.z = lerp(0, 1.3 + (tail.vary.a - 0.5) * 0.5, e);
           break;
         case 'lost':
@@ -2101,6 +2142,19 @@ const TOUCHED = new Set(['contact']);
         back.phase = back.gone * back.w * STRIDE;
         kp = walkPose(back.phase);
       }
+      kRate = WALK_RATE;
+    }
+    if (controlledX !== null) {
+      keeper.position.x = controlledX;
+      keeper.rotation.z = 0;
+      keeper.rotation.y = 0;
+      if (controlledVx) {
+        // 기존 보행 보폭과 무릎 들기를 재사용하되 골라인 옆걸음은 다리를 옆으로 벌린다.
+        const ph = shuffleDistance * STRIDE;
+        kp = walkPose(ph);
+        kp.hipL = [POSES.ready.hipL[0], POSES.ready.hipL[1], HIP_SWING * Math.sin(ph)];
+        kp.hipR = [POSES.ready.hipR[0], POSES.ready.hipR[1], -HIP_SWING * Math.sin(ph)];
+      } else kp = POSES.ready;
       kRate = WALK_RATE;
     }
     /* 뜨는 몸은 골반 위를 올린다. 골반 마디(hip)를 올리면 다리가 같이 올라가 몸의 최저점이
@@ -2836,6 +2890,7 @@ const TOUCHED = new Set(['contact']);
   renderer.setAnimationLoop(frame);
 
   function reset() {
+    controlledX = null;
     // 첫 호출은 장면을 세우는 배치다. 그 한 번만 복귀를 안 연다.
     const boot = !placed;
     placed = true;
@@ -2981,7 +3036,10 @@ const TOUCHED = new Set(['contact']);
     goalRank = r;
     pitch.setGoal(r);
   }
-  return { play, act, reset, setKeeper, setCity, setGoal, sfx, ballProbe, stageProbe, goalFrame, goalShape, crowd, shadowRect, shadowPair,
+  return { prepareShot, setKeeperX, keeperX: () => keeper.position.x / (VIEW_X * SX),
+    onPositionFrame: (fn) => { positionFrame = fn; },
+    positionTime: () => vnow, onReturnHeld: (fn) => { returnHeld = fn; },
+    play, act, reset, setKeeper, setCity, setGoal, sfx, ballProbe, stageProbe, goalFrame, goalShape, crowd, shadowRect, shadowPair,
     ballPos: () => ({ x: ball.position.x, y: ball.position.y, z: ball.position.z }),
     // 크기는 거리 배율과 짜부라짐 둘로 갈린다. 둘을 한 수로 돌려주면 임팩트의 튐과
     // 거리의 튐이 구분되지 않아, 이어져야 할 것과 튀어야 할 것을 같은 자로 재게 된다.

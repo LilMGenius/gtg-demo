@@ -16,4 +16,4 @@ title: "버는 법"
 
 <h2 id="backlinks">Backlinks</h2>
 
-<ul><li><a href="./cash-rate.html">환산</a></li><li><a href="./coin-conceded.html">먹혀도</a></li><li><a href="./coin-save.html">막으면</a></li><li><a href="./hand.html">세 칸과 타이밍</a></li></ul>
+<ul><li><a href="./cash-rate.html">환산</a></li><li><a href="./coin-conceded.html">먹혀도</a></li><li><a href="./coin-save.html">막으면</a></li><li><a href="./hand.html">좌우 이동</a></li></ul>

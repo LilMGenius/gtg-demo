@@ -107,7 +107,7 @@ function storageScenario() {
   const program = `import assert from 'node:assert/strict'; import * as s from ${JSON.stringify(pathToFileURL(resolve(ROOT, 'web/src/state/save.mjs')).href)};
     let reads=0,writes=0,removes=0; globalThis.localStorage={getItem(){reads++;throw Error('denied')},setItem(){writes++;throw Error('denied')},removeItem(){removes++;throw Error('denied')}};
     assert.equal(s.load(),null); assert.deepEqual(s.readSquad(s.load()),{squad:[],pick:0});s.save([{level:1}],0);s.wipe();assert(reads===2&&writes===1&&removes===1);
-    let raw;globalThis.localStorage={getItem(){return raw},setItem(k,v){raw=v}};const args=[[{level:1}],0,false,0,0,{},[],{},{},{},{},{},0,{},[],[],2,-1];s.save(...args);let saved=s.load();assert.equal(saved.onboard,2);assert.equal(saved.pref,-1);assert.equal(saved.squad[0].level,1);console.log('denied reads=2 writes=1 removes=1; defaults returned; roundtrip onboard=2 pref=-1 level=1');`;
+    let raw;globalThis.localStorage={getItem(){return raw},setItem(k,v){raw=v}};const args=[[{level:1}],0,false,0,0,{},[],{},{},{},{},{},0,{},[],[],2,-1];s.save(...args);let saved=s.load();assert.equal(saved.onboard,2);assert.equal(Object.hasOwn(saved,'pref'),false);assert.equal(saved.squad[0].level,1);saved.pref=-1;raw=JSON.stringify(saved);assert.equal(s.load().pref,-1);s.save(...args);assert.equal(Object.hasOwn(s.load(),'pref'),false);console.log('denied reads=2 writes=1 removes=1; defaults returned; onboard=2 level=1; legacy pref loads and is dropped on save');`;
   return execFileSync(process.execPath, ['--input-type=module', '-e', program], { cwd: ROOT, encoding: 'utf8', timeout: 10000 }).trim();
 }
 axis('audio-resume-hooks-source-only', () => {
@@ -120,10 +120,10 @@ axis('audio-resume-hooks-source-only', () => {
 
 axis('hud-touch-minimum', () => {
   const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
-  const selectors = ['#meBtn', '#lv', '#form', '#pips', '#purse button', '#auto', '#out', '#mute', '#fullscreen', '#wikiBtn', '#gymBtn', '#rosterBtn', '#gramBtn', '#shopBtn', '.zone'];
+  const selectors = ['#meBtn', '#lv', '#form', '#pips', '#purse button', '#auto', '#mute', '#fullscreen', '#wikiBtn', '#gymBtn', '#rosterBtn', '#gramBtn', '#shopBtn', '.move-arrow'];
   const minimum = selector => {
     const blocks = rules.filter(r => r[1].split(',').map(s => s.trim()).includes(selector)).map(r => r[2]);
-    const defaults = selector === '.zone' ? [] : rules.filter(r => r[1].split(',').map(s => s.trim()).join(',') === '#hud > button,#top button').map(r => r[2]);
+    const defaults = selector === '.move-arrow' ? [] : rules.filter(r => r[1].split(',').map(s => s.trim()).join(',') === '#hud > button,#top button').map(r => r[2]);
     return ['width', 'height'].map(d => {
       const values = [...blocks, ...defaults].flatMap(b => [...b.matchAll(new RegExp('(?:^|;)\\s*(?:min-)?' + d + ':\\s*(\\d+(?:\\.\\d+)?)px', 'g'))].map(m => Number(m[1])));
       return values.length ? Math.max(...values) : 0;
@@ -132,8 +132,8 @@ axis('hud-touch-minimum', () => {
   const measured = selectors.map(s => ({ selector: s, px: minimum(s) }));
   lines.push('TOUCH_DECLARATIONS ' + JSON.stringify(measured));
   assert(measured.every(m => m.px.every(v => v >= 24)), 'Missing >=24px declarations: ' + JSON.stringify(measured.filter(m => m.px.some(v => v < 24))));
-  assert.equal([...html.matchAll(/data-dive="-?[01]"/g)].length, 3);
-  return 'HUD minimum >=24 CSS px; dive zones 48x48; declaration audit, rendered bounds owned by mobile gate';
+  assert.equal([...html.matchAll(/data-move="-?1"/g)].length, 2);
+  return 'HUD minimum >=24 CSS px; movement arrows 48x48; declaration audit, rendered bounds owned by mobile gate';
 });
 const tokens = Object.fromEntries([...css.match(/:root\s*\{([^}]+)\}/)[1].matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})\b/gi)].map(m => [m[1], m[2]]));
 const luminance = hex => hex.slice(1).match(/../g).map(v => parseInt(v, 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4).reduce((n, v, i) => n + v * [0.2126, 0.7152, 0.0722][i], 0);
@@ -197,7 +197,7 @@ for (const [name, owner, marker] of [
   ['HUD native buttons', 'entry', 'affordance:every-hud-click-target-is-a-button'],
   ['condition name and icon', 'entry', 'entry:the-condition-slot-paints-an-icon-in-every-band'],
   ['keyboard ESC Tab no-mouse', 'keys', 'keys:the-game-plays-without-a-mouse'],
-  ['three dive zones rendered size', 'mobile', ':zones-take-a-finger'],
+  ['two movement arrows rendered size', 'mobile', ':arrows-take-a-finger'],
   ['fullscreen optional and unsupported hidden', 'fullscreen', 'unsupported:hidden-and-home-screen-help'],
   ['in-game odds match current pool', 'pull', 'pull:printed-odds-match-the-pool']
 ]) {

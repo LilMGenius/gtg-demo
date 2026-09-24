@@ -1,6 +1,7 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
 import { HUD_LINKS, linkAttrs } from './ui/links.mjs';
-import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, autoInput, rollForm, ballInHand, restartDelay, setBreak, followerGain, judgeWindow, GEAR_STEP } from '../../src/chain.mjs';
+import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, botPlan, X_MAX, moveSpeed, rollForm, ballInHand, restartDelay, setBreak, followerGain, GEAR_STEP } from '../../src/chain.mjs';
+import { aimAt, diveTrigger } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
 import { KEY_MAP } from './ui/keys.mjs';
 import { KEEPERS, KICKERS, keeperCost, kickerCost, kickerByName, ROLES, ROLE_SLOTS, ELEVEN, defaultEleven, TRAITS, PULL_COST, PULL_BULK, PULL_BONUS, pullYield, TICKET_CAP, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
@@ -81,8 +82,6 @@ const state = { squad, pick: Math.min(restored.pick, squad.length - 1), shots: [
 // 크레딧이 끝났다고 훈련이 멈추면 레벨은 오르는데 스탯이 3에 머무는 방치 결함이 다시 온다.
 state.coach = Boolean(saved?.coach);
 state.keeper = state.squad[state.pick];
-// 옛 저장과 세 패드 밖의 값은 가운데를 선호해야 다음 구도 안전하게 이어진다.
-state.pref = [-1, 0, 1].includes(Number(saved?.pref)) ? Number(saved.pref) : 0;
 // 호출 수는 로그가 아니라 실제 입력 자리를 세야 손 모드의 우회 호출을 놓치지 않는다.
 window.__autoCalls = 0;
 window.__lastInput = null;
@@ -188,10 +187,63 @@ window.__lockRound = () => { roundLocked = true; stage.cancel(timer); state.phas
 window.__resumeRound = () => { roundLocked = false; state.phase = 'idle'; nextSet(); return state.phase; };
 // 불러오기는 판이 시작되기 전에 끝난다. 첨 판을 기다려 그리면 그 사이에 숫자가 없다.
 
-// 손가락 셋. 방향과 타이밍과 나갈지 여부.
-// 여기서 나온 실패는 손가락 셋으로 귀속하고 스탯 원장에 섞지 않는다.
-let pressAt = 0;
-let advance = 0;
+// 위치는 판정 단위로 보관하고 렌더 어댑터가 월드 단위로 바꾼다.
+let keeperX = 0, keeperVx = 0;
+const held = new Map();
+let positioning = null;
+let firstPositionHint = !saved;
+// 준비 1.2초와 기존 도움닫기 0.55초를 합쳐 발 접촉까지 움직일 시간을 준다.
+const SET_SECONDS = 1.2, RUN_SECONDS = 0.55;
+// 키커의 가장 이른 읽기보다 긴 1초를 50ms 간격으로 전달한다(P15 입력 계약).
+const TRACE_MS = 1000, SAMPLE_MS = 50;
+const direction = () => Math.sign([...held.values()].reduce((a, b) => a + b, 0));
+function paintMovement() {
+  for (const b of document.querySelectorAll('.move-arrow')) {
+    b.setAttribute('aria-pressed', String(direction() === Number(b.dataset.move)));
+  }
+}
+function holdMovement(source, value) {
+  if (value && (state.phase === 'wait' || held.has(source))) {
+    held.set(source, value);
+    if (positioning) positioning.manual = true;
+  } else held.delete(source);
+  paintMovement();
+}
+function traceX(trace, ms) {
+  if (ms <= trace[0].ms) return trace[0].x;
+  for (let i = 1; i < trace.length; i++) {
+    const a = trace[i - 1], b = trace[i];
+    if (ms <= b.ms) return a.x + (b.x - a.x) * (ms - a.ms) / (b.ms - a.ms);
+  }
+  return trace.at(-1).x;
+}
+// 장면의 세계시계를 같이 써야 정지 프레임과 느린 탭에서도 접촉이 앞서지 않는다.
+stage.onPositionFrame((dt, now) => {
+  const p = positioning;
+  if (!p || state.phase !== 'wait' || !dt) return;
+  const before = p.elapsed;
+  p.elapsed = now - p.started;
+  const elapsed = p.elapsed - before;
+  const old = keeperX;
+  if (p.manual || direction()) keeperX += direction() * moveSpeed(state.keeper) * elapsed;
+  else {
+    const ms = (p.elapsed - SET_SECONDS - RUN_SECONDS) * 1000;
+    const target = traceX(p.plan, ms);
+    keeperX += Math.sign(target - keeperX) * Math.min(Math.abs(target - keeperX), moveSpeed(p.keeper) * elapsed);
+  }
+  keeperX = Math.max(-X_MAX, Math.min(X_MAX, keeperX));
+  keeperVx = elapsed ? (keeperX - old) / elapsed : 0;
+  p.frames.push({ ms: (p.elapsed - SET_SECONDS - RUN_SECONDS) * 1000, x: keeperX });
+  stage.setKeeperX(keeperX, keeperVx);
+});
+stage.onReturnHeld(() => Boolean(direction()));
+window.__position = () => ({ x: keeperX, vx: keeperVx, speed: moveSpeed(state.keeper), max: X_MAX,
+  phase: state.phase, elapsed: positioning?.elapsed, set: SET_SECONDS, runup: RUN_SECONDS,
+  manual: positioning?.manual, plan: positioning?.plan, frames: positioning?.frames,
+  resolved: positioning?.resolved || false, contacted: positioning?.contacted || false,
+  contact: positioning?.contact, trigger: positioning?.trigger,
+  aimCalls: positioning?.aimCalls || 0, resolveCalls: positioning?.resolveCalls || 0,
+  held: direction() });
 let timer = 0;
 // 직전 예고 한 줄만 기억한다. 사람이 반복을 느끼는 단위가 직전 한 구다.
 let lastAim = null;
@@ -437,45 +489,17 @@ function formChip() {
   hudSay('form', name + ': ' + HUD_LINKS.form.label);
 }
 
-/* 묶음 이름 둘. 판이 사는 동안 방향은 언제든 바뀌므로 단추 하나하나는 늘 같은 뜻이고, 갈리는 것은
-   이 누름이 판정을 받느냐다. 그 하나를 묶음 이름이 말한다. */
-const PAD_OPEN = '다이빙 방향, 판정 창 열림';
-const PAD_SHUT = '다이빙 방향, 판정 창 닫힘';
-
-/* 창은 판정을 받는 구간이지 방향을 고르는 구간이 아니다. 단추를 disabled로 잠그면 그 둘이 한 속성에 묶여,
-   읽어 주는 자와 탭 이동에는 죽은 단추라고 말하면서 손가락의 누름은 그대로 받아 선호를 옮겼다. 열림은
-   클래스가 들고 disabled는 어느 마디에도 안 붙는다. 흐림은 hud.css의 .zone:not(.live) svg가 그대로 그린다. */
+// 자동 다이빙이 시작되면 이동이 닫힌 상태를 눈과 읽어 주는 자에게 같이 알린다.
 function setPad(on) {
-  for (const b of document.querySelectorAll('.zone')) b.classList.toggle('live', on);
-  /* 창이 열렸다는 것은 흐림으로만 말했다. 읽어 주는 자에게는 지금 누름이 판정을 받는지 안 받는지가
-     안 들린다. 묶음 이름이 그 둘을 가른다. */
-  const name = on ? PAD_OPEN : PAD_SHUT;
-  el('pad').setAttribute('aria-label', name);
+  for (const b of document.querySelectorAll('.move-arrow')) b.classList.toggle('live', on);
+  const name = on ? '좌우 이동 가능' : '슛 진행 중';
+  el('movement').setAttribute('aria-label', name);
   hudSay('pad', name);
-}
-
-function markDive(dive, bot) {
-  for (const b of document.querySelectorAll('.zone')) {
-    const on = dive !== null && Number(b.dataset.dive) === dive;
-    b.classList.toggle('bot', on && bot);
-    b.querySelector('.bot').hidden = !(on && bot);
-  }
-  markPref();
-}
-
-/* 선호 표시는 이 구가 그린 배지와 따로 움직인다. 선호만 바뀔 때 배지까지 다시 그리면 봇이 고른 쪽
-   표시가 그 구 중간에 지워진다. */
-function markPref() {
-  for (const b of document.querySelectorAll('.zone')) {
-    const pref = Number(b.dataset.dive) === state.pref;
-    b.classList.toggle('pref', pref);
-    b.setAttribute('aria-pressed', String(pref));
-  }
 }
 
 // 저장은 항상 보유 목록 전체로 나간다. 뛰는 키퍼만 저장하면 나머지가 다음 저장에서 지워진다.
 function persist() {
-save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets, state.social, state.kickers, state.eleven, state.onboard, state.pref, state.coach);
+save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets, state.social, state.kickers, state.eleven, state.onboard, undefined, state.coach);
 }
 
 // 봇 크레딧은 실시간으로 줄어든다. 구 수로 세면 탭을 열어두고 안 누르는 쪽이 이득이 된다.
@@ -519,49 +543,6 @@ function coinPop(n) {
   s.addEventListener('animationend', () => s.remove());
 }
 
-/* 타이밍 자. 노란 구간은 판정이 쓰는 그 창이고, 폭은 judgeWindow가 소유한다.
-   240ms 상수를 그리던 동안에는 반응속도 3인 키퍼와 10인 키퍼가 같은 창을 보고 있었다.
-   꼬리 260ms. 900ms를 달 때는 창이 레인 왼쪽 38%에 몰리고 바늘이 창을 지나고도 한참 달려,
-   이 자가 무엇을 세는지가 화면에서 안 읽혔다. */
-const BEAT_TAIL_MS = 260;
-let lastBeat = null;
-
-function beatStart(shot) {
-  const b = el('beat');
-  const span = shot.flight * 1000 + BEAT_TAIL_MS;
-  const w = judgeWindow(state.keeper, shot, { studs: state.gear.studs });
-  const center = (w.markerAt * 1000) / span;
-  // 창이 레인 앞뒤로 넘치면 잘라 그린다. 0.04는 가장 좁은 창도 한 칸으로는 보이게 하는 하한이다.
-  const half = Math.min(center, Math.max(0.04, w.slackMs / span));
-  const left = Math.max(0, center - half);
-  const width = Math.min(1 - left, half * 2);
-  b.hidden = false;
-  b.classList.remove('hit');
-  b.style.setProperty('--beat', span.toFixed(0) + 'ms');
-  const lane = b.querySelector('.lane');
-  lane.style.setProperty('--hot-l', (left * 100).toFixed(2) + '%');
-  lane.style.setProperty('--hot-w', (width * 100).toFixed(2) + '%');
-  lastBeat = { spanMs: span, markerAt: w.markerAt, slackMs: w.slackMs, flight: shot.flight,
-    strong: Boolean(shot.strong), course: shot.course, studs: state.gear.studs,
-    /* 그릴 때의 키퍼를 그대로 뜬다. 나중에 읽으면 그 사이에 연속 실점과 컨디션이 바뀌어,
-       같은 구를 두 값으로 재게 된다. 실제로 이 자를 세우다 그렇게 48ms가 갈렸다. */
-    keeper: { reflex: state.keeper.reflex, composure: state.keeper.composure, agility: state.keeper.agility,
-      resilience: state.keeper.resilience, height: state.keeper.height, weight: state.keeper.weight,
-      streak: state.keeper.streak || 0, form: state.keeper.form || 0 } };
-  // 같은 노드에 시간만 갈면 애니메이션이 다시 돌지 않는다. 자막과 같은 이유다.
-  const run = document.createElement('i');
-  run.className = 'run';
-  lane.querySelector('.run').replaceWith(run);
-}
-
-// 손가락이 친 자리에 바늘을 세워둔다. 어디서 눌렀는지가 남아야 다음 구에서 고칠 데가 보인다.
-function beatStop(byHand) {
-  const b = el('beat');
-  if (!byHand) { b.hidden = true; return; }
-  b.classList.add('hit');
-  stage.after(0.8, () => { b.hidden = true; });
-}
-
 function nextSet() {
   // 기복은 판당 한 번 굴러서 그 판 내내 같은 값으로 선다.
   const form = rollForm(state.keeper, rng);
@@ -580,35 +561,58 @@ function nextShot() {
   if (roundLocked) { state.phase = 'demo'; return; }
   const shot = state.shots[state.i];
   state.phase = 'wait';
-  advance = 0;
-  el('out').classList.remove('on');
-  // 자막 종료 시점의 pips()는 state.i가 오르기 전에 돌아서 마커가 한 칸 뒤에 남는다.
   pips();
   setPad(true);
-  // 지난 구의 표시를 지운다. 남겨 두면 이번 구를 안 눌렀을 때 지난 선택이 이번 것으로 읽힌다.
-  markDive(state.pref, false);
-  beatStart(shot);
   stage.reset();
-  pressAt = performance.now() + shot.flight * 1000 * 0.72;
+  keeperX = stage.keeperX();
+  keeperVx = 0;
+  const keeper = state.auto && state.bot.ms > 0 ? botKeeper(state.keeper, state.bot) : state.keeper;
+  positioning = { started: stage.positionTime(), elapsed: 0, keeper, plan: botPlan(keeper, shot, rng), manual: Boolean(direction()),
+    frames: [{ ms: -(SET_SECONDS + RUN_SECONDS) * 1000, x: keeperX }], resolved: false };
+  el('moveHint').hidden = !firstPositionHint;
   lastAim = aimLine(shot.kicker, rng, lastAim);
   say(lastAim, null);
-  // 창이 닫히면 손가락 대신 자동 입력이 친다. 늦은 만큼은 스탯이 아니라 손가락 탓이다.
   stage.cancel(timer);
-  // 자동은 손가락만 대신한다. 공은 같은 시간을 날고 대기시간은 그대로다.
-  // 안 누르고 넘어가는 시간도 자와 같아야 한다. 바늘이 끝난 뒤에도 눌리면 자가 거짓말을 한 것이다.
-  const wait = state.auto ? Math.max(0, pressAt - performance.now()) : shot.flight * 1000 + BEAT_TAIL_MS;
-  timer = stage.after(wait / 1000, () => { if (state.phase === 'wait') commit(null); });
+  stage.prepareShot(shot, SET_SECONDS, positionTimeline, () => rollCaptions(positioning.result));
 }
 
-function commit(dive) {
-  if (state.phase !== 'wait') return;
+// 접촉에서 고정한 조준을 유지하고 최초 자동 다이빙 신호에서만 판정한다.
+function positionTimeline(event) {
+  const p = positioning;
+  if (state.phase !== 'wait') return null;
+  if (event === 'contact') {
+    const pre = sampleTrace(0);
+    p.aimed = aimAt(p.keeper, state.shots[state.i], pre);
+    p.aimCalls = (p.aimCalls || 0) + 1;
+    p.contacted = true;
+    p.contact = p.elapsed;
+    firstPositionHint = false;
+    el('moveHint').hidden = true;
+    el('caption').innerHTML = '';
+    return { shot: p.aimed };
+  }
+  const ms = (p.elapsed - SET_SECONDS - RUN_SECONDS) * 1000;
+  if (p.contacted && diveTrigger(p.keeper, p.aimed, keeperX, ms)) return commit();
+  return null;
+}
+
+function sampleTrace(endMs) {
+  const trace = [];
+  for (let ms = -TRACE_MS; ms <= endMs; ms += SAMPLE_MS) trace.push({ ms, x: traceX(positioning.frames, ms) });
+  if (trace.at(-1).ms < endMs) trace.push({ ms: endMs, x: keeperX });
+  return trace;
+}
+
+function commit() {
+  if (state.phase !== 'wait') return null;
   state.phase = 'flying';
   stage.cancel(timer);
   setPad(false);
-  beatStop(dive !== null);
-  const shot = state.shots[state.i];
+  firstPositionHint = false;
+  el('moveHint').hidden = true;
+  const shot = positioning.aimed || state.shots[state.i];
   // 봇이 섰는지는 크레딧을 깎기 전에 정한다. 깎고 나서 재면 마지막 구가 사람으로 잡힌다.
-  const ran = dive === null && state.auto && state.bot.ms > 0;
+  const ran = !positioning.manual && state.auto && state.bot.ms > 0;
   state.botRan = ran;
   botTick();
   // 이 구에 적용되는 버프를 먼저 읽고 그 뒤에 닳는다; 닳고 나서 읽으면 마지막 구가 효과 없이 굴러 판 만큼보다 하나 적다
@@ -616,50 +620,27 @@ function commit(dive) {
   shotBuff = applied;
   // 버프는 실제로 굴린 구에서만 닳는다. 시간으로 닳으면 상점에 둔 채로 증발한다.
   state.buff = spendBuff(state.buff);
-  const input = dive === null && !ran
-    ? { dive: state.pref, errMs: 0, advance, auto: false }
-    : dive === null
-      ? (window.__autoCalls += 1, autoInput(ran ? botKeeper(state.keeper, state.bot) : state.keeper, shot, rng))
-      : { dive, errMs: performance.now() - pressAt, advance, auto: false };
+  const trace = sampleTrace((positioning.elapsed - SET_SECONDS - RUN_SECONDS) * 1000);
+  const input = { x: keeperX, vx: keeperVx, trace, auto: ran };
+  if (ran) window.__autoCalls += 1;
   // 실제 판정에 넘긴 한 덩어리를 남겨 계기가 표시나 로그가 아닌 입력을 읽는다.
   window.__lastInput = input;
   window.__lastBuff = { kind: applied.kind, shots: applied.shots };
   // 판정이 고른 쪽까지 정해진 뒤에 표시한다. 누른 값으로 표시하면 안 누른 구가 빈 채로 남는다.
-  markDive(input.dive, input.auto);
   stage.diving = state.keeper.diving;
-  const result = resolve({ keeper: state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads, socks: state.gear.socks, frame: state.gear.frame, focusAid: applied.kind === 'tonic' ? TONIC_FOCUS : 1, rosin: applied.kind === 'rosin', gazeAid: rapportGazeAid(state.rapport, state.gear.city, shot.passer) });
+  const result = resolve({ keeper: ran ? positioning.keeper : state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads, socks: state.gear.socks, frame: state.gear.frame, focusAid: applied.kind === 'tonic' ? TONIC_FOCUS : 1, rosin: applied.kind === 'rosin', gazeAid: rapportGazeAid(state.rapport, state.gear.city, shot.passer) });
+  positioning.resolveCalls = (positioning.resolveCalls || 0) + 1;
   state.results[state.i] = result.conceded;
   // 판정 결과에는 키커 이름이 없다. 장부는 이 자리에서만 이름을 알 수 있다.
   tally(shot.kicker.name, result.conceded);
   // 비행 중에는 자막을 비운다. 자리표시자를 남기면 화면 위쪽에 말줄임표가 박힌 채 촬영된다.
   el('caption').innerHTML = '';
-  stage.play(shot, input, result, () => rollCaptions(result));
-}
-
-/* 패드 누름 한 번은 언제나 이 방향이라는 뜻이다. 창 안이면 그 뜻이 이 구의 입력이기도 해서 판정까지 굴리고,
-   창 밖이면 다음 구부터 설 선호만 옮긴다. 자막 위의 방향 누름은 넘기기이면서 방향이다. 한 누름이 둘 다 하는
-   것이 맞는 이유는, 자막을 접으려고 누르는 손과 방향을 바꾸려고 그 칸을 누르는 손이 같은 손짓이어서다.
-   나누면 방향을 바꾸려던 누름이 넘기기로만 먹히고 방향은 다음 창까지 안 선다.
-   봇 모드 관문은 창 밖에만 선다. 봇이 대신 고르는 동안에는 선호를 안 건드리고, 창 안에서 사람이 누른 구는
-   그 손이 가져간다. */
-function chooseDive(dive) {
-  if (state.phase === 'wait') {
-    setPref(dive);
-    commit(dive);
-    return;
-  }
-  if (!state.auto) setPref(dive);
-  if (state.phase === 'caption' && state.skip) state.skip();
-}
-
-/* 방향 선택은 판이 사는 동안 언제든 바뀐다. 킥 앞에만 열어 두면 막는 중에 마음이 바뀐 사람이 다음 창까지
-   기다려야 하는데, 고정 선호는 이 구의 입력이 아니라 상태다. 이미 굴린 이 구의 판정은 안 건드리고 표시만
-   옮긴다. 실측으로 창 밖 누름은 aria-pressed를 false/true/false에 그대로 남긴다. 지금은 false/false/true로
-   옮겨 가고 그 다음 구가 새 선호로 굴러간다. */
-function setPref(dive) {
-  state.pref = dive;
-  persist();
-  markPref();
+  positioning.resolved = true;
+  positioning.trigger = positioning.elapsed;
+  positioning.result = result;
+  window.__lastInput = result.input;
+  window.__positionResult = result;
+  return result;
 }
 
 // 자막은 체인 순서대로 한 줄씩 나온다. 반전이 반전을 덮으려면 한꺼번에 오면 안 된다.
@@ -2582,14 +2563,19 @@ function closeShop() {
   pullTab = 'town';
 }
 
-for (const b of document.querySelectorAll('.zone')) {
-  /* 방향은 누르는 순간에 정해진다. 창 안에서는 누른 시각이 곧 입력이라 pointerdown이 판정을 굴려야 하고,
-     창 밖의 같은 누름도 같은 순간에 방향을 세워야 한 손짓이 한 뜻을 갖는다. 예전에는 창 밖의 선호가
-     pointerup에 달려 있어서, 누르고 끄는 손가락은 방향을 못 옮기고 자막 위의 누름은 넘기기와 방향이
-     따로 놀았다. 비활성 단추에도 pointerdown과 pointerup은 그대로 오고 click과 mousedown만 안 온다(실측).
-     지금은 어느 마디에서도 단추를 안 잠그므로 그 사정에 기대지 않는다. */
-  b.onpointerdown = () => chooseDive(Number(b.dataset.dive));
+for (const b of document.querySelectorAll('.move-arrow')) {
+  b.onpointerdown = (e) => {
+    e.preventDefault();
+    if (Number.isFinite(e.pointerId)) b.setPointerCapture(e.pointerId);
+    holdMovement('pointer:' + e.pointerId, Number(b.dataset.move));
+  };
+  const release = (e) => holdMovement('pointer:' + e.pointerId, 0);
+  b.onpointerup = release;
+  b.onpointercancel = release;
+  b.onlostpointercapture = release;
 }
+addEventListener('blur', () => { held.clear(); paintMovement(); });
+addEventListener('keyup', (e) => holdMovement('key:' + e.key, 0));
 const autoBtn = el('auto');
 autoBtn.classList.toggle('on', state.auto);
 autoBtn.onpointerdown = () => {
@@ -2651,12 +2637,7 @@ window.__squad = () => ({ squad: state.squad.map((k) => k.name), pick: state.pic
 window.__roster = (open) => { if (open) openRoster(); else closeRoster(); };
 window.__gym = (open) => { if (open) openGym(); else closeGym(); };
 // 그린 창과 잰 창을 맞대는 자리. 화면이 읽은 값과 판정이 쓰는 값을 같이 돌려준다.
-window.__beat = () => {
-  const lane = el('beat').querySelector('.lane');
-  const st = getComputedStyle(lane);
-  return Object.assign({ hotL: st.getPropertyValue('--hot-l').trim(), hotW: st.getPropertyValue('--hot-w').trim() },
-    lastBeat || {});
-};
+window.__beat = () => ({ retired: true });
 window.__gram = (open) => { if (open) openGram(); else closeGram(); };
 window.__me = (open) => { if (open) openMe(); else closeMe(); };
 // 만남은 내 정보 안의 버튼으로만 열린다. 게이트가 그 버튼까지 클릭해서 오게 하려면 좌표가 필요하다.
@@ -2755,10 +2736,6 @@ muteBtn.onpointerdown = (e) => {
   setMuted(muteBtn.getAttribute('aria-pressed') !== 'true');
 };
 
-el('out').onpointerdown = () => {
-  advance = advance > 0 ? 0 : 0.9;
-  el('out').classList.toggle('on', advance > 0);
-};
 addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (!el('title').hidden) return;
@@ -2785,17 +2762,16 @@ addEventListener('keydown', (e) => {
   if (e.target.closest?.('input, textarea, select, [contenteditable="true"]')) return;
   if (binding?.action === 'confirm') {
     const button = e.target.closest?.('button, [role="button"]');
-    if (button?.classList.contains('zone')) { e.preventDefault(); chooseDive(Number(button.dataset.dive)); return; }
+    if (button?.classList.contains('move-arrow')) { e.preventDefault(); holdMovement('key:' + e.key, Number(button.dataset.move)); return; }
     if (button) {
       if (button.onpointerdown && !button.onclick) { e.preventDefault(); button.onpointerdown(e); }
       else if (button.tagName !== 'BUTTON') { e.preventDefault(); button.click(); }
       return;
     }
     if (id) return;
-    if (binding.value !== undefined) { e.preventDefault(); chooseDive(binding.value); return; }
   }
   if (id) return;
-  if (binding?.action === 'dive') { e.preventDefault(); chooseDive(binding.keys[key]); return; }
+  if (binding?.action === 'move') { e.preventDefault(); holdMovement('key:' + e.key, binding.keys[key]); return; }
   if (binding?.action === 'fullscreen') { e.preventDefault(); if (!fullscreenBtn.hidden) fullscreenBtn.click(); return; }
   const action = binding?.action === 'open' ? binding.keys[key] : binding?.action;
   if (action && el(action)?.onpointerdown) {
@@ -2808,7 +2784,7 @@ addEventListener('keydown', (e) => {
 });
 
 if (state.coach) trainKeeper();
-markDive(state.pref, false);
+paintMovement();
 pips();
 mountTitle(() => {
   stage.leaveTitle();

@@ -19,7 +19,8 @@ const check = (name, ok, detail) => {
 const selectors = { wiki: '.cats [data-cat]', roster: '.kind[data-pos]', me: '.tab[data-tab]', shop: '.tab[data-tab]' };
 const selected = (p, id) => p.locator('#' + id + ' ' + selectors[id]).evaluateAll((bs) => bs.findIndex((b) => b.getAttribute('aria-current') === 'true' || b.getAttribute('aria-selected') === 'true'));
 const hidden = (p, id) => p.locator('#' + id).evaluate((b) => b.hidden);
-const parent = execFileSync('git', ['show', '323ec93:web/src/main.mjs'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1024 * 1024 });
+// 현재 입력 표면에서 닫기 배선만 끊어 양성 대조군을 만든다.
+const parent = execFileSync('node', ['-e', "process.stdout.write(require('fs').readFileSync('web/src/main.mjs','utf8'))"], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1024 * 1024 }).replace("binding?.action === 'close'", "binding?.action === 'withheld-close'");
 let browser;
 try {
   browser = await chromium.launch({ executablePath: EXE });
@@ -86,9 +87,11 @@ try {
   await k.locator('#wiki .body table').first().waitFor({ state: 'visible' });
   await k.screenshot({ path: new URL('p4-keys-wiki.png', evidence).pathname.replace(/^\/(\w:)/, '$1') });
   await k.keyboard.press('Escape');
-  await k.keyboard.press('ArrowLeft');
-  const dive = await k.locator('.zone[data-dive="-1"]').evaluate((b) => ({ selected: b.getAttribute('aria-pressed'), className: b.className }));
+  await k.waitForFunction(() => window.__position().phase === 'wait');
+  await k.keyboard.down('ArrowLeft');
+  const dive = await k.locator('.move-arrow[data-move="-1"]').evaluate((b) => ({ selected: b.getAttribute('aria-pressed'), className: b.className }));
   check('keys:the-game-plays-without-a-mouse', shopOpen && shopTab === 1 && wikiOpen && await hidden(k, 'shop') && await hidden(k, 'wiki') && dive.selected === 'true', { shopOpen, shopTab, wikiOpen, dive });
+  await k.keyboard.up('ArrowLeft');
   await k.keyboard.press('s');
   for (let i = 0; i < 100 && !(await k.locator('#shop .buy[data-want="1"]').evaluate((b) => b === document.activeElement)); i++) await k.keyboard.press('F6');
   await k.keyboard.press('Enter');
