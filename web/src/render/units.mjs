@@ -1,5 +1,6 @@
 // 렌더 단위와 공용 보조 함수. 판정 단위는 여기에 없다.
 import * as THREE from '../../vendor/three.module.min.js';
+import { GOAL } from '../../../src/reality.mjs';
 import { GOAL_HALF_W, GOAL_H } from '../../../src/chain.mjs';
 
 /* 밝기를 세 단으로 끊는 자. 램버트는 면을 매끄럽게 깎아 3D 렌더로 읽히고, 끊긴 면은 그림으로 읽힌다.
@@ -40,14 +41,15 @@ export const BALL_PAST = 1.134;
 export const REST_Z = -1.36;
 // 0.95는 화면에서 골라인 흰 줄과 공 아랫변이 정확히 맞물리는 높이였다.
 // 골이 들어간 컷인데 공이 라인 위에 놓인 그림이 되어 득점으로 안 읽혔다.
-// 골 높이 2.44의 위쪽 절반에 걸어야 공중에 걸린 것으로 읽힌다.
+// GOAL 높이의 위쪽 절반에 걸어야 공중에 걸린 것으로 읽힌다.
 export const REST_Y = 1.34;
 // 판정 단위와 렌더 미터는 같지 않다.
 // 판정의 골대는 4.4 x 1.9이고 사람은 1.9이라 키퍼 머리가 크로스바에 닿는다.
-// 실제 골대는 7.32 x 2.44다. 그 비율로 그려야 사람이 골대 안에 들어간다.
+// 실제 골대는 GOAL의 규격이다. 그 비율로 그려야 사람이 골대 안에 들어간다.
 // 판정식은 건들지 않는다. 여기서 단위만 바꾼다.
-export const R_HALF_W = 3.66;
-export const R_H = 2.44;
+// 중심에서 양쪽 기둥까지의 거리는 GOAL 폭의 절반이다.
+export const R_HALF_W = GOAL.values.width / 2;
+export const R_H = GOAL.values.height;
 export const SX = R_HALF_W / GOAL_HALF_W;
 export const SY = R_H / GOAL_H;
 export const lerp = (a, b, t) => a + (b - a) * t;

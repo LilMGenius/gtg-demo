@@ -1,3 +1,4 @@
+import { BAR_MODES } from '../src/reality.mjs';
 import { chromium } from "playwright";
 import { readFileSync } from "node:fs";
 import { pinClock } from "./clock.mjs";
@@ -23,6 +24,8 @@ const GAP_URL = URL + "&seed=20";
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();
 
+// BAR_MODES의 마지막 모드도 정수배가 아니어야 종 대조군과 비교할 수 있다.
+if (BAR_MODES.values.ratios.every(Number.isInteger)) throw new Error("BAR_MODES가 정수배다");
 const fails = [];
 const notes = [];
 function check(name, ok, detail) {
@@ -248,7 +251,7 @@ try {
   check("kick:is-a-dull-thump-not-a-bright-click", r.each.kick.cen <= 900, r.each.kick.cen + "Hz");
   // 먹먹함은 저역이 남는 것이다. 40ms에 끊기면 딱 소리지 퍽 소리가 아니다.
   check("kick:the-low-end-keeps-ringing-after-contact", r.each.kick.tailMs >= 80, r.each.kick.tailMs + "ms");
-  // 알루미늄 크로스바는 712/1965/3845/6358 모드가 다 살아 울린다. 무게중심이 위로 올라간다.
+  // BAR_MODES 자유단 보 모델의 비정수 배음이 다 살아 울린다. 무게중심이 위로 올라간다.
   check("post:is-a-bright-metal-ring", r.each.post.cen >= 1800,
     r.each.post.cen + "Hz median of 11, spread " + r.each.post.cenLow + " to " + r.each.post.cenHigh);
   // 먹먹하다와 명쾌하다가 같은 밝기면 두 형용사 중 하나는 구현되지 않은 것이다.
@@ -561,19 +564,16 @@ try {
     countdownSec + "s, " + gapRead.countdown + " frames");
   console.log("drawn-gap HEAD " + JSON.stringify(gapRead));
 
-  // Remove only act() outcome calls in the served scene. No product bytes are written.
+  // 이동 발소리가 결과음만 지운 대조군의 침묵을 채운다. 킥 사이의 나머지 소리를 모두 끊어 같은 간격 축에 오류를 심는다.
+  // 제품 바이트는 건드리지 않고 브라우저 응답에만 적용한다. 실제 킥은 남겨 표본 수가 영인 거짓 대조군을 막는다.
   const sceneSource = readFileSync(new globalThis.URL("../web/src/render/scene.mjs", import.meta.url), "utf8");
-  let silentScene = sceneSource;
-  for (const call of [
-    "    if (GRAB.has(kind)) sfx.kick(0.12);",
-    "    else if (SHOT.has(kind)) sfx.kick(0.5);",
-    "    else if (THUD.has(kind)) sfx.step(true);",
-    "    if (DRIB.has(kind)) sfx.dribble();",
-    "    if (NET.has(kind)) sfx.place();",
-  ]) {
-    if (silentScene.split(call).length !== 2) throw new Error("Outcome control anchor: " + call);
-    silentScene = silentScene.replace(call, "");
-  }
+  const calls = [...sceneSource.matchAll(/^.*sfx\.(?:kick|post|dribble|place|step)\([^\n]*;.*$/gm)].map(match => match[0]);
+  const shotCalls = calls.filter(call => call.includes('sfx.kick(shot.strong'));
+  if (shotCalls.length !== 1 || calls.length <= shotCalls.length) throw new Error('무음 대조군의 발화 경계');
+  const mutedCalls = new Set(calls.filter(call => !shotCalls.includes(call)));
+  const sceneLines = sceneSource.split(/\r?\n/);
+  if (sceneLines.filter(line => mutedCalls.has(line)).length !== calls.length - shotCalls.length) throw new Error('무음 대조군의 발화 수');
+  const silentScene = sceneLines.map(line => mutedCalls.has(line) ? '' : line).join('\n');
   const control = await readGap(silentScene);
   const controlSec = Number((control.gapRead.frames * STEP).toFixed(2));
   check("control:a-silent-outcome-reddens-the-drawn-gap-axis", control.gapRead.fires >= 2 && controlSec > 4,

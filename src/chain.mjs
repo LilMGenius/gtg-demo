@@ -9,7 +9,7 @@ import { KICKERS } from "./roster.mjs";
 export const GOAL_HALF_W = 2.2;
 export const GOAL_H = 1.9;
 
-// 판정 반폭 2.2는 실물 3.66m이며 기둥에서 0.4단위 떨어져 선다(P15 HOTL 가설).
+// 판정 반폭 2.2는 GOAL의 실물 반폭이며 기둥에서 0.4단위 떨어져 선다(P15 HOTL 가설).
 export const X_MAX = GOAL_HALF_W - 0.4;
 // 서서 뻗는 0.45단위는 약 0.75m다(P15 HOTL 가설).
 const STAND = 0.45;

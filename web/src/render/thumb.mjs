@@ -3,6 +3,7 @@
 //
 // 렌더러는 하나만 연다. 카드마다 WebGL 맥락을 열면 열 몇 장에서 브라우저 상한에 걸리고,
 // 상한에 걸린 맥락은 조용히 검은 사각형이 된다. 한 대를 돌려 쓰고 결과만 이미지로 굽는다.
+import { GOAL } from '../../../src/reality.mjs';
 import * as THREE from "../../vendor/three.module.min.js";
 import { buildKeeper } from "./objects/actors.mjs";
 import { meshPanel, buildPassers } from "./objects/pitch.mjs";
@@ -124,10 +125,10 @@ function clearScene() {
 function goalRig(pick) {
   const g = skinAt("frame", pick && pick.rank, pick && pick.skin);
   const grp = new THREE.Group();
-  // 실제 골대 폭 7.32에 높이 2.44를 4로 나눈 축소판이다. 칸 안에서 비율이 실물과 같아야
+  // GOAL 폭과 높이를 4로 나눈 축소판이다. 칸 안에서 비율이 실물과 같아야
   // 상점에서 본 것과 경기장에 선 것이 같은 물건으로 읽힌다.
-  const W = 7.32 / 4;
-  const H = 2.44 / 4;
+  const W = GOAL.values.width / 4;
+  const H = GOAL.values.height / 4;
   // 기둥 색은 변형이 정한다. 여기 상수로 두면 녹슨 철골대와 은색 겹그물이 같은 기둥으로 선다.
   const bar = new THREE.MeshLambertMaterial({ color: g.post });
   const post = new THREE.BoxGeometry(0.055, H, 0.055);

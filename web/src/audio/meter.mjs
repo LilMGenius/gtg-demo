@@ -155,7 +155,7 @@ export function tailBrightness(d) {
 }
 
 // 종은 모든 모드가 정수배다. 하나만 정수배에 가까워도 종이라고 부르면 관을 종으로 잃는다.
-// 알루미늄 관은 1 : 2.76 : 5.40 : 8.93이고, 마지막은 9에 거의 붙는다.
+// BAR_MODES의 자유단 보 근에서 유도한 마지막 비율은 정수에 거의 붙는다.
 // 그래서 가장 먼 모드로 잰다. 종은 가장 먼 것도 0이고, 관은 어떤 세 모드를 집어도 멀다.
 export function harmonicity(peaks) {
   if (peaks.length < 2) return 1;

@@ -1,5 +1,7 @@
 import { chromium } from "playwright";
-import { R_HALF_W, R_H } from "../web/src/render/units.mjs";
+import { GOAL } from "../src/reality.mjs";
+// GOAL의 안쪽 폭을 양분해 중심 기준 거리로 잰다.
+const R_HALF_W = GOAL.values.width / 2, R_H = GOAL.values.height;
 
 // 골대가 실물 형상인지 잰다. 뒷틀이 앞보다 좁으면 사다리꼴이고, 그 결함은 파운더가
 // 화면에서 먼저 봤는데 어느 게이트도 골대가 직육면체인지를 묻지 않았다.
@@ -11,7 +13,7 @@ const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 90000)
 t.unref();
 
 // 허용 오차. 기둥 반지름 0.06, 뒷틀 레일 반지름 0.05, jitterMesh 0.018,
-// 그리고 앞뒤가 각각 0.021과 0.012 라디안 기울어 있어 높이 2.44에서 최대 0.05가 밀린다.
+// 그리고 앞뒤가 각각 0.021과 0.012 라디안 기울어 있어 GOAL 높이에서 최대 0.05가 밀린다.
 // 합쳐서 0.2면 의도된 흔들림은 전부 통과하고, 뒤가 앞보다 눈에 띄게 좁은 형태는 잡힌다.
 const TOL = 0.2;
 
