@@ -122,7 +122,8 @@ function stadium(p){
   stands(p,8,76,43);
   // 측면 단은 골대 바깥 ±25미터부터 넓어져 중앙 판정 공간을 비운다.
   for(const side of [-1,1])for(let row=0;row<5;row++)p.box(1.8,0.8,27,side*(25+row*1.8),30,0x9aa9a4,row*0.8);
-  lights(p,14);
+  // 여덟 미터 조명은 고정 경기 카메라의 위끝 안에 광원이 남는 높이다.
+  lights(p,8);
   p.box(80,0.35,8,0,52,0x748b8d,10);
 }
 
