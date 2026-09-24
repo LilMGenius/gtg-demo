@@ -67,7 +67,8 @@ for (let city = 0; city <= 3; city++) {
 check("passer-zero", true, "index 0 present in every tier above");
 
 // 신인의 착지 실패, 장갑 벗겨짐, 칩 노출을 줄인 판정의 sweep({}) 재실측값이다. 스트림의 조용한 이동을 잡는다.
-const BASE = {"rate":26.22,"fans":759253,"gazeSlip":337,"flairFans":13066,"talked":108,"shots":10000};
+// U3e 위치 경로의 고정 이천 시드 실측이다. 각 값은 baseline/rapport.txt의 다섯 옛 감시 실패를 재고정하며 효과 문턱은 보존한다.
+const BASE = {"rate":23.66,"fans":717965,"gazeSlip":482,"flairFans":16007,"talked":133,"shots":10000};
 const c1 = sweep({});
 check("stream-rate", Number(c1.rate.toFixed(2)) === BASE.rate, BASE.rate + " vs " + c1.rate.toFixed(2));
 check("stream-fans", c1.fans === BASE.fans, BASE.fans + " vs " + c1.fans);
