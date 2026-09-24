@@ -645,9 +645,12 @@ try {
   check('price:the-cash-token-reads-the-cash-value', richCash.every(s=>s.rows.length>0 && s.rows.every(e=>e.value===e.token && e.value===e.shown)), JSON.stringify(richCash));
   check('price:short-and-rich-show-the-same-cash-number', JSON.stringify(richCash.map(s=>s.rows.map(e=>e.shown)))===JSON.stringify(poorCash.map(s=>s.rows.map(e=>e.shown))), String(poorCash.length));
   check('instrument:cash-tokens-equal-gold-tokens-on-every-tab', richCash.every(s=>s.gold>0 && s.gold===s.cash), JSON.stringify(richCash.map(({tab,gold,cash})=>({tab,gold,cash}))));
-  await p.setViewportSize({width:740,height:360});
-  const smallCash=await cashRows(8000);
-  check('price:two-currencies-fit-the-small-shelf', smallCash.every(s=>s.rows.length>0 && s.rows.every(e=>e.fits)), JSON.stringify(smallCash));
+  // 가로 전용 계약의 두 휴대폰 크기에서 동일한 가격·넘침 기준을 적용한다.
+  for (const [width, height] of [[844, 390], [740, 360]]) {
+    await p.setViewportSize({width,height});
+    const smallCash=await cashRows(8000);
+    check('price:two-currencies-fit-the-small-shelf:' + width, smallCash.every(s=>s.rows.length>0 && s.rows.every(e=>e.fits)), JSON.stringify(smallCash));
+  }
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 
