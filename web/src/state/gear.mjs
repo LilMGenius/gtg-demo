@@ -19,7 +19,7 @@ export const GLOVES = [
 /* 장갑 변형. bulk는 손 전체 배율, cuff는 손목밴드 길이 배율, pips는 손바닥 빨판 수다.
    네 번째 등급의 이름이 빨판을 말하므로 그 돌기는 이름이 이미 선언한 것이다.
    목장갑은 얇고 손목이 짧아 손이 드러나고, 고무는 손바닥이 두꺼워지고,
-   송진은 손목까지 감아 올린다. 등급 안에서는 그 성질을 지키면서 색과 두께만 갈린다.
+   송진은 손목까지 감아 올린다. 등급 안에서는 기본 형태를 공유하고 색만 갈린다.
    손바닥도 엄지도 손목밴드도 전부 bulk 하나에 곱해지는 값이라, 칠해진 자리가 읽는 것은
    손 크기 하나다. 실측으로 bulk를 세운 채 cuff만 0.3에서 2.45까지 여덟 배 늘려도 두 장이
    나눠 쓴 자리가 0.894였고 화소는 14퍼센트만 늘었다. 밴드가 팔뚝보다 얕아 그 각도에서
@@ -29,17 +29,17 @@ export const GLOVES = [
    사이만 1.28과 1.36으로 좁은데, 그 자리는 빨판이 든다. */
 export const GLOVE_SKINS = [
   [{ name: '장터 목장갑', tone: 0xf2d64b, cut: { bulk: 0.78, cuff: 0.45, pips: 0 } },
-   { name: '흙때 낀 목장갑', tone: 0x8f8f5b, cut: { bulk: 0.82, cuff: 0.55, pips: 0 } },
-   { name: '빨아 놓은 흰 목장갑', tone: 0xe8e4d4, cut: { bulk: 0.76, cuff: 0.38, pips: 0 } }],
+   { name: '흙때 낀 목장갑', tone: 0x8f8f5b, cut: { bulk: 0.78, cuff: 0.45, pips: 0 } },
+   { name: '빨아 놓은 흰 목장갑', tone: 0xe8e4d4, cut: { bulk: 0.78, cuff: 0.45, pips: 0 } }],
   [{ name: '주황 고무코팅', tone: 0xd9552f, cut: { bulk: 1, cuff: 0.8, pips: 0 } },
-   { name: '파랑 고무코팅', tone: 0x2f6fd9, cut: { bulk: 1.04, cuff: 0.72, pips: 0 } },
-   { name: '초록 고무코팅', tone: 0x2f8f5b, cut: { bulk: 0.98, cuff: 0.9, pips: 0 } }],
+   { name: '파랑 고무코팅', tone: 0x2f6fd9, cut: { bulk: 1, cuff: 0.8, pips: 0 } },
+   { name: '초록 고무코팅', tone: 0x2f8f5b, cut: { bulk: 1, cuff: 0.8, pips: 0 } }],
   [{ name: '송진 범벅', tone: 0xbf8a2e, cut: { bulk: 1.24, cuff: 1.55, pips: 0 } },
-   { name: '굳은 송진', tone: 0x8f6a1e, cut: { bulk: 1.28, cuff: 1.72, pips: 0 } },
-   { name: '테이프까지 감은 손', tone: 0xe0dccc, cut: { bulk: 1.22, cuff: 1.4, pips: 0 } }],
+   { name: '굳은 송진', tone: 0x8f6a1e, cut: { bulk: 1.24, cuff: 1.55, pips: 0 } },
+   { name: '테이프색 송진', tone: 0xe0dccc, cut: { bulk: 1.24, cuff: 1.55, pips: 0 } }],
   [{ name: '보라 빨판', tone: 0x8f4fd1, cut: { bulk: 1.38, cuff: 2.1, pips: 5 } },
-   { name: '붉은 빨판', tone: 0xd14f6f, cut: { bulk: 1.42, cuff: 1.95, pips: 5 } },
-   { name: '먹색 빨판', tone: 0x2a2f4f, cut: { bulk: 1.36, cuff: 2.3, pips: 5 } }]
+   { name: '붉은 빨판', tone: 0xd14f6f, cut: { bulk: 1.38, cuff: 2.1, pips: 5 } },
+   { name: '먹색 빨판', tone: 0x2a2f4f, cut: { bulk: 1.38, cuff: 2.1, pips: 5 } }]
 ];
 
 export const MAX_GRIP = GLOVES.length - 1;
@@ -67,18 +67,18 @@ export const BOOTS = [
    3등급 14에서 24퍼센트였다. 1등급과 2등급이 나눠 쓴 자리가 0.796이던 이유가 그것이다.
    그래서 pip을 등급마다 벌리고 밑창의 넓이도 같이 벌린다. */
 export const BOOT_SKINS = [
-  [{ name: '흰 실내화', tone: 0x2a241c, cut: { sole: 0.54, long: 0.82, wide: 0.84, pips: 0, pip: 0, girth: 1 } },
-   { name: '뒤축 꺾어 신은 실내화', tone: 0x4a4438, cut: { sole: 0.48, long: 0.76, wide: 0.88, pips: 0, pip: 0, girth: 1 } },
-   { name: '남의 실내화', tone: 0x1c2a2a, cut: { sole: 0.6, long: 0.88, wide: 0.8, pips: 0, pip: 0, girth: 1 } }],
+  [{ name: '때 탄 실내화', tone: 0x2a241c, cut: { sole: 0.54, long: 0.82, wide: 0.84, pips: 0, pip: 0, girth: 1 } },
+   { name: '먼지색 실내화', tone: 0x4a4438, cut: { sole: 0.54, long: 0.82, wide: 0.84, pips: 0, pip: 0, girth: 1 } },
+   { name: '먹색 실내화', tone: 0x1c2a2a, cut: { sole: 0.54, long: 0.82, wide: 0.84, pips: 0, pip: 0, girth: 1 } }],
   [{ name: '갈색 조기축구화', tone: 0x4a3b2a, cut: { sole: 0.94, long: 1.04, wide: 1, pips: 3, pip: 0.5, girth: 1 } },
-   { name: '검은 조기축구화', tone: 0x22201c, cut: { sole: 1, long: 1, wide: 1.04, pips: 3, pip: 0.58, girth: 1.1 } },
-   { name: '흰 줄 두 개', tone: 0xd8d2c2, cut: { sole: 0.9, long: 1.08, wide: 0.96, pips: 3, pip: 0.42, girth: 0.9 } }],
+   { name: '검은 조기축구화', tone: 0x22201c, cut: { sole: 0.94, long: 1.04, wide: 1, pips: 3, pip: 0.5, girth: 1 } },
+   { name: '크림색 축구화', tone: 0xd8d2c2, cut: { sole: 0.94, long: 1.04, wide: 1, pips: 3, pip: 0.5, girth: 1 } }],
   [{ name: '파란 스터드', tone: 0x1f4f8f, cut: { sole: 1.4, long: 1.12, wide: 1.2, pips: 6, pip: 1.9, girth: 1.3 } },
-   { name: '형광 스터드', tone: 0xb8d92f, cut: { sole: 1.32, long: 1.18, wide: 1.14, pips: 6, pip: 2.05, girth: 1.2 } },
-   { name: '먹색 스터드', tone: 0x1a1c22, cut: { sole: 1.48, long: 1.06, wide: 1.26, pips: 6, pip: 1.75, girth: 1.4 } }],
+   { name: '형광 스터드', tone: 0xb8d92f, cut: { sole: 1.4, long: 1.12, wide: 1.2, pips: 6, pip: 1.9, girth: 1.3 } },
+   { name: '먹색 스터드', tone: 0x1a1c22, cut: { sole: 1.4, long: 1.12, wide: 1.2, pips: 6, pip: 1.9, girth: 1.3 } }],
   [{ name: '주황 스파이크', tone: 0xd94f2a, cut: { sole: 0.74, long: 1.26, wide: 0.8, pips: 8, pip: 3.1, girth: 0.54 } },
-   { name: '은색 스파이크', tone: 0xc2c6cc, cut: { sole: 0.68, long: 1.34, wide: 0.74, pips: 8, pip: 3.3, girth: 0.48 } },
-   { name: '검은 스파이크', tone: 0x24262c, cut: { sole: 0.8, long: 1.18, wide: 0.86, pips: 8, pip: 2.9, girth: 0.62 } }]
+   { name: '은색 스파이크', tone: 0xc2c6cc, cut: { sole: 0.74, long: 1.26, wide: 0.8, pips: 8, pip: 3.1, girth: 0.54 } },
+   { name: '검은 스파이크', tone: 0x24262c, cut: { sole: 0.74, long: 1.26, wide: 0.8, pips: 8, pip: 3.1, girth: 0.54 } }]
 ];
 
 export const MAX_STUD = BOOTS.length - 1;
@@ -99,17 +99,17 @@ export const KITS = [
    마지막 등급의 이름이 그 스펀지를 말하므로 그 등급의 변형은 전부 두께를 지킨다. */
 export const KIT_SKINS = [
   [{ name: '초록 면티', tone: 0x2f8f5b, cut: { girth: 1.3, len: 1.26, pad: 0 } },
-   { name: '누런 러닝', tone: 0xd8cfa8, cut: { girth: 1.22, len: 1.34, pad: 0 } },
-   { name: '늘어난 검정 면티', tone: 0x24262a, cut: { girth: 1.38, len: 1.18, pad: 0 } }],
+   { name: '누런 면티', tone: 0xd8cfa8, cut: { girth: 1.3, len: 1.26, pad: 0 } },
+   { name: '검정 면티', tone: 0x24262a, cut: { girth: 1.3, len: 1.26, pad: 0 } }],
   [{ name: '파란 체육복', tone: 0x2f6f8f, cut: { girth: 1, len: 1, pad: 0 } },
-   { name: '빨간 체육복', tone: 0x9f2f2f, cut: { girth: 1.06, len: 0.96, pad: 0 } },
-   { name: '흰 체육복', tone: 0xdcdcd2, cut: { girth: 0.94, len: 1.06, pad: 0 } }],
+   { name: '빨간 체육복', tone: 0x9f2f2f, cut: { girth: 1, len: 1, pad: 0 } },
+   { name: '흰 체육복', tone: 0xdcdcd2, cut: { girth: 1, len: 1, pad: 0 } }],
   [{ name: '자주 단체복', tone: 0x8f2f5b, cut: { girth: 1.14, len: 0.78, pad: 0.8 } },
-   { name: '주황 단체복', tone: 0xcf7a2f, cut: { girth: 1.08, len: 0.84, pad: 1 } },
-   { name: '남색 단체복', tone: 0x25355f, cut: { girth: 1.2, len: 0.74, pad: 0.7 } }],
+   { name: '주황 단체복', tone: 0xcf7a2f, cut: { girth: 1.14, len: 0.78, pad: 0.8 } },
+   { name: '남색 단체복', tone: 0x25355f, cut: { girth: 1.14, len: 0.78, pad: 0.8 } }],
   [{ name: '검은 저지', tone: 0x1c1f2b, cut: { girth: 0.88, len: 1.04, pad: 2.1 } },
-   { name: '형광 저지', tone: 0xc8e02f, cut: { girth: 0.92, len: 0.98, pad: 2.3 } },
-   { name: '보라 저지', tone: 0x4a2b6f, cut: { girth: 0.84, len: 1.1, pad: 1.9 } }]
+   { name: '형광 저지', tone: 0xc8e02f, cut: { girth: 0.88, len: 1.04, pad: 2.1 } },
+   { name: '보라 저지', tone: 0x4a2b6f, cut: { girth: 0.88, len: 1.04, pad: 2.1 } }]
 ];
 
 export const MAX_KIT = KITS.length - 1;
@@ -135,18 +135,18 @@ export const SOCKS = [
    제 겉모습 화소의 6에서 13퍼센트만 들었다. 발목 밴드는 다르다. 반지름이 legR 1.15 band라
    정강이보다 굵어 22에서 48퍼센트를 든다. 그래서 2등급은 girth가 세우고 3등급은 밴드가 세운다. */
 export const SOCK_SKINS = [
-  [{ name: '늘어난 흰 양말', tone: 0x63d3e8, cut: { girth: 0.66, guard: 0, band: 0 } },
-   { name: '짝짝이 양말', tone: 0xd863b0, cut: { girth: 0.7, guard: 0, band: 0 } },
-   { name: '구멍 난 양말', tone: 0xcfd8c8, cut: { girth: 0.62, guard: 0, band: 0 } }],
+  [{ name: '소다색 양말', tone: 0x63d3e8, cut: { girth: 0.66, guard: 0, band: 0 } },
+   { name: '딸기우유 양말', tone: 0xd863b0, cut: { girth: 0.66, guard: 0, band: 0 } },
+   { name: '빛바랜 흰 양말', tone: 0xcfd8c8, cut: { girth: 0.66, guard: 0, band: 0 } }],
   [{ name: '노란 스타킹', tone: 0xe8d463, cut: { girth: 1.06, guard: 0, band: 0 } },
-   { name: '검은 스타킹', tone: 0x22242a, cut: { girth: 1.1, guard: 0, band: 0 } },
-   { name: '줄무늬 스타킹', tone: 0x2f8f7a, cut: { girth: 1.02, guard: 0, band: 0 } }],
+   { name: '검은 스타킹', tone: 0x22242a, cut: { girth: 1.06, guard: 0, band: 0 } },
+   { name: '민트색 스타킹', tone: 0x2f8f7a, cut: { girth: 1.06, guard: 0, band: 0 } }],
   [{ name: '붉은 보호대', tone: 0xe86363, cut: { girth: 1.38, guard: 1.5, band: 0 } },
-   { name: '검은 보호대', tone: 0x2a2c32, cut: { girth: 1.44, guard: 1.7, band: 0 } },
-   { name: '흰 보호대', tone: 0xe4e4dc, cut: { girth: 1.32, guard: 1.35, band: 0 } }],
+   { name: '검은 보호대', tone: 0x2a2c32, cut: { girth: 1.38, guard: 1.5, band: 0 } },
+   { name: '흰 보호대', tone: 0xe4e4dc, cut: { girth: 1.38, guard: 1.5, band: 0 } }],
   [{ name: '흰 그립 양말', tone: 0xf2f2f2, cut: { girth: 0.86, guard: 0, band: 1.45 } },
-   { name: '검은 그립 양말', tone: 0x1e2024, cut: { girth: 0.82, guard: 0, band: 1.6 } },
-   { name: '주황 그립 양말', tone: 0xe08a2f, cut: { girth: 0.9, guard: 0, band: 1.35 } }]
+   { name: '검은 그립 양말', tone: 0x1e2024, cut: { girth: 0.86, guard: 0, band: 1.45 } },
+   { name: '주황 그립 양말', tone: 0xe08a2f, cut: { girth: 0.86, guard: 0, band: 1.45 } }]
 ];
 
 export const MAX_SOCK = SOCKS.length - 1;
@@ -165,20 +165,20 @@ export const GOALS = [
 /* 골대 변형. cell은 그물코 한 변의 미터, dim은 실의 진하기, sag는 가운데가 늘어지는 깊이,
    post는 기둥 색이다. 0.50에서 0.30으로 좁히면 같은 폭에 실이 열여덟 줄에서 서른 줄이 되어
    촘촘함이 눈에 보이고, 늘어짐 0.34에서 0.14로 줄면 팽팽하게 당겨 맨 그물로 읽힌다.
-   안 산 사람의 골대가 가장 성기다. 한 등급의 변형은 그 성김을 지키고 기둥 색과 늘어짐만 갈린다. */
+   안 산 사람의 골대가 가장 성기다. 한 등급의 변형은 기본 그물코·농도·늘어짐을 공유하고 기둥 색만 갈린다. */
 export const GOAL_SKINS = [
   [{ name: '녹슨 철골대', tone: 0x8a7a68, cell: 0.50, dim: 0.55, sag: 0.34, post: 0x8a7a68 },
-   { name: '페인트 벗겨진 골대', tone: 0xd8d4c8, cell: 0.52, dim: 0.5, sag: 0.38, post: 0xd8d4c8 },
-   { name: '파란 철골대', tone: 0x3f6f9f, cell: 0.48, dim: 0.6, sag: 0.3, post: 0x3f6f9f }],
+   { name: '빛바랜 흰 골대', tone: 0xd8d4c8, cell: 0.50, dim: 0.55, sag: 0.34, post: 0xd8d4c8 },
+   { name: '파란 철골대', tone: 0x3f6f9f, cell: 0.50, dim: 0.55, sag: 0.34, post: 0x3f6f9f }],
   [{ name: '흰 나일론', tone: 0xf2f4f0, cell: 0.44, dim: 0.62, sag: 0.28, post: 0xf2f4f0 },
-   { name: '누런 나일론', tone: 0xd8c88a, cell: 0.46, dim: 0.58, sag: 0.31, post: 0xd8c88a },
-   { name: '초록 기둥 나일론', tone: 0x3f8f5f, cell: 0.42, dim: 0.66, sag: 0.25, post: 0x3f8f5f }],
+   { name: '누런 나일론', tone: 0xd8c88a, cell: 0.44, dim: 0.62, sag: 0.28, post: 0xd8c88a },
+   { name: '초록 기둥 나일론', tone: 0x3f8f5f, cell: 0.44, dim: 0.62, sag: 0.28, post: 0x3f8f5f }],
   [{ name: '팽팽한 흰 그물', tone: 0xf6f8f4, cell: 0.36, dim: 0.70, sag: 0.22, post: 0xf6f8f4 },
-   { name: '팽팽한 검은 그물', tone: 0x2a2c30, cell: 0.34, dim: 0.76, sag: 0.2, post: 0x2a2c30 },
-   { name: '팽팽한 붉은 그물', tone: 0xb84a3a, cell: 0.38, dim: 0.68, sag: 0.24, post: 0xb84a3a }],
+   { name: '팽팽한 검은 그물', tone: 0x2a2c30, cell: 0.36, dim: 0.70, sag: 0.22, post: 0x2a2c30 },
+   { name: '팽팽한 붉은 그물', tone: 0xb84a3a, cell: 0.36, dim: 0.70, sag: 0.22, post: 0xb84a3a }],
   [{ name: '검은 겹그물', tone: 0x1e2024, cell: 0.30, dim: 0.80, sag: 0.14, post: 0x1e2024 },
-   { name: '은색 겹그물', tone: 0xc8ccd2, cell: 0.28, dim: 0.86, sag: 0.12, post: 0xc8ccd2 },
-   { name: '형광 겹그물', tone: 0xc8e02f, cell: 0.32, dim: 0.78, sag: 0.16, post: 0xc8e02f }]
+   { name: '은색 겹그물', tone: 0xc8ccd2, cell: 0.30, dim: 0.80, sag: 0.14, post: 0xc8ccd2 },
+   { name: '형광 겹그물', tone: 0xc8e02f, cell: 0.30, dim: 0.80, sag: 0.14, post: 0xc8e02f }]
 ];
 
 export const MAX_FRAME = GOALS.length - 1;
@@ -265,7 +265,7 @@ export const BEARD_SKINS = [
 
 /* 선반 길이가 등급 수에 묶여 있었다. 등급을 늘리면 값 사다리와 팔로워 승수가 같이 늘어나
    그 둘을 여는 결정이 날 때까지 콘텐츠 수가 넷에서 멈춘다.
-   변형은 그 매듭 밖이다. 같은 등급, 같은 값, 같은 승수에 모양과 색만 다르다.
+   변형은 그 매듭 밖이다. 같은 등급, 같은 값, 같은 승수와 형태에 색만 다르다.
    등급을 사면 그 등급의 변형이 전부 열리고 바꾸는 데 값이 안 든다.
    목록의 0번이 그 등급의 기본이다.
 
@@ -281,18 +281,18 @@ export const BEARD_SKINS = [
    모두에서 0등급 어느 변형보다 낮다. 이름이 안 든 날인 0등급 변형이 그 자리를 넘어서 있었고,
    실측으로 그 장과 은발이 칠한 자리의 0.829를 함께 썼다. */
 export const HAIR_SKINS = [
-  [{ name: '엄마 손 그대로', tone: 0x2b1d14, cut: { wide: 1, tall: 1.02, phi: 0.46, tilt: 0.09 } },
-   { name: '한쪽만 눌린 자국', tone: 0x3b2a1a, cut: { wide: 1.04, tall: 1, phi: 0.5, tilt: -0.14 } },
-   { name: '가위 안 든 날', tone: 0x241a12, cut: { wide: 1.06, tall: 1.06, phi: 0.5, tilt: 0.05 } }],
-  [{ name: '기본 투블럭', tone: 0x1b1410, cut: { wide: 1, tall: 1.14, phi: 0.33, tilt: 0 } },
-   { name: '올백 투블럭', tone: 0x2a2018, cut: { wide: 0.94, tall: 1.3, phi: 0.35, tilt: 0.11 } },
-   { name: '반삭 투블럭', tone: 0x141010, cut: { wide: 1.06, tall: 1.06, phi: 0.31, tilt: 0 } }],
+  [{ name: '엄마표 밤색', tone: 0x2b1d14, cut: { wide: 1, tall: 1.02, phi: 0.46, tilt: 0.09 } },
+   { name: '간장빛 갈색', tone: 0x3b2a1a, cut: { wide: 1, tall: 1.02, phi: 0.46, tilt: 0.09 } },
+   { name: '커피빛 흑갈색', tone: 0x241a12, cut: { wide: 1, tall: 1.02, phi: 0.46, tilt: 0.09 } }],
+  [{ name: '먹색 투블럭', tone: 0x1b1410, cut: { wide: 1, tall: 1.14, phi: 0.33, tilt: 0 } },
+   { name: '초코색 투블럭', tone: 0x2a2018, cut: { wide: 1, tall: 1.14, phi: 0.33, tilt: 0 } },
+   { name: '깜깜한 투블럭', tone: 0x141010, cut: { wide: 1, tall: 1.14, phi: 0.33, tilt: 0 } }],
   [{ name: '탈색 노랑', tone: 0xd8b45c, cut: { wide: 0.98, tall: 1.32, phi: 0.57, tilt: 0 } },
-   { name: '물 빠진 은발', tone: 0xd6d8d2, cut: { wide: 0.98, tall: 1.28, phi: 0.59, tilt: 0 } },
-   { name: '탈색 실패 주황', tone: 0xd9762f, cut: { wide: 0.98, tall: 1.4, phi: 0.55, tilt: 0.06 } }],
+   { name: '물 빠진 은발', tone: 0xd6d8d2, cut: { wide: 0.98, tall: 1.32, phi: 0.57, tilt: 0 } },
+   { name: '탈색 실패 주황', tone: 0xd9762f, cut: { wide: 0.98, tall: 1.32, phi: 0.57, tilt: 0 } }],
   [{ name: '빨간 모히칸', tone: 0xc4402c, cut: { wide: 0.34, tall: 1.8, phi: 0.6, tilt: 0 } },
-   { name: '파란 모히칸', tone: 0x2f6fd9, cut: { wide: 0.28, tall: 2.1, phi: 0.66, tilt: 0 } },
-   { name: '쓰러진 모히칸', tone: 0x8f2fd1, cut: { wide: 0.42, tall: 1.55, phi: 0.56, tilt: 0.24 } }]
+   { name: '파란 모히칸', tone: 0x2f6fd9, cut: { wide: 0.34, tall: 1.8, phi: 0.6, tilt: 0 } },
+   { name: '포도맛 모히칸', tone: 0x8f2fd1, cut: { wide: 0.34, tall: 1.8, phi: 0.6, tilt: 0 } }]
 ];
 
 /* 잉크 변형. 머리와 같은 형식이다. span은 위팔을 덮는 비율, girth는 감는 두께 배율이다.
@@ -306,17 +306,17 @@ export const HAIR_SKINS = [
    0.14에서 0.17이 두 축이 같이 사는 칸이다. */
 export const INK_SKINS = [
   [{ name: '맨살', tone: 0x5f8f93, cut: { span: 0.14, girth: 1 } },
-   { name: '햇볕에 탄 자국', tone: 0x8f6f53, cut: { span: 0.15, girth: 1.02 } },
-   { name: '붕대 감은 팔', tone: 0xd8d4c6, cut: { span: 0.17, girth: 1.06 } }],
-  [{ name: '문신 스티커', tone: 0x3a4f7a, cut: { span: 0.26, girth: 1.03 } },
-   { name: '번진 스티커', tone: 0x4f3a7a, cut: { span: 0.34, girth: 1.01 } },
-   { name: '반쯤 뜯긴 스티커', tone: 0x2f5f4a, cut: { span: 0.25, girth: 1.08 } }],
-  [{ name: '이름 석 자', tone: 0x2a2f3a, cut: { span: 0.38, girth: 1.04 } },
-   { name: '등번호 하나', tone: 0x7a2a2f, cut: { span: 0.36, girth: 1.1 } },
-   { name: '알아볼 수 없는 글씨', tone: 0x1f3a2a, cut: { span: 0.44, girth: 1.02 } }],
+   { name: '햇볕에 탄 자국', tone: 0x8f6f53, cut: { span: 0.14, girth: 1 } },
+   { name: '붕대색 자국', tone: 0xd8d4c6, cut: { span: 0.14, girth: 1 } }],
+  [{ name: '남색 스티커', tone: 0x3a4f7a, cut: { span: 0.26, girth: 1.03 } },
+   { name: '보라 스티커', tone: 0x4f3a7a, cut: { span: 0.26, girth: 1.03 } },
+   { name: '초록 스티커', tone: 0x2f5f4a, cut: { span: 0.26, girth: 1.03 } }],
+  [{ name: '먹색 이름', tone: 0x2a2f3a, cut: { span: 0.38, girth: 1.04 } },
+   { name: '붉은 이름', tone: 0x7a2a2f, cut: { span: 0.38, girth: 1.04 } },
+   { name: '초록 이름', tone: 0x1f3a2a, cut: { span: 0.38, girth: 1.04 } }],
   [{ name: '검은 먹토시', tone: 0x14161c, cut: { span: 0.98, girth: 1.2 } },
-   { name: '푸른 먹토시', tone: 0x14263c, cut: { span: 0.9, girth: 1.26 } },
-   { name: '붉은 먹토시', tone: 0x3c1418, cut: { span: 1, girth: 1.14 } }]
+   { name: '푸른 먹토시', tone: 0x14263c, cut: { span: 0.98, girth: 1.2 } },
+   { name: '붉은 먹토시', tone: 0x3c1418, cut: { span: 0.98, girth: 1.2 } }]
 ];
 
 /* 변형을 파는 선반 표. 여기 든 칸만 변형이 있고, 칸 이름에 Skin을 붙인 것이 그 선택을 담는 자리다.

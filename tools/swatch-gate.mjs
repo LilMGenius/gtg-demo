@@ -6,9 +6,9 @@ import { load, saveKey } from '../web/src/state/save.mjs';
 import { FACES_V } from '../web/src/state/passer.mjs';
 
 // 상점의 skinsAt 목록 전체를 순회한다. 이름은 표시 문구이고 나머지는 색 또는 형태 데이터다.
-// 색 키는 gear의 계약을 따른다. post는 기둥 색, sky·haze는 하늘·안개 색, dim은 그물 색 농도다.
+// 색 키는 gear의 계약을 따른다. post는 기둥 색, sky·haze는 하늘·안개 색이다. 그물 농도 dim은 같은 등급에서 고정한다.
 // 중첩 cut까지 Node의 isDeepStrictEqual로 비교하므로 새 기하 키도 별도 등록 없이 검사된다.
-const colourKeys = new Set(['tone', 'post', 'sky', 'haze', 'dim']);
+const colourKeys = new Set(['tone', 'post', 'sky', 'haze']);
 const geometryOf = variant => Object.fromEntries(Object.entries(variant).filter(([key]) => key !== 'name' && !colourKeys.has(key)));
 const differences = variants => {
   const [first, ...rest] = variants;
