@@ -1,37 +1,29 @@
-import { createHash } from 'node:crypto';
 import * as chain from '../src/chain.mjs';
 import { PENALTY_RULE } from '../src/reality.mjs';
 
-// 최소 이천 시드의 다섯 슛을 자동과 수동 양쪽에서 고정한다.
+// 접촉 전 골라인 대조는 기존 이천 시드와 수동·봇 양쪽 표본 수를 유지한다.
 const SEEDS = 2000;
-const PIN = '6cc9c59dc3205ff3d49362a7e4f493c97e22031328a957c1422fba14932d4182';
 const failures = [];
 function check(axis, ok, detail) {
   console.log(`${ok ? 'PASS' : 'FAIL'} move:${axis} ${detail}`);
   if (!ok) failures.push(axis);
 }
-function legacyChecksum(perturb = false) {
-  const hash = createHash('sha256');
-  for (let seed = 1; seed <= SEEDS; seed++) {
-    for (const manual of [false, true]) {
-      const rng = chain.makeRng(seed);
-      // 서른 레벨의 성장 표본을 반복해 신인과 성장 뒤 입력을 같이 묶는다.
-      const keeper = chain.keeperAtLevel(1 + seed % 30, rng);
-      chain.rollForm(keeper, rng);
-      for (const shot of chain.buildSet(rng, keeper.level)) {
-        const input = manual ? { dive: shot.side, errMs: 0, advance: 0, auto: false } : undefined;
-        const r = chain.resolve({ keeper, shot, rng, input });
-        hash.update(JSON.stringify([perturb ? !r.conceded : r.conceded, r.cause, r.rolls, r.stage]));
-      }
-    }
-  }
-  return hash.digest('hex');
-}
-const checksum = legacyChecksum();
-console.log(`PIN seeds=${SEEDS} shots=5 modes=2 sha256=${checksum}`);
-if (process.argv.includes('--pin')) process.exit(0);
-check('old-path-unchanged', checksum === PIN, checksum);
-check('checksum-positive-control', legacyChecksum(true) !== checksum, '결과 반전은 해시를 바꾼다');
+// 옛 방향 입력과 생략 입력은 거절하고 실제 봇 자취는 받아야 계약 검사가 살아 있다.
+// 시드 1의 첫 구를 거절 입력과 수락 입력에 똑같이 쓴다.
+const keeper = chain.newKeeper(), rng = chain.makeRng(1);
+const shot = chain.buildSet(rng)[0];
+const rejected = input => {
+  try { chain.resolve({ keeper: { ...keeper }, shot, rng: chain.makeRng(1), input }); return false; }
+  catch (error) { return error instanceof TypeError && error.message.includes('trace'); }
+};
+check('trace-required', rejected(undefined), '입력 생략을 거절한다');
+// 방향 0과 오차 0은 종전 정면 완벽 입력 양성 대조다.
+check('old-direction-positive-control', rejected({ dive: 0, errMs: 0 }), '옛 방향 입력을 거절한다');
+check('empty-trace-refused', rejected({ trace: [] }), '빈 자취를 거절한다');
+// 시드 1은 거절 대조와 같은 한 구를 재현한다.
+const trace = chain.botPlan(keeper, shot, chain.makeRng(1));
+const accepted = chain.resolve({ keeper, shot, rng: chain.makeRng(1), input: { trace, auto: true } });
+check('trace-accepted-control', Array.isArray(accepted.input.trace), '실제 봇 자취는 판정된다');
 check('position-api', typeof chain.botPlan === 'function' && typeof chain.moveSpeed === 'function', '위치 경로 공개 함수');
 if (typeof chain.botPlan === 'function') {
   // 만이천 쌍은 방향 확률의 95% 오차를 약 1%p 안으로 좁힌다.

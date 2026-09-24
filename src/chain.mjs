@@ -248,8 +248,8 @@ export function judgeWindow(keeper, shot, input, over) {
   const form = keeper.form || 0;
   const s = (k) => clamp((over && k in over ? over[k] : keeper[k]) + form, 1, 10);
   const power = over && "kickerPower" in over ? over.kickerPower : shot.kicker.power;
-  // 위치 경로의 반사실은 같은 19.5ms/칸을 쓰고 옛 방향 입력의 비행식은 보존한다.
-  const flight = Array.isArray(input?.trace) ? clamp(shot.flight + (shot.kicker.power - power) * 0.0195, 0.55, 1.1) : clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
+  // 위치 경로의 반사실은 제품 비행 시간과 같은 19.5ms/칸을 쓴다.
+  const flight = clamp(shot.flight + (shot.kicker.power - power) * 0.0195, 0.55, 1.1);
   // 판정 창과 기동. 반응속도가 인지이고 민첩성이 기동이다.
   let windowMs = WIN0 + 13 * s("reflex") + 4 * s("composure");
   // 연속 실점은 다음 구를 좁힌다. 회복탄력성이 그 좁혀짐을 먹는다.
@@ -292,16 +292,15 @@ function contactMargin(keeper, shot, input, over) {
 }
 
 function bareContactMargin(keeper, shot, input, over) {
-  const positional = Array.isArray(input.trace);
-  if (positional) input = positionDive(keeper, shot, input, over);
+  input = positionDive(keeper, shot, input, over);
   const form = keeper.form || 0;
   const s = (k) => clamp((over && k in over ? over[k] : keeper[k]) + form, 1, 10);
   const k = shot.kicker;
   const power = over && "kickerPower" in over ? over.kickerPower : k.power;
   // 프로브는 한 칸만 움직인다. 커브를 절반으로 줄이면 한 칸이 아니라 다섯 칸을 준 것이 된다.
   const bend = Math.max(0, (shot.bend || 0) - (over && "bendSub" in over ? over.bendSub : 0));
-  // 위치 경로의 반사실은 같은 19.5ms/칸을 쓰고 옛 방향 입력의 비행식은 보존한다.
-  const flight = Array.isArray(input?.trace) ? clamp(shot.flight + (shot.kicker.power - power) * 0.0195, 0.55, 1.1) : clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
+  // 위치 경로의 반사실은 제품 비행 시간과 같은 19.5ms/칸을 쓴다.
+  const flight = clamp(shot.flight + (shot.kicker.power - power) * 0.0195, 0.55, 1.1);
 
   const offball = s("offball");
   const lateral = lateralGap(offball);
@@ -313,10 +312,10 @@ function bareContactMargin(keeper, shot, input, over) {
   const SCALE_MS = 200;
   // 시간 항은 judgeWindow가 소유한다. 화면의 자가 그리는 그 창이 여기서 그대로 쓰인다.
   // P15 가설: 전속 이동 중 미숙한 자리잡기는 최대 60ms의 준비 시간을 잃는다.
-  const unset = positional ? 60 * Math.min(1, Math.abs(input.vx) / moveSpeed({ agility: s("agility") })) * (10 - offball) / 9 : 0;
+  const unset = 60 * Math.min(1, Math.abs(input.vx) / moveSpeed({ agility: s("agility") })) * (10 - offball) / 9;
   // 위치 입력은 마커 이후 예산을 실제 발동 뒤 남은 비행시간으로 바꾼다. 기존 창의 스탯/장비 항은 유지한다.
-  const arrival = positional ? (over && "kickerPower" in over ? flight : shot.flight) * 1000 : 0;
-  const remaining = positional ? arrival - input.triggerMs - diveNeed({ diving: s("diving") }, Math.abs(shot.aimX - input.x)) - flight * (1 - 0.72) * 1000 : 0;
+  const arrival = (over && "kickerPower" in over ? flight : shot.flight) * 1000;
+  const remaining = arrival - input.triggerMs - diveNeed({ diving: s("diving") }, Math.abs(shot.aimX - input.x)) - flight * (1 - 0.72) * 1000;
   const slack = judgeWindow(keeper, shot, input, over).slackMs + remaining - Math.abs(input.errMs) - unset;
   // 상한을 두지 않는다. 늦으면 늦은 만큼 손이 짧아져야 그 늦음이 원인으로 잡힌다.
   const timing = clamp(slack / SCALE_MS, -1.2, 1.35);
@@ -329,20 +328,20 @@ function bareContactMargin(keeper, shot, input, over) {
   const quality = clamp(0.55 + 0.33 * timing, 0.05, 1.05) * input.dirQuality;
 
   let margin;
-  const distance = Math.abs(shot.aimX - (positional ? input.x : 0));
+  const distance = Math.abs(shot.aimX - input.x);
   if (shot.course === "상단") {
     margin = vert * quality - (shot.aimY - SHOULDER + bend * 0.6) * closing;
     // 높은 공도 수평으로 닿아야 한다. 두 축 중 모자란 쪽이 접촉을 결정한다.
-    if (positional) margin = Math.min(margin, horiz * quality - (distance + lateral + bend) * closing);
+    margin = Math.min(margin, horiz * quality - (distance + lateral + bend) * closing);
   } else {
     const gap = (distance + lateral + bend) * closing;
     margin = horiz * quality - gap;
   }
   // 정면 슛의 일부는 서 있기만 해도 몸에 맞는다. 무거울수록 넓다.
-  if (positional ? distance <= STAND : shot.course === "정면") margin += 0.10 + (keeper.weight - 84) * W_FRONT;
+  if (distance <= STAND) margin += 0.10 + (keeper.weight - 84) * W_FRONT;
   // Bar-Eli 외 표 2의 중앙 공/옆 점프 블록을 기존 몸 폭과 깊이로 표현한다. 손 방향이 틀려도 몸은 사라지지 않는다.
   // 오독 때 남는 몸만 별도로 판정한다. 올바른 손의 접촉과 오프더볼 한 칸의 반사실을 몸 폭이 가로채지 않는다.
-  if (positional && input.dirQuality < 1 && shot.aimY <= SHOULDER) margin = Math.max(margin, STAND + depth + (keeper.weight - 84) * W_FRONT - distance - bend);
+  if (input.dirQuality < 1 && shot.aimY <= SHOULDER) margin = Math.max(margin, STAND + depth + (keeper.weight - 84) * W_FRONT - distance - bend);
   return margin;
 }
 
@@ -370,7 +369,7 @@ function attributeContact(keeper, shot, input) {
        ["kickerCurve", { bendSub: 0.028 }]];
   let best = probes[0][0];
   // 자동 읽기와 타이밍은 같은 난수로 판단력 한 칸을 재평가한다.
-  if (Array.isArray(input.trace)) probes.push(["judgement", { judgement: keeper.judgement + 1 }]);
+  probes.push(["judgement", { judgement: keeper.judgement + 1 }]);
   let bestGain = -Infinity;
   let restored = false;
   for (const [cause, over] of probes) {
@@ -378,36 +377,13 @@ function attributeContact(keeper, shot, input) {
     restored ||= base + gain > 0;
     if (gain > bestGain) { bestGain = gain; best = cause; }
   }
-  if (Array.isArray(input.trace)) {
+  {
     // 자동 다이빙의 오독은 손의 위치가 아니라 판단력이 소유한다.
     if (input.dirQuality < 1) return "judgement";
     // 수동 자리 탓은 스탯 한 칸으로 복원되지 않으며 공 앞에 섰을 때 닿는 경우뿐이다.
     if (!input.auto && !restored && contactMargin(keeper, shot, { ...input, x: clamp(shot.aimX, -X_MAX, X_MAX) }, null) > 0) return "position";
   }
   return best;
-}
-
-// 자동 입력. 판단력이 품질을 소유한다.
-// 손가락이 만든 실패와 스탯이 만든 실패를 갈라놓는 것이 공정성의 전부이므로,
-// 여기서 나온 실패는 손가락 셋으로 귀속하고 스탯 원장에 섞지 않는다.
-export function autoInput(keeper, shot, rng) {
-  const j = keeper.judgement;
-  // 가설: 등급당 방향 판단 0.03은 같은 판단력에도 값을 주고 완전 수동 1.0 아래에 둔다.
-  const readP = Math.min(0.999, 0.34 + j * 0.065 + (keeper.botTier || 0) * 0.03) * 100;
-  const read = pct(rng, readP);
-  const dive = read ? shot.side : [-1, 0, 1][Math.floor(rng() * 3)];
-  const spread = 200 - j * 12;
-  const errMs = (rng() * 2 - 1) * spread;
-  // 나갈 것인가. 강제 각도에서는 나가지 않으면 못 막고, 칩에 나가면 골대가 빈다.
-  const wantOut = shot.forced || pct(rng, 16 + j * 2);
-  const advance = wantOut ? clamp(0.6 + rng() * 0.9, 0, 1.3 + 0.19 * LOCKED.sweeping) : 0;
-  return { dive, errMs, advance, auto: true };
-}
-
-function dirQualityOf(dive, shot) {
-  if (dive === shot.side) return 1.0;
-  if (dive === 0 || shot.side === 0) return 0.5;
-  return 0.1;
 }
 
 // U1 선형 보간을 재사용한다. 키커에게 주는 접촉 전 경계는 aimAt이 소유한다.
@@ -529,7 +505,7 @@ function positionDive(keeper, shot, raw, over) {
   // reality에 확인한 중앙 슛 비중을 오독 때 대기의 시험값으로만 쓴다. 키퍼 행동의 관측률은 아니다.
   const wrong = raw.missU >= PENALTY_OBSERVATION.values.centerKickProbability;
   const dive = standing ? 0 : correct ? Math.sign(rel) : wrong ? -Math.sign(rel) : 0;
-  // autoInput과 같은 판단력별 타이밍 분산을 재사용한다.
+  // 판단력 한 칸마다 타이밍 분산을 줄인다.
   const errMs = (raw.timeU * 2 - 1) * (200 - 12 * j);
   return { ...raw, dive, dirQuality: correct ? 1 : wrong ? 0.1 : 0.5, errMs };
 }
@@ -542,9 +518,9 @@ export function keeperDepthAt(input, ms) {
 function positionInput(keeper, shot, raw, rng) {
   // 새 경로 전용 난수: 판단력의 방향 읽기, 오독 형태, 타이밍을 짝지어 보존한다.
   const readU = rng(), missU = rng(), timeU = rng();
-  // 새 경로 전용 난수: autoInput의 판단력별 전진 결정을 그대로 따른다.
+  // 판단력별 전진 결정은 별도의 난수로 정한다.
   const wantOut = shot.forced || pct(rng, 16 + keeper.judgement * 2);
-  // 새 경로 전용 난수: autoInput과 같은 전진 거리와 잠긴 수비범위 상한이다.
+  // 전진 거리는 잠긴 수비범위 상한 안에서 정한다.
   const advance = wantOut ? clamp(0.6 + rng() * 0.9, 0, 1.3 + 0.19 * LOCKED.sweeping) : 0;
   // 기본 접촉 깊이는 placement가 소유하며 접촉 전에 미리 도달한 것으로 그리지 않는다.
   const baseDepth = placement(keeper, shot).depth;
@@ -586,9 +562,9 @@ export function resolve(input) {
   const keeper = input.keeper;
   let shot = input.shot;
   const rng = input.rng;
-  let raw = input.input || autoInput(keeper, shot, rng);
-  const positional = Array.isArray(raw.trace);
-  if (positional) {
+  let raw = input.input;
+  if (!Array.isArray(raw?.trace) || !raw.trace.length) throw new TypeError('판정 입력에는 비어 있지 않은 trace가 필요하다');
+  {
     raw = { ...raw, x: clamp(Number(raw.x) || 0, -X_MAX, X_MAX), vx: Number(raw.vx) || 0 };
     shot = raw.trace.aimedShot || aimAt(keeper, shot, raw.trace, rng);
     raw = { ...raw, ...triggerOnTrace(keeper, shot, raw.trace, raw.x) };
@@ -598,7 +574,7 @@ export function resolve(input) {
   // 원인 귀속에서 이 항은 상쇄되고, 장비가 실점 원인으로 잡히는 일은 없다.
   // 가산 위 유계 승산의 E는 활성 장비를 한 버킷에 모으므로 독립 구매 승수가 늘지 않는다.
   const gearStrength = [input.grip, input.studs, input.pads, input.socks, input.frame].reduce((sum, rank) => sum + gearRank(rank) / 3, 0) + (input.rosin ? 1 / 3 : 0);
-  const inp = Object.assign({}, raw, { dirQuality: positional ? raw.dirQuality : dirQualityOf(raw.dive, shot), studs: input.studs, gearStrength });
+  const inp = Object.assign({}, raw, { dirQuality: raw.dirQuality, studs: input.studs, gearStrength });
 
   const events = [];
   const state = { stage: 1, rolls: 0 };
@@ -616,7 +592,7 @@ export function resolve(input) {
     // 유명한 키커를 막으면 더 오르고, 유명한 키커에게 먹히면 덜 오른다. STATS 4절의 M 경로다.
     return { events, conceded, cause: conceded ? cause : null, stage: state.stage, rolls: state.rolls,
       fame: shot.kicker.fame, untested: Boolean(untested),
-      ...(positional ? { shot, input: inp } : {}) };
+      shot, input: inp };
   };
 
   const place = placement(keeper, shot);
@@ -632,8 +608,8 @@ export function resolve(input) {
   // 0단 배치. 나가서 생긴 사고와 안 와도 될 공에 누운 사고는 같은 판단에서 나온다.
   // 한 단계는 롤 하나를 쓴다. 두 사고는 같은 난수를 구간으로 나눠 가른다.
   const centerish = shot.course === "정면" || shot.chip;
-  // 위치 입력의 칩 위험은 실제 자동 전진과 키커 위장에서 나온다. 자리 능력 자체에 붙던 벌점은 옛 입력에만 남긴다.
-  const overP = shot.chip ? Math.max(0, (positional ? 0 : (clamp(keeper.offball, 1, 10) - 3) * 5) + shot.kicker.flair * 4 + (place.depth + inp.advance > 1.0 ? 30 : 0)) : 0;
+  // 칩 위험은 실제 자동 전진과 키커 위장에서 나온다.
+  const overP = shot.chip ? Math.max(0, shot.kicker.flair * 4 + (place.depth + inp.advance > 1.0 ? 30 : 0)) : 0;
   const diveP = centerish && inp.dive !== 0 ? Math.max(0, keeper.diving * 4.2 - keeper.judgement * 3.4) : 0;
   // 한눈팔기. 행인이 지나가는 구에서만 열리고 집중력이 소유한다.
   // 같은 단계의 사고는 롤 하나를 구간으로 나눠 가른다. 새 롤을 뒤면 한 구가 일곱 번 굴러간다.
@@ -684,7 +660,7 @@ export function resolve(input) {
     // 역방향은 보이는 동작의 자막이고 자동 읽기를 틀린 능력의 귀속은 판단력이다.
     if (inp.dirQuality <= 0.1) {
       say("miss", "완전히 역동작이었습니다.", "direction");
-      return done(true, positional ? "judgement" : "direction");
+      return done(true, "judgement");
     }
     const cause = attributeContact(keeper, shot, inp);
     const lines = {
@@ -759,7 +735,7 @@ export function resolve(input) {
      장갑으로 순간이동하는 그림을 그렸다. 실측으로 손에 들어온 구의 15.1퍼센트(1레벨),
      10.0퍼센트(10레벨), 1.7퍼센트(30레벨)가 반대로 뛴 구였다. 판단력이 오르면 저절로 준다.
      맞은 공은 살아 있으므로 아래 리바운드 단계를 흘린 공과 그대로 공유한다. */
-  const offDir = positional ? inp.dirQuality < 1 : inp.dive !== shot.side;
+  const offDir = inp.dirQuality < 1;
   if (d2 < taken + spillP * (100 - taken) / 100 || offDir) {
     if (offDir) say("bodyBlock", "반대로 뛰었는데 몸에 맞고 튕겼습니다. 공이 아직 살아 있습니다.", null);
     else say("spill", "흘렸습니다. 공이 아직 살아 있습니다.", "handling");
