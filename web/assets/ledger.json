@@ -60,16 +60,6 @@
     "form": "png"
   },
   {
-    "path": "flags/LICENSE",
-    "origin": "lipis/flag-icons",
-    "rights": "MIT",
-    "license": "MIT",
-    "source": "https://raw.githubusercontent.com/lipis/flag-icons/086f7e97d657358203916dbe84f61c2bccaa81eb/LICENSE",
-    "commit": "086f7e97d657358203916dbe84f61c2bccaa81eb",
-    "sha256": "8f1195d55a2fd315a07d812328470ca9ba2abb78c8d317ff19619d5125e00cea",
-    "form": "text"
-  },
-  {
     "path": "flags/ar.svg",
     "origin": "lipis/flag-icons",
     "rights": "MIT",

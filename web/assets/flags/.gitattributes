@@ -1,0 +1,3 @@
+# 국기와 라이선스 원본 바이트는 Windows 체크아웃에서도 줄바꿈을 바꾸지 않는다.
+*.svg -text
+LICENSE -text

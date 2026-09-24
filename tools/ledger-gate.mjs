@@ -44,7 +44,7 @@ const shipped = readdirSync(ASSETS, { recursive: true }).map((p) => p.replaceAll
 const rows = JSON.parse(readFileSync(resolve(ASSETS, "ledger.json"), "utf8"));
 const validRows = Array.isArray(rows) && rows.every((r) => r && typeof r.path === "string"
   && typeof r.origin === "string" && r.origin.trim().length > 0
-  && ["self", "OFL-1.1", "unconfirmed", "commercial-free"].includes(r.rights)
+  && ["self", "OFL-1.1", "MIT", "unconfirmed", "commercial-free"].includes(r.rights)
   && typeof r.form === "string" && r.form.trim().length > 0);
 check("ledger:rows-have-the-required-fields", validRows, "path, origin, rights, form");
 if (validRows) {
@@ -68,6 +68,13 @@ if (validRows) {
       const lic = shipped.includes(row.path) && /\.(ttf|otf|woff2?)$/i.test(extname(row.path))
         && readdirSync(beside).find((f) => f.toLowerCase().startsWith(family(name).toLowerCase()) && /ofl\.txt$/i.test(f));
       check("ledger:" + name + ":carries-its-licence", Boolean(lic), lic || "no *OFL.txt beside " + row.path);
+    }
+    if (row.rights === "MIT") {
+      const licensePath = resolve(ASSETS, dirname(row.path), 'LICENSE');
+      const license = existsSync(licensePath) ? readFileSync(licensePath, 'utf8') : '';
+      check('ledger:' + name + ':MIT-license-and-pinned-source', license.includes('Permission is hereby granted')
+        && license.includes('Copyright') && license.includes('THE SOFTWARE IS PROVIDED "AS IS"')
+        && /^[a-f0-9]{40}$/.test(row.commit || '') && row.source?.includes('/' + row.commit + '/'), row.source);
     }
     if (row.rights === "commercial-free") {
       // 출처 이름이 있어야 상업용 무료 확인을 특정 원작자에게 연결할 수 있다.
