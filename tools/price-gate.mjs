@@ -69,7 +69,8 @@ const LONG_STATES = ["상위 보유"];
 const LABEL_NODES = "button, .px, .held, .tried i";
 // 이름이 서는 자리. 선반 탭과 갈래 버튼과 명단 카드와 걸친 목록은 상품과 사람의 이름을 든다.
 // 이름에는 두 글자 자를 못 대지만 마침표 자는 그대로 받는다.
-const NAME_SLOTS = ".tab, .kind, #roster .row button, #shop .fitting .tried i[data-off]";
+// 쇼케이스 진입은 상품 영역의 이름이며 가격 버튼의 짧은 값 검사는 그대로 유지한다.
+const NAME_SLOTS = "#shop .show-legends, .tab, .kind, #roster .row button, #shop .fitting .tried i[data-off]";
 
 // 한 판의 버튼과 배지를 재서 계약을 어긴 글자만 돌려준다. 판이 없으면 null이라 0건과 안 섞인다.
 // 재는 단위는 그려진 글자 토막 하나다. 버튼 글자를 통째로 이으면 사유 배지와 값이 붙어
