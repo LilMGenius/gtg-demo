@@ -34,11 +34,22 @@ try {
   b = await chromium.launch({ executablePath: EXE });
   const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
   const p = await ctx.newPage();
+  // thumb-gate의 응답 덧붙이기를 따른다. 내 정보가 읽는 SHELVES는 모듈 안에 있어
+  // 같은 실행 문맥에서 필드 목록만 꺼내며, 제품 파일이나 렌더 결과는 바꾸지 않는다.
+  await p.route("**/web/src/main.mjs", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, body: await response.text()
+      + "\nwindow.__mepaneWardrobe = Object.values(SHELVES).map((s) => s.field);\n" });
+  });
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
   p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
   await p.goto(BASE, { waitUntil: "load" });
   await p.waitForSelector("#go", { timeout: 15000 });
+  const wardrobe = await p.evaluate(() => window.__mepaneWardrobe);
+  // 빈 선반은 표본이 아니며 초상은 기존 기준대로 하나여야 한다.
+  const wardrobeOk = (pane) => wardrobe.length > 0 && pane.wear === wardrobe.length
+    && wardrobe.every((field) => pane.wearFields.includes(field)) && pane.shot === 1;
   await p.click("#go", { force: true });
   await p.waitForTimeout(1300);
   // 전적 한 줄과 아는 얼굴 한 줄을 만든다. 빈 칸만 재면 갈렸는지를 알 수 없다.
@@ -216,6 +227,7 @@ try {
       // 라포 줄은 사람에게 붙은 버튼을 들고 있다. 그 버튼이 곧 그 칸의 표식이다.
       faces: box.querySelectorAll(".note .go").length,
       wear: box.querySelectorAll(".wear .on i").length,
+      wearFields: [...box.querySelectorAll(".wear .on i")].map((e) => e.dataset.wear),
       shot: box.querySelector(".wear .shot img") ? 1 : 0,
       // 첫 단. 누구를 보고 있는지가 초상과 이름과 레벨과 컨디션으로 선다.
       head: {
@@ -301,8 +313,27 @@ try {
   check("mepane:the-recent-rounds-stop-at-ten", seen.log.logs === 10, seen.log.logs + " rounds in the record pane");
   check("mepane:the-people-pane-holds-the-people", seen.face.faces > 0 && seen.stat.faces === 0 && seen.log.faces === 0,
     "stat " + seen.stat.faces + ", face " + seen.face.faces + ", log " + seen.log.faces);
-  check("mepane:the-wardrobe-stays-in-every-pane", TABS.every((id) => seen[id].wear === 8 && seen[id].shot === 1),
-    TABS.map((id) => id + " " + seen[id].wear + " lines, shot " + seen[id].shot).join(", "));
+  check("mepane:the-wardrobe-stays-in-every-pane", TABS.every((id) => wardrobeOk(seen[id])),
+    "shelves " + wardrobe.join(",") + "; "
+    + TABS.map((id) => id + " " + seen[id].wear + " lines, shot " + seen[id].shot).join(", "));
+  // 선반 한 줄을 실제 DOM에서 빼면 같은 판정식이 거부하고, 제자리에 돌려놓으면 통과해야 한다.
+  const removedWear = await p.evaluateHandle(() => {
+    const row = document.querySelector("#me .wear .on i");
+    const place = { row, parent: row.parentNode, next: row.nextSibling };
+    row.remove();
+    return place;
+  });
+  let missingWear;
+  try {
+    missingWear = await read();
+  } finally {
+    await removedWear.evaluate(({ row, parent, next }) => parent.insertBefore(row, next));
+    await removedWear.dispose();
+  }
+  const restoredWear = await read();
+  check("control:a-missing-shelf-row-reddens-the-wardrobe-axis",
+    wardrobeOk(seen.log) && !wardrobeOk(missingWear) && wardrobeOk(restoredWear),
+    "expected " + wardrobe.length + ", missing " + missingWear.wear + ", restored " + restoredWear.wear);
   // 720p에서 능력치가 하나도 접힘 아래로 안 내려가야 한다. 실측으로 열다섯 중 아홉만 보이던 자리다.
   // 이 축은 능력치가 늘어나는 날에도 운다. 칸이 늘면 격자나 창 높이가 같이 움직여야 한다는 뜻이다.
   check("mepane:every-stat-is-visible-without-scrolling", seen.stat.inView === seen.stat.stats,
