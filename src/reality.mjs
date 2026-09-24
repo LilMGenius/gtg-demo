@@ -212,3 +212,153 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
+
+// 세계은행 최신 비결측 연도의 국가별 Atlas GNI 원값이다. 도시 소득을 뜻하지 않는다.
+export const GNI_ARG = {
+  "units": "current US$",
+  "values": {
+    "year": 2025,
+    "income": 14650
+  },
+  "source": {
+    "name": "World Bank WDI, GNI per capita, Atlas method (Argentina)",
+    "url": "https://api.worldbank.org/v2/country/ARG/indicator/NY.GNP.PCAP.CD?format=json&mrnev=1",
+    "clause": "{\"indicator\":{\"id\":\"NY.GNP.PCAP.CD\",\"value\":\"GNI per capita, Atlas method (current US$)\"},\"country\":{\"id\":\"AR\",\"value\":\"Argentina\"},\"countryiso3code\":\"ARG\",\"date\":\"2025\",\"value\":14650,\"obs_status\":\"\",\"decimal\":0}",
+    "checked": "2026-09-25"
+  }
+};
+
+// 세계은행 최신 비결측 연도의 국가별 Atlas GNI 원값이다. 도시 소득을 뜻하지 않는다.
+export const GNI_BRA = {
+  "units": "current US$",
+  "values": {
+    "year": 2025,
+    "income": 10550
+  },
+  "source": {
+    "name": "World Bank WDI, GNI per capita, Atlas method (Brazil)",
+    "url": "https://api.worldbank.org/v2/country/BRA/indicator/NY.GNP.PCAP.CD?format=json&mrnev=1",
+    "clause": "{\"indicator\":{\"id\":\"NY.GNP.PCAP.CD\",\"value\":\"GNI per capita, Atlas method (current US$)\"},\"country\":{\"id\":\"BR\",\"value\":\"Brazil\"},\"countryiso3code\":\"BRA\",\"date\":\"2025\",\"value\":10550,\"obs_status\":\"\",\"decimal\":0}",
+    "checked": "2026-09-25"
+  }
+};
+
+// 세계은행 최신 비결측 연도의 국가별 Atlas GNI 원값이다. 도시 소득을 뜻하지 않는다.
+export const GNI_DEU = {
+  "units": "current US$",
+  "values": {
+    "year": 2025,
+    "income": 60200
+  },
+  "source": {
+    "name": "World Bank WDI, GNI per capita, Atlas method (Germany)",
+    "url": "https://api.worldbank.org/v2/country/DEU/indicator/NY.GNP.PCAP.CD?format=json&mrnev=1",
+    "clause": "{\"indicator\":{\"id\":\"NY.GNP.PCAP.CD\",\"value\":\"GNI per capita, Atlas method (current US$)\"},\"country\":{\"id\":\"DE\",\"value\":\"Germany\"},\"countryiso3code\":\"DEU\",\"date\":\"2025\",\"value\":60200,\"obs_status\":\"\",\"decimal\":0}",
+    "checked": "2026-09-25"
+  }
+};
+
+// 세계은행 최신 비결측 연도의 국가별 Atlas GNI 원값이다. 도시 소득을 뜻하지 않는다.
+export const GNI_ESP = {
+  "units": "current US$",
+  "values": {
+    "year": 2025,
+    "income": 37120
+  },
+  "source": {
+    "name": "World Bank WDI, GNI per capita, Atlas method (Spain)",
+    "url": "https://api.worldbank.org/v2/country/ESP/indicator/NY.GNP.PCAP.CD?format=json&mrnev=1",
+    "clause": "{\"indicator\":{\"id\":\"NY.GNP.PCAP.CD\",\"value\":\"GNI per capita, Atlas method (current US$)\"},\"country\":{\"id\":\"ES\",\"value\":\"Spain\"},\"countryiso3code\":\"ESP\",\"date\":\"2025\",\"value\":37120,\"obs_status\":\"\",\"decimal\":0}",
+    "checked": "2026-09-25"
+  }
+};
+
+// 세계은행 최신 비결측 연도의 국가별 Atlas GNI 원값이다. 도시 소득을 뜻하지 않는다.
+export const GNI_GBR = {
+  "units": "current US$",
+  "values": {
+    "year": 2025,
+    "income": 54550
+  },
+  "source": {
+    "name": "World Bank WDI, GNI per capita, Atlas method (United Kingdom)",
+    "url": "https://api.worldbank.org/v2/country/GBR/indicator/NY.GNP.PCAP.CD?format=json&mrnev=1",
+    "clause": "{\"indicator\":{\"id\":\"NY.GNP.PCAP.CD\",\"value\":\"GNI per capita, Atlas method (current US$)\"},\"country\":{\"id\":\"GB\",\"value\":\"United Kingdom\"},\"countryiso3code\":\"GBR\",\"date\":\"2025\",\"value\":54550,\"obs_status\":\"\",\"decimal\":0}",
+    "checked": "2026-09-25"
+  }
+};
+
+// 세계은행 최신 비결측 연도의 국가별 Atlas GNI 원값이다. 도시 소득을 뜻하지 않는다.
+export const GNI_JPN = {
+  "units": "current US$",
+  "values": {
+    "year": 2025,
+    "income": 38340
+  },
+  "source": {
+    "name": "World Bank WDI, GNI per capita, Atlas method (Japan)",
+    "url": "https://api.worldbank.org/v2/country/JPN/indicator/NY.GNP.PCAP.CD?format=json&mrnev=1",
+    "clause": "{\"indicator\":{\"id\":\"NY.GNP.PCAP.CD\",\"value\":\"GNI per capita, Atlas method (current US$)\"},\"country\":{\"id\":\"JP\",\"value\":\"Japan\"},\"countryiso3code\":\"JPN\",\"date\":\"2025\",\"value\":38340,\"obs_status\":\"\",\"decimal\":0}",
+    "checked": "2026-09-25"
+  }
+};
+
+// 세계은행 최신 비결측 연도의 국가별 Atlas GNI 원값이다. 도시 소득을 뜻하지 않는다.
+export const GNI_KOR = {
+  "units": "current US$",
+  "values": {
+    "year": 2025,
+    "income": 37880
+  },
+  "source": {
+    "name": "World Bank WDI, GNI per capita, Atlas method (Korea, Rep.)",
+    "url": "https://api.worldbank.org/v2/country/KOR/indicator/NY.GNP.PCAP.CD?format=json&mrnev=1",
+    "clause": "{\"indicator\":{\"id\":\"NY.GNP.PCAP.CD\",\"value\":\"GNI per capita, Atlas method (current US$)\"},\"country\":{\"id\":\"KR\",\"value\":\"Korea, Rep.\"},\"countryiso3code\":\"KOR\",\"date\":\"2025\",\"value\":37880,\"obs_status\":\"\",\"decimal\":0}",
+    "checked": "2026-09-25"
+  }
+};
+
+// 세계은행 최신 비결측 연도의 국가별 Atlas GNI 원값이다. 도시 소득을 뜻하지 않는다.
+export const GNI_NGA = {
+  "units": "current US$",
+  "values": {
+    "year": 2025,
+    "income": 1360
+  },
+  "source": {
+    "name": "World Bank WDI, GNI per capita, Atlas method (Nigeria)",
+    "url": "https://api.worldbank.org/v2/country/NGA/indicator/NY.GNP.PCAP.CD?format=json&mrnev=1",
+    "clause": "{\"indicator\":{\"id\":\"NY.GNP.PCAP.CD\",\"value\":\"GNI per capita, Atlas method (current US$)\"},\"country\":{\"id\":\"NG\",\"value\":\"Nigeria\"},\"countryiso3code\":\"NGA\",\"date\":\"2025\",\"value\":1360,\"obs_status\":\"\",\"decimal\":0}",
+    "checked": "2026-09-25"
+  }
+};
+
+// 세계은행 최신 비결측 연도의 국가별 Atlas GNI 원값이다. 도시 소득을 뜻하지 않는다.
+export const GNI_PRT = {
+  "units": "current US$",
+  "values": {
+    "year": 2025,
+    "income": 29930
+  },
+  "source": {
+    "name": "World Bank WDI, GNI per capita, Atlas method (Portugal)",
+    "url": "https://api.worldbank.org/v2/country/PRT/indicator/NY.GNP.PCAP.CD?format=json&mrnev=1",
+    "clause": "{\"indicator\":{\"id\":\"NY.GNP.PCAP.CD\",\"value\":\"GNI per capita, Atlas method (current US$)\"},\"country\":{\"id\":\"PT\",\"value\":\"Portugal\"},\"countryiso3code\":\"PRT\",\"date\":\"2025\",\"value\":29930,\"obs_status\":\"\",\"decimal\":0}",
+    "checked": "2026-09-25"
+  }
+};
+
+// 세계은행 최신 비결측 연도의 국가별 Atlas GNI 원값이다. 도시 소득을 뜻하지 않는다.
+export const GNI_QAT = {
+  "units": "current US$",
+  "values": {
+    "year": 2025,
+    "income": 74330
+  },
+  "source": {
+    "name": "World Bank WDI, GNI per capita, Atlas method (Qatar)",
+    "url": "https://api.worldbank.org/v2/country/QAT/indicator/NY.GNP.PCAP.CD?format=json&mrnev=1",
+    "clause": "{\"indicator\":{\"id\":\"NY.GNP.PCAP.CD\",\"value\":\"GNI per capita, Atlas method (current US$)\"},\"country\":{\"id\":\"QA\",\"value\":\"Qatar\"},\"countryiso3code\":\"QAT\",\"date\":\"2025\",\"value\":74330,\"obs_status\":\"\",\"decimal\":0}",
+    "checked": "2026-09-25"
+  }
+};
