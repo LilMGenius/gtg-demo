@@ -8,7 +8,7 @@ import { jitterMesh, seeded, addOutline, INK } from '../handmade.mjs';
 import { MARK_LINES, ARC_R, ARC_HALF, SPOT_Z, FAR_W } from './markspec.mjs';
 import { buildWalker, PASSER_VARIANTS } from './actors.mjs';
 import { skinAt } from '../../state/gear.mjs';
-import { PERSONAS, personaKindAt } from '../../state/passer.mjs';
+import { PERSONAS, personaKindAt, passerRosterAt } from '../../state/passer.mjs';
 
 // 사각 그물 한 장. wireframe 평면은 삼각형 대각선이 남아 그물이 아니라 격자무늬로 읽힌다.
 // 팽팽한 격자는 그물이 아니라 방충망이다. 가운데를 배가 부르게 늘어뜨려야 천으로 읽힌다.
@@ -548,20 +548,47 @@ export function buildPitch(scene) {
 // 소지품마다 메시를 세우면 열한 명이 예산을 통째로 먹는다. 실측: 옛 배치는 한 명이 4에서 7
 // 드로우콜을 썼고 번화가에서 134콜이었다. 몸통과 팔과 머리와 소지품을 한 지오메트리로 붙이면
 // 한 명이 셋이고, 얼굴이 붙는 0번만 넷이다.
-export function buildPassers(scene, count = 5) {
+// 소품과 몸 비율은 기존 무광 장난감 리그를 재사용한다. 개최국 색은 옷에만 섞고 피부와 체형에는 쓰지 않는다.
+function rosterLook(row){
+  const base=PASSER_VARIANTS.find(variant=>variant.id===row.id);
+  // 일상복 20%·외출복 55%의 개최지 색은 직업별 원래 색면을 남기면서 두 차림을 가른다.
+  const mix=row.clothing==='외출복'?0.55:0.2;
+  return {...base,shirt:new THREE.Color(base.shirt).lerp(new THREE.Color(row.shirt),mix).getHex(),
+    pants:new THREE.Color(base.pants).lerp(new THREE.Color(row.pants),mix).getHex()};
+}
+
+// 이동 좌표·라포 번호·향하던 방향을 보존하고 개최지가 바뀔 때 차림만 갈아입힌다.
+export function setPasserRoster(passers,tier,variant=0){
+  const rows=passerRosterAt(tier,variant,passers.length);
+  passers.forEach((body,i)=>{
+    const row=rows[i];if(body.userData.roster?.key===row.key)return;
+    const old=[];body.traverse(part=>{if(part.isMesh)old.push(part.geometry);});
+    body.clear();
+    const rig=buildWalker(rosterLook(row));
+    body.scale.copy(rig.root.scale).multiplyScalar(body.userData.bodyScale);
+    body.add(...rig.root.children.slice());rig.root=body;
+    Object.assign(body.userData,{walker:rig,head:rig.head,variantId:row.id,roster:row});
+    body.traverse(part=>{if(part.isMesh)part.userData.probeIgnore=true;});
+    // 공유 구·캡슐은 살아 있는 몸이 쓰므로 남기고 제거된 몸의 고유 기하만 해제한다.
+    const kept=new Set();body.parent.traverse(part=>{if(part.isMesh)kept.add(part.geometry);});
+    for(const geo of new Set(old))if(!kept.has(geo))geo.dispose();
+  });
+}
+
+export function buildPassers(scene, count = 5, tier = 0, variant = 0) {
   const passers = [], rnd = seeded(0x9a55e7); // 기존 배치 시드를 유지해 동네별 가시 인원 비교를 보존한다.
   // 판정의 번호와 이름은 그대로 두고 렌더 차림만 명시적으로 매핑한다.
-  const wardrobe = ['fashion','student','office','elder','jogger','delivery','tourist','office','tourist','elder','delivery'];
+  const wardrobe = passerRosterAt(tier,variant,count);
   for (let i = 0; i < count; i += 1) {
     const kind = personaKindAt(i), P = PERSONAS[kind];
-    const v = PASSER_VARIANTS.find(v => v.id === wardrobe[i % wardrobe.length]);
+    const v = rosterLook(wardrobe[i]);
     const rig = buildWalker(v), g = rig.root;
     const s = 0.92 + rnd() * 0.2; // 기존 원경 크기 분산만 유지하고 키트의 몸 비율은 보존한다.
     g.scale.multiplyScalar(s);
     const z = i === 0 ? 31.6 + rnd() * 1.8 : 26.8 + rnd() * 12.4; // 기존 배치 밴드로 골대 연출과 원근을 보존한다.
     const raw = -25 + i * 9.5 + (rnd() - 0.5) * 9.8; // 기존 불규칙 간격을 재사용한다.
     g.position.set(((raw + 42) % 84 + 84) % 84 - 42, 0, z); // 화면 밖 순환 구간을 보존한다.
-    Object.assign(g.userData,{walker:rig,head:rig.head,variantId:v.id,persona:kind,
+    Object.assign(g.userData,{walker:rig,head:rig.head,variantId:v.id,persona:kind,roster:wardrobe[i],bodyScale:s,
       speed:1.05+P.stride*0.95,phase:rnd()*Math.PI*2,homeZ:z,walkDistance:0,heading:Math.PI/2}); // 기존 속도는 유지하고 첫 방향은 +x 보행이다.
     g.rotation.y=g.userData.heading;
     g.traverse(m=>{if(m.isMesh)m.userData.probeIgnore=true;});

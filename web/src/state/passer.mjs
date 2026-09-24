@@ -1,4 +1,5 @@
 import { venueAt } from './gear.mjs';
+import { makeRng } from '../../../src/chain.mjs';
 
 // 행인 로스터는 판정 등급과 개최지 정보를 함께 읽는다. 인원과 기존 라포 번호는 그대로다.
 export function passerVenue(tier, variant = 0) { return venueAt(tier, variant); }
@@ -162,4 +163,73 @@ export function passerName(city, passer, tier) {
   const who = passerAt(city, passer);
   if (!who) return "행인 " + passer;
   return (Number(tier) || 0) >= 1 ? who.name : who.face;
+}
+
+// 차림 표의 순서는 보통 주민에서 눈길을 끄는 패션 순이다. 몸·소품 모형은 actors의 같은 id를 재사용한다.
+// 네 가중치는 인용 소득에서 얻은 제품 부유도 0~3의 연출 선택이며 실제 주민 비율이나 계층 통계가 아니다.
+export const PASSER_ROSTER = [
+  {id:'student',name:'학생',weights:[5,4,3,3]},
+  {id:'office',name:'직장인',weights:[3,4,5,5]},
+  {id:'delivery',name:'배달원',weights:[5,4,3,3]},
+  {id:'jogger',name:'운동객',weights:[3,4,5,4]},
+  {id:'tourist',name:'관광객',weights:[1,2,4,5]},
+  {id:'elder',name:'어르신',weights:[3,3,3,3]},
+  {id:'fashion',name:'패셔니스타',weights:[1,2,4,5]}
+];
+// 개최국별 두 옷 색은 실측이나 국적별 외모 가정이 아닌 제품 팔레트다. 피부색·체형·머리와 무관하다.
+export const COUNTRY_CLOTHES = {
+  kr:[0x597a99,0xc09571],br:[0xc29a49,0x639783],'gb-eng':[0x946468,0x6a8690],
+  jp:[0xa66c70,0x718494],pt:[0x788f6b,0xb9806c],de:[0x78859b,0xa5926b],
+  ar:[0x79a0b0,0xb6a78d],ng:[0x648a76,0xb49a69],es:[0xb27d67,0x7c8da4],qa:[0x9a747f,0xb5a581]
+};
+// 일상복과 외출복의 비중은 모든 주민 종류에 적용한다. 어떤 부유도에서도 두 차림의 가중치는 양수다.
+const CLOTHING_WEIGHTS=[[4,1],[3,2],[2,3],[1,4]];
+const pools=new Map();
+export function passerPoolAt(tier,variant=0){
+  const host=venueAt(tier,variant),key=host.name;
+  if(!pools.has(key)){
+    // 기본 일곱 종류에 시설 한 단계마다 차림 세 벌을 더한다. 두 벌씩 갖는 최대 열네 벌에서 멈춘다.
+    const size=Math.min(PASSER_ROSTER.length*2,PASSER_ROSTER.length+host.tier*3);
+    const palette=COUNTRY_CLOTHES[host.flag];
+    const pool=Array.from({length:size},(_,i)=>{
+      const person=PASSER_ROSTER[i%PASSER_ROSTER.length],clothing=Math.floor(i/PASSER_ROSTER.length);
+      const clothingWeight=CLOTHING_WEIGHTS[host.wealth][clothing];
+      return {key:host.flag+':'+host.tier+':'+host.wealth+':'+i,id:person.id,name:person.name,country:host.country,wealth:host.wealth,
+        clothing:clothing?'외출복':'일상복',clothingWeight,weight:person.weights[host.wealth]*clothingWeight,
+        shirt:palette[clothing],pants:clothing?0x454955:0x59616a}; // 무채색 두 바지는 상의와 소품의 구별을 남긴다.
+    });
+    pools.set(key,pool);
+  }
+  return pools.get(key);
+}
+
+// 저장된 관계 번호와 첫 네 페르소나의 실루엣을 보존하고 남은 자리를 독립된 시각 난수로 뽑는다.
+export function passerRosterAt(tier,variant=0,count=passerCountAt(tier)){
+  const host=venueAt(tier,variant),pool=passerPoolAt(tier,variant),left=[...pool],selected=[];
+  const anchors=['fashion','student','office','elder'];
+  // 기존 makeRng를 재사용한다. 도시 글자와 부유도로 만든 씨앗은 판정 스트림을 소비하지 않는다.
+  const rng=makeRng([...host.city].reduce((sum,char)=>sum+char.codePointAt(0),host.wealth));
+  for(let slot=0;slot<count;slot++){
+    let pick;
+    if(slot<anchors.length)pick=left.find(row=>row.id===anchors[slot]);
+    else {
+      const unused=left.filter(row=>!selected.some(chosen=>chosen.id===row.id));
+      // 새로운 주민 종류를 먼저 포함한 뒤, 남은 차림은 부유도별 가중치로 고른다.
+      const choices=unused.length?unused:left.length?left:pool;
+      let draw=rng()*choices.reduce((sum,row)=>sum+row.weight,0);
+      pick=choices.find(row=>(draw-=row.weight)<0)||choices.at(-1);
+    }
+    selected.push(pick);const at=left.indexOf(pick);if(at>=0)left.splice(at,1);
+  }
+  return selected;
+}
+
+// 국적·부유도 일치와 다종 주민 혼합은 실제 풀을 읽어 검사한다. 한 종류로 칠한 표는 항상 거절한다.
+export function passerPoolErrors(pool,host){
+  const errors=[];
+  if(!pool.length)errors.push('빈 풀');
+  if(new Set(pool.map(row=>row.id)).size<2)errors.push('단일 주민 종류');
+  if(pool.some(row=>row.country!==host.country||row.wealth!==host.wealth))errors.push('개최지 불일치');
+  if(pool.some(row=>!PASSER_ROSTER.some(person=>person.id===row.id)||!(row.weight>0)||!(row.clothingWeight>0)))errors.push('차림 가중치');
+  return errors;
 }
