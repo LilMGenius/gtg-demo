@@ -946,7 +946,19 @@ function ball(parent,color,pos,scale){const m=new T.Mesh(sphere,material(color))
 function capsule(parent,color,r,length,pos){const m=new T.Mesh(capsuleGeometry(r,length),material(color));m.position.set(...pos);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
 function group(parent,pos){const g=new T.Group();g.position.set(...pos);parent.add(g);return g;}
 function limb(parent,color,r){return capsule(parent,color,r,0.15,[0,0,0]);} // 중심 구간을 짧은 0.15 구간으로 만들어 늘려도 둥근 관절 끝이 납작해지지 않게 한다.
-function between(m,a,b,r){const av=new T.Vector3(...a),bv=new T.Vector3(...b);m.position.copy(av).add(bv).multiplyScalar(0.5);m.quaternion.setFromUnitVectors(up,bv.clone().sub(av).normalize());m.scale.y=(av.distanceTo(bv)+r)/(0.15+2*r);} // 반구를 포함한 0.15 구간의 전체 길이로 보정하고 반경만큼 겹쳐 관절 틈을 없앤다.
+function between(m,a,b,r){
+  const av=new T.Vector3(...a),bv=new T.Vector3(...b),distance=av.distanceTo(bv);
+  m.position.copy(av).add(bv).multiplyScalar(0.5); // 끝점 사이 중앙에 캡슐을 놓는다.
+  m.quaternion.setFromUnitVectors(up,bv.clone().sub(av).normalize());
+  const position=m.geometry.attributes.position;
+  const rest=m.userData.restLimb || (m.userData.restLimb=position.array.slice());
+  for(let i=0;i<position.count;i++){
+    const y=rest[i*3+1]; // XYZ 정점의 세 채널 중 세로 축만 늘린다.
+    position.setY(i,y+Math.sign(y)*(distance-r-0.15)/2); // 중심 길이 0.15를 늘리되 반경만큼 덜 연장해 끝이 관절을 덮으면서 발밑으로 뚫리지 않게 한다.
+  }
+  position.needsUpdate=true;
+  m.geometry.computeBoundingSphere();
+} // 캡슐 중심선이 관절 끝점까지 닿으므로 둥근 끝이 관절을 충분히 덮는다.
 export function buildWalker(v=PASSER_VARIANTS[0]){
   const root=new T.Group(), hips=group(root,[0,C.hip,0]), chest=group(hips,[0,C.chest-C.hip,0]); // 원점은 지면이고 골반과 가슴은 따로 회전한다.
   root.scale.set(v.width,v.height,v.width);
@@ -965,10 +977,10 @@ export function buildWalker(v=PASSER_VARIANTS[0]){
   ball(head,0x6b3e38,[0,-0.17,0.305],[0.072,0.022,0.025]); // 얇은 입은 얼굴에 검은 덩어리를 만들지 않는다.
   const arms=[],legs=[],feet=[];
   for(const side of [-1,1]){
-    const arm=limb(chest,v.shirt,C.arm),fore=limb(chest,v.skin,C.arm*0.92); // 소매와 맨팔은 두 마디로 나누어 접힌다.
-    const hand=ball(chest,v.prop==='gloves'?0xf6df8a:v.skin,[0,0,0],[0.145,0.17,0.135]); // 장갑은 얼굴보다 작고 손보다는 크다.
+    const arm=limb(chest,v.shirt,C.arm),fore=limb(chest,v.skin,C.arm*0.98); // 맨팔 반경을 소매의 98퍼센트로 두어 접합면의 깊이 충돌을 없애고 윤곽은 잇는다.
+    const hand=ball(chest,v.prop==='gloves'?0xf6df8a:v.skin,[0,0,0],[0.13,0.15,0.12]); // 손의 반축 0.13/0.15/0.12는 팔 반경에 맞춰 손목의 갑작스러운 부풀음을 줄인다.
     arms.push({side,arm,fore,hand});
-    legs.push({side,thigh:limb(root,v.pants,C.leg),shin:limb(root,v.pants,C.leg*0.85)}); // 짧고 두툼한 다리를 두 마디로 유지한다.
+    legs.push({side,thigh:limb(root,v.pants,C.leg),shin:limb(root,v.pants,C.leg)}); // 짧고 두툼한 다리를 두 마디로 유지한다.
     feet.push(ball(root,0x303b49,[side*0.19,C.foot,0.05],[0.16,C.foot,0.25])); // 넓은 신발은 접지와 전진 방향을 읽게 한다.
   }
   const accessory=group(chest,[0,0,0]);
@@ -1016,7 +1028,7 @@ export function poseWalker(rig,distance,{mode='walk',time=0,heading=0}={}){
     const x=side*(v.prop==='bag'?0.155:0.19); // 코트 걸음은 발 간격만 좁히고 신체 부위는 강조하지 않는다.
     feet[i].position.set(x,y,z);feet[i].userData.stance=stance;
     const knee=[x,0.41,z*0.5+0.12]; // 무릎은 앞쪽으로만 접혀 역관절을 막는다.
-    between(thigh,[x,C.hip,0],knee,C.leg);between(shin,knee,[x,y,z],C.leg*0.85); // 신발까지 끊기지 않는 두 마디다.
+    between(thigh,[x,C.hip,0],knee,C.leg);between(shin,knee,[x,y,z],C.leg); // 신발까지 끊기지 않는 두 마디다.
   }
   for(const {side,arm,fore,hand} of arms){
     const swing=Math.sin(phase+(side>0?Math.PI:0))*0.19; // 팔과 반대 다리가 함께 전진한다.
@@ -1027,7 +1039,7 @@ export function poseWalker(rig,distance,{mode='walk',time=0,heading=0}={}){
   }
   if(mode==='shuffle'){
     for(const f of feet){const old=f.position.z;f.position.z=0;f.position.x+=old;} // 셔플만 보폭 축을 옆으로 바꾼다.
-    for(let i=0;i<legs.length;i++){const l=legs[i],f=feet[i].position,k=[l.side*0.2,0.36,0.14];between(l.thigh,[l.side*0.19,C.hip,0],k,C.leg);between(l.shin,k,f.toArray(),C.leg*0.85);} // 옆으로 벌어진 발까지 무릎을 다시 연결한다.
+    for(let i=0;i<legs.length;i++){const l=legs[i],f=feet[i].position,k=[l.side*0.2,0.36,0.14];between(l.thigh,[l.side*0.19,C.hip,0],k,C.leg);between(l.shin,k,f.toArray(),C.leg);} // 옆으로 벌어진 발까지 무릎을 다시 연결한다.
   }
   if(mode==='dive')root.rotation.z=-Math.PI*0.43; // 수평에 가까운 옆다이빙이며 발이 손을 따라가는 실루엣이다.
   root.updateMatrixWorld(true);
