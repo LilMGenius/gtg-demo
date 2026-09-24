@@ -1029,8 +1029,8 @@ export function buildWalker(v=PASSER_VARIANTS[0]){
 export function poseWalker(rig,distance,{mode='walk',time=0,heading=0}={}){
   const {root,hips,chest,head,arms,legs,feet,v}=rig;
   const cycle=distance/C.stride,phase=cycle*Math.PI*2; // 한 주기의 이동 거리를 보폭에 묶는다.
-  const sway=Math.sin(phase)*0.045; // 작게 흔들어 허리보다 전신 리듬을 보이게 한다.
-  root.rotation.set(0,heading,0);hips.rotation.set(0,sway,0);chest.rotation.set(0,-sway*1.4,-sway*0.4); // 가슴은 골반 반대 방향으로 돌아간다.
+  const sway=Math.sin(phase)*0.11; // 0.11의 골반 기울기로 작은 화면에서도 디딤 쪽 체중 이동을 읽게 한다.
+  root.rotation.set(0,heading,0);hips.rotation.set(0,sway,sway);chest.rotation.set(0,-sway*1.4,-sway*2); // 부모 골반 기울기를 상쇄한 뒤 같은 크기로 어깨가 반대 기울기를 갖게 두 배 역회전한다.
   head.rotation.z=Math.exp(-time*2.8)*Math.sin(time*10)*0.09+sway*0.3; // 감쇠율은 삼 초 안에 잔동작이 가라앉는 범위다.
   rig.accessory.rotation.z=Math.exp(-time*2.4)*Math.sin(time*8)*0.08-sway; // 소품은 머리보다 느리게 뒤따른다.
   for(let i=0;i<legs.length;i++){
@@ -1042,10 +1042,11 @@ export function poseWalker(rig,distance,{mode='walk',time=0,heading=0}={}){
     const x=side*(v.prop==='bag'?0.155:0.19); // 코트 걸음은 발 간격만 좁히고 신체 부위는 강조하지 않는다.
     feet[i].position.set(x,y,z);feet[i].userData.stance=stance;
     const knee=[x,0.41,z*0.5+0.12]; // 무릎은 앞쪽으로만 접혀 역관절을 막는다.
-    between(thigh,[x,C.hip,0],knee,C.leg);between(shin,knee,[x,y,z],C.leg); // 신발까지 끊기지 않는 두 마디다.
+    const hip=new T.Vector3(x,0,0).applyEuler(hips.rotation).add(hips.position); // 기운 골반에 허벅지 시작점을 붙이고 발의 지면 궤적은 보존한다.
+    between(thigh,hip.toArray(),knee,C.leg);between(shin,knee,[x,y,z],C.leg); // 신발까지 끊기지 않는 두 마디다.
   }
   for(const {side,arm,fore,hand} of arms){
-    const swing=Math.sin(phase+(side>0?Math.PI:0))*0.19; // 팔과 반대 다리가 함께 전진한다.
+    const swing=Math.sin(phase+(side>0?Math.PI:0))*0.34; // 팔의 이동폭을 0.34로 키워 반대 다리와 함께 전진하는 외곽선을 드러낸다.
     const elbow=[side*0.43,-0.22,swing],end=[side*0.47,-0.5,swing*1.3]; // 팔을 몸에서 조금 벌려 외곽선을 유지한다.
     if(mode==='shuffle'){elbow[2]=0.25;end[1]=-0.05;end[2]=0.43;} // 셔플은 장갑을 앞에 들고 공을 향한다.
     if(mode==='dive'){elbow[0]=side*0.3;elbow[1]=0.9;end[0]=side*0.24;end[1]=1.45;end[2]=0.12;} // 누운 몸의 머리 위로 양손이 함께 뻗는다.
