@@ -3,6 +3,7 @@
 
 // 장갑 선반. 0번은 파는 물건이 아니라 아무것도 안 산 사람이 이미 끼고 있는 것이다.
 import { faceOf } from '../../../src/roster.mjs';
+import { GNI_KOR, GNI_BRA, GNI_GBR, GNI_JPN, GNI_PRT, GNI_DEU, GNI_ARG, GNI_NGA, GNI_ESP, GNI_QAT } from '../../../src/reality.mjs';
 
 // 값은 이적시장 380 골드를 기준으로 잡았다. 첫 칸은 그보다 싸야 처음 지르는 자리가 되고,
 // 마지막 칸은 그보다 비싸야 이적시장이 선반에서 밀려나지 않는다.
@@ -190,13 +191,13 @@ export const MAX_FRAME = GOALS.length - 1;
 // sky는 하늘색, haze는 안개색이다. 골대의 그물 값과 같은 이유로 렌더가 아니라 여기 있다.
 // 등급이 오를수록 하늘이 옅고 뿌예진다. 뒷산은 파랗고 번화가는 먼지가 낀다.
 export const CITIES = [
-  { city: 0, name: '동네 뒷산 공터', cost: 0, note: '아무것도 안 샀을 때 서 있는 곳. 지나가는 사람이 거의 없다',
+  { city: 0, name: '동네 운동장', cost: 0, note: '아무것도 안 샀을 때 서 있는 곳. 지나가는 사람이 거의 없다',
     ground: 0x9c7a4a, fence: 0x3f6b4a, rise: 0.55 },
-  { city: 1, name: '학교 앞 흙 운동장', cost: 145, note: '하교 시간에 사람이 지나간다. 가끔 고개가 돌아간다',
+  { city: 1, name: '풋살장', cost: 145, note: '하교 시간에 사람이 지나간다. 가끔 고개가 돌아간다',
     ground: 0xa8763f, fence: 0x6b6f5a, rise: 0.8 },
-  { city: 2, name: '역세권 풋살장', cost: 385, note: '유동인구가 많다. 막으면 소문이 빨리 난다',
+  { city: 2, name: '잔디 축구장', cost: 385, note: '유동인구가 많다. 막으면 소문이 빨리 난다',
     ground: 0x4a7a46, fence: 0x8a9099, rise: 1.1 },
-  { city: 3, name: '번화가 한복판 코트', cost: 860, note: '사방이 사람이다. 팔로워도 실점도 같이 는다',
+  { city: 3, name: '프로 경기장', cost: 860, note: '사방이 사람이다. 팔로워도 실점도 같이 는다',
     ground: 0x585d64, fence: 0xb0b6bd, rise: 1.55 }
 ];
 
@@ -226,6 +227,33 @@ export const CITY_SKINS = [
    { name: '노을 지는 저녁', tone: 0xcc9f7d, sky: 0xcc9f7d, haze: 0xd9b89c },
    { name: '비 오기 직전', tone: 0x81888e, sky: 0x81888e, haze: 0x9aa1a6 }]
 ];
+
+// HOTL: balance의 레벨 7 선방률 22.89%와 제품의 다섯 슛당 한 레벨에서 첫 일곱 판은 약 여덟 세이브다.
+// 첫 세션 문은 레벨 8·세이브 8·팔로워 300으로 시험한다. 150세이브는 같은 곡선에서 약 131판이라 첫 문에 맞지 않는다.
+// 뒤의 두 문은 브리프의 HOTL 시작값(16/600/2000, 24/2000/10000)을 유지해 장기 기록을 요구한다.
+const VENUE_REQUIREMENTS = [[], [8, 8, 300], [16, 600, 2000], [24, 2000, 10000]];
+const VENUE_MODES = [[], ['풋살 5대5'], ['중거리 슛', '코너킥 헤딩', '프리킥', '11대11'], ['프로 리그']];
+CITIES.forEach((venue, rank) => {
+  venue.subtitle = ['골대 뒤 연습 골대', '', '11인제 아마추어 경기', ''][rank];
+  venue.shipped = rank ? '승부차기' : '페널티킥 연습';
+  venue.coming = VENUE_MODES[rank];
+  venue.conditions = VENUE_REQUIREMENTS[rank].map((min, i) => ({ key: ['level', 'saves', 'fans'][i], min }));
+});
+
+// HOTL 제품 구간: 1만2천 미만·3만 미만·7만 미만·그 이상을 0~3으로 나눈다. 세계은행 소득분류나 도시 실측이 아니다.
+export function wealthBand(income) { return income < 12000 ? 0 : income < 30000 ? 1 : income < 70000 ? 2 : 3; }
+// 도시와 개최국은 변형의 기존 순서에 붙인다. 잉글랜드 개최지의 소득 표본은 국가 단위인 영국이다.
+const HOSTS = [
+  [['서울', '대한민국', 'kr', GNI_KOR], ['리우데자네이루', '브라질', 'br', GNI_BRA], ['맨체스터', '잉글랜드', 'gb-eng', GNI_GBR]],
+  [['도쿄', '일본', 'jp', GNI_JPN], ['리스본', '포르투갈', 'pt', GNI_PRT], ['부산', '대한민국', 'kr', GNI_KOR]],
+  [['뮌헨', '독일', 'de', GNI_DEU], ['부에노스아이레스', '아르헨티나', 'ar', GNI_ARG], ['라고스', '나이지리아', 'ng', GNI_NGA]],
+  [['런던', '잉글랜드', 'gb-eng', GNI_GBR], ['마드리드', '스페인', 'es', GNI_ESP], ['도하', '카타르', 'qa', GNI_QAT]]
+];
+CITY_SKINS.forEach((skins, tier) => skins.forEach((skin, variant) => {
+  const [city, country, flag, income] = HOSTS[tier][variant];
+  Object.assign(skin, { time: skin.name, name: CITIES[tier].name + ' · ' + city, tier, city, country, flag, wealth: wealthBand(income.values.income), income });
+}));
+export function venueAt(tier, variant = 0) { return skinAt('city', tier, variant); }
 
 export const MAX_CITY = CITIES.length - 1;
 
@@ -376,6 +404,7 @@ export function rememberCosmetic(worn, field, rank) {
 export function newGear() {
   const g = { grip: 0, studs: 0, pads: 0, socks: 0, frame: 0, city: 0, hair: 0, beard: 0, ink: 0 };
   for (const f of SKIN_FIELDS) g[f + 'Skin'] = 0;
+  g.venueUnlocked = [0];
   return g;
 }
 
@@ -383,7 +412,7 @@ export function newGear() {
    장갑을 낀 것은 그 사람이지만 골대와 동네는 누가 뛰든 같은 곳이라, 키퍼를 바꿨을 때
    앞의 여섯은 따라 바뀌고 뒤의 둘은 그대로여야 한다. */
 const WORN_BASE = ['grip', 'studs', 'pads', 'socks', 'hair', 'beard', 'ink'];
-const PLACE_BASE = ['frame', 'city'];
+const PLACE_BASE = ['frame', 'city', 'venueUnlocked'];
 // 변형 칸은 그 등급 칸을 따라간다. 몸에 걸치는 것의 변형은 키퍼의 것이고 자리의 변형은 계정의 것이라,
 // 이 둘이 갈리지 않으면 키퍼를 바꿀 때 하늘색이 같이 따라 바뀐다.
 export const WORN_FIELDS = WORN_BASE.concat(SKIN_FIELDS.filter((f) => WORN_BASE.indexOf(f) >= 0).map((f) => f + 'Skin'));
@@ -412,6 +441,8 @@ export function readGear(raw) {
     const v = raw[f + 'Skin'];
     if (Number.isFinite(v)) g[f + 'Skin'] = Math.max(0, Math.min(skinsAt(f, g[f]).length - 1, Math.floor(v)));
   }
+  // 기존에 산 경기장은 기록이 없어도 열려 있다. 통과 기록은 계정 자리 저장을 따른다.
+  g.venueUnlocked = [...new Set([0, g.city, ...(Array.isArray(raw.venueUnlocked) ? raw.venueUnlocked.filter(v => Number.isInteger(v) && v >= 0 && v <= MAX_CITY) : [])])];
   return g;
 }
 
