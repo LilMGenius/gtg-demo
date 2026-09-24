@@ -479,7 +479,8 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
   // 이 넷은 움직이지 않으므로 정점색 한 장으로 붙인다.
   // 껍데기 각과 배율을 등급이 정한다. 색만 바꾸면 네 값이 같은 실루엣을 판다.
   const cut = hairCut || { wide: 1, tall: 1, phi: 0.42, tilt: 0 };
-  const hair = new THREE.SphereGeometry(r * 1.05, 10, 8, 0, Math.PI * 2, 0, Math.PI * cut.phi);
+  // 늘린 머리도 입 높이 아래로 내려오지 않는다. 반지름 1.05배는 위의 기존 껍데기 두께다.
+  const hair = new THREE.SphereGeometry(r * 1.05, 10, 8, 0, Math.PI * 2, 0, Math.min(Math.PI * cut.phi, Math.acos(mouth.position.y / (r * 1.05 * cut.tall))));
   // 좌우로 죄면 볏이 되고 위로 늘리면 기른 머리가 된다. z는 그대로 둬야 뒤통수를 계속 덮는다.
   hair.scale(cut.wide, cut.tall, 1);
   // 집에서 깎은 머리는 한쪽이 눌린다. 라디안이라 0.07이면 4도쯤이다.
@@ -523,8 +524,8 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
       g.scale(1, 1, c.rad);
       g.translate(0, -r * 0.06, 0);
       shellGeos.push(g);
-      // 수염은 머리보다 한 단 어둡다. 같은 색이면 턱과 머리가 한 덩어리로 붙는다.
-      shellColors.push(hairTone === undefined ? 0x1c1712 : hairTone);
+      // 수염은 독립된 짙은 갈색이다. 기존 기본색을 유지해 염색이 턱으로 새지 않는다.
+      shellColors.push(0x1c1712);
     }
   }
   // 뒤로 묶은 머리. 뒤통수에서 뒤로 뻗는 덩어리 하나면 실루엣이 갈린다.
