@@ -21,15 +21,15 @@ export const SHELF_WORDS = {
 };
 
 export const AXIS_WORD = {
-  tear: '장갑이 벗겨지는 사고',
-  spill: '손에서 흘리는 사고',
-  delay: '첫 발이 뜨는 데 걸리는 시간',
-  carry: '정면 강슛에 같이 밀려 들어가는 사고',
-  landing: '착지에 실패하는 사고',
-  neteat: '그물이 공을 먼저 먹는 확률',
-  gaze: '눈에 띄는 행인이 지나갈 확률',
-  passer: '동네에 서 있는 행인 수',
-  crowd: '소문이 퍼지는 배율'
+  tear: '장갑 벗겨짐',
+  spill: '흘림',
+  delay: '첫발 지연',
+  carry: '강슛 밀림',
+  landing: '착지 실수',
+  neteat: '그물 흡수',
+  gaze: '행인 등장',
+  passer: '행인 수',
+  crowd: '팔로워 배율'
 };
 // 축마다 단위가 다르다. 확률은 %p, 시간은 ms, 사람은 명이다.
 export const AXIS_UNIT = { delay: 'ms', passer: '명', crowd: '%', tear: '%p', spill: '%p', carry: '%p', landing: '%p', neteat: '%p' };

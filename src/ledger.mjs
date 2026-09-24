@@ -12,11 +12,13 @@ export const INPUT_CAUSES = ["direction", "timing", "greed", "position"];
 export const LEDGER = STAT_CAUSES.concat(INPUT_CAUSES);
 
 // 화면에 뜨는 이름. 자막이 부르는 스탯 이름과 로그가 돌려주는 원인이 같아야 한다.
+// 위치 선정과 키커 이름은 FC Online 한국어 표기를 따른다. 고유 능력과 저장 키는 유지한다.
+// 출처: https://m.fconline.nexon.com/datacenter/playerinfo?spid=863228010
 export const CAUSE_LABEL = {
   diving: "다이빙",
   handling: "핸들링",
   reflex: "반응속도",
-  offball: "오프더볼",
+  offball: "위치 선정",
   judgement: "판단력",
   agility: "민첩성",
   balance: "밸런스",
@@ -28,9 +30,9 @@ export const CAUSE_LABEL = {
   goalKick: "골킥",
   throwing: "스로잉",
   communication: "의사소통",
-  kickerFinishing: "키커 골결정력",
-  kickerPower: "키커 슛파워",
-  kickerCurve: "키커 슛커브",
+  kickerFinishing: "골 결정력",
+  kickerPower: "슛 파워",
+  kickerCurve: "커브",
   direction: "방향",
   position: "자리",
   timing: "타이밍",
