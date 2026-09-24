@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { PULL_KINDS, PULL_BULK, PULL_BONUS, KEEPERS, KICKERS, poolFor } from '../src/roster.mjs';
 import { clearDraw } from './draw.mjs';
 
-// 요청한 데스크톱·세로 폰 크기이며 배율 1과 JPEG 85는 원본 글자를 유지하면서 증거 용량을 줄인다.
-const SIZES = [[1280, 720], [390, 844]], QUALITY = 85;
+// 요청한 데스크톱과 두 가로 폰 크기이며 배율 1과 JPEG 85는 원본 글자를 유지하면서 증거 용량을 줄인다.
+const SIZES = [[1280, 720], [844, 390], [740, 360]], QUALITY = 85;
 // CSS 응답 160ms 뒤의 안정 프레임을 읽는 여유다. 8도는 PORT의 기울임 상한이다.
 const SETTLE = 220, MAX_TILT = 8;
 // 부족분과 정가가 서로 다른 양수 표본이며 충분 잔고는 기존 rich 프리셋과 같은 규모다.
@@ -25,7 +25,7 @@ const browser = await chromium.launch({ executablePath: exe, headless: true });
 report.chrome = await browser.version();
 try {
   for (const [width, height] of SIZES) {
-    // 경기는 가로 시작 계약을 따르고 상점을 연 뒤 세로로 돌리는 실제 경로를 잰다.
+    // 경기와 상점 모두 같은 가로 화면 계약으로 연다. 세로 안내는 orientation 게이트가 잰다.
     const page = await browser.newPage({ viewport: { width: Math.max(width, height), height: Math.min(width, height) }, deviceScaleFactor: 1 });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.goto(base); await page.locator('#go').click({ force: true }); await clearDraw(page);

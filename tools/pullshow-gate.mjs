@@ -1038,6 +1038,9 @@ try {
       && m.onTap && n.onTap && m.clash.length === 0 && n.clash.length === 0;
     const cornerWide = await labelAt(1280, 720);
     const cornerTight = await labelAt(740, 360);
+    // 추가 가로 크기에도 같은 귀·적중·겹침 판정을 적용한다.
+    const cornerPhone = await labelAt(844, 390);
+    check('ux:the-advance-label-keeps-its-corner-at-844', sameCorner(cornerWide, cornerPhone), labelPair(cornerWide, cornerPhone));
     check("ux:the-advance-label-stands-in-the-same-corner-at-both-viewports",
       sameCorner(cornerWide, cornerTight), labelPair(cornerWide, cornerTight));
     /* 대조군. 좁은 폭에서만 글자를 아래로 붙이면 두 폭의 귀가 갈려 위 축이 빨개져야 하고, 걷으면
@@ -1054,12 +1057,14 @@ try {
 
     const wide = await plateAt(1280, 720);
     const tight = await plateAt(740, 360);
+    const phone = await plateAt(844, 390);
     const plateSay = (x) => (x ? x.vw + "x" + x.vh : "unmeasured");
     const plateFlat = (x) => Boolean(x) && Boolean(x.ink) && x.ink.n > 0 && x.ink.off === 0;
     const statNear = (x) => Boolean(x) && x.rows.length === STAT_ROWS
       && x.rows.every((r) => r.gap <= x.gap2 * 2);
     const faceClear = (x) => Boolean(x) && x.plateTop > x.headBottom;
     const pair = (f) => [wide, tight].map(f).join(" | ");
+    check('pullshow:the-844-plate-preserves-name-stats-and-face', plateFlat(phone) && statNear(phone) && faceClear(phone), JSON.stringify(phone));
     check("pullshow:the-name-sits-on-a-plate-not-on-the-artwork",
       plateFlat(wide) && plateFlat(tight),
       pair((x) => (!x ? "unmeasured" : plateSay(x) + " " + x.ink.off + " of " + x.ink.n

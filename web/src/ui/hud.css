@@ -1452,7 +1452,5 @@ body { word-break: keep-all; overflow-wrap: break-word; }
 #shop .legend-showcase .player h3{color:var(--ink)}
 /* 520px 아래는 한 열에 전신을 유지한다. 포장 142×188과 무대 204는 세로 폰의 약속 공간을 남긴다. */
 @media(max-width:520px){#shop .pack-stage{height:204px}#shop .pack-art{width:142px;height:188px}#shop .legend-showcase .players{grid-template-columns:1fr}#shop .legend-showcase .player img{height:262px}}
-/* 세로 팩 진열은 회전 안내 뒤에 가리지 않는다. 경기 화면의 회전 계약은 그대로 둔다. */
-body:has(#shop:not([hidden]) :is(.pack-card,.legend-showcase)) #rotate{display:none}
 /* 감소 동작은 대기·조작·금테 모두 멈추며 초점 윤곽은 유지한다. */
 @media(prefers-reduced-motion:reduce){#shop .pack-card *,#shop .pack-card *::before,#shop .legend-showcase *,#shop .legend-showcase *::before{animation:none!important;transition:none!important}#shop .pack-art:is(:hover,:focus-visible){transform:none}#shop .pack-card .foil::before{transform:none;opacity:0}}
