@@ -486,7 +486,11 @@ export function buildPitch(scene) {
   let lastRise = 1;
   const applyRise = () => {
     for (const o of scene.children) {
-      if (o.name === 'skyline' || o.name === 'skyline-back') o.scale.y = lastRise;
+      if (o.name === 'skyline' || o.name === 'skyline-back') {
+        o.scale.y = lastRise;
+        // 경기장 앞쪽은 시설의 교사동과 관람석이 맡고 타이틀 뒤쪽 도시는 그대로 둔다.
+        o.visible = o.name === 'skyline-back';
+      }
     }
   };
   // GLB가 서면 이 사본도 GLB 사본으로 갈린다. loadDecor가 여기를 본다.
@@ -518,6 +522,8 @@ export function buildPitch(scene) {
       // 이름이 말하는 장소가 화면에도 서야 한다. 색만 갈던 동안 공터와 번화가가 같은 빈 벌판이었다.
       // 등급 번호는 선반 데이터가 들고 있다. 여기서 순서를 다시 세면 상점 카드와 경기장이 갈린다.
       props.geometry = placeGeo(place.city);
+      // 잔디 구장부터는 관람석이 경계이므로 행인 앞의 공용 철망을 걷는다.
+      fence.visible = place.city < 2;
       ground.material.color.setHex(place.ground);
       // 마모는 텍스처의 넓은 패치가 소유한다. 판 전체를 밝히면 네모 경계가 생긴다.
       box.material.color.copy(ground.material.color);
