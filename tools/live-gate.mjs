@@ -264,12 +264,20 @@ async function phoneRound(url, control = false, requiredLogin = false) {
     for (let tap = 0; tap < 5; tap += 1) {
       result.balls = await page.locator("#pips i.gone, #pips i.save").count();
       if (result.balls === 5) break;
-      await page.waitForFunction(() => document.querySelectorAll(".zone.live").length === 3,
+      await page.waitForFunction(() => document.querySelectorAll(".move-arrow.live").length === 2,
         null, { timeout: STEP_MS });
       const before = await page.locator("#pips i.gone, #pips i.save").count();
       if (await page.locator("#lv").innerText() !== "Lv 1") throw new Error("missed the first round");
       console.log(`phone ${control ? "control" : "live"} beforeTap=${before}/5`);
-      await page.locator(`.zone[data-dive='${[-1, 0, 1, -1, 0][tap]}']`).tap();
+      // 터치는 방향을 고르지 않고 누르는 동안 위치를 옮긴다.
+      const arrow = page.locator('.move-arrow[data-move="' + (tap % 2 ? 1 : -1) + '"]');
+      const box = await arrow.boundingBox();
+      const touch = await context.newCDPSession(page);
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }] });
+      // 반 초 홀드는 P15 이동 속도 검증과 같은 실제 엄지 입력이다.
+      await page.waitForTimeout(500);
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await touch.detach();
       await page.waitForFunction((n) => document.querySelectorAll("#pips i.gone, #pips i.save").length > n,
         before, { timeout: STEP_MS });
       result.balls = await page.locator("#pips i.gone, #pips i.save").count();

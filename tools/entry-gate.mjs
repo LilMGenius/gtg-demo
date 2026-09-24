@@ -243,7 +243,7 @@ try {
   check("ux:the-condition-change-is-announced-once", steps.every((s) => s.ok), saySteps(steps));
   /* 대조군. 살아 있다는 표시를 떼면 이 축이 빨개져야 한다. 안 그러면 이 축은 자리가 있다는 것만 재고 있다. */
   const pulled = await p.evaluate(() => {
-    const n = document.querySelector("#pad [aria-live]");
+    const n = document.querySelector("#movement [aria-live]");
     if (!n) return false;
     n.dataset.was = n.getAttribute("aria-live");
     n.removeAttribute("aria-live");
@@ -255,7 +255,7 @@ try {
   const pulledHeard = await reap();
   const pulledName = await chipName();
   await p.evaluate(() => {
-    const n = document.querySelector("#pad [data-was]");
+    const n = document.querySelector("#movement [data-was]");
     if (!n) return;
     n.setAttribute("aria-live", n.dataset.was);
     delete n.dataset.was;
@@ -349,9 +349,9 @@ try {
      내리고 잰다. 세는 것은 콜백이 아니라 기록이다. 한 호출 안의 두 번 쓰기는 콜백 하나로 묶여 온다. */
   await shut();
   await p.evaluate(() => window.__resumeRound());
-  await p.waitForFunction(() => document.querySelectorAll(".zone.live").length === 3, null, { timeout: 20000 });
-  await p.click('.zone[data-dive="0"]', { force: true });
-  await p.waitForFunction(() => document.querySelectorAll(".zone.live").length === 0, null, { timeout: 20000 });
+  await p.waitForFunction(() => document.querySelectorAll(".move-arrow.live").length === 2, null, { timeout: 20000 });
+  await p.click('.move-arrow[data-move="-1"]', { force: true });
+  await p.waitForFunction(() => document.querySelectorAll(".move-arrow.live").length === 0, null, { timeout: 20000 });
   await p.evaluate(() => window.__lockRound());
   await p.evaluate(() => window.__form(0.9));
   await p.waitForTimeout(160);
@@ -378,7 +378,7 @@ try {
     return new Promise((res) => setTimeout(() => {
       for (const mo of mos) mo.disconnect();
       out.after = document.getElementById("form").getAttribute("aria-label") || "";
-      out.pad = document.getElementById("pad").getAttribute("aria-label") || "";
+      out.pad = document.getElementById("movement").getAttribute("aria-label") || "";
       res(out);
     }, 400));
   });

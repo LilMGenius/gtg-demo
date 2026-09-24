@@ -9,7 +9,7 @@ import { chromium } from "playwright";
 // 그래서 가로인지부터 확인하고, 세로일 때 돌려 달라는 안내가 서는지를 대조군으로 둔다.
 // 표본 범위: 판정을 안 부른다. 한 프레임의 배치만 재므로 키퍼 표본이 결론을 안 바꾼다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
+const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const LINE = String.fromCharCode(10);
 const W = 1280, H = 720;
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
@@ -36,7 +36,7 @@ try {
   // 착탄 뒤에 재면 자는 이미 사라져 있고, 킥 전에 재면 공이 발밑에 붙어 있다.
   /* 프레임 수로 세면 그날의 비행시간에 따라 착탄 뒤에 서기도 한다. 자가 떠 있는 동안을
      조건으로 걸어 그 창 안에서 세운다. 자는 킥과 함께 서고 착탄 260ms 뒤에 접힌다. */
-  await p.waitForFunction(() => document.getElementById("beat").hidden === false, null, { timeout: 20000 });
+  await p.waitForFunction(() => window.__position().phase === 'wait', null, { timeout: 20000 });
   await p.waitForTimeout(120);
   await p.evaluate(() => window.__fixedStep(0.000001));
   await p.waitForTimeout(200);
@@ -47,15 +47,15 @@ try {
     const goal = window.__goalFrame();
     const head = window.__headAt();
     const hv = window.__project(head.x, head.y, head.z);
-    const lane = document.getElementById("beat");
-    const hot = lane.querySelector(".hot");
+    const lane = document.querySelector(".move-arrow");
+    const hot = lane;
     const r = (e) => { const q = e.getBoundingClientRect(); return { left: q.left, top: q.top, right: q.right, bottom: q.bottom, w: q.width, h: q.height }; };
-    return { ball: v, goal, keeper: hv, laneHidden: lane.hidden, lane: r(lane), hot: r(hot),
+    return { ball: v, goal, keeper: hv, laneHidden: !lane.classList.contains("live"), lane: r(lane), hot: r(hot),
       rotate: getComputedStyle(document.getElementById("rotate")).display,
-      pad: [...document.querySelectorAll("#pad .zone")].map(r) };
+      pad: [...document.querySelectorAll("#movement .move-arrow")].map(r) };
   });
 
-  check("instrument:the-frame-was-caught-mid-flight", seen.laneHidden === false,
+  check("instrument:the-frame-was-caught-during-positioning", seen.laneHidden === false,
     "lane " + (seen.laneHidden ? "hidden" : "up"));
   check("frame:the-goal-mouth-fills-the-shot", seen.goal.widthFrac >= 0.5 && seen.goal.widthFrac <= 1,
     (seen.goal.widthFrac * 100).toFixed(1) + "% of the width");
@@ -66,16 +66,16 @@ try {
     "ndc " + seen.ball.x.toFixed(2) + "," + seen.ball.y.toFixed(2));
   check("frame:the-keeper-is-in-the-shot", Math.abs(seen.keeper.x) <= 1 && Math.abs(seen.keeper.y) <= 1,
     "ndc " + seen.keeper.x.toFixed(2) + "," + seen.keeper.y.toFixed(2));
-  check("frame:the-timing-lane-is-in-the-shot", inside(seen.lane) && seen.hot.w > 4,
+  check("frame:the-arrow-is-in-the-shot", inside(seen.lane) && seen.hot.w > 4,
     "lane " + Math.round(seen.lane.left) + ".." + Math.round(seen.lane.right) + ", band " + Math.round(seen.hot.w) + "px");
   // 자가 공이나 골문 위에 앉으면 한 장에 들어온 것이 아니라 서로를 가린 것이다.
   const ballPx = { x: (seen.ball.x * 0.5 + 0.5) * W, y: (-seen.ball.y * 0.5 + 0.5) * H };
   const over = ballPx.x >= seen.lane.left && ballPx.x <= seen.lane.right
     && ballPx.y >= seen.lane.top && ballPx.y <= seen.lane.bottom;
-  check("frame:the-lane-does-not-sit-on-the-ball", !over,
+  check("frame:the-arrow-does-not-sit-on-the-ball", !over,
     "ball at " + Math.round(ballPx.x) + "," + Math.round(ballPx.y) + " lane top " + Math.round(seen.lane.top));
-  check("frame:the-three-zones-cover-the-width",
-    seen.pad.length === 3 && Math.abs(seen.pad[0].left) < 2 && Math.abs(seen.pad[2].right - W) < 2,
+  check("frame:the-two-arrows-occupy-thumb-corners",
+    seen.pad.length === 2 && seen.pad.every(z => inside(z) && z.w >= 48 && z.h >= 48) && seen.pad[0].right < W / 2 && seen.pad[1].left > W / 2,
     seen.pad.map((z) => Math.round(z.w)).join("+") + " over " + W);
   check("control:landscape-hides-the-turn-notice", seen.rotate === "none", seen.rotate);
 

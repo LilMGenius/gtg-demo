@@ -12,9 +12,10 @@ const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000
 t.unref();
 
 // 손가락이 닿는 최소 크기. 애플과 구글이 각각 44와 48을 말하므로 둘 중 낮은 쪽을 바닥으로 둔다.
-const TOUCH = 44;
+// P15 화살표의 터치 하한은 48 CSS px다.
+const TOUCH = 48;
 // 작은 폰 가로와 큰 폰 가로. 둘 다 서야 기종 폭에 안 묶인다.
-const SIZES = [[667, 375, "se"], [844, 390, "modern"]];
+const SIZES = [[667, 375, "se"], [844, 390, "modern"], [740, 360, "narrow"], [1280, 720, "desktop"]];
 
 const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
@@ -62,33 +63,33 @@ try {
     const box = await p.evaluate(() => {
       const r = (sel) => { const e = document.querySelector(sel); if (!e) return null; const b = e.getBoundingClientRect(); return [Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height)]; };
       return {
-        top: r("#top"), auto: r("#auto"), out: r("#out"), mute: r("#mute"),
-        zones: [...document.querySelectorAll(".zone")].map((e) => { const b = e.getBoundingClientRect(); return [Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height)]; }),
+        top: r("#top"), auto: r("#auto"), mute: r("#mute"),
+        zones: [...document.querySelectorAll(".move-arrow")].map((e) => { const b = e.getBoundingClientRect(); return [Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height)]; }),
         w: innerWidth, h: innerHeight
       };
     });
 
     // 조작 세 칸이 손가락보다 작으면 화면이 아니라 바늘이다.
     const small = box.zones.filter((z) => z[2] < TOUCH || z[3] < TOUCH);
-    check(tag + ":zones-take-a-finger", box.zones.length === 3 && small.length === 0,
+    check(tag + ":arrows-take-a-finger", box.zones.length === 2 && small.length === 0,
       box.zones.map((z) => z[2] + "x" + z[3]).join(" "));
 
-    const targets = await p.evaluate(() => [...document.querySelectorAll('#hud > button, #top button, #pad button')].filter(e => e.getClientRects().length && !e.hidden).map(e => ({id:e.id || e.dataset.dive,width:e.offsetWidth,height:e.offsetHeight})));
-    check(tag + ':readiness-hud-targets-24px', targets.length >= 15 && targets.every(e => e.width >= 24 && e.height >= 24), JSON.stringify(targets));
+    const targets = await p.evaluate(() => [...document.querySelectorAll('#hud > button, #top button, #movement button')].filter(e => e.getClientRects().length && !e.hidden).map(e => ({id:e.id || e.dataset.move,width:e.offsetWidth,height:e.offsetHeight})));
+    check(tag + ':readiness-hud-targets-24px', targets.length >= 13 && targets.every(e => e.width >= 24 && e.height >= 24), JSON.stringify(targets));
     await p.emulateMedia({reducedMotion:'reduce'});
     const motion = await p.locator('#hud').evaluate(e => getComputedStyle(e).transitionDuration);
     check(tag + ':readiness-reduced-motion', motion.split(',').every(t => parseFloat(t) <= 0.00001), motion);
     await p.emulateMedia({reducedMotion:'no-preference'});
 
     // 버튼이 화면 밖으로 나가면 그 기능은 없는 것과 같다.
-    const outside = ["top", "auto", "out", "mute"].filter((k) => {
+    const outside = ["top", "auto", "mute"].filter((k) => {
       const b = box[k];
       return !b || b[0] < 0 || b[1] < 0 || b[0] + b[2] > box.w + 1 || b[1] + b[3] > box.h + 1;
     });
     check(tag + ":controls-stay-on-screen", outside.length === 0, outside.join(",") || "all inside " + box.w + "x" + box.h);
 
     // 좁은 화면에서 가장 먼저 부딪히는 것은 좌상단 정보와 우측 버튼 줄이다.
-    check(tag + ":hud-does-not-collide", !overlap(box.top, box.auto) && !overlap(box.top, box.out) && !overlap(box.mute, box.auto),
+    check(tag + ":hud-does-not-collide", !overlap(box.top, box.auto) && !overlap(box.mute, box.auto),
       "top " + JSON.stringify(box.top) + " auto " + JSON.stringify(box.auto));
 
     // 요구는 골대가 좌우로 길어서 가로여야 한다는 것이었다. 그 입구가 프레임 안에 있어야 그 요구가 지켜진다.

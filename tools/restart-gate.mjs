@@ -81,7 +81,7 @@ async function sample(browser, body, tag, { scene, error = false } = {}) {
           current.end = f;
           current.resetZ = pos.z;
           current.resetKind = kind;
-          current.pad = document.querySelector(".zone")?.classList.contains("live") === true;
+          current.pad = document.querySelector(".move-arrow")?.classList.contains("live") === true;
           current.dribbles = window.__sfxLog.filter((e) => e[0] === "dribble" && e[3] >= current.start && e[3] < f).length;
           window.__m2Windows.push(current);
           current = null;
@@ -140,7 +140,13 @@ async function sample(browser, body, tag, { scene, error = false } = {}) {
 
 let browser;
 try {
-  const old = execFileSync("git", ["show", OLD + ":web/src/main.mjs"], { cwd: ROOT, encoding: "utf8" });
+  // 옛 전체 화면은 퇴역한 패드를 찾으므로 재시작 결함 두 함수만 현재 표면에 이식한다.
+  const historical = execFileSync("git", ["show", OLD + ":web/src/main.mjs"], { cwd: ROOT, encoding: "utf8" });
+  const current = readFileSync(new URL('../web/src/main.mjs', import.meta.url), 'utf8');
+  const restartBlock = /function countdown\(sec, label, then\) \{[\s\S]*?(?=function endSet\(\))/g;
+  const before = [...historical.matchAll(restartBlock)], now = [...current.matchAll(restartBlock)];
+  if (before.length !== 1 || now.length !== 1) throw new Error('restart control anchor');
+  const old = current.replace(now[0][0], before[0][0]);
   console.log("restart " + new Date().toISOString() + " HEAD " + execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim());
   console.log("runtime " + process.execPath + " " + process.version + " playwright " + import.meta.resolve("playwright") + " chromium " + EXE);
   browser = await chromium.launch({ executablePath: EXE });

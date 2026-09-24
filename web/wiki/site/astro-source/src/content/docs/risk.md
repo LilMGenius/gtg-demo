@@ -10,7 +10,7 @@ title: "사고"
 
 <h2 id="related-entries">Related entries</h2>
 
-<h3>relatedTo</h3><ul><li><a href="./hand.html">세 칸과 타이밍</a></li></ul>
+<h3>relatedTo</h3><ul><li><a href="./hand.html">좌우 이동</a></li></ul>
 
 <h2 id="backlinks">Backlinks</h2>
 

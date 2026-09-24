@@ -2,4 +2,4 @@
 title: "hand"
 ---
 
-<ul><li><a href="./hand.html">세 칸과 타이밍</a></li></ul>
+<ul><li><a href="./hand.html">좌우 이동</a></li></ul>
