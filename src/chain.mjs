@@ -248,8 +248,8 @@ export function judgeWindow(keeper, shot, input, over) {
   const form = keeper.form || 0;
   const s = (k) => clamp((over && k in over ? over[k] : keeper[k]) + form, 1, 10);
   const power = over && "kickerPower" in over ? over.kickerPower : shot.kicker.power;
-  // 위치 경로의 반사실은 같은 20ms/칸을 쓰고 옛 방향 입력의 비행식은 보존한다.
-  const flight = Array.isArray(input?.trace) ? clamp(shot.flight + (shot.kicker.power - power) * 0.020, 0.55, 1.1) : clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
+  // 위치 경로의 반사실은 같은 19.5ms/칸을 쓰고 옛 방향 입력의 비행식은 보존한다.
+  const flight = Array.isArray(input?.trace) ? clamp(shot.flight + (shot.kicker.power - power) * 0.0195, 0.55, 1.1) : clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
   // 판정 창과 기동. 반응속도가 인지이고 민첩성이 기동이다.
   let windowMs = WIN0 + 13 * s("reflex") + 4 * s("composure");
   // 연속 실점은 다음 구를 좁힌다. 회복탄력성이 그 좁혀짐을 먹는다.
@@ -300,8 +300,8 @@ function bareContactMargin(keeper, shot, input, over) {
   const power = over && "kickerPower" in over ? over.kickerPower : k.power;
   // 프로브는 한 칸만 움직인다. 커브를 절반으로 줄이면 한 칸이 아니라 다섯 칸을 준 것이 된다.
   const bend = Math.max(0, (shot.bend || 0) - (over && "bendSub" in over ? over.bendSub : 0));
-  // 위치 경로의 반사실은 같은 20ms/칸을 쓰고 옛 방향 입력의 비행식은 보존한다.
-  const flight = Array.isArray(input?.trace) ? clamp(shot.flight + (shot.kicker.power - power) * 0.020, 0.55, 1.1) : clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
+  // 위치 경로의 반사실은 같은 19.5ms/칸을 쓰고 옛 방향 입력의 비행식은 보존한다.
+  const flight = Array.isArray(input?.trace) ? clamp(shot.flight + (shot.kicker.power - power) * 0.0195, 0.55, 1.1) : clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
 
   const offball = s("offball");
   const lateral = lateralGap(offball);
@@ -428,8 +428,8 @@ function positionAt(trace, ms, fallback) {
 // 접촉 때 한 번 확정한다. 선택 난수를 주면 U1의 이동 역이용도 같은 값으로 재현한다.
 export function aimAt(keeper, shot, preTrace, rng) {
   if (shot.aimed) return shot;
-  // U3b의 위치 전용 비행 보정을 재사용한다. 파워 5 고정, 20ms/칸이므로 옛 50ms와의 차이는 30ms다(P15-U3c 가설).
-  shot = { ...shot, flight: clamp(shot.flight + (shot.kicker.power - 5) * 0.030, 0.55, 1.1) };
+  // U3b의 위치 전용 비행 보정을 재사용한다. 파워 5를 고정하고 19.5ms/칸으로 줄여 C4 파워 독점을 시험한다. 옛 50ms와의 차이는 30.5ms다(P15-U3d 가설).
+  shot = { ...shot, flight: clamp(shot.flight + (shot.kicker.power - 5) * 0.0305, 0.55, 1.1) };
   const trace = preTrace.filter(p => p.ms <= 0);
   const raw = { trace, x: trace.at(-1)?.x || 0 };
   // 32비트 시드 변환은 기존 sideU를 재사용해 세 인자 호출도 결정론으로 만든다.
