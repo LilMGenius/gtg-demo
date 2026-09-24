@@ -1,13 +1,13 @@
 // 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { modifierContract } from "./modifier-contract.mjs";
-import { makeRng, buildSet, resolve, newKeeper, autoInput } from "./position-pop.mjs";
+import { makeRng, buildSet, resolve, newKeeper, autoInput, positionInput } from "./position-pop.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 import { BOTS, botKeeper } from "../web/src/state/bot.mjs";
 
 // 봇 선반 효과 게이트. 클론 세 등급이 값을 치른 만큼 실제로 대신 막아주는가.
 // 상거래도 효과도 어떤 게이트도 이 선반을 안 봤다. 등급과 가격이 있으면 사다리와 값당을 잰다.
 // 브라우저를 안 띄운다. 판정은 src/chain.mjs 순수 함수고 봇은 judgement 한 칸만 갈아끼운다.
-// The bot shapes the input, not the keeper, per main.mjs:613 and judgement.md 계측 모집단.
+// main.mjs의 위치 경로는 botKeeper를 입력과 resolve 양쪽에 쓴다. 이전 입력 전용 모집단은 음성 대조로 남긴다.
 
 // 2000시드 x 5구 = 10000구. gear-effect-gate와 같은 표본이라 수치를 나란히 읽을 수 있다.
 const SEEDS = 2000;
@@ -25,7 +25,7 @@ function sweep(opt) {
   // 표본을 밖에서 넘길 수 있어야 한다. 고정되어 있으면 만렘 축을 붙여도 신인만 재고 조용히 초록을 낸다.
   const who = o.keeper || base;
   const inputKeeper = o.tier ? botKeeper(who, { tier: o.tier }) : who;
-  const keeper = o.oldPopulation ? inputKeeper : who;
+  const keeper = o.oldPopulation ? who : inputKeeper;
   let saved = 0, shots = 0;
   for (let s = 0; s < SEEDS; s++) {
     const set = buildSet(makeRng(s + 1), 5, 0);
@@ -33,7 +33,8 @@ function sweep(opt) {
     for (const shot of set) {
       const arg = { keeper, shot, rng };
       // advance 0 고정은 실제 손 조작이 아니었다. 돌진 버튼의 0.9를 쓰되 칩에는 나가지 않는다.
-      if (o.hand) arg.input = { dive: shot.side, errMs: 0, advance: shot.chip ? 0 : 0.9, auto: false };
+      if (o.centre) arg.input = positionInput(who, shot, rng, "hand-centre");
+      else if (o.hand) arg.input = { dive: shot.side, errMs: 0, advance: shot.chip ? 0 : 0.9, auto: false };
       else arg.input = autoInput(inputKeeper, shot, rng);
       const r = resolve(arg);
       shots++;
@@ -44,6 +45,13 @@ function sweep(opt) {
 }
 
 const F = (x) => x.toFixed(2);
+
+// 판단력 하한 1, 중간 5, 상한 10만 바꿔 등급 효과와 분리한 세이브 사다리를 잰다.
+const judgementRungs = [1, 5, 10].map(judgement => sweep({ keeper: { ...base, judgement } }).rate);
+check("judgement:save-rate-rises", judgementRungs.every((rate, i) => !i || rate > judgementRungs[i - 1]), judgementRungs.map(F).join(" -> "));
+// 판단력 상한 10의 봇이 같은 키퍼의 중앙 대기보다 나아야 방치 제어에 의미가 있다.
+const centreAtMax = sweep({ keeper: { ...base, judgement: 10 }, centre: true }).rate;
+check("judgement:high-bot-beats-centre", judgementRungs.at(-1) > centreAtMax, F(judgementRungs.at(-1)) + " > " + F(centreAtMax));
 
 // 대조군. 같은 조건 두 번이 완전히 같아야 나머지 차이가 봇 몫으로 읽힌다.
 const c1 = sweep({});
@@ -57,7 +65,7 @@ const line = rate.map(F).join(" -> ");
 const oldRate = RANKS.map(t => sweep({ tier: t, oldPopulation: true }).rate);
 console.log("ladder live " + line);
 console.log("ladder old-population " + oldRate.map(F).join(" -> "));
-check("control:the-old-population-read-the-bot-into-the-judgement",
+check("control:the-old-population-omitted-live-bot-judgement",
   Math.abs(oldRate[3] - rungs[3].rate) > 0,
   "tier3 old " + F(oldRate[3]) + " live " + F(rungs[3].rate));
 
@@ -97,7 +105,7 @@ for (const b of BOTS) {
 check("bot:never-downgrades-at-max", worst.length === 0,
   "bare " + F(topBare) + " but " + (worst.join(", ") || "no tier falls below"));
 
-// 자동은 입력만 대신한다. 최상급 클론도 손으로 정확히 누른 것보다는 못 막아야 축이 산다.
+// 라이브 봇의 판단력 보정까지 적용한 최상급 클론도 숙련 손 아래여야 한다.
 const hand = sweep({ hand: true });
 check("bot-below-hand", rate[3] < hand.rate, "bot3 " + F(rate[3]) + " hand " + F(hand.rate));
 

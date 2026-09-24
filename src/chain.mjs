@@ -5,6 +5,7 @@
 
 import { LOCKED, GROWABLE } from "./ledger.mjs";
 import { KICKERS } from "./roster.mjs";
+import { PENALTY_RULE, PENALTY_OBSERVATION } from "./reality.mjs";
 
 export const GOAL_HALF_W = 2.2;
 export const GOAL_H = 1.9;
@@ -247,7 +248,8 @@ export function judgeWindow(keeper, shot, input, over) {
   const form = keeper.form || 0;
   const s = (k) => clamp((over && k in over ? over[k] : keeper[k]) + form, 1, 10);
   const power = over && "kickerPower" in over ? over.kickerPower : shot.kicker.power;
-  const flight = clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
+  // 위치 경로의 반사실은 같은 20ms/칸을 쓰고 옛 방향 입력의 비행식은 보존한다.
+  const flight = Array.isArray(input?.trace) ? clamp(shot.flight + (shot.kicker.power - power) * 0.020, 0.55, 1.1) : clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
   // 판정 창과 기동. 반응속도가 인지이고 민첩성이 기동이다.
   let windowMs = WIN0 + 13 * s("reflex") + 4 * s("composure");
   // 연속 실점은 다음 구를 좁힌다. 회복탄력성이 그 좁혀짐을 먹는다.
@@ -298,7 +300,8 @@ function bareContactMargin(keeper, shot, input, over) {
   const power = over && "kickerPower" in over ? over.kickerPower : k.power;
   // 프로브는 한 칸만 움직인다. 커브를 절반으로 줄이면 한 칸이 아니라 다섯 칸을 준 것이 된다.
   const bend = Math.max(0, (shot.bend || 0) - (over && "bendSub" in over ? over.bendSub : 0));
-  const flight = clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
+  // 위치 경로의 반사실은 같은 20ms/칸을 쓰고 옛 방향 입력의 비행식은 보존한다.
+  const flight = Array.isArray(input?.trace) ? clamp(shot.flight + (shot.kicker.power - power) * 0.020, 0.55, 1.1) : clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
 
   const offball = s("offball");
   const lateral = lateralGap(offball);
@@ -337,6 +340,9 @@ function bareContactMargin(keeper, shot, input, over) {
   }
   // 정면 슛의 일부는 서 있기만 해도 몸에 맞는다. 무거울수록 넓다.
   if (positional ? distance <= STAND : shot.course === "정면") margin += 0.10 + (keeper.weight - 84) * W_FRONT;
+  // Bar-Eli 외 표 2의 중앙 공/옆 점프 블록을 기존 몸 폭과 깊이로 표현한다. 손 방향이 틀려도 몸은 사라지지 않는다.
+  // 오독 때 남는 몸만 별도로 판정한다. 올바른 손의 접촉과 오프더볼 한 칸의 반사실을 몸 폭이 가로채지 않는다.
+  if (positional && input.dirQuality < 1 && shot.aimY <= SHOULDER) margin = Math.max(margin, STAND + depth + (keeper.weight - 84) * W_FRONT - distance - bend);
   return margin;
 }
 
@@ -422,6 +428,8 @@ function positionAt(trace, ms, fallback) {
 // 접촉 때 한 번 확정한다. 선택 난수를 주면 U1의 이동 역이용도 같은 값으로 재현한다.
 export function aimAt(keeper, shot, preTrace, rng) {
   if (shot.aimed) return shot;
+  // U3b의 위치 전용 비행 보정을 재사용한다. 파워 5 고정, 20ms/칸이므로 옛 50ms와의 차이는 30ms다(P15-U3c 가설).
+  shot = { ...shot, flight: clamp(shot.flight + (shot.kicker.power - 5) * 0.030, 0.55, 1.1) };
   const trace = preTrace.filter(p => p.ms <= 0);
   const raw = { trace, x: trace.at(-1)?.x || 0 };
   // 32비트 시드 변환은 기존 sideU를 재사용해 세 인자 호출도 결정론으로 만든다.
@@ -511,17 +519,24 @@ export function reactTrace(keeper, shot, trace, reactionMs, aimX = shot.aimX) {
 function positionDive(keeper, shot, raw, over) {
   const j = clamp(over?.judgement ?? keeper.judgement, 1, 10);
   const rel = shot.aimX - raw.x;
-  // 몸 앞은 오독 없이 서고, 비행 중 방향 단서는 휨과 칩에서 흐려진다는 P15 가설이다.
-  // P15-U1b HOTL: 비행 중 직선 공은 기저 0.90, 판단당 0.008로 거의 오독하지 않는다. 휨 0.20/단위와 칩 0.16은 속임 단서를 남긴다.
-  const readP = Math.min(0.995, 0.90 + 0.008 * j + 0.03 * (keeper.botTier || 0) - (shot.bend || 0) * 0.20 - (shot.chip ? 0.16 : 0));
+  // 몸 앞은 서서 막고 멀리 있는 공은 키커 단서를 읽는다. 휨과 칩의 기존 위장 항을 유지한다.
+  // Bar-Eli 외(2007) 표 1의 불완전한 단서를 구현한다. 확률 자체는 연구값이 아닌 HOTL 가설이다.
+  // 기저 .78, 판단 한 칸 .02, 침착성 위장 .012는 신인도 주로 맞히고 성장으로 오독을 줄이는 범위다.
+  const readP = clamp(0.78 + 0.02 * j - 0.012 * shot.kicker.composure - (shot.bend || 0) * 0.20 - (shot.chip ? 0.16 : 0), 0, 0.995);
   const standing = Math.abs(rel) <= STAND;
   const correct = standing || raw.readU < readP;
-  // 오독의 절반은 역동작(품질 0.1), 절반은 주저(품질 0.5)라는 P15 가설이다.
-  const wrong = raw.missU < 0.5;
+  // 오독의 방향은 아래 중앙 대기 비중으로 갈라 기존 역동작/주저 품질을 재사용한다.
+  // reality에 확인한 중앙 슛 비중을 오독 때 대기의 시험값으로만 쓴다. 키퍼 행동의 관측률은 아니다.
+  const wrong = raw.missU >= PENALTY_OBSERVATION.values.centerKickProbability;
   const dive = standing ? 0 : correct ? Math.sign(rel) : wrong ? -Math.sign(rel) : 0;
   // autoInput과 같은 판단력별 타이밍 분산을 재사용한다.
   const errMs = (raw.timeU * 2 - 1) * (200 - 12 * j);
   return { ...raw, dive, dirQuality: correct ? 1 : wrong ? 0.1 : 0.5, errMs };
+}
+
+// 기존 자취 보간을 깊이에도 쓴다. 판정과 연출이 같은 접촉 시각을 읽는다.
+export function keeperDepthAt(input, ms) {
+  return positionAt(input.depthTrace.map(p => ({ ms: p.ms, x: p.depth })), ms, PENALTY_RULE.values.lineDepth).x;
 }
 
 function positionInput(keeper, shot, raw, rng) {
@@ -531,7 +546,18 @@ function positionInput(keeper, shot, raw, rng) {
   const wantOut = shot.forced || pct(rng, 16 + keeper.judgement * 2);
   // 새 경로 전용 난수: autoInput과 같은 전진 거리와 잠긴 수비범위 상한이다.
   const advance = wantOut ? clamp(0.6 + rng() * 0.9, 0, 1.3 + 0.19 * LOCKED.sweeping) : 0;
-  return positionDive(keeper, shot, { ...raw, readU, missU, timeU, advance });
+  // 기본 접촉 깊이는 placement가 소유하며 접촉 전에 미리 도달한 것으로 그리지 않는다.
+  const baseDepth = placement(keeper, shot).depth;
+  // 제품 비행 시간은 초이고 자취 시계는 밀리초다.
+  const arrival = shot.flight * 1000;
+  const contact = PENALTY_RULE.values.contactMs, line = PENALTY_RULE.values.lineDepth;
+  const trigger = clamp(raw.triggerMs, contact, arrival);
+  const depthTrace = [
+    { ms: raw.trace[0].ms, depth: line }, { ms: contact, depth: line },
+    { ms: trigger, depth: baseDepth * trigger / arrival },
+    { ms: arrival, depth: baseDepth + advance }
+  ];
+  return positionDive(keeper, shot, { ...raw, readU, missU, timeU, advance, depthTrace });
 }
 
 // 봇은 접촉 전 계획과 접촉 뒤 추적을 잇는다. 소비자는 trace.aimedShot을 같은 공으로 쓴다.
@@ -541,25 +567,19 @@ export function botPlan(keeper, shot, rng) {
   // 새 경로 전용 난수: Box-Muller 표준정규 변환으로 위치 오차의 표준편차를 맞춘다.
   const noise = Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng()) * sigma;
   const start = clamp(noise, -X_MAX, X_MAX);
-  // 새 경로 전용 난수: 판단력 1~10의 계획 방향 적중률은 31~85%다(P15 가설).
-  const read = rng() < 0.25 + 0.06 * keeper.judgement;
-  // 새 경로 전용 난수: 계획을 못 읽으면 양쪽을 반반 고른다.
-  const randomSide = rng() < 0.5 ? -1 : 1;
-  const side = read && shot.side !== 0 ? shot.side : randomSide;
-  // P15 가설: 판단력이 높으면 더 늦게 움직여 키커에게 주는 정보를 줄인다.
-  const tMove = 350 - 10 * keeper.judgement;
-  // P15 가설: 목표 편위는 오프더볼 1~10에서 0.28~0.55단위다.
-  const target = side * (0.25 + 0.03 * keeper.offball);
-  // 이동시간을 밀리초로 환산하고 실제 도착 시점을 표본에 넣어 보간을 정확히 한다.
-  const duration = Math.abs(target - start) / moveSpeed(keeper) * 1000;
-  const finish = -tMove + duration;
-  // 1초 전부터 관측해야 가장 이른 키커의 900ms 읽기가 초기 위치를 본다.
-  const trace = [{ ms: -1000, x: start }, { ms: -tMove, x: start }];
-  if (finish < 0) trace.push({ ms: finish, x: target });
-  trace.push({ ms: 0, x: start + Math.sign(target - start) * Math.min(Math.abs(target - start), moveSpeed(keeper) * tMove / 1000) });
+  // 새 경로의 읽기 난수는 판단력에 따른 추적 확률과 비교한다.
+  const readU = rng();
+  // 같은 읽기 난수는 아래 접촉 뒤 추적에 사용한다.
+  // 키커가 읽기 전에 유리한 쪽을 선점하던 계획은 수동 follow와 다른 정보 우위였다.
+  // 1초 전부터 같은 준비 위치를 유지하고 공 접촉 뒤의 제한된 읽기로만 움직인다.
+  const trace = [{ ms: -1000, x: start }, { ms: 0, x: start }];
   const aimed = aimAt(keeper, shot, trace);
-  // P15-U1b HOTL: 판단 1~10의 반응은 335~200ms이며 인간 시험값 250ms와 교차한다.
-  return reactTrace(keeper, aimed, trace, 350 - 15 * clamp(keeper.judgement, 1, 10));
+  // 인간 시험값 250ms를 점근 하한으로 둔다. 200ms 여유는 판단 1의 350ms에서 시작하고 등급도 같은 분모에서 값을 한다.
+  const reaction = 250 + 200 / (1 + clamp(keeper.judgement, 1, 10) + (keeper.botTier || 0));
+  // 추적은 기저 .30과 판단당 .02, 등급당 .015로 최고 .545다. R3의 늦은 봇도 선행 손을 이겨 정확도를 제한한 HOTL 가설이다.
+  const tracking = readU < 0.30 + 0.02 * clamp(keeper.judgement, 1, 10) + 0.015 * (keeper.botTier || 0);
+  const x = trace.at(-1).x;
+  return reactTrace(keeper, aimed, trace, reaction, tracking ? aimed.aimX : x - (aimed.aimX - x));
 }
 
 export function resolve(input) {
@@ -612,7 +632,8 @@ export function resolve(input) {
   // 0단 배치. 나가서 생긴 사고와 안 와도 될 공에 누운 사고는 같은 판단에서 나온다.
   // 한 단계는 롤 하나를 쓴다. 두 사고는 같은 난수를 구간으로 나눠 가른다.
   const centerish = shot.course === "정면" || shot.chip;
-  const overP = shot.chip ? Math.max(0, (clamp(keeper.offball, 1, 10) - 3) * 5 + shot.kicker.flair * 4 + (place.depth + inp.advance > 1.0 ? 30 : 0)) : 0;
+  // 위치 입력의 칩 위험은 실제 자동 전진과 키커 위장에서 나온다. 자리 능력 자체에 붙던 벌점은 옛 입력에만 남긴다.
+  const overP = shot.chip ? Math.max(0, (positional ? 0 : (clamp(keeper.offball, 1, 10) - 3) * 5) + shot.kicker.flair * 4 + (place.depth + inp.advance > 1.0 ? 30 : 0)) : 0;
   const diveP = centerish && inp.dive !== 0 ? Math.max(0, keeper.diving * 4.2 - keeper.judgement * 3.4) : 0;
   // 한눈팔기. 행인이 지나가는 구에서만 열리고 집중력이 소유한다.
   // 같은 단계의 사고는 롤 하나를 구간으로 나눠 가른다. 새 롤을 뒤면 한 구가 일곱 번 굴러간다.
@@ -660,9 +681,10 @@ export function resolve(input) {
   state.rolls++;
   const margin = contactMargin(keeper, shot, inp, null);
   if (margin <= 0) {
-    if (!positional && inp.dirQuality <= 0.1) {
+    // 역방향은 보이는 동작의 자막이고 자동 읽기를 틀린 능력의 귀속은 판단력이다.
+    if (inp.dirQuality <= 0.1) {
       say("miss", "완전히 역동작이었습니다.", "direction");
-      return done(true, "direction");
+      return done(true, positional ? "judgement" : "direction");
     }
     const cause = attributeContact(keeper, shot, inp);
     const lines = {

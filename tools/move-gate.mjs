@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import * as chain from '../src/chain.mjs';
+import { PENALTY_RULE } from '../src/reality.mjs';
 
 // 최소 이천 시드의 다섯 슛을 자동과 수동 양쪽에서 고정한다.
 const SEEDS = 2000;
@@ -136,7 +137,8 @@ const botStarts = [1, 5, 10].map(judgement => {
   const index = trace.findIndex((p,i) => i && p.ms > 0 && p.x !== trace[i-1].x);
   return index > 0 ? trace[index-1].ms : NaN;
 });
-check('bot-reacts-with-judgement', botStarts.every((t,i) => t === 350 - 15 * [1, 5, 10][i] && (!i || t < botStarts[i-1])), JSON.stringify(botStarts));
+// 인간 기준 250ms보다 늦으며 판단이 높을수록 빨라지는 동작을 잰다. 특정 계수 복제는 하지 않는다.
+check('bot-reacts-with-judgement', botStarts.every((t,i) => Number.isFinite(t) && t > 250 && (!i || t < botStarts[i-1])), JSON.stringify(botStarts));
 // 4000개 시드의 다섯 슛을 짝지어 95% McNemar 구간을 재사용한다.
 const reactIntervals = [];
 for (const level of [1, 5, 13, 21]) {
@@ -182,13 +184,40 @@ if (chain.diveTrigger) for (let seed = 1; seed <= 1200; seed++) {
   const trace = [{ ms: -1000, x }, { ms: 0, x }, { ms: end, x: x + Math.sign(target-x)*Math.min(Math.abs(target-x),chain.moveSpeed(who)*end/1000) }];
   const aimed = chain.aimAt(who,shot,trace);
   const result = chain.resolve({keeper:{...who},shot:aimed,input:{trace,x},rng:chain.makeRng(seed)});
-  const at = t => x+(trace.at(-1).x-x)*t/end;
-  let firstMs = end;
-  for(let t=0;t<=end;t++) if(chain.diveTrigger(who,aimed,at(t),t)){firstMs=t;break;}
+  const at = t => x+(trace.at(-1).x-x)*Math.min(t,end)/end;
+  let firstMs = aimed.flight*1000;
+  for(let t=0;t<=aimed.flight*1000;t++) if(chain.diveTrigger(who,aimed,at(t),t)){firstMs=t;break;}
   // 1ms는 독립 전수 탐색의 해상도이고 1e-6은 교점의 부동소수 오차다.
   triggerErrors += Number(Math.abs(firstMs-result.input.triggerMs)>1+1e-6 || !chain.diveTrigger(who,aimed,result.input.x,result.input.triggerMs));
   earlierControl += Number(!chain.diveTrigger(who,aimed,at(0),0));
 }
 check('trace-trigger-matches-independent-scan', Boolean(chain.diveTrigger) && triggerErrors===0 && earlierControl>0, JSON.stringify({triggerErrors,earlierControl}));
+// 조문은 reality의 확인된 IFAB 원문에서 읽는다. 오차는 세계의 선 폭이 아닌 보간의 부동소수 허용치다.
+const LINE_EPS = 1e-9;
+const contact = PENALTY_RULE.values.contactMs, line = PENALTY_RULE.values.lineDepth;
+const lawAxis = inp => inp.depthTrace.length > 0
+  && inp.depthTrace.some(p => p.ms === contact)
+  && inp.depthTrace.filter(p => p.ms <= contact).every(p => Math.abs(p.depth - line) <= LINE_EPS)
+  && Math.abs(chain.keeperDepthAt(inp, contact) - line) <= LINE_EPS;
+let depthSamples = 0, depthViolations = 0, earlyAdvanceControls = 0, postKickRush = 0;
+// 옛 경로 가드와 같은 이천 시드에서 손과 봇의 모든 슛을 재며 실제 전진도 양수여야 한다.
+for (let seed = 1; seed <= SEEDS; seed++) for (const bot of [false, true]) {
+  const rng = chain.makeRng(seed), keeper = chain.keeperAtLevel(1 + seed % 30, rng);
+  for (const shot of chain.buildSet(rng, keeper.level)) {
+    const trace = bot ? chain.botPlan(keeper, shot, rng) : [{ ms: -1000, x: 0 }, { ms: 0, x: 0 }];
+    const result = chain.resolve({ keeper: { ...keeper }, shot, rng, input: { trace, x: trace.at(-1).x, auto: bot } });
+    const inp = result.input;
+    depthSamples++;
+    depthViolations += Number(!lawAxis(inp));
+    postKickRush += Number(inp.advance > 0 && inp.depthTrace.at(-1).depth > line);
+    // 실제 판정의 마지막 전진 깊이를 접촉 표본에 심으면 같은 축이 반드시 거부해야 한다.
+    const planted = { ...inp, depthTrace: inp.depthTrace.map(p => ({ ...p, depth: p.ms === contact ? inp.depthTrace.at(-1).depth : p.depth })) };
+    earlyAdvanceControls += Number(!lawAxis(planted));
+  }
+}
+check('law14:keeper-depth-at-contact-on-line', depthSamples > 0 && depthViolations === 0,
+  JSON.stringify({ depthSamples, depthViolations, contact, line, tolerance: LINE_EPS, source: PENALTY_RULE.source.name }));
+check('law14:pre-kick-advance-positive-control', earlyAdvanceControls === depthSamples && postKickRush > 0,
+  JSON.stringify({ earlyAdvanceControls, depthSamples, postKickRush }));
 console.log(`move ${failures.length ? 'FAIL' : 'PASS'} ${failures.length}`);
 process.exitCode = Number(failures.length > 0);

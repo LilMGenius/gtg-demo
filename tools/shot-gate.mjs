@@ -46,6 +46,20 @@ try {
 
   // 여덟 구를 실제로 친다. 한 구는 우연이고 여덟 구는 분포다.
   await p.evaluate(() => { window.__ballProbe.reset(); window.__stageProbe.reset(); });
+  await p.evaluate(() => {
+    window.__shotFrame = null;
+    const sample = () => {
+      const peak = window.__stageProbe.worst.keeper;
+      if (!window.__shotFrame || peak.maxAbsY > window.__shotFrame.maxAbsY) {
+        const position = window.__position();
+        window.__shotFrame = { maxAbsY: peak.maxAbsY, keeper: window.__keeperPos(),
+          sinceKick: position.elapsed - position.set - position.runup,
+          phase: position.phase, input: window.__lastInput, camera: window.__camDbg() };
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
   for (let i = 0; i < 8; i += 1) {
     await p.keyboard.press(i % 2 ? "ArrowRight" : "ArrowLeft");
     await p.waitForTimeout(3200);
@@ -66,6 +80,7 @@ try {
     ball.longest + " by " + JSON.stringify(w ? w.by : {}) + at);
 
   const stage = await p.evaluate(() => JSON.parse(JSON.stringify(window.__stageProbe.worst)));
+  console.log("keeper-frame-phase " + JSON.stringify(await p.evaluate(() => window.__shotFrame)));
   // 발은 땅에 붙는다. 다이빙과 점프로 뜨는 만큼만 허용한다.
   const LIFT = { keeper: 0.5, kicker: 0.06 };
   for (const k of ["keeper", "kicker"]) {
