@@ -6,7 +6,7 @@
 // 재질은 밖에서 units.mjs의 flatVertex 한 장을 물려 준다. 색은 전부 정점에 실린다.
 import * as THREE from '../../../vendor/three.module.min.js';
 import { mergeGeos } from '../units.mjs';
-import { seeded } from '../handmade.mjs';
+import { GOAL } from '../../../../src/reality.mjs';
 
 /* 물건이 설 수 있는 자리. 페널티 박스 판은 밟는 면이라 그 위에는 아무것도 안 세운다.
    reality의 규칙이 아닌 연출용 흙판은 16.5 x 16.5이고 중심이 z 8.2라 x는 8.25까지, z는 16.45까지가 그 판이다.
@@ -62,105 +62,71 @@ function tree(p, x, z, s) {
   p.cone(1.5 * s, 2.0 * s, x, 3.3 * s, z, 0x3f6533);
 }
 
-// 0 공터. 무너진 블록 담과 나무와 풀뿐이다. 아무것도 안 샀을 때 서는 자리라 사람 손이 제일 덜 갔다.
-function lot(p) {
-  const r = seeded(0x51a70c);
-  for (let i = 0; i < 22; i += 1) {
-    // 다섯에 하나는 무너져 없다. 이가 빠져야 쌓다 만 담이지 옹벽이 아니다.
-    if (i % 5 === 3) continue;
-    const x = -32 + i * 3.05;
-    const h = 0.95 + r() * 0.4;
-    p.box(2.6, h, 0.34, x, 26.2, 0xb8ac96);
-    p.box(2.76, 0.14, 0.46, x, 26.2, 0x8f8474, h);
-  }
-  for (let i = 0; i < 5; i += 1) tree(p, -24 + i * 12.5, 28.6 + r() * 2.4, 0.9 + r() * 0.3);
-  // 오른쪽 큰 나무 하나. 먼 나무만 있으면 화면 아래 절반이 비어 공터가 아니라 벌판이 된다.
-  // 왼쪽에 안 세우는 이유는 한눈팔기 연출이 왼쪽 x -11.5에 서기 때문이다.
-  tree(p, 10.5, 13.5, 1.25);
-  // 풀 포기. 담 앞 맨흙이 너무 넓어 밟힌 땅이 아니라 칠한 판으로 읽혔다.
-  for (let i = 0; i < 22; i += 1) {
-    // 자리는 담 앞 흙(z 17.4~24.8)이다. 페널티 박스 판은 z 16.45에서 끝나므로 밟는 면 위에는 안 선다.
-    p.box(0.66, 0.42 + r() * 0.24, 0.08, -30 + r() * 60, 17.4 + r() * 7.4, 0x6d8a4a);
-  }
+// 골문은 인용된 실물 규격을 쓰고 위치·봉 두께는 연출 값이다. 뒤쪽 본 골문이 연습 골문과 분리되어 보인다.
+function mainGoal(p, x, z) {
+  const {width:w,height:h}=GOAL.values;
+  // 0.09 반지름은 원경에서도 보이는 봉 두께, 1.5 깊이는 뒤 지지대의 제품 모형이다.
+  for(const side of [-1,1]){p.post(0.09,h,x+side*w/2,z,0xe2e4da);p.post(0.07,h,x+side*w/2,z+1.5,0xa4aaa0);}
+  p.bar(0.09,w,x,h,z,0xe2e4da);
+  // 여덟 가닥은 원경에서 골망임을 읽는 최소한의 수직 실이다.
+  for(let i=0;i<=8;i++)p.box(0.025,h,0.025,x-w/2+w*i/8,z+1.5,0xa4aaa0);
 }
 
-// 1 학교 앞 흙 운동장. 담장과 교사동과 구령대와 철봉이다. 학교 운동장은 담이 먼저 눈에 든다.
-function school(p) {
-  const r = seeded(0x2c81f3);
-  // 학교 담장. 공터의 무너진 담과 달리 이어져 있고 기둥이 규칙적이다. 그 규칙이 학교를 말한다.
-  p.box(64, 1.25, 0.3, 0, 25, 0xe0d6bd);
-  p.box(64, 0.16, 0.42, 0, 25, 0xb3a992, 1.25);
-  for (let i = 0; i < 12; i += 1) p.box(0.5, 1.62, 0.5, -30 + i * 5.5, 25, 0xd0c4a6);
-  // 교사동. 펜스 뒤라 밑동만 화면에 남지만, 창 띠가 있어야 학교 건물로 읽힌다.
-  p.box(31, 6.6, 5, -7, 30.6, 0xe6ddc6);
-  for (let i = 0; i < 3; i += 1) p.box(29, 0.85, 0.2, -7, 28.05, 0x53656e, 1.5 + i * 1.7);
-  p.box(32, 0.5, 5.5, -7, 30.6, 0x9a8f7a, 6.6);
-  // 구령대. 조회 때 올라서는 단이다. 오른쪽 흙 위에 서서 화면 아래쪽을 채운다.
-  p.box(3.4, 1.25, 2.6, 10.6, 15.5, 0xcfc6b2);
-  p.box(3.4, 0.36, 0.7, 10.6, 14, 0xb3a992);
-  // 철봉. 기둥 셋에 가로대 둘이다. 왼쪽은 z 21보다 뒤에만 세운다.
-  for (let i = 0; i < 3; i += 1) p.post(0.08, 2.4, -12.6 + i * 1.8, 21.4, 0xb9c2c9);
-  for (const y of [2.32, 1.6]) p.bar(0.06, 3.6, -10.8, y, 21.4, 0xb9c2c9);
-  // 국기 게양대. 학교 운동장에 하나씩 서 있고, 세로 한 줄이 담장의 가로선을 끊는다.
-  p.post(0.09, 7.2, -3.5, 23.5, 0xdcdcd4);
-  p.box(1.5, 1.0, 0.06, -2.7, 23.5, 0xc94a4a, 6.1);
-  for (let i = 0; i < 6; i += 1) p.box(0.5, 0.3, 0.5, -14 + r() * 28, 18 + r() * 6, 0xb5a074);
+// 운동장 뒤편의 학교와 담은 골문보다 뒤에 두어 슈터와 행인을 가리지 않는다.
+function neighborhood(p){
+  // 46미터 뒤의 낮은 교사동과 세 창 띠는 기존 학교 모형을 축소한 배경이다.
+  p.box(30,6,5,-5,46,0xc8c5ad);
+  for(let i=0;i<3;i++)p.box(28,0.7,0.16,-5,43.4,0x75888a,1+i*1.6);
+  p.box(32,0.35,5.5,-5,46,0x858c7c,6);
+  // 행인 띠 뒤의 42미터 담과 열린 골문 사이로 몸을 계속 볼 수 있다.
+  p.box(56,0.7,0.3,0,42,0xb4b19c);
+  mainGoal(p,0,23);
+  tree(p,-17,29,0.9);tree(p,18,33,1.1);
 }
 
-// 2 역세권 풋살장. 케이지 펜스와 야간 조명 기둥과 상가 간판이다. 풋살장은 그물로 둘러싸여 있다.
-function futsal(p) {
-  // 킥보드. 케이지 아래를 두르는 널판이다. 공이 밖으로 안 나가게 막는 판이라 여기만 막혀 있다.
-  p.box(60, 0.8, 0.16, 0, 22.5, 0x27523f);
-  // 그물 살. 0.9m 간격이면 사이로 행인이 계속 보이고, 1.9m 위로는 아무것도 없어 머리가 안 잘린다.
-  for (let i = 0; i < 45; i += 1) p.box(0.13, 1.9, 0.1, -29.7 + i * 1.35, 22.5, 0x2f4f3f, 0.8);
-  for (const y of [1.55, 2.62]) p.box(60, 0.11, 0.13, 0, 22.5, 0x9aa3ab, y);
-  // 야간 조명 기둥 넷. 역세권은 밤에 더 붐빈다. 기둥은 사이가 넓어 사람을 안 가린다.
-  for (const [x, z] of [[-11.4, 16.8], [11.4, 16.8], [-15.5, 24.5], [15.5, 24.5]]) {
-    p.post(0.17, 8.4, x, z, 0x7d858c);
-    p.box(2.2, 0.85, 0.5, x, z, 0x3a4048, 8.2);
-    p.box(1.9, 0.5, 0.3, x, z - 0.24, 0xf2eecf, 8.35);
-  }
-  // 상가 간판. 행인 띠보다 뒤(z 41)에 세워 사람을 안 가리고 지평선 아랫도리만 채운다.
-  const wall = [0x8f97a0, 0xa9a094, 0x99a3a8];
-  const sign = [0xd94f4f, 0x2f6fd9, 0xe0a23c];
-  for (let i = 0; i < 7; i += 1) {
-    const x = -27 + i * 9;
-    p.box(7.4, 5.2 + (i % 3) * 1.4, 4, x, 41, wall[i % 3]);
-    p.box(6.4, 1.1, 0.3, x, 38.9, sign[i % 3], 3.1);
-  }
+// 풋살장은 낮은 킥보드와 성긴 펜스로 둘러싸인 인조잔디 시설이다.
+function futsal(p){
+  // 기존 배치 22.5미터를 유지하고 펜스 높이 2.6미터는 행인 사이가 보이는 연출 크기다.
+  p.box(60,0.7,0.16,0,22.5,0x3d6856);
+  for(let i=0;i<31;i++)p.post(0.055,2.6,-30+i*2,22.5,0x899b91);
+  for(const y of [1.5,2.6])p.bar(0.045,60,0,y,22.5,0x899b91);
+  lights(p,7);
 }
 
-// 3 번화가 한복판 코트. 가드레일과 네온 기둥과 버스 정류장과 고층 열이다. 코트가 거리에 끼어 있다.
-function downtown(p) {
-  // 가드레일. 차도와 코트를 가르는 난간이다. 키가 1m라 행인 정강이만 자른다.
-  p.box(60, 0.1, 0.14, 0, 25.2, 0xcfd4d8, 0.9);
-  p.box(60, 0.1, 0.14, 0, 25.2, 0xcfd4d8, 0.45);
-  for (let i = 0; i < 25; i += 1) p.box(0.12, 1.0, 0.14, -29 + i * 2.42, 25.2, 0x9aa2a8);
-  // 네온 기둥 열. 세로 판이 5m 간격으로 서서 가로선을 끊는다. 사이가 넓어 사람이 계속 보인다.
-  const neon = [0xff4f7a, 0x3fd8e0, 0xffd83d];
-  for (let i = 0; i < 12; i += 1) {
-    const x = -27.5 + i * 5;
-    p.post(0.13, 3.4, x, 23.2, 0x4a525c);
-    p.box(0.82, 2.5, 0.16, x, 23.05, neon[i % 3], 0.9);
-  }
-  // 버스 정류장. 오른쪽 흙 위에 서서 화면 아래쪽을 채운다. 처마와 등받이와 의자다.
-  // 처마는 기둥 바깥으로 0.2m씩 나온다. 기둥에 딱 맞추면 챙이 없어
-  // 정류장이 아니라 판 하나로 읽힌다.
-  p.box(4.4, 0.22, 2.2, 10.9, 14.5, 0x3f4a54, 2.6);
-  for (const [dx, dz] of [[-2, -0.9], [2, -0.9], [-2, 0.9], [2, 0.9]]) p.post(0.08, 2.6, 10.9 + dx, 14.5 + dz, 0x5a6470);
-  p.box(4.0, 1.7, 0.12, 10.9, 15.4, 0x3f4a54, 0.85);
-  p.box(1.15, 1.75, 0.16, 12.6, 15.35, 0xe8e4d2, 0.7);
-  p.box(3.5, 0.14, 0.5, 10.9, 14.6, 0x8f6f4a, 0.5);
-  // 고층 열. 행인 띠보다 뒤(z 43)에 서서 지평선을 올린다. 앞에 세우면 사람이 통째로 가려진다.
-  const tower = [0x8a93a0, 0x9fa8ae, 0x7c848f];
-  for (let i = 0; i < 7; i += 1) {
-    const x = -28 + i * 9.4;
-    p.box(6.6, 9 + (i % 3) * 3.5, 4.5, x, 43, tower[i % 3]);
-    p.box(5.6, 0.9, 0.3, x, 40.7, neon[(i + 1) % 3], 4.2 + (i % 2) * 2.4);
+// 단은 뒤로 갈수록 높아지는 같은 모듈이다. 한 메시로 합쳐 규모만 바꾼다.
+function stands(p,rows,width,z){
+  // 단차 0.75·깊이 1.5와 등받이 0.35는 원경에서도 계단을 읽게 하는 제품 모형이다.
+  for(let row=0;row<rows;row++){
+    const y=row*0.75;
+    p.box(width,0.75,1.5,0,z+row*1.5,0xa5ada8,y);
+    p.box(width,0.35,0.3,0,z+row*1.5+0.5,row%2?0x638a83:0x8c9baf,y+0.75);
   }
 }
+function lights(p,height){
+  // 골문 밖 ±18미터의 네 기둥은 화면 중앙을 비우고 경기장 양끝을 표시한다.
+  for(const x of [-18,18])for(const z of [24,44]){
+    p.post(0.15,height,x,z,0x80908d);
+    p.box(2.6,0.8,0.45,x,z,0x6a7775,height);
+    p.box(2.3,0.55,0.08,x,z-0.26,0xe3e2c9,height+0.12);
+  }
+}
+function grass(p){
+  // 아마추어 구장은 폭 26미터의 세 단 관람석과 작은 지붕으로 프로 시설과 규모를 가른다.
+  stands(p,3,26,42);
+  p.box(28,0.25,6,0,45,0x7c9690,4.8);
+  for(const x of [-13,13])p.post(0.12,4.8,x,43,0x879a92);
+  tree(p,-20,42,1);tree(p,20,44,1);
+}
+function stadium(p){
+  // 프로 구장은 여덟 단과 폭 76미터의 관람석으로 시야 양쪽까지 감싼다. 행인 뒤 43미터부터 시작한다.
+  stands(p,8,76,43);
+  // 측면 단은 골대 바깥 ±25미터부터 넓어져 중앙 판정 공간을 비운다.
+  for(const side of [-1,1])for(let row=0;row<5;row++)p.box(1.8,0.8,27,side*(25+row*1.8),30,0x9aa9a4,row*0.8);
+  lights(p,14);
+  p.box(80,0.35,8,0,52,0x748b8d,10);
+}
 
-const BUILD = [lot, school, futsal, downtown];
+const BUILD=[neighborhood,futsal,grass,stadium];
 const cache = [];
 
 /* 동네 하나의 물건 전부를 한 지오메트리로 굽는다. 등급이 바뀔 때마다 다시 구우면
@@ -175,56 +141,28 @@ export function placeGeo(city) {
   return cache[c];
 }
 
-/* 상점 카드의 같은 동네. 경기장 배치를 그대로 쓰면 60m짜리 담이 19m 칸에서 실 한 오라기가 된다.
-   칸이 보는 폭이 다르므로 배치도 칸의 것이다. 어느 동네인지를 말하는 물건만 골라 다시 세운다. */
-const CARD = [
-  (p) => {
-    for (let i = 0; i < 7; i += 1) { if (i === 4) continue; p.box(2.6, 1.0, 0.3, -9 + i * 3, -5.5, 0xb8ac96); }
-    tree(p, -6.5, -6.8, 0.85);
-    tree(p, 6.2, -6.4, 1.0);
-  },
-  (p) => {
-    p.box(17, 4.2, 2, -3, -7.4, 0xe6ddc6);
-    for (let i = 0; i < 2; i += 1) p.box(15.5, 0.6, 0.2, -3, -6.3, 0x53656e, 1.1 + i * 1.5);
-    p.box(20, 1.0, 0.28, 0, -5.2, 0xe0d6bd);
-    for (let i = 0; i < 5; i += 1) p.box(0.42, 1.3, 0.42, -8 + i * 4, -5.2, 0xd0c4a6);
-    for (let i = 0; i < 3; i += 1) p.post(0.07, 2.0, 5.4 + i * 1.5, -4.2, 0xb9c2c9);
-    p.bar(0.05, 3.0, 6.9, 1.94, -4.2, 0xb9c2c9);
-  },
-  (p) => {
-    p.box(22, 0.8, 0.16, 0, -5.4, 0x27523f);
-    for (let i = 0; i < 17; i += 1) p.box(0.12, 1.8, 0.1, -10.4 + i * 1.3, -5.4, 0x2f4f3f, 0.8);
-    p.box(22, 0.1, 0.13, 0, -5.4, 0x9aa3ab, 2.5);
-    for (const x of [-7.5, 7.5]) {
-      p.post(0.14, 6.2, x, -6.4, 0x7d858c);
-      p.box(1.8, 0.7, 0.45, x, -6.4, 0x3a4048, 6.0);
-      p.box(1.5, 0.42, 0.28, x, -6.6, 0xf2eecf, 6.14);
-    }
-  },
-  (p) => {
-    const tower = [0x8a93a0, 0x9fa8ae, 0x7c848f];
-    const neon = [0xff4f7a, 0x3fd8e0, 0xffd83d];
-    for (let i = 0; i < 4; i += 1) {
-      const x = -8.4 + i * 5.6;
-      p.box(4.6, 7.5 + (i % 3) * 2.6, 3, x, -8.6, tower[i % 3]);
-      p.box(3.8, 0.7, 0.25, x, -7.1, neon[i % 3], 2.6 + (i % 2) * 1.8);
-    }
-    p.box(20, 0.9, 0.12, 0, -4.6, 0x9aa2a8);
-    p.box(3.8, 0.2, 1.9, 6.6, -3.4, 0x3f4a54, 2.4);
-    for (const dx of [-1.7, 1.7]) p.post(0.07, 2.4, 6.6 + dx, -2.7, 0x5a6470);
-    p.box(3.4, 1.5, 0.1, 6.6, -4.2, 0x3f4a54, 0.8);
-  }
-];
+// 카드에서도 같은 시설 모형을 쓴다. 폭 45%·높이 70%·깊이 30%는 작은 카드의 정사각 구도에 맞춘 연출 배율이다.
+const cardCache=[];
+export function placeCardGeo(city){
+  if(!cardCache[city])cardCache[city]=placeGeo(city).clone().scale(0.45,0.7,0.3).rotateY(Math.PI).translate(0,0,3);
+  return cardCache[city];
+}
 
-const cardCache = [];
-
-// 카드 한 장이 쓰는 지오메트리. 경기장과 같은 규칙으로 한 장이고, 같은 재질을 문다.
-export function placeCardGeo(city) {
-  const c = Math.max(0, Math.min(CARD.length - 1, Math.floor(Number(city) || 0)));
-  if (!cardCache[c]) {
-    const p = pen();
-    CARD[c](p);
-    cardCache[c] = mergeGeos(p.geos, p.cols);
+// THREE.InstancedMesh와 기존 mergeGeos를 재사용해 둥근 머리·상의 관중을 한 드로우콜로 만든다.
+export function venueCrowd(){
+  // 여덟 단에 36명씩 배치한다. 머리 0.18·몸 0.23은 먼 관중을 행인보다 작은 실루엣으로 읽게 한다.
+  const body=new THREE.CapsuleGeometry(0.23,0.35,4,8);body.translate(0,0.4,0);
+  const head=new THREE.SphereGeometry(0.18,8,6);head.translate(0,0.88,0);
+  const geo=mergeGeos([body,head],[0xffffff,0xd7b79a]);
+  const crowd=new THREE.InstancedMesh(geo,new THREE.MeshLambertMaterial({vertexColors:true}),8*36);
+  const matrix=new THREE.Matrix4(),color=new THREE.Color();
+  // 차분한 네 색은 팀이나 국가의 실측이 아니라 관중석의 제품 팔레트다.
+  const colors=[0x9eb6b1,0xb8877c,0xbca86b,0x8393ae];
+  for(let row=0;row<8;row++)for(let seat=0;seat<36;seat++){
+    const i=row*36+seat;
+    matrix.makeTranslation(-35+seat*2,0.8+row*0.75,43+row*1.5);
+    crowd.setMatrixAt(i,matrix);crowd.setColorAt(i,color.setHex(colors[i%colors.length]));
   }
-  return cardCache[c];
+  crowd.name='venue-crowd';crowd.userData.probeIgnore=true;
+  return crowd;
 }

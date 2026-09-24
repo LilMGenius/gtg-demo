@@ -190,15 +190,16 @@ export const MAX_FRAME = GOALS.length - 1;
 // 값 기준은 앞의 다섯과 같다. 첫 칸은 이적시장 380 골드보다 싸고 마지막 칸은 그보다 비싸다.
 // sky는 하늘색, haze는 안개색이다. 골대의 그물 값과 같은 이유로 렌더가 아니라 여기 있다.
 // 등급이 오를수록 하늘이 옅고 뿌예진다. 뒷산은 파랗고 번화가는 먼지가 낀다.
+// 무광 흙·인조잔디·잔디·프로 잔디의 채도를 낮춘 제품 팔레트이며 실제 구장의 색 실측은 아니다.
 export const CITIES = [
   { city: 0, name: '동네 운동장', cost: 0, note: '아무것도 안 샀을 때 서 있는 곳. 지나가는 사람이 거의 없다',
-    ground: 0x9c7a4a, fence: 0x3f6b4a, rise: 0.55 },
+    ground: 0xa68b60, fence: 0x3f6b4a, rise: 0.55 },
   { city: 1, name: '풋살장', cost: 145, note: '하교 시간에 사람이 지나간다. 가끔 고개가 돌아간다',
-    ground: 0xa8763f, fence: 0x6b6f5a, rise: 0.8 },
+    ground: 0x527d60, fence: 0x6b6f5a, rise: 0.8 },
   { city: 2, name: '잔디 축구장', cost: 385, note: '유동인구가 많다. 막으면 소문이 빨리 난다',
-    ground: 0x4a7a46, fence: 0x8a9099, rise: 1.1 },
+    ground: 0x658562, fence: 0x8a9099, rise: 1.1 },
   { city: 3, name: '프로 경기장', cost: 860, note: '사방이 사람이다. 팔로워도 실점도 같이 는다',
-    ground: 0x585d64, fence: 0xb0b6bd, rise: 1.55 }
+    ground: 0x547757, fence: 0xb0b6bd, rise: 1.55 }
 ];
 
 /* 등급이 소유하는 자리의 생김새. 이름이 말하는 장소가 화면에서도 그 장소여야 한다.

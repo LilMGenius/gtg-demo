@@ -8,7 +8,7 @@ import * as THREE from "../../vendor/three.module.min.js";
 import { buildKeeper, buildKicker, setPose, POSES } from "./objects/actors.mjs";
 import { faceOf } from "../../../src/roster.mjs";
 import { meshPanel, buildPassers } from "./objects/pitch.mjs";
-import { placeCardGeo } from "./objects/places.mjs";
+import { placeCardGeo, venueCrowd } from "./objects/places.mjs";
 import { flatVertex, mergeGeos } from "./units.mjs";
 import { skinAt, placeAt } from "../state/gear.mjs";
 
@@ -172,23 +172,19 @@ function cityRig(pick) {
     new THREE.MeshLambertMaterial({ color: place.ground }));
   ground.rotation.x = -Math.PI / 2;
   grp.add(ground);
-  /* 지평선 한 조각. 인원과 하늘만으로는 네 칸이 같은 장소의 다른 시간대로 읽혔다.
-     경기장과 같은 규칙으로 등급이 높을수록 건물이 솟는다. 다섯 동이면 칸 폭을 채우고,
-     행인 뒤에 서므로 사람을 안 가린다. 다섯을 한 지오메트리로 붙여 칸 하나가 메시 하나다. */
-  const far = [];
-  for (let i = 0; i < 5; i += 1) {
-    const h = (1.6 + (i % 3) * 0.7) * place.rise;
-    const b = new THREE.BoxGeometry(1.5, h, 1.2);
-    b.translate(-3.2 + i * 1.6, h / 2, -10.4);
-    far.push(b);
-  }
-  grp.add(new THREE.Mesh(mergeGeos(far), new THREE.MeshLambertMaterial({ color: place.fence })));
+  // 시설 자체가 지평선을 만든다. 별도 도심 건물을 얹으면 잔디 구장과 스타디움이 같은 도시로 읽힌다.
   /* 그 동네의 물건. 밟는 면과 지평선 높이만 갈리던 동안 네 칸이 색만 다른 같은 벌판이었다.
      경기장 배치를 그대로 담으면 60m짜리 담이 이 칸에서 실 한 오라기가 되므로, 칸의 배치는
      places.mjs가 따로 쥔다. 어느 동네인지는 한 곳이 정하고 어떻게 담을지만 칸마다 다르다.
      굽고 나면 clearScene이 이 리그의 지오메트리를 버린다. 사본을 주지 않으면 같은 칸을
      두 번째로 구울 때 이미 버려진 지오메트리를 그리게 된다. */
   grp.add(new THREE.Mesh(placeCardGeo(rank).clone(), flatVertex(0xffffff)));
+  // 프로 관중은 시설 카드와 같은 배율로 옮겨 관람석 위에 앉힌다.
+  if(rank===3){
+    const crowd=venueCrowd();
+    crowd.scale.set(0.45,0.7,0.3);crowd.rotation.y=Math.PI;crowd.position.z=3;
+    grp.add(crowd);
+  }
   // 행인 수는 경기장과 같은 식으로 센다. 다섯에서 시작해 등급마다 둘씩 는다.
   const n = PASSER_BASE + PASSER_STEP * rank;
   const who = buildPassers(grp, n);

@@ -12,6 +12,7 @@ import {
 } from './units.mjs';
 import { pupilMat, buildKeeper, buildKicker, poseWalker, POSES, JOINTS, lerpPose, pushPose, setPose, poseDist, KICK_WIND, beatOf } from './objects/actors.mjs';
 import { buildPitch, buildPassers, BOX_Z } from './objects/pitch.mjs';
+import { venueCrowd } from './objects/places.mjs';
 import { contactTex } from './texture.mjs';
 import { skinAt, placeAt } from '../state/gear.mjs';
 import { gazeMood } from '../ui/lines.mjs';
@@ -305,6 +306,9 @@ export function createScene(canvas) {
   // 등급이 오를수록 하늘이 탁해진다. 사람이 많은 동네일수록 공기가 나쁘다는 한 줄 연출
   let passerCount = PASSER_BASE;
   const passers = buildPassers(scene, PASSER_MAX);
+  const stadiumCrowd = venueCrowd();
+  stadiumCrowd.visible = false;
+  scene.add(stadiumCrowd);
   subTag = 'impact';
   const impact = createImpact(scene);
   subTag = 'ball';
@@ -583,6 +587,7 @@ const TOUCHED = new Set(['contact']);
     scene.fog.color.setHex(look.haze);
     // 시간대는 변형이 정하고 장소는 등급이 정한다. 하늘만 바꾸면 이름이 말하는 곳이 화면에 없다.
     pitch.setPlace(placeAt(c));
+    stadiumCrowd.visible = c === 3 /* 프로 경기장은 사다리의 마지막인 3등급이다. */;
   }
 
   function setKeeper(k, look) {
