@@ -75,14 +75,14 @@ const SCUFF_S = 2048; // 누적 접촉 자국이 쓰는 기존 캔버스 해상�
 export function paintScuffBase(c) {
   c.drawImage(dirtTex().image, 0, 0, SCUFF_S, SCUFF_S);
   // 골문 앞은 넓게, 페널티 스폿 부근은 좁게 닳게 하되 표시는 별도 규정선 메시가 소유한다.
-  const patches = [[0.5, 0.14, 0.48, 0.2], [0.5, 0.66, 0.14, 0.1]]; // 판 UV에서 두 접촉 영역만 강조한다.
+  const patches = [[0.5, 0.07, 0.48, 0.09], [0.5, 0.66, 0.14, 0.1]]; // 판 UV에서 두 접촉 영역만 강조한다.
   for (const [x, y, rx, ry] of patches) {
     c.save();
     c.translate(x * SCUFF_S, y * SCUFF_S);
     c.scale(rx * SCUFF_S, ry * SCUFF_S);
     const g = c.createRadialGradient(0, 0, 0, 0, 0, 1); // 정규화한 타원 안에서 중심부터 가장자리까지 번진다.
-    g.addColorStop(0, 'rgba(132,111,79,0.16)'); // 최대 대비를 얕게 두어 공과 발의 외곽선에 경쟁하지 않는다.
-    g.addColorStop(1, 'rgba(132,111,79,0)'); // 끝은 투명해서 마모판의 경계가 보이지 않는다.
+    g.addColorStop(0, 'rgba(96,78,52,0.78)'); // 넓은 골문 마모가 세 휘도 구간을 지나도록 중심만 어둡게 하고 가장자리까지 천천히 푼다.
+    g.addColorStop(1, 'rgba(96,78,52,0)'); // 끝은 투명해서 마모판의 경계가 보이지 않는다.
     c.fillStyle = g;
     c.fillRect(-1, -1, 2, 2); // 정규화 타원의 외접 사각형을 채운다.
     c.restore();

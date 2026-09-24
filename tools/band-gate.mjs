@@ -4,7 +4,9 @@
 import { chromium } from "playwright";
 
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const URL = "http://127.0.0.1:10310/web/index.html?seed=20";
+// 기본 전체 해상도와 선택 픽셀 모드에서 같은 바닥을 재되 문턱은 공유한다.
+const PIX = process.argv.includes("--pix=1");
+const URL = "http://127.0.0.1:10310/web/index.html?seed=20&pix=" + Number(PIX);
 const W = 1280;
 const H = 720;
 const COL0 = 140;
@@ -69,6 +71,13 @@ async function lumaOf([b64, picks, half]) {
 // 서로 다른 두 단으로 세어진다. 묶고 나서 재면 둘 다 사라진다.
 function bands(vals) {
   if (!vals.length) return { n: 0, levels: [] };
+  // 전체 해상도에는 포스터라이즈 틈이 없다. 연속 그라데이션을 한 군집으로 합치지 않고 같은 일곱 휘도 칸에 센다.
+  if (!PIX) {
+    const count = new Array(7).fill(0); // 렌더의 배경 일곱 단계와 같은 수의 지각 휘도 구간이다.
+    for (const v of vals) count[Math.min(count.length - 1, Math.floor(v * count.length / 256))]++; // 화면 바이트 전체를 고정 구간으로 나눈다.
+    const levels = count.flatMap((n, i) => n / vals.length >= MIN_SHARE ? [i] : []);
+    return { n: levels.length, levels };
+  }
   const hist = new Map();
   for (const v of vals) hist.set(v, (hist.get(v) || 0) + 1);
   const keys = [...hist.keys()].sort((a, b) => a - b);
@@ -142,6 +151,8 @@ try {
 
   // 음성 대조군. 한 가지 색으로 채운 화소 목록은 반드시 한 단으로 세어져야 한다.
   const ctrl = bands(new Array(4000).fill(137));
+  const positive = bands(Array.from({ length: 4000 }, (_, i) => [40, 120, 200][i % 3])); // 떨어진 세 휘도면은 양쪽 모드에서 세 칸으로 검출되어야 한다.
+  console.log("POSITIVE bands=" + positive.n + " (must be 3)");
 
   console.log("TARGET " + target + " cells=" + tally[target]);
   console.log("MID  rows " + rows[lo] + ".." + rows[lo + 2] + "  bands=" + mid.n + "  levels=" + mid.levels.join(","));
@@ -149,7 +160,7 @@ try {
   console.log("CONTROL bands=" + ctrl.n + "  (must be 1)  " + (ctrl.n === 1 ? "ok" : "INSTRUMENT BROKEN"));
   console.log("errors " + (errs.length ? errs.join(" | ") : "clean"));
 
-  const ok = ctrl.n === 1 && errs.length === 0 && near.n >= 3 && near.n >= mid.n;
+  const ok = ctrl.n === 1 && positive.n === 3 && errs.length === 0 && near.n >= 3 && near.n >= mid.n;
   console.log("band " + (ok ? "PASS" : "FAIL"));
   if (!ok) process.exitCode = 1;
 } finally {
