@@ -58,7 +58,7 @@ try {
     const keeper = r.KEEPERS[0];
     const look = g.lookOf({}, keeper.name);
     // 기존 턱 덮개를 수염 최상 등급으로 강제해 양성 대조군을 만든다.
-    look.hair = 0xff00ff; look.face = { ...look.face, beard: 2, forceHairChin: true };
+    look.hair = 0xff00ff; look.face = { ...look.face, beard: 2, beardShape: 'full', forceHairChin: true };
     const control = await read(m.headBox("hair", keeper, look));
     return { rows, control };
   });

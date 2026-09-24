@@ -2,9 +2,21 @@
 // 몸통 하나를 통째로 기울이면 T포즈를 회전시킨 것으로만 읽힌다.
 // 어깨와 고관절을 끝단 피벗으로 세우고, 각도를 데이터로 둔다. 과장은 여기서 나온다.
 import * as THREE from '../../../vendor/three.module.min.js';
-import { flat, flatMap, flatVertex, mergeGeos, standOnGround } from '../units.mjs';
+import { mergeGeos, standOnGround } from '../units.mjs';
 import { clothTex, inkTex } from '../texture.mjs';
-import { jitterMesh, addOutline } from '../handmade.mjs';
+// Three.js MIT CapsuleGeometry를 키트와 공유하고 기존 관절 피벗에 맞춰 복제한다.
+// 출처: https://threejs.org/docs/pages/CapsuleGeometry.html (MIT, three 패키지 LICENSE).
+const KIT = {cap:6, radial:16, sphere:20, rings:14, roughness:0.9}; // 키트의 둥근 외곽선과 넓은 무광 반사를 그대로 쓴다.
+const capsuleCache = new Map();
+function capsuleGeometry(radius, length) {
+  const key = radius + ':' + length;
+  if (!capsuleCache.has(key)) capsuleCache.set(key, new THREE.CapsuleGeometry(radius, length, KIT.cap, KIT.radial));
+  return capsuleCache.get(key).clone();
+}
+function flat(color) { return new THREE.MeshStandardMaterial({color, roughness:KIT.roughness}); }
+function flatMap(color, map) { const m=flat(color); m.map=map; return m; }
+function flatVertex(color) { const m=flat(color); m.vertexColors=true; return m; }
+// 키트는 매끈한 기하 자체로 실루엣을 만들므로 임의 정점 잡음과 복제 외곽선을 쓰지 않는다.
 
 // 동공은 연출이 바꿔 끼우므로 재질을 밖에서 소유한다.
 export const pupilMat = new THREE.MeshBasicMaterial({ color: 0x18140f });
@@ -445,7 +457,7 @@ export function setPose(g, pose, time = 0) {
 // 안 넘기면 기본 갈색에 기본 반구로 선다.
 export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
   const whiteMat = new THREE.MeshBasicMaterial({ color: 0xfbfbf5 });
-  const darkMat = pupilMat;
+  const darkMat = pupilMat.clone(); // 경기장의 알파 마스크 셰이더가 썸네일의 눈과 입에 새지 않게 재질을 분리한다.
   // 흰자 둘은 표정이 바뀌어도 자리가 그대로다. 한 장으로 붙여야 얼굴 하나가 드로우콜을 아홉 부르지 않는다.
   const whiteGeos = [];
   const eyes = [];
@@ -455,14 +467,14 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
        먼 거리 기준으로만 깎아 흰자 지름이 머리 반지름의 0.68이었고, 두 개가 얼굴을 덮어
        파운더가 볼에 검은 김이 붙었다고 짚었다. 그 김은 입이고, 흰자에 밀려 자리가 없었다.
        가까운 쪽에 맞추고 먼 쪽은 facevis가 지킨다. 그 자가 열다섯 사건에서 얼굴 노출을 잰다. */
-    const w = new THREE.SphereGeometry(r * 0.23, 10, 8);
+    const w = new THREE.SphereGeometry(r * 0.203, KIT.sphere, KIT.rings);
     w.scale(1, 1.15, 0.42);
-    w.translate(s * r * 0.36, r * 0.16, dir * r * 0.78);
+    w.translate(s * r * 0.36, r * 0.095, dir * r * 0.9); // 키트 눈 간격과 작은 흰자를 구 표면에 맞춘다.
     whiteGeos.push(w);
     // 동공은 감정마다 따로 늘어난다. 붙이면 한쪽 배율이 반대쪽 눈을 밖으로 민다.
-    const pupil = new THREE.Mesh(new THREE.SphereGeometry(r * 0.115, 8, 6), darkMat);
-    pupil.position.set(s * r * 0.36, r * 0.14, dir * r * 0.99);
-    pupil.scale.set(1, 1.1, 0.5);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(r * 0.086, KIT.sphere, KIT.rings), darkMat);
+    pupil.position.set(s * r * 0.36, r * 0.081, dir * r * 0.98); // 흰자 앞에 작은 동공을 둔다.
+    pupil.scale.set(1, 1.5, 0.6); // 키트의 세로 눈동자 비율이다.
     head.add(pupil);
     eyes.push(pupil);
   }
@@ -471,7 +483,7 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
   const mouth = new THREE.Mesh(new THREE.SphereGeometry(r * 0.155, 8, 6), darkMat);
   mouth.position.set(0, -r * 0.4, dir * r * 0.9);
   // 폭이 좁으면 검은 원이 되어 공의 검은 오각 무늬와 구별이 안 된다. 가로로 눕혀야 입이다.
-  mouth.scale.set(1.35, 0.6, 0.34);
+  mouth.scale.set(1.25, 0.38, 0.34); // 얇은 키트 입을 사건 표정의 기준 배율로 쓴다.
   head.add(mouth);
   // 카메라는 골대 뒤에 있다. 키퍼는 키커를 보므로 화면에 잡히는 건 언제나 뒤통수다.
   // 구 하나에 정수리 반구만 얹으면 그 아래가 굴곡 없는 살색 판이 되어 머리로 안 읽힌다.
@@ -480,15 +492,19 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
   // 껍데기 각과 배율을 등급이 정한다. 색만 바꾸면 네 값이 같은 실루엣을 판다.
   const cut = hairCut || { wide: 1, tall: 1, phi: 0.42, tilt: 0 };
   // 늘린 머리도 입 높이 아래로 내려오지 않는다. 반지름 1.05배는 위의 기존 껍데기 두께다.
-  const hair = new THREE.SphereGeometry(r * 1.05, 10, 8, 0, Math.PI * 2, 0, Math.min(Math.PI * cut.phi, Math.acos(mouth.position.y / (r * 1.05 * cut.tall))));
+  const hair = new THREE.SphereGeometry(r * 1.05, KIT.sphere, KIT.rings, 0, Math.PI * 2, 0, Math.min(Math.PI * cut.phi, Math.PI * 0.43));
   // 좌우로 죄면 볏이 되고 위로 늘리면 기른 머리가 된다. z는 그대로 둬야 뒤통수를 계속 덮는다.
-  hair.scale(cut.wide, cut.tall, 1);
+  const hp=hair.attributes.position, hu=hair.attributes.uv;
+  const height=Math.max(1,cut.tall)+(cut.phi>0.5&&cut.wide>0.9?0.22:0); // 넓은 탈색 헤어는 정수리를 더 세워 기본 커트와 실루엣이 갈리게 한다.
+  for(let i=0;i<hp.count;i++){
+    const blend=Math.min(1,hu.getY(i)*6); // 마지막 두 위도 띠만 두피에 접어 등급별 볏 높이를 보존한다. // 아랫단은 두피에 붙이고 정수리만 등급 비율로 늘린다.
+    hp.setXYZ(i,hp.getX(i)*cut.wide,hp.getY(i)*(1+(height-1)*blend),hp.getZ(i));
+  }
+  hair.computeVertexNormals(); // 정수리 덮개는 피부 구보다 커야 낮은 헤어도 피부가 뚫고 나오지 않는다.
   // 집에서 깎은 머리는 한쪽이 눌린다. 라디안이라 0.07이면 4도쯤이다.
-  if (cut.tilt) hair.rotateZ(cut.tilt);
-  hair.translate(0, r * 0.08, -dir * r * 0.1);
-  const nape = new THREE.SphereGeometry(r * 0.98, 10, 8);
-  nape.scale(1, 1, 0.62);
-  nape.translate(0, -r * 0.04, -dir * r * 0.42);
+  if (cut.tilt) for(let i=0;i<hp.count;i++) hp.setX(i,hp.getX(i)+Math.sin(cut.tilt)*r*hu.getY(i)); // 눌린 정수리만 기울이고 두피 접촉선은 고정한다.
+  // 정수리 껍질은 머리와 원점을 공유해야 헤어 아랫단이 두피에서 떠 있지 않는다.
+
   /* 목은 머리보다 가늘다. 1.12r로 시작하면 머리보다 굵어 어깨 위에 기둥이 서고,
      그 위에 밝은 칼라까지 얹혀 있어서 파운더가 목깁스를 찼다고 짚었다.
      0.62r은 두개골 반지름의 3분의 2로, 사람 목이 머리에 대해 갖는 비율에 가깝다. */
@@ -497,37 +513,51 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
   /* 칼라를 뺐다. 머리와 어깨 사이 값이 안 끊긴다는 문제에 실물에 없는 원반을 얹어
      풀었고, 사람은 없는 물건이 몸에 붙어 있으면 그것을 결함이 아니라 병으로 읽는다.
      값은 목을 가늘게 해서 끊는다. 가는 목은 양옆에 배경을 남기므로 그 자체가 경계다. */
-  const shellGeos = [hair, nape, neck];
-  const shellColors = [hairTone || 0x2b1d14, 0x5a4030, 0x2a2018];
+  const shellGeos = [hair, neck]; // 정수리만 머리색으로 덮고 턱까지 내려오는 뒷머리 구는 쓰지 않는다.
+  const shellColors = [hairTone || 0x2b1d14, skin]; // 목은 피부색이며 수염은 별도 데이터만 칠한다.
   /* 수염과 묶은 머리. 머리색과 피부색만으로는 백 명이 다섯 얼굴로 뭉친다.
      이 둘은 실루엣을 바꾸므로 카드 크기에서도, 경기장의 작은 머리에서도 갈린다.
      수염은 턱과 인중에 붙는 껍데기다. 1은 짧고 2는 덥수룩해서 조금 더 서고 넓다. */
   const beard = face && face.beard ? face.beard : 0;
   if (beard) {
-    /* 앞의 턱선 고리는 위도 0.54파이에서 시작해 입 창만 남기고 머리를 한 바퀴 감았고,
-       그 띠가 정면에서 양볼에 어두운 조각 둘로 맺혀 파운더가 볼에 김이 붙었다고 짚었다.
-       실측으로 조각의 위 끝이 머리 중심에서 반지름의 0.21 아래인데 입 윗선은 0.40 아래라
-       조각이 볼 한가운데 섰다. 귀에서 내려오는 구레나룻도 그 자리에서 시작하지 않는다.
-       짧은 수염은 입 아래 턱과 인중 두 덩이로 읽힌다. 그 둘만 남긴다.
-       턱수염은 입 아랫선 -0.49r 바로 아래인 -0.52r에서 시작하고 뒷머리를 감싸지 않는다.
-       인중은 입 윗선 -0.31r 위 한 줄이고 폭은 입 반폭 0.21r보다 조금 넓다.
-       볼 높이에는 어느 등급도 아무것도 안 선다. */
-    // 키커의 기존 수염 정체성은 유지한다. 묶은 머리의 긴 수염은 턱끝에 모아 형태를 구별한다.
+    // 수염은 피부 구의 턱 표면을 따라가며 입과 볼은 비워 둔다. 면도는 이 분기 자체가 없다.
     const shape = face.beardShape || (beard === 1 ? 'stubble' : face.tail ? 'goatee' : 'full');
-    const c = beard === 2 ? { rad: 1.06, mus: 0.16 } : { rad: 1.02, mus: 0.14 };
-    // 껍데기는 y를 0.06r 내려 쓰므로 높이를 위도로 바꿀 때 그만큼 되돌린다.
-    const lat = (y) => Math.acos((y + 0.06) / c.rad);
-    // 턱 앞면만 덮는다. 0.24파이는 턱끝, 0.8파이는 짧은 수염, 1.1파이는 앞턱 양옆까지다.
-    const span = Math.PI * (shape === 'goatee' ? 0.24 : shape === 'stubble' ? 0.8 : 1.1);
-    const chin = new THREE.SphereGeometry(r * c.rad, 12, 6,
-      Math.PI * (dir > 0 ? 0.5 : 1.5) - span / 2, span,
-      lat(-0.52), Math.PI - lat(-0.52));
-    const mus = new THREE.SphereGeometry(r * c.rad, 12, 3,
-      Math.PI * (0.5 - c.mus * 0.5 + (dir > 0 ? 0 : 1)), Math.PI * c.mus,
-      lat(-0.20), lat(-0.31) - lat(-0.20));
+    const stubble = shape === 'stubble', goatee = shape === 'goatee';
+    const shell = stubble ? 1.008 : goatee ? 1.025 : 1.018; // 잔수염은 피부 바로 위, 긴 수염만 턱 실루엣 밖으로 나온다.
+    const span = Math.PI * (goatee ? 0.24 : stubble ? 1 : 1.1); // 염소수염은 턱끝만, 나머지는 아래턱 양옆까지 덮는다.
+    const top = Math.acos(-0.52 / shell); // 입 아랫선보다 아래에서 시작해 볼과 입을 비운다.
+    const chin = new THREE.SphereGeometry(r * shell, 32, 12,
+      Math.PI * (dir > 0 ? 0.5 : 1.5) - span / 2, span, top, Math.PI - top); // 촘촘한 곡면이 각진 턱띠 대신 턱선을 따라간다.
+    const jawPos = chin.attributes.position, jawUV = chin.attributes.uv;
+    for (let i = 0; i < jawPos.count; i++) {
+      const u = jawUV.getX(i), v = jawUV.getY(i);
+      const lip = goatee ? -0.58 : -0.45 - 0.20 * Math.sin(Math.PI * u) ** 2; // 가운데는 입 아래로 파고 양옆은 아래턱을 따라 완만히 오른다.
+      const begin = Math.acos(lip / shell), theta = begin + (Math.PI - begin) * (1 - v); // 기존 구의 위도를 다시 배치해 일자 턱띠를 없앤다.
+      const phi = Math.atan2(jawPos.getZ(i), jawPos.getX(i));
+      jawPos.setXYZ(i, r * shell * Math.sin(theta) * Math.cos(phi), r * shell * Math.cos(theta), r * shell * Math.sin(theta) * Math.sin(phi));
+    }
+    if (goatee) chin.scale(1, 1.08, 1); // 턱끝에만 짧은 술을 내려 둥근 공처럼 보이지 않게 한다.
+    chin.computeVertexNormals();
+    const musSpan = Math.PI * (goatee ? 0.13 : 0.20); // 콧수염은 입 폭 안팎의 얇은 조각이며 뺨으로 번지지 않는다.
+    const musTop = Math.acos(-0.22 / shell), musBottom = Math.acos(-0.29 / shell); // 입 윗선과 콧수염 사이 피부 여백을 남긴다.
+    const mus = new THREE.SphereGeometry(r * shell, 24, 4,
+      Math.PI * (dir > 0 ? 0.5 : 1.5) - musSpan / 2, musSpan, musTop, musBottom - musTop); // 가는 윗입술 그림자를 매끄러운 곡면으로 만든다.
+    const musPos = mus.attributes.position, musUV = mus.attributes.uv;
+    for (let i = 0; i < musPos.count; i++) {
+      const u = musUV.getX(i), v = musUV.getY(i);
+      const middle = -0.25 + 0.035 * Math.cos(u * Math.PI * 2); // 인중에서 양끝으로 올라가는 짧은 콧수염 곡선이다.
+      const y = middle + (v - 0.5) * 0.07 * Math.sin(u * Math.PI); // 양끝 두께를 줄여 직사각형 검은 띠가 되지 않게 한다.
+      const phi = Math.atan2(musPos.getZ(i), musPos.getX(i)), radius = Math.sqrt(shell * shell - y * y) * r;
+      musPos.setXYZ(i, radius * Math.cos(phi), y * r, radius * Math.sin(phi));
+    }
+    mus.computeVertexNormals();
     for (const g of [chin, mus]) {
-      g.scale(1, 1, c.rad);
-      g.translate(0, -r * 0.06, 0);
+      if (stubble) {
+        const shade = flatVertex(0xffffff); // 흰 재질에 독립된 수염색 정점만 곱한다.
+        shade.transparent = true; shade.opacity = 0.45; shade.depthWrite = false; // 잔수염은 피부 윤곽을 보존하는 얇은 음영이다.
+        head.add(new THREE.Mesh(mergeGeos([g], [face.beardTone ?? 0x1c1712]), shade)); // 염색 색은 이 표면에 들어오지 않는다.
+        continue;
+      }
       shellGeos.push(g);
       // 수염은 독립된 짙은 갈색이다. 기존 기본색을 유지해 염색이 턱으로 새지 않는다.
       shellColors.push(face.beardTone ?? 0x1c1712);
@@ -562,7 +592,7 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
 // 사지에는 외곽선을 안 건다. 팔 여덟 개가 각자 복제본을 달면 드로우콜이 두 배가 되고,
 // 가늘어서 어차피 선만 남는다. 실루엣을 만드는 건 몸통과 머리다.
 function seg(radius, len, color, tag, salt, cuff, span, girth, ink) {
-  const geo = new THREE.CapsuleGeometry(radius, len, 3, 6);
+  const geo = capsuleGeometry(radius, len);
   geo.translate(0, -len / 2, 0);
   // 마디 중간에 밝은 띠를 하나 병합한다. 드로우콜은 그대로다.
   // 피벗 쪽에 두면 어깨 구와 몸통 측면에 묻혀 화면에 안 나온다.
@@ -587,7 +617,7 @@ function seg(radius, len, color, tag, salt, cuff, span, girth, ink) {
   }
   m.name = tag;
   // 사지는 얇다. 0.035를 그대로 주면 팔이 끊어진 것처럼 잘록해진다.
-  jitterMesh(m, 0.012, salt);
+
   return m;
 }
 
@@ -607,14 +637,17 @@ function buildBody(o) {
 
   // 품과 기장을 등급이 정한다. 뼈대는 안 건드린다. 관절을 같이 늘리면 팔이 몸통에서 떨어진다.
   const kc = o.kitCut || { girth: 1, len: 1, pad: 0 };
-  const torsoGeo = new THREE.CapsuleGeometry(o.torsoR, o.torsoLen, 3, 8);
+  const rigRadius = o.tag === 'keeper' ? o.torsoR * 0.55 / 0.85 : 0.16; // 기존 관절 높이를 보존해 몸통 폭이 사건 포즈의 누움 판정을 바꾸지 않게 한다.
+  const neckY = (o.torsoLen + rigRadius) * kc.len - rigRadius * 0.18; // 사건 포즈의 기존 목 앵커다.
+  const torsoGeo = capsuleGeometry(o.torsoR, o.torsoLen);
   torsoGeo.translate(0, o.torsoLen / 2, 0);
   torsoGeo.scale(kc.girth, kc.len, kc.girth);
+  torsoGeo.scale(1, (neckY - o.headR * 0.1) / ((o.torsoLen + o.torsoR) * kc.len), 1); // 넓힌 몸통의 윗끝을 턱 아래로 내려 얼굴과 수염을 가리지 않는다.
   // 유니폼 한 장이 단색이면 사람이 아니라 색 견본이다. 구겨진 명암이 옷을 옷으로 만든다.
-  const torso = new THREE.Mesh(torsoGeo, flatMap(o.shirt, clothTex()));
+  const torso = new THREE.Mesh(torsoGeo, flat(o.shirt));
   torso.name = tag;
-  jitterMesh(torso, 0.022, 3);
-  addOutline(torso, 0.05);
+
+
   spine.add(torso);
 
   /* 목은 몸통 위에 선다. 상의 등급이 몸통을 세로 kc.len으로 늘리는데 이 자리를 원래
@@ -627,13 +660,13 @@ function buildBody(o) {
      머리를 몸통 꼭대기까지 올려 머리가 몸에서 떨어져 보인다. 파운더가 그 둘을 차례로 짚었다.
      0.18은 눈이 뜨는 선에서 머리를 가장 낮게 놓는 자리다. 실측으로 가장 나쁜 등급이 0.006m다.
      두 조건이 반대 방향이라 여유를 더 주면 다시 떠오르므로 이 값은 최대가 아니라 경계다. */
-  const neck = joint(spine, 0, (o.torsoLen + o.torsoR) * kc.len - o.torsoR * 0.18, 0);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(o.headR, 10, 8), flat(o.skin));
+  const neck = joint(spine, 0, neckY, 0);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(o.headR, KIT.sphere, KIT.rings), flat(o.skin));
   head.name = tag;
   head.position.y = o.headR * 0.92;
   // 머리는 작다. 몸통과 같은 진폭을 주면 두개골이 찌그러진 것으로 읽힌다.
-  jitterMesh(head, 0.008, 11);
-  addOutline(head, 0.045);
+
+
   addFace(head, o.headR, o.faceDir, o.skin, o.hair, o.hairCut, o.face);
   neck.add(head);
 
@@ -650,9 +683,9 @@ function buildBody(o) {
     const sh = joint(spine, side * o.shoulderX, o.torsoLen * 0.92, 0);
     // 어깨에 살이 없으면 팔이 몸통 옆에 떠 있는 별개 물체로 읽힌다.
     // 팔을 어느 각도로 돌려도 피벗에 있는 이 구가 몸통과 팔 사이를 메운다.
-    const delt = new THREE.Mesh(new THREE.SphereGeometry(o.armR * 1.45, 8, 6), flat(o.sleeve));
+    const delt = new THREE.Mesh(new THREE.SphereGeometry(o.armR * 1.45, KIT.sphere, KIT.rings), flat(o.sleeve));
     delt.name = tag;
-    jitterMesh(delt, 0.015, side < 0 ? 25 : 26);
+
     sh.add(delt);
     // 어깨 스펀지. 상의 색이라 무엇이 두꺼워졌는지가 그 옷의 색으로 읽힌다.
     // 어깨 삼각근 구가 반지름 1.45라, 그 안에 넣으면 스펀지를 사도 화면이 그대로다.
@@ -668,12 +701,12 @@ function buildBody(o) {
       const wide = o.armR * 1.9 + o.torsoR * kc.girth * 0.9;
       const pad = new THREE.Mesh(new THREE.BoxGeometry(wide, th, o.armR * 2.7), flat(o.shirt));
       pad.name = tag;
-      jitterMesh(pad, 0.015, side < 0 ? 27 : 28);
+
       /* 몸통 껍질 폭 0.05를 어깨 여유의 단위로 쓴다. 준비 자세의 어깨는 기울어 있어 로컬 y만
          올리면 스펀지가 목 안으로 들어간다. 작은 스펀지는 덜 올리고 두꺼운 저지는 더 솟는다.
          외곽선은 handmade.mjs의 addOutline을 장갑과 축구화의 폭 0.028로 그대로 쓴다. */
-      pad.position.set(side * (o.armR * 0.45 + Math.max(1, kc.pad) * 0.05), o.armR * 1.15 + th * 0.3 - 0.05, 0);
-      addOutline(pad, 0.028);
+      pad.position.set(side * (o.armR * 1.1 + Math.max(1, kc.pad) * 0.05), o.armR * 1.15 + th * 0.3 - 0.05, o.armR * 1.2); // 넓은 상체 앞쪽에 어깨 패드를 앉혀 양쪽이 가려지지 않게 한다.
+
       sh.add(pad);
     }
     const upper = seg(o.armR, o.upperLen, o.sleeve, tag, side < 0 ? 21 : 22, o.cuffSleeve, o.cuffSpan, o.cuffGirth, o.inkGrade);
@@ -691,8 +724,10 @@ function buildBody(o) {
       const s = o.gloveSize * gc.bulk;
       // 정육면체는 어느 각도에서 봐도 노란 상자다. 벗겨져 날아가는 순간에는 카드 한 장으로 읽혔다.
       // 손바닥, 엄지, 손목밴드를 하나로 병합한다. 실루엣이 벙어리장갑이 되고 드로우콜은 그대로 하나다.
-      const palm = new THREE.BoxGeometry(s, s * 1.15, s * 0.5);
-      const thumb = new THREE.BoxGeometry(s * 0.44, s * 0.52, s * 0.46);
+      const palm = new THREE.SphereGeometry(s * 0.5, KIT.sphere, KIT.rings); // 기존 손 폭 안에서 벙어리장갑을 둥글게 만든다.
+      palm.scale(1, 1.15, 0.5); // 장갑 앵커와 등급별 폭을 보존한다.
+      const thumb = new THREE.SphereGeometry(s * 0.26, KIT.sphere, KIT.rings); // 엄지는 손바닥보다 작은 둥근 덩어리다.
+      thumb.scale(0.85, 1, 0.88); // 기존 엄지의 접촉 범위를 보존한다.
       thumb.translate(side * s * 0.6, s * 0.1, 0);
       const cuffH = s * 0.32 * gc.cuff;
       const cuff = new THREE.BoxGeometry(s * 1.12, cuffH, s * 0.58);
@@ -712,14 +747,16 @@ function buildBody(o) {
            수로는 못 고친다. col과 row가 n의 홀짝과 n<=2로만 갈려서 다섯을 넘긴 빨판은 같은
            다섯 자리에 겹쳐 쌓인다. 실측: 돌기를 아예 빼면 이 선반의 최악 쌍이 0.801에서
            0.853으로 오른다. */
-        pip.translate(col * s * 0.28, row * s * 0.3, s * 0.42);
+        pip.translate(col * s * 0.28, row * s * 0.3, s * 0.26); // 둥근 손바닥 가장자리에도 빨판 뒷면이 닿도록 얕게 붙인다.
         hand.push(pip);
       }
       const gv = new THREE.Mesh(mergeGeos(hand), flatMap(o.gloveTone || 0xf2d64b, clothTex()));
       gv.name = tag;
+      gv.userData.partVertices = hand.map(g => g.attributes.position.count); // 합친 장갑의 조각 경계를 계기가 실제 기하에서 읽는다.
+      gv.geometry.computeBoundingBox();
       // 장갑은 화면에서 가장 자주 보는 물건이다. 직육면체 그대로면 여기서 티가 제일 크게 난다.
-      jitterMesh(gv, 0.02, side < 0 ? 31 : 32);
-      addOutline(gv, 0.028);
+
+
       gv.position.set(0, -o.foreLen - s * 0.2, 0);
       el.add(gv);
       gloves.push(gv);
@@ -728,8 +765,8 @@ function buildBody(o) {
       // 장갑만 날리면 팔가 끝에서 잘린 것으로 보인다.
       const bh = new THREE.Mesh(new THREE.SphereGeometry(o.gloveSize * 0.42, 8, 6), flat(o.skin));
       bh.name = tag;
-      jitterMesh(bh, 0.02, side < 0 ? 33 : 34);
-      addOutline(bh, 0.028);
+
+
       bh.position.set(0, -o.foreLen - o.gloveSize * 0.16, 0);
       bh.visible = false;
       el.add(bh);
@@ -747,7 +784,7 @@ function buildBody(o) {
     if (sc.guard) {
       const gd = new THREE.Mesh(new THREE.BoxGeometry(o.legR * 1.3, o.shinLen * 0.62, o.legR * 0.5 * sc.guard), flat(o.socks));
       gd.name = tag;
-      jitterMesh(gd, 0.012, side < 0 ? 45 : 46);
+
       gd.position.set(0, -o.shinLen * 0.46, o.faceDir * o.legR * 0.78);
       kn.add(gd);
     }
@@ -755,7 +792,7 @@ function buildBody(o) {
     if (sc.band) {
       const bd = new THREE.Mesh(new THREE.CylinderGeometry(o.legR * 1.15 * sc.band, o.legR * 1.15 * sc.band, o.shinLen * 0.22, 8), flat(o.socks));
       bd.name = tag;
-      jitterMesh(bd, 0.012, side < 0 ? 47 : 48);
+
       bd.position.set(0, -o.shinLen * 0.86, 0);
       kn.add(bd);
     }
@@ -774,7 +811,7 @@ function buildBody(o) {
       for (let n = 0; n < bc.pips; n++) {
         const col = n % 2 === 0 ? -1 : 1;
         const row = Math.floor(n / 2);
-        const len = o.legR * 0.26 * bc.pip;
+        const len = o.legR * 0.32 * bc.pip; // 스파이크 돌기를 늘려 짧은 스터드와 카드 외곽선이 겹치지 않게 한다.
         const th = o.legR * 0.2 * (bc.girth || 1);
         const pip = new THREE.BoxGeometry(th, len, th);
         // 앞뒤로 고르게 편다. rows가 1이면 가운데 하나다.
@@ -785,7 +822,7 @@ function buildBody(o) {
       const boot = new THREE.Mesh(mergeGeos(parts), flat(o.bootTone || 0x2a241c));
       boots.push(boot);
       boot.name = tag;
-      jitterMesh(boot, 0.016, side < 0 ? 51 : 52);
+
       // 발끝은 얼굴이 보는 쪽으로 나간다. 뒤꿈치는 발목 밑에 남긴다.
       boot.position.set(0, -o.shinLen - o.legR * 0.36, o.faceDir * (o.bootLen * 0.28));
       kn.add(boot);
@@ -818,8 +855,8 @@ export function buildKeeper(height, weight, look) {
   const g = buildBody({
     tag: 'keeper',
     hipY: h * 0.47,
-    torsoR: w * 0.55, torsoLen: h * 0.27,
-    headR: h * 0.082, faceDir: 1,
+    torsoR: w * 0.85, torsoLen: h * 0.27, // 넉넉한 키트 몸통을 기존 척추 길이에 붙인다.
+    headR: h * 0.14, faceDir: 1, // 머리를 몸통 폭과 비슷하게 키워 장난감 비율로 읽힌다.
     shoulderX: w * 0.56, armR: h * 0.048,
     upperLen: h * 0.17, foreLen: h * 0.16,
     hipX: w * 0.34, legR: w * 0.24,
@@ -855,8 +892,8 @@ export function buildKicker(face) {
   const g = buildBody({
     tag: 'kicker',
     hipY: 0.88,
-    torsoR: 0.16, torsoLen: 0.48,
-    headR: 0.145, faceDir: -1,
+    torsoR: 0.25, torsoLen: 0.48, // 키커도 키퍼와 같은 둥근 몸통 폭을 쓴다.
+    headR: 0.26, faceDir: -1, // 키커 얼굴도 같은 키트의 큰 머리 비율이다.
     shoulderX: 0.17, armR: 0.05,
     upperLen: 0.30, foreLen: 0.28,
     hipX: 0.10, legR: 0.085,
