@@ -9,7 +9,9 @@ import { FACES_V } from '../web/src/state/passer.mjs';
 // 색 키는 gear의 계약을 따른다. post는 기둥 색, sky·haze는 하늘·안개 색이다. 그물 농도 dim은 같은 등급에서 고정한다.
 // 중첩 cut까지 Node의 isDeepStrictEqual로 비교하므로 새 기하 키도 별도 등록 없이 검사된다.
 const colourKeys = new Set(['tone', 'post', 'sky', 'haze']);
-const geometryOf = variant => Object.fromEntries(Object.entries(variant).filter(([key]) => key !== 'name' && !colourKeys.has(key)));
+// 개최지와 출처는 기하가 아니다. 이 필드의 의미와 구간은 venue 게이트가 별도로 검증한다.
+const metadataKeys = new Set(['name', 'time', 'tier', 'city', 'country', 'flag', 'wealth', 'income']);
+const geometryOf = variant => Object.fromEntries(Object.entries(variant).filter(([key]) => !metadataKeys.has(key) && !colourKeys.has(key)));
 const differences = variants => {
   const [first, ...rest] = variants;
   if (!first) return [{ reason: '빈 변형 목록' }];
