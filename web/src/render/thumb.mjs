@@ -321,8 +321,8 @@ function boot() {
     R.setSize(BAKE_W, BAKE_H, false);
   scene = new THREE.Scene();
   // 경기장과 같은 빛을 쓴다. 상점에서 본 색과 화면에서 신은 색이 다르면 산 것이 다른 물건이 된다.
-  scene.add(new THREE.HemisphereLight(0xdfe8ef, 0x2b2a24, 1.15));
-  const key = new THREE.DirectionalLight(0xffffff, 1.25);
+  scene.add(new THREE.HemisphereLight(0xe7f4ff, 0x9b9384, 2.1));
+  const key = new THREE.DirectionalLight(0xffedce, 3.2);
   key.position.set(-1.4, 2.2, 1.8);
   scene.add(key);
     // 세로 화각이 프레임을 정한다. 가로로 넓히면 담기는 폭만 늘고 물건 높이는 그대로다.

@@ -17,7 +17,8 @@ try {
   };
   await page.goto('http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran');
   await page.click('#go',{force:true});
-  await page.evaluate(()=>window.__fixedStep(0.000001)); // 같은 포즈를 화면마다 비교하도록 세계시계를 멈춘다.
+  await page.evaluate(()=>{window.__fixedStep(1/60);window.__plan(0,null,window.__frames()+1);}); // 한 프레임 뒤 세계를 멈춰 모든 화면에서 같은 포즈를 비교한다.
+  await page.waitForTimeout(500); // 세계 정지와 별개인 HUD의 진입 전환이 끝난 화면을 담는다.
   await shot('pitch-1280x720');
   await page.setViewportSize({width:844,height:390}); // 과제의 가로 모바일 화면 크기다.
   await page.waitForTimeout(500); // 크기 변경 뒤 캔버스 재배치가 끝나야 빈 버퍼를 찍지 않는다.
