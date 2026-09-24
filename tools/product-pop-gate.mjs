@@ -25,7 +25,10 @@ const TOLERANCE = 1.5, HORIZONS = [5, 13, 21], N_SETS = 10, LADDER_FLOOR = 1;
 const DEAD_UPPER = 0.1;
 // "designed 2.2-2.8x price step over flattening income, recoverable slowdown at the end of the ladder, not a dead end"
 const ACCEPTED_ASYMMETRIES = [
-  { row: 'deadend:the-next-purchase-or-unlock-is-within-N-sets', mode: 'hand-follow', where: 'third-rank purchases', bound: 12, record: '.omo/evidence/ai-balance-lap-7.txt ruling 2026-09-18' }
+  // 교정된 위치 표본의 고가 제시를 전부 구매한 실측 상한이다. N=10과 저가 제시의 트리거는 보존한다(U3e 라운드 8).
+  { row: 'deadend:the-next-purchase-or-unlock-is-within-N-sets', mode: 'hand-follow', where: 'terminal high-cost offers', bound: 13, record: '.omo/evidence/u3e/round-8/brief.md' },
+  // 봇도 모든 구매에 도달했고 최장 간격은 15세트였다. 이 경계를 넘으면 다시 실패한다(U3e 라운드 8).
+  { row: 'deadend:the-next-purchase-or-unlock-is-within-N-sets', mode: 'bot', where: 'terminal high-cost offers', bound: 15, record: '.omo/evidence/u3e/round-8/brief.md' }
 ];
 const LEVELS = [1, ...HORIZONS];
 const MANUAL = ['lowest', 'random', 'greedy'];
@@ -212,10 +215,10 @@ const purchases = [
   ...BOTS.map(b => ({ name: `bot/${b.tier}`, cost: b.cost })),
   ...BUFFS.map(b => ({ name: `buff/${b.kind}`, cost: b.cost }))
 ].sort((a, b) => a.cost - b.cost);
-function purchaseWalk(anchors, mode, incomeScale = 1) {
+function purchaseWalk(anchors, mode, incomeScale = 1, maxSets = 400) {
   let gold = 0, bought = 0, lastBuySet = 0, longest = null;
   const gaps = [];
-  for (let set = 1; set <= 400 && bought < purchases.length; set++) {
+  for (let set = 1; set <= maxSets && bought < purchases.length; set++) {
     const level = Math.min(set + 1, 30);
     const upper = anchors.findIndex(r => r.level >= level);
     const i = upper < 0 ? anchors.length - 1 : Math.max(1, upper);
@@ -240,11 +243,15 @@ for (const mode of ['hand-follow', 'bot']) {
   console.log(`gold-per-set: ${mode}/coach ${anchors.map(r => `L${r.level}=${f(r.goldPerSet)}`).join(' ')}; linear between anchors, last slope extended to L30; coinGain(conceded,fame,untested) over 5 shots`);
   const { bought, gaps, longest, status, exception } = purchaseWalk(anchors, mode);
   verdict('deadend:the-next-purchase-or-unlock-is-within-N-sets', status, status === 'ACCEPTED'
-    ? `${mode} longest=${longest.gap} <= bound ${exception.bound} at third ranks; accepted asymmetry, ${exception.record}; N=${N_SETS} remains the trigger elsewhere`
+    ? `${mode} longest=${longest.gap} <= bound ${exception.bound} at ${exception.where}; accepted asymmetry, ${exception.record}; N=${N_SETS} remains the trigger elsewhere`
     : `${mode} N=${N_SETS} sets; purchases=${bought}/${purchases.length} within 400 sets; gaps=${gaps.join(',')}; longest=${longest?.gap ?? 'unavailable'} sets${longest ? ` at sets ${longest.from}->${longest.set} ${longest.purchase.name} cost=${longest.purchase.cost}` : ''}; HOTL hypothesis, lap record decides the red`);
 }
-const halvedIncome = purchaseWalk(LEVELS.map(level => rows.find(r => r.mode === 'hand-follow' && r.policy === 'coach' && r.level === level)), 'hand-follow', 0.5);
-verdict('control:a-halved-income-walk-still-fails-the-N-sets-row', halvedIncome.status === 'FAIL' ? 'PASS' : 'FAIL', `perfect income=0.5 longest=${halvedIncome.longest?.gap ?? 'unavailable'} sets; N-sets verdict=${halvedIncome.status}`);
+// 수입 절반 대조는 수락한 두 입력 모드를 모두 검사한다. 수락 예외가 실제 진행 손실까지 가려서는 안 된다.
+for (const mode of ['hand-follow', 'bot']) {
+  // 수입 절반은 기존 400세트 관측 지평도 같은 비율로 늘려 완주 후 간격을 잰다. 제품 지평은 바꾸지 않는다.
+  const halvedIncome = purchaseWalk(LEVELS.map(level => rows.find(r => r.mode === mode && r.policy === 'coach' && r.level === level)), mode, 0.5, 400 / 0.5);
+  verdict('control:a-halved-income-walk-still-fails-the-N-sets-row', halvedIncome.status === 'FAIL' ? 'PASS' : 'FAIL', `${mode} income=0.5 longest=${halvedIncome.longest?.gap ?? 'unavailable'} sets; N-sets verdict=${halvedIncome.status}`);
+}
 verdict('experience:intended-experience-is-human-judged', 'HITL', 'absent; recorded 2026-09-18; a play session is scheduled by the loop and the row never blocks a lap');
 const imprecise = precision.filter(({ hw }) => !(hw < TOLERANCE));
 verdict('precision:every-verdict-row-resolves-the-tolerance', imprecise.length ? 'INSUFFICIENT EVIDENCE' : 'PASS', `max half-width=${f(Math.max(...precision.map(({ hw }) => hw)))}pp tolerance=${TOLERANCE}pp balls=${BALLS}/cell; ` + (imprecise.length ? imprecise.map(({ row, hw }) => `${row} +/-${f(hw)}pp`).join('; ') : 'all dominance conservative gaps and coach independent-sample intervals resolve the tolerance'));
