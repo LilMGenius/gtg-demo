@@ -1770,11 +1770,12 @@ function specLines(kind, rank) {
   return specRows(kind, rank).map((r) => (r.v ? r.k + ' ' + r.v : r.k));
 }
 
-/* 카드가 파는 것을 한 줄로 말한다. 값이 붙은 항목만 세운다. 값 없는 항목은 그 자체로 정보가 없고,
-   기간과 횟수는 카드의 보조행이 따로 받으므로 여기서 빠진다. 항목과 값을 가른 표는 효과 칸의 몫이다. */
+/* 기존 specRows의 항목과 값을 카드에서도 그대로 나눈다. 긴 이름은 제목으로 전부 읽고,
+   기간과 횟수는 기존 보조 칸이 받는다. 효과가 없는 기본 장비는 빈 칸을 유지한다. */
 function cardLine(kind, rank) {
   return specRows(kind, rank).filter((r) => r.v && !/[분슛]$/.test(r.v))
-    .map((r) => r.k + ' ' + r.v).join(', ');
+    .map((r) => '<span class="effect-row" title="' + r.k + ' ' + r.v + '"><span class="effect-name">'
+      + r.k + '</span><span class="effect-value">' + r.v + '</span></span>').join('');
 }
 
 /* 카드 테두리가 말하는 등급. 선반이 스스로 매긴 순번을 그대로 쓴다. 장비는 0에서 3, 봇은 1에서 3이다.
@@ -1856,10 +1857,15 @@ function nameOfField(field, rank) {
 
 // 조건과 진행도는 구매 핸들러와 같은 판정 함수에서 읽는다. 가격은 별도 버튼에 그대로 둔다.
 function conditionHTML(item) {
-  if (!item.condition) return '';
-  const c = purchaseCondition(item, state);
-  return '<button class="condition" data-route="' + c.route + '" data-value="' + c.value + '" data-min="' + c.min + '">'
-    + '<span>' + (c.met ? '🔓' : '🔒') + ' 구매 조건 · ' + c.label + '</span><small>' + c.value.toLocaleString('ko-KR') + '/' + c.min.toLocaleString('ko-KR') + '</small></button>';
+  if (!item.condition && !item.conditions?.length) return '';
+  const condition = purchaseCondition(item, state);
+  // 경기장의 복수 조건도 이름과 진행도를 각각 같은 버튼에 묶고, 이미 연 문은 잠그지 않는다.
+  // 복수 조건은 머리글을 한 번만 쓰고 각 버튼에서 이름과 진행도를 짝짓는다.
+  const heading = condition.parts ? '<span class="condition-label">구매 조건</span>' : '';
+  return heading + (condition.parts || [condition]).map(c => '<button class="condition" data-route="' + c.route + '" data-value="' + c.value + '" data-min="' + c.min + '">'
+    + '<span class="condition-label">' + (condition.met || c.met ? '🔓' : '🔒') + ' ' + (condition.parts ? '' : '구매 조건 · ') + c.label + '</span>'
+    + '<span class="condition-progress"><progress aria-label="구매 조건 진행도" value="' + c.value + '" max="' + c.min + '"></progress>'
+    + '<small>' + c.value.toLocaleString('ko-KR') + '/' + c.min.toLocaleString('ko-KR') + '</small></span></button>').join('');
 }
 
 function gearShelf(kind) {

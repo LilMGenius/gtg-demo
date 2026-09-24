@@ -1051,35 +1051,28 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
    기성작이 쓰는 문법도 이것이다. FC 모바일의 선수 카드와 클래시 오브 클랜의 상점 줄은 이름에 두 줄 자리를
    내주고 값은 한 줄에 맞춰 세운다. */
 #shop .card.gear > b{min-height:2.5em}
-/* 효과 한 줄은 카드 폭을 다 쓴다. 값 배지와 한 줄을 나눠 쓰면 남는 폭이 절반이라
-   두 낱말짜리 줄도 두 줄로 접히고, 접힌 자리가 낱말 가운데였다(실측: '한눈팔기 -50%, 수다...').
-   두 줄에서 자르는 이유는 축이 둘인 선반의 한 줄이 세 줄까지 가고, 그때 카드 높이가
-   같은 격자 줄 안에서 갈리기 때문이다. 잘린 나머지는 효과 칸이 표로 받는다. */
-#shop .card.gear em{margin:0;font-weight:400;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-/* 접기는 문장에만 건다. 접기가 <em> 통째에 걸려 있어서 줄 끝에 붙은 기간 칸이 말줄임표 뒤로 같이
-   잘렸다(실측: 송진 스프레이가 문장 81px을 창 54px에 담아 10슛이 1280과 740 양쪽에서 화면에 안 뜨고,
-   그 자리를 찍으면 값 배지가 돌아왔다. 형제 둘은 12슛과 8슛을 그대로 들고 있어 셋 중 하나만
-   조용히 기간을 감췄다). 파는 물건의 크기가 기간인 선반에서 그 수가 없으면 값만 남는다.
-   문장과 칸을 가로로 세워 문장만 접고 칸은 제 폭을 지킨다. 칸을 아랫줄로 내리지 않는 이유는
-   740x360에서 카드 아래끝이 354px이라 한 줄을 더하면 360px 화면 밖으로 나가기 때문이다.
-   칸은 문장 블록 전체에 세로 가운데로 선다. 첫 줄에 맞추면 문장이 두 줄인 카드에서 아랫줄이 값 없이
-   남고 수는 위로 떠서, 그 수가 어느 줄에 딸린 것인지를 카드마다 다시 맞춘다(실측: 1280에서
-   자양강장제의 문장 블록 세로 가운데가 417.3인데 12슛은 402.71로, 한 줄 26.88의 절반인 13.44를
-   14.58이 넘었다). 기성작이 쓰는 문법도 이것이다. 클래시 오브 클랜의 자원 행과 FC 모바일의 효과 행은
-   여러 줄로 접힌 이름 옆의 수 칸을 이름 블록 전체에 세로 가운데로 세운다. 마지막 줄 끝에 붙이는
-   형태는 안 쓴다. */
-#shop .card.gear em:has(.eff){display:flex;align-items:center;overflow:visible}
-#shop .card.gear em .eff{min-width:0;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* 기존 효과 표의 두 칸을 카드에도 쓴다. 0 최소 폭은 긴 이름만 줄이고 값 칸은 보존한다. */
+#shop .card.gear em{margin:0;font-weight:400;font-style:normal;display:grid;min-width:0;width:100%}
+#shop .card.gear em:has(.eff){display:flex;align-items:center}
+#shop .card.gear em .eff{display:grid;flex:1;min-width:0}
+#shop .card.gear .effect-row{display:flex;gap:var(--gap-1);min-width:0;width:100%;white-space:nowrap}
+#shop .card.gear .effect-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#shop .card.gear .effect-value{flex:none;text-align:right;font-variant-numeric:tabular-nums}
 /* 값은 오른쪽 아래 구석에 못 박힌다. 넉 장을 훑는 눈이 같은 자리에서 값만 맞대 본다.
    auto 여백이 배지를 카드 바닥으로 밀어, 이름이 두 줄인 카드에서도 배지가 같은 높이에 선다. */
 #shop .card.gear .foot{display:flex;justify-content:flex-end;margin-top:auto}
 /* 조건이 추가된 선반은 내부 스크롤을 없애 가격까지 함께 보인다. 짧은 화면은 상점 전체가 스크롤된다. */
 #shop .rack:has(.condition){max-height:none;overflow:visible}
 /* 조건은 별도 버튼이다. 1.3줄 간격으로 조건과 진행도를 구분하고 기존 본문 크기를 유지한다. */
-#shop .card.gear .condition{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--gap-1);width:100%;padding:var(--gap-1);text-align:left;font-size:var(--fs-body);line-height:1.3;background:var(--panel);color:var(--ink);border:var(--line) solid var(--edge);cursor:pointer}
-#shop .card.gear .condition small{font:inherit;white-space:nowrap}
+#shop .card.gear .condition{display:flex;flex-direction:column;gap:var(--gap-1);width:100%;padding:var(--gap-1);text-align:left;font-size:var(--fs-body);line-height:1.3;background:var(--panel);color:var(--ink);border:var(--line) solid var(--edge);cursor:pointer}
+#shop .card.gear .condition small{font:inherit;white-space:nowrap;font-variant-numeric:tabular-nums}
+/* 조건 잠금은 자물쇠와 비활성 버튼이 말한다. 지갑이 충분한 가격 자체는 또렷하게 남긴다. */
+#shop .card.gear .condition ~ .foot .buy:disabled .px:not(.bad-price):not(.bad-cash){color:var(--ink)}
+/* 조건 문구 다음 줄에 진행 막대와 분수를 함께 둔다. 0 최소 폭은 막대가 글자를 밀지 않게 한다. */
+#shop .card.gear .condition-label{width:100%}
+#shop .card.gear .condition-progress{display:flex;align-items:center;gap:var(--gap-1);width:100%}
+/* 4px는 기존 최소 간격 토큰과 같은 얇은 막대 높이다. 분수와 잠금 표시가 색 이외의 신호다. */
+#shop .card.gear .condition progress{flex:1;min-width:0;height:4px;accent-color:var(--ink)}
 /* 봇과 버프의 기간·횟수는 가격 배지 밖의 보조 칸이다. 효과 한 줄 끝에 붙어 한 줄로 읽힌다. */
 #shop .card.gear .duration{flex:0 0 auto;margin-left:var(--gap-2);color:var(--dim);font-size:var(--fs-body);
   font-style:normal;font-weight:700;white-space:nowrap}
@@ -1112,8 +1105,6 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 @media (max-height:480px){
   #shop .rack{max-height:none;overflow-y:visible}
   #shop .card.gear .shot{aspect-ratio:12 / 5}
-  #shop .card.gear em{-webkit-line-clamp:1}
-  #shop .card.gear em .eff{-webkit-line-clamp:1}
   /* 짧은 화면에서는 이름 칸을 도로 거둔다. 카드 아래끝이 353px이라 360px 화면에 7px밖에 안 남는데,
      두 줄 자리는 한 줄 22.2px을 더해 그 끝을 375px으로 밀어 값 배지를 화면 밖에 세운다.
      이 폭에서는 어느 이름도 안 접히므로(실측: 740x360에서 열 선반 카드 38장이 전부 한 줄)
