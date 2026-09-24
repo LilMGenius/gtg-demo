@@ -1,6 +1,7 @@
+// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { modifierContract } from "./modifier-contract.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
-import { makeRng, buildSet, resolve, newKeeper, followerGain } from "../src/chain.mjs";
+import { makeRng, buildSet, resolve, newKeeper, followerGain } from "./position-pop.mjs";
 import { newRapport, readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost, RAPPORT_STEPS, RAPPORT_CAP } from "../web/src/state/rapport.mjs";
 
 // 라포 게이트. 반복해서 마주친 행인이 판정과 팔로워에 실제로 붙는가.

@@ -1,4 +1,5 @@
-import { makeRng, buildSet, resolve, keeperAtLevel, newKeeper } from "../src/chain.mjs";
+// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+import { makeRng, buildSet, resolve, keeperAtLevel, newKeeper } from "./position-pop.mjs";
 
 // 성장 곡선을 감시한다. 판정 상수 하나가 움직이면 세이브율 전체가 따라 움직이는데,
 // 지금까지는 그 이동을 아무도 보지 않았다. 어느 랩이 밸런스를 바꿨는지 나중에 알 수 없었다.

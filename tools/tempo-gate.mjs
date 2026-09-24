@@ -1,7 +1,8 @@
+// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 
 // 회전 트립와이어. 시간당 구 수가 초기 대비 만렙에서 두 배 근처인가.
 // 화면 대기시간을 그대로 더한다. 판정 로직은 안 건드린다.
-import { makeRng, buildSet, resolve, restartDelay, setBreak, keeperAtLevel, rollForm, newKeeper } from "../src/chain.mjs";
+import { makeRng, buildSet, resolve, restartDelay, setBreak, keeperAtLevel, rollForm, newKeeper } from "./position-pop.mjs";
 
 const CAPTION_MS = Number(process.argv[2] ?? 850);
 
