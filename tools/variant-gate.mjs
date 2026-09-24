@@ -1,4 +1,6 @@
 import { chromium } from "playwright";
+import { mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 // 변형 선반의 자. 선반 길이가 등급 수에 묶여 있으면 콘텐츠가 넷에서 멈춘다.
 // 등급을 늘리면 값 사다리와 팔로워 승수가 같이 늘어나므로, 그 매듭 밖에서 늘리는 길이 변형이다.
@@ -43,7 +45,7 @@ try {
   for (const s of shelves) {
     check("variant:" + s.field + ":the-shelf-sells-more-than-one-thing-per-grade", s.total > s.ranks,
       s.total + " items over " + s.ranks + " grades");
-    check("variant:" + s.field + ":every-grade-carries-at-least-two", s.per.every((n) => n >= 2), s.per.join(", "));
+    check("variant:" + s.field + ":every-coloured-grade-carries-at-least-two", s.per.every((n, rank) => s.field === 'beard' && rank === 0 ? n === 1 : n >= 2), s.per.join(", "));
   }
 
   // 같은 등급의 변형끼리 화면이 갈리는가. 굽힌 그림을 화소로 맞댄다.
@@ -61,7 +63,8 @@ try {
       for (let r = 0; r < g.SKINS[field].length; r++) {
         const urls = g.skinsAt(field, r).map((v, i) => bake(r, i));
         for (let i = 0; i < urls.length; i++) for (let j = i + 1; j < urls.length; j++) if (urls[i] === urls[j]) same.push(r + ":" + i + "-" + j);
-        if (r === 0) twice = bake(0, 1) === urls[1];
+        // 단일 면도도 실제로 존재하는 기본 변형으로 동일 그림 대조를 한다.
+        if (r === 0) twice = bake(0, 0) === urls[0];
       }
       return { same, twice };
     }, s.field);
@@ -106,6 +109,16 @@ try {
 
   await p.evaluate(() => window.__fixedStep(0));
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
+  // 색 선택을 실제 카드에서 확인할 두 선반이다. JPEG 85는 화소 판정이 아닌 검토용 압축이다.
+  const out = new URL('../.omo/evidence/p18-p17/', import.meta.url);
+  mkdirSync(out, { recursive: true });
+  for (const tab of ['hair', 'glove']) {
+    await p.locator('#shop .tab[data-tab="' + tab + '"]').click({ force: true });
+    await p.evaluate(() => { document.querySelector('#shop').scrollTop = 0; return document.fonts.ready; });
+    // 기존 패널 전환과 썸네일 생성이 끝날 때까지 같은 시작 대기 시간을 쓴다.
+    await p.waitForTimeout(1300);
+    await p.screenshot({ path: fileURLToPath(new URL('a-' + tab + '-1280x720.jpg', out)), type: 'jpeg', quality: 85 });
+  }
   await ctx.close();
 
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
