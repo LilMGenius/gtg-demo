@@ -11,7 +11,7 @@ import {
   R_HALF_W, R_H, SX, SY, MOUTH_X, lerp, ease
 } from './units.mjs';
 import { pupilMat, buildKeeper, buildKicker, poseWalker, POSES, JOINTS, lerpPose, pushPose, setPose, poseDist, KICK_WIND, beatOf } from './objects/actors.mjs';
-import { buildPitch, buildPassers, BOX_Z } from './objects/pitch.mjs';
+import { buildPitch, buildPassers, setPasserRoster, BOX_Z } from './objects/pitch.mjs';
 import { venueCrowd } from './objects/places.mjs';
 import { contactTex } from './texture.mjs';
 import { skinAt, placeAt } from '../state/gear.mjs';
@@ -554,6 +554,9 @@ const TOUCHED = new Set(['contact']);
   // 동네 등급은 버프가 아니라 교환이다. 배경이 바뀌는 것은 화면이고, 확률은 chain이 쥔다.
   function setCity(city, skin) {
     const c = Math.max(0, Math.min(3, city | 0));
+    // 시설과 개최 도시가 차림 풀을 정하되 이동 방향과 판정 인원은 바꾸지 않는다.
+    setPasserRoster(passers, c, skin);
+    for (const body of passers) markForeground(body);
     passerCount = PASSER_BASE + PASSER_STEP * c;
     for (let i = 0; i < passers.length; i += 1) {
       // 0번은 미인 행인이라 연출이 직접 지목한다. 어떤 등급에서도 숨기지 않는다.
@@ -799,8 +802,8 @@ const TOUCHED = new Set(['contact']);
   // 그 결함은 화면을 봐야만 보이고 그때는 이미 파운더가 먼저 본 뒤다.
   // 동네 등급이 오르면 행인이 는다는 설계가 화면에서 참인지 밖에서 물을 수 있어야 한다.
   // visible 플래그가 켜진 것과 그 사람이 화면 안에 있는 것은 다른 명제다.
-  const crowd = (city) => {
-    if (city !== undefined) setCity(city);
+  const crowd = (city, skin) => {
+    if (city !== undefined) setCity(city, skin);
     const v = new THREE.Vector3();
     return passers.map((p, i) => {
       p.getWorldPosition(v);

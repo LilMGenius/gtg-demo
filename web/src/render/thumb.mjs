@@ -187,7 +187,7 @@ function cityRig(pick) {
   }
   // 행인 수는 경기장과 같은 식으로 센다. 다섯에서 시작해 등급마다 둘씩 는다.
   const n = PASSER_BASE + PASSER_STEP * rank;
-  const who = buildPassers(grp, n);
+  const who = buildPassers(grp, n, rank, pick && pick.skin);
   // 경기장은 행인을 84미터 걷는 구간에 흩어 놓는다. 그 좌표 그대로 칸에 담으면
   // 다섯이든 열하나든 전부 프레임 밖이라 등급 차이가 하늘색뿐인 그림이 나온다.
   // 칸 안에서는 한 줄로 세워, 몇 명인지가 그림 자체로 읽히게 한다.
