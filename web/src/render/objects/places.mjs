@@ -46,7 +46,9 @@ function pen() {
     // 가지 한 층. 일곱 각이면 실루엣이 원뿔로 읽히면서 정점이 스물넷이다.
     // 각을 더 줄이면 원뿔이 아니라 엎은 그릇으로 읽혀 나무가 안 된다.
     cone: (r, h, x, y0, z, c) => {
-      const g = new THREE.ConeGeometry(r, h, 7);
+      // 기존 수관 봉투 안에 매끈한 타원체를 넣어 삼각 고깔 외곽선을 없앤다.
+      const g = new THREE.SphereGeometry(1, 20, 12); // 원경에서도 둥근 윤곽을 유지할 최소 분할이다.
+      g.scale(r, h / 2, r);
       g.translate(x, y0 + h / 2, z);
       push(g, c);
     }

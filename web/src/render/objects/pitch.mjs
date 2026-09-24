@@ -137,8 +137,8 @@ export const BOX_Z = 8.2;
 
 export function buildPitch(scene) {
   // 흙바닥. 잔디가 아니다. 동네 운동장이 이 게임의 무대다.
-  // 단색 흙은 카펫으로 읽힌다. 얼룩과 발자국과 잔모래가 있어야 밟은 땅이 된다.
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), flatLit(0x9c7a4a, dirtTex()));
+  // 바닥 두 판은 같은 황토색을 공유하고 골문과 스폿의 넓은 마모만 구별한다.
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), flatLit(0xb08e58, dirtTex()));
   ground.rotation.x = -Math.PI / 2;
   ground.position.z = 24;
   ground.name = 'ground';
@@ -231,8 +231,8 @@ export function buildPitch(scene) {
 
   // 골대. 판정식이 쓰는 폭과 높이를 그대로 쓴다. 그림과 숫자가 어긋나면 화면이 거짓말을 한다.
   const post = new THREE.CylinderGeometry(0.06, 0.06, R_H, 8);
-  // 새로 칠한 골대는 규격 경기장의 물건이다. 아래에서 녹이 올라와야 동네 골대다.
-  const white = flatMap(0xf4f6f2, chippedTex());
+  // 골대도 배우와 같은 무광 표면이라 작은 녹 얼룩이 공의 윤곽과 경쟁하지 않는다.
+  const white = new THREE.MeshLambertMaterial({ color: 0xf4f6f2 });
   for (const [pi, x] of [-R_HALF_W, R_HALF_W].entries()) {
     const p = new THREE.Mesh(post, white);
     p.position.set(x, R_H / 2, 0);
@@ -360,7 +360,7 @@ export function buildPitch(scene) {
   rails.push(railGeo(BACK_HW * 2, 'x').translate(0, 0.05, -NET_D));
   // 0x5f6a5c는 흰 골대 옆에서 조명을 못 받은 물건으로 읽혔다. 같은 램버트 재질인데 색만 어두웠다.
   // 낡은 아연도금 쇠 밝기로 올린다. 흰 골대와는 여전히 갈라지고, 빛을 받은 것으로 읽힌다.
-  const rear = new THREE.Mesh(mergeGeos(rails), flatMap(0x9aa294, chippedTex()));
+  const rear = new THREE.Mesh(mergeGeos(rails), new THREE.MeshLambertMaterial({ color: 0x9aa294 }));
   // 앞 골대는 한 번 들이받혀 기울었다. 뒷틀만 정확히 서 있으면 둘이 다른 날 세운 물건으로 보인다.
   rear.name = 'rear';
   rear.rotation.z = 0.012;
@@ -399,8 +399,8 @@ export function buildPitch(scene) {
         '  float a = texture2D(cloud, uv).a;',
         // 알파를 두 단으로 끊는다. 몸통은 흰색, 아랫배는 회색. 부드러운 경계는 손그림이 아니다.
         // 여기 리터럴은 선형값이라 sRGB 인코딩을 한 번 더 받는다. 화면에서 흰 판으로 날지 않게 낮춰 적는다.
-        '  vec3 body = mix(vec3(0.60, 0.62, 0.66), vec3(0.85), step(0.62, a));',
-        '  float on = step(0.38, a);',
+        '  vec3 body = mix(vec3(0.60, 0.62, 0.66), vec3(0.85), smoothstep(0.0, 1.0, a));',
+        '  float on = smoothstep(0.0, 0.38, a);', // 기존 경계값까지 연속으로 섞어 오린 종이 같은 경계를 없앤다.
         // 지평선 바로 위는 구름을 걷는다. 건물 실루엣과 겹치면 스티커로 읽힌다.
         '  on *= smoothstep(0.005, 0.045, vH);',
         '  gl_FragColor = vec4(mix(sky, body, on), 1.0);',
@@ -425,7 +425,7 @@ export function buildPitch(scene) {
      드로우콜도 하나다. 넷을 각각 메시로 세우고 보이기만 끄면 예산은 같아도 지오메트리 넷이
      GPU에 올라가고, 등급을 안 산 사람이 안 보는 동네 셋의 정점을 계속 들고 있게 된다.
      계측이 광선으로 되묻는 면은 밟는 흙이라, 지평선 건물과 같은 이유로 광선은 통과시킨다. */
-  const props = new THREE.Mesh(placeGeo(0), flatVertex(0xffffff));
+  const props = new THREE.Mesh(placeGeo(0), new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true }));
   props.name = 'place';
   props.userData.probeIgnore = true;
   scene.add(props);
@@ -519,16 +519,8 @@ export function buildPitch(scene) {
       // 등급 번호는 선반 데이터가 들고 있다. 여기서 순서를 다시 세면 상점 카드와 경기장이 갈린다.
       props.geometry = placeGeo(place.city);
       ground.material.color.setHex(place.ground);
-      /* 골문 앞 밟힌 자리도 같은 면이다. 이것만 흙으로 두었더니 잔디와 아스팔트 위에
-         흙 사각형이 하나 떠 있었다. 색을 따로 적지 않고 바닥에서 밝기만 올려 만든다.
-         밟혀서 벗겨진 자리라 원래 면보다 밝고 채도가 낮다. 그러면 등급이 늘어도 값이 하나다. */
-      {
-        const c = new THREE.Color(place.ground);
-        const h = {};
-        c.getHSL(h);
-        c.setHSL(h.h, h.s * 0.72, Math.min(1, h.l * 1.28 + 0.06));
-        box.material.color.copy(c);
-      }
+      // 마모는 텍스처의 넓은 패치가 소유한다. 판 전체를 밝히면 네모 경계가 생긴다.
+      box.material.color.copy(ground.material.color);
       for (const f of [fence, backFence]) f.material.color.setHex(place.fence);
       // 건물은 y가 h/2에 서 있어서 그룹을 세로로 늘리면 크기와 자리가 같이 늘어난다.
       // 밑동은 바닥에 붙은 채로 높이만 자란다. 거울 사본도 같은 배율을 받아야 앞뒤가 안 갈린다.
