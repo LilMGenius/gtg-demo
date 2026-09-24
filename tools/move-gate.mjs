@@ -108,5 +108,87 @@ if (typeof chain.botPlan === 'function') {
   check('deterministic', different === 0 && controlDifferent > 0, `mismatch=${different} different-seed-positive-control=${controlDifferent} N=${N}`);
   check('position-and-stat-causes', positionCauses > 0 && statCauses > 0, `manual-position=${positionCauses} bot-judgement=${statCauses}`);
 }
+
+// 고정 슛에서 1ms 간격으로 최초 발동을 관측해 프레임 오차를 제한한다.
+const first = (k, shot, x) => {
+  if (!chain.diveTrigger) return NaN;
+  for (let t = 0; t <= shot.flight * 1000; t++) if (chain.diveTrigger(k, shot, x, t)) return t;
+  return NaN;
+};
+// 느린 낮은 공은 반응 하한에 붙지 않아 마지막 도달 시각의 단조를 드러낸다.
+const fixed = { ...chain.buildSet(chain.makeRng(71))[0], aimX: 1, aimY: 0.6, side: 1, sideU: undefined, course: '하단', flight: 1, chip: false, bend: 0, strong: false };
+// 시드 71은 고정 재현용이며 1단위/높이 0.6/비행 1초는 낮은 도달 경계를 격리한다.
+const k = chain.newKeeper();
+const reflexTimes = [1, 5, 10].map(reflex => first({ ...k, reflex }, fixed, 0));
+check('reflex-widens-the-window', reflexTimes.every((t, i) => Number.isFinite(t) && (!i || t > reflexTimes[i - 1])), JSON.stringify(reflexTimes));
+const distanceTimes = [0.6, 1, 1.4].map(dist => first(k, fixed, 1 - dist));
+const divingTimes = [1, 5, 10].map(diving => first({ ...k, diving }, fixed, 0));
+const boundary = chain.diveNeed && distanceTimes.every((t, i) => {
+  const dist = [0.6, 1, 1.4][i];
+  const slack = fixed.flight * 1000 - t - chain.diveNeed(k, dist);
+  return slack <= 60 - 4 * k.reflex && slack > 60 - 4 * k.reflex - 1;
+});
+check('dive-leaves-at-the-last-reachable-moment', boundary && distanceTimes.every((t,i) => !i || t < distanceTimes[i-1]) && divingTimes.every((t,i) => !i || t > divingTimes[i-1]), JSON.stringify({ distanceTimes, divingTimes }));
+const powers = [1, 5, 10].map(power => first(k, { ...fixed, flight: Math.max(0.55, 1.05 - power * 0.05) }, 0));
+check('faster-shots-leave-less-reaction', powers.every((t,i) => Number.isFinite(t) && (!i || t < powers[i-1])), JSON.stringify(powers));
+const botStarts = [1, 5, 10].map(judgement => {
+  const trace = chain.botPlan({ ...k, judgement }, fixed, chain.makeRng(71));
+  const index = trace.findIndex((p,i) => i && p.ms > 0 && p.x !== trace[i-1].x);
+  return index > 0 ? trace[index-1].ms : NaN;
+});
+check('bot-reacts-with-judgement', botStarts.every((t,i) => t === 350 - 15 * [1, 5, 10][i] && (!i || t < botStarts[i-1])), JSON.stringify(botStarts));
+// 4000개 시드의 다섯 슛을 짝지어 95% McNemar 구간을 재사용한다.
+const reactIntervals = [];
+for (const level of [1, 5, 13, 21]) {
+  let up = 0, down = 0, n = 0;
+  for (let seed = 1; seed <= 4000; seed++) {
+    const who = chain.keeperAtLevel(level, chain.makeRng(seed));
+    // 같은 생성 스트림의 슛 다섯 개 뒤를 정책 롤로 써 연속 시드의 첫 xorshift 값 편향을 피한다.
+    const policyRng = chain.makeRng(seed);
+    const shots = chain.buildSet(policyRng, level);
+    for (const shot of shots) {
+      const pre = [{ ms: -1000, x: 0 }, { ms: 0, x: 0 }];
+      const aimed = chain.aimAt ? chain.aimAt(who, shot, pre) : shot;
+      // 인간 반응 250ms와 90% 방향 적중은 P15-U1b의 HOTL 정책이다.
+      const direction = policyRng() < 0.9 ? Math.sign(aimed.aimX) : -Math.sign(aimed.aimX);
+      const target = direction * Math.min(Math.abs(aimed.aimX), chain.X_MAX);
+      const finish = 250 + Math.abs(target) / chain.moveSpeed(who) * 1000;
+      const end = aimed.flight * 1000;
+      const trace = [...pre, { ms: 250, x: 0 }];
+      if (finish > 250 && finish < end) trace.push({ ms: finish, x: target });
+      trace.push({ ms: end, x: direction * Math.min(Math.abs(target), chain.moveSpeed(who)*(end-250)/1000) });
+      const play = trace => chain.resolve({ keeper: { ...who }, shot: aimed, input: { trace, x: 0, vx: 0, auto: false }, rng: chain.makeRng(seed + 90001) });
+      const a = play(pre), b = play(trace);
+      const saved = r => Number(!r.conceded && !r.untested);
+      up += Number(saved(b) > saved(a)); down += Number(saved(a) > saved(b)); n++;
+    }
+  }
+  reactIntervals.push({ level, n, up, down, delta: (up-down)/n, hw: 1.96*Math.sqrt(up+down)/n });
+}
+check('reacting-beats-standing', reactIntervals.every(r => r.delta > r.hw), JSON.stringify(reactIntervals));
+
+// 반응 1/5/10은 스탯 양끝과 중간이다. 같은 이동 정책에서 실제 발동까지 허용된 시간이 늘어야 한다.
+const movingTimes = chain.reactTrace ? [1, 5, 10].map(reflex => chain.reactTrace({ ...k, reflex }, fixed, [{ ms: -1000, x: 0 }, { ms: 0, x: 0 }], 250).at(-1).ms) : [];
+check('reflex-adds-movement-time', movingTimes.length === 3 && movingTimes.every((t,i) => !i || t > movingTimes[i-1]), JSON.stringify(movingTimes));
+// 1200개 궤적은 서기 경계 양쪽, 역방향 이동, 빠른/느린 다이빙을 겹친다. 1ms 독립 전수 탐색이 교점 풀이를 검사한다.
+let triggerErrors = 0, earlierControl = 0;
+if (chain.diveTrigger) for (let seed = 1; seed <= 1200; seed++) {
+  const rng = chain.makeRng(seed);
+  const who = chain.keeperAtLevel(1 + seed % 21, rng);
+  const shot = chain.buildSet(rng)[seed % 5];
+  const x = (rng()*2-1)*chain.X_MAX;
+  const target = (rng()*2-1)*chain.X_MAX;
+  const end = shot.flight*1000;
+  const trace = [{ ms: -1000, x }, { ms: 0, x }, { ms: end, x: x + Math.sign(target-x)*Math.min(Math.abs(target-x),chain.moveSpeed(who)*end/1000) }];
+  const aimed = chain.aimAt(who,shot,trace);
+  const result = chain.resolve({keeper:{...who},shot:aimed,input:{trace,x},rng:chain.makeRng(seed)});
+  const at = t => x+(trace.at(-1).x-x)*t/end;
+  let firstMs = end;
+  for(let t=0;t<=end;t++) if(chain.diveTrigger(who,aimed,at(t),t)){firstMs=t;break;}
+  // 1ms는 독립 전수 탐색의 해상도이고 1e-6은 교점의 부동소수 오차다.
+  triggerErrors += Number(Math.abs(firstMs-result.input.triggerMs)>1+1e-6 || !chain.diveTrigger(who,aimed,result.input.x,result.input.triggerMs));
+  earlierControl += Number(!chain.diveTrigger(who,aimed,at(0),0));
+}
+check('trace-trigger-matches-independent-scan', Boolean(chain.diveTrigger) && triggerErrors===0 && earlierControl>0, JSON.stringify({triggerErrors,earlierControl}));
 console.log(`move ${failures.length ? 'FAIL' : 'PASS'} ${failures.length}`);
 process.exitCode = Number(failures.length > 0);

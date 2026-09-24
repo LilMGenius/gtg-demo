@@ -311,7 +311,10 @@ function bareContactMargin(keeper, shot, input, over) {
   // 시간 항은 judgeWindow가 소유한다. 화면의 자가 그리는 그 창이 여기서 그대로 쓰인다.
   // P15 가설: 전속 이동 중 미숙한 자리잡기는 최대 60ms의 준비 시간을 잃는다.
   const unset = positional ? 60 * Math.min(1, Math.abs(input.vx) / moveSpeed({ agility: s("agility") })) * (10 - offball) / 9 : 0;
-  const slack = judgeWindow(keeper, shot, input, over).slackMs - Math.abs(input.errMs) - unset;
+  // 위치 입력은 마커 이후 예산을 실제 발동 뒤 남은 비행시간으로 바꾼다. 기존 창의 스탯/장비 항은 유지한다.
+  const arrival = positional ? (over && "kickerPower" in over ? flight : shot.flight) * 1000 : 0;
+  const remaining = positional ? arrival - input.triggerMs - diveNeed({ diving: s("diving") }, Math.abs(shot.aimX - input.x)) - flight * (1 - 0.72) * 1000 : 0;
+  const slack = judgeWindow(keeper, shot, input, over).slackMs + remaining - Math.abs(input.errMs) - unset;
   // 상한을 두지 않는다. 늦으면 늦은 만큼 손이 짧아져야 그 늦음이 원인으로 잡힌다.
   const timing = clamp(slack / SCALE_MS, -1.2, 1.35);
 
@@ -401,9 +404,9 @@ function dirQualityOf(dive, shot) {
   return 0.1;
 }
 
-// 관측 사이에는 선형 보간한다. 접촉 뒤 표본은 키커의 미래 정보가 되므로 버린다.
+// U1 선형 보간을 재사용한다. 키커에게 주는 접촉 전 경계는 aimAt이 소유한다.
 function positionAt(trace, ms, fallback) {
-  const samples = trace.filter(p => Number.isFinite(p.ms) && p.ms <= 0 && Number.isFinite(p.x))
+  const samples = trace.filter(p => Number.isFinite(p.ms) && Number.isFinite(p.x))
     .map(p => ({ ms: p.ms, x: clamp(p.x, -X_MAX, X_MAX) })).sort((a, b) => a.ms - b.ms);
   if (!samples.length) return { x: fallback, vx: 0 };
   if (ms < samples[0].ms) return { x: samples[0].x, vx: 0 };
@@ -416,11 +419,17 @@ function positionAt(trace, ms, fallback) {
   return { x: samples.at(-1).x, vx: 0 };
 }
 
-function readPosition(shot, raw, rng) {
+// 접촉 때 한 번 확정한다. 선택 난수를 주면 U1의 이동 역이용도 같은 값으로 재현한다.
+export function aimAt(keeper, shot, preTrace, rng) {
+  if (shot.aimed) return shot;
+  const trace = preTrace.filter(p => p.ms <= 0);
+  const raw = { trace, x: trace.at(-1)?.x || 0 };
+  // 32비트 시드 변환은 기존 sideU를 재사용해 세 인자 호출도 결정론으로 만든다.
+  rng ||= makeRng(Math.floor((shot.sideU ?? 0.5) * 4294967296));
   // van der Kamp(2006)의 접촉 400~600ms 전 방향 전환 결과를 참고한 P15 가설이다.
   const readMs = 900 - 65 * (shot.kicker.composure - 1);
   const observed = positionAt(raw.trace, -readMs, raw.x);
-  if (shot.chip || shot.side === 0) return { ...shot, readMs, xRead: observed.x };
+  if (shot.chip || shot.side === 0) return { ...shot, readMs, xRead: observed.x, aimed: true };
   // Masters 외(2007)의 현장값 9.95cm·59.2%를 우선해 폭을 0.32단위(약 53cm)로 둔다: 편위 0.06에서 59%, 0.13/0.26/0.53에서 69/84/96%로 Weigelt와 Memmert(2012)의 지시된 실험 과제보다 낮은 곡선이다(P15 HOOTL 판정).
   const largerP = 0.5 + 0.5 * Math.tanh(Math.abs(observed.x) / 0.32);
   const larger = observed.x >= 0 ? -1 : 1;
@@ -432,14 +441,79 @@ function readPosition(shot, raw, rng) {
     if (rng() < 0.3 + 0.05 * shot.kicker.composure) side = -Math.sign(observed.vx);
   }
   const aimX = Math.abs(shot.aimX) * side;
-  return { ...shot, aimX, side, course: courseOf(aimX, shot.aimY), readMs, xRead: observed.x };
+  return { ...shot, aimX, side, course: courseOf(aimX, shot.aimY), readMs, xRead: observed.x, aimed: true };
+}
+
+// K6의 옆 다이빙 약 600ms와 상단 약 1000ms를 기준으로 한 P15-U1b HOTL 계수다.
+export function diveNeed(keeper, dist) {
+  // 몸 앞 0.45단위는 서서 막고, 출발 120ms와 2.0+0.1D 단위/s를 밀리초로 환산한다.
+  return dist <= STAND ? 0 : 120 + (dist - STAND) / (2.0 + 0.1 * clamp(keeper.diving, 1, 10)) * 1000;
+}
+
+export function diveTrigger(keeper, shot, x, t) {
+  const reflex = clamp(keeper.reflex, 1, 10);
+  // P15-U1b HOTL: 반응 하한 280-12R ms, 안전 여유 60-4R ms라 숙련자는 더 오래 움직인다.
+  return t >= 280 - 12 * reflex && shot.flight * 1000 - t <= diveNeed(keeper, Math.abs(shot.aimX - x)) + 60 - 4 * reflex;
+}
+
+// 선형 자취의 각 구간과 서서 막는 경계를 나눠 최초 발동을 찾는다. 고정 시간 샘플링은 쓰지 않는다.
+function triggerOnTrace(keeper, shot, trace, fallback) {
+  // 발동 탐색의 양끝은 반응 하한과 공 도착이다. 단위는 ms다.
+  const rt = 280 - 12 * clamp(keeper.reflex, 1, 10), arrival = shot.flight * 1000;
+  const samples = trace.filter(p => Number.isFinite(p.ms) && Number.isFinite(p.x)).sort((a,b) => a.ms-b.ms);
+  const at = t => positionAt(samples, t, fallback);
+  const knots = [rt, ...samples.map(p => p.ms).filter(t => t > rt && t < arrival), arrival];
+  const edges = [...knots];
+  for (let i = 1; i < knots.length; i++) {
+    const a = knots[i-1], b = knots[i], xa = at(a).x, xb = at(b).x;
+    for (const boundary of [shot.aimX - STAND, shot.aimX + STAND]) {
+      const ratio = (boundary-xa)/(xb-xa);
+      if (ratio > 0 && ratio < 1) edges.push(a+(b-a)*ratio);
+    }
+  }
+  edges.sort((a,b) => a-b);
+  const fires = t => diveTrigger(keeper, shot, at(t).x, t);
+  let previous = rt;
+  for (const end of edges) {
+    if (fires(previous)) return { ...at(previous), triggerMs: previous };
+    // 1e-7ms 안쪽은 서기 경계에서 필요시간이 120ms 뛰는 양쪽을 분리한다.
+    const leftTime = Math.min(end, previous + 1e-7), rightTime = Math.max(leftTime, end - 1e-7);
+    if (fires(leftTime)) return { ...at(leftTime), triggerMs: leftTime };
+    if (fires(rightTime)) {
+      // 구간 내부에서 거리와 남은 시간은 선형이다. U1 보간처럼 두 끝으로 교점을 직접 구한다.
+      const gap = t => diveNeed(keeper, Math.abs(shot.aimX-at(t).x)) + 60 - 4*clamp(keeper.reflex,1,10) + t-arrival;
+      const left = gap(leftTime), right = gap(rightTime);
+      const root = leftTime + (rightTime-leftTime)*(-left)/(right-left);
+      const triggerMs = Math.min(rightTime, root + 1e-7);
+      return { ...at(triggerMs), triggerMs };
+    }
+    if (fires(end)) return { ...at(end), triggerMs: end };
+    previous=end;
+  }
+  return { ...at(arrival), triggerMs: arrival };
+}
+
+// U1 봇의 접촉 전 자리를 유지하고 접촉 뒤에는 실제 이동 속도로 공을 따라간다.
+export function reactTrace(keeper, shot, trace, reactionMs, aimX = shot.aimX) {
+  const x = trace.at(-1).x, target = clamp(aimX, -X_MAX, X_MAX);
+  const arrival = shot.flight * 1000;
+  const finish = reactionMs + Math.abs(target-x)/moveSpeed(keeper)*1000;
+  const full = [...trace, { ms: reactionMs, x }];
+  if (finish > reactionMs && finish < arrival) full.push({ ms: finish, x: target });
+  full.push({ ms: arrival, x: x + Math.sign(target-x)*Math.min(Math.abs(target-x), moveSpeed(keeper)*Math.max(0, arrival-reactionMs)/1000) });
+  const trigger = triggerOnTrace(keeper, shot, full, x);
+  const result = full.filter(p => p.ms < trigger.triggerMs);
+  result.push({ ms: trigger.triggerMs, x: trigger.x });
+  result.aimedShot = shot;
+  return result;
 }
 
 function positionDive(keeper, shot, raw, over) {
   const j = clamp(over?.judgement ?? keeper.judgement, 1, 10);
   const rel = shot.aimX - raw.x;
-  // 몸 앞은 오독 없이 서고, 먼 공은 방향 단서가 커진다는 P15 가설이다.
-  const readP = Math.min(0.995, 0.50 + 0.04 * j + 0.10 * Math.min(1, (Math.abs(rel) - STAND) / 1.0) + 0.03 * (keeper.botTier || 0));
+  // 몸 앞은 오독 없이 서고, 비행 중 방향 단서는 휨과 칩에서 흐려진다는 P15 가설이다.
+  // P15-U1b HOTL: 비행 중 직선 공은 기저 0.90, 판단당 0.008로 거의 오독하지 않는다. 휨 0.20/단위와 칩 0.16은 속임 단서를 남긴다.
+  const readP = Math.min(0.995, 0.90 + 0.008 * j + 0.03 * (keeper.botTier || 0) - (shot.bend || 0) * 0.20 - (shot.chip ? 0.16 : 0));
   const standing = Math.abs(rel) <= STAND;
   const correct = standing || raw.readU < readP;
   // 오독의 절반은 역동작(품질 0.1), 절반은 주저(품질 0.5)라는 P15 가설이다.
@@ -460,7 +534,7 @@ function positionInput(keeper, shot, raw, rng) {
   return positionDive(keeper, shot, { ...raw, readU, missU, timeU, advance });
 }
 
-// 봇은 샷을 바꾸지 않고 접촉 전의 자취만 만든다. 소비자는 마지막 표본을 x로 쓴다.
+// 봇은 접촉 전 계획과 접촉 뒤 추적을 잇는다. 소비자는 trace.aimedShot을 같은 공으로 쓴다.
 export function botPlan(keeper, shot, rng) {
   // P15 가설: 오프더볼 1의 표준편차 0.12단위가 만렙에서 사라진다.
   const sigma = 0.12 * (10 - clamp(keeper.offball, 1, 10)) / 9;
@@ -483,7 +557,9 @@ export function botPlan(keeper, shot, rng) {
   const trace = [{ ms: -1000, x: start }, { ms: -tMove, x: start }];
   if (finish < 0) trace.push({ ms: finish, x: target });
   trace.push({ ms: 0, x: start + Math.sign(target - start) * Math.min(Math.abs(target - start), moveSpeed(keeper) * tMove / 1000) });
-  return trace;
+  const aimed = aimAt(keeper, shot, trace);
+  // P15-U1b HOTL: 판단 1~10의 반응은 335~200ms이며 인간 시험값 250ms와 교차한다.
+  return reactTrace(keeper, aimed, trace, 350 - 15 * clamp(keeper.judgement, 1, 10));
 }
 
 export function resolve(input) {
@@ -494,7 +570,8 @@ export function resolve(input) {
   const positional = Array.isArray(raw.trace);
   if (positional) {
     raw = { ...raw, x: clamp(Number(raw.x) || 0, -X_MAX, X_MAX), vx: Number(raw.vx) || 0 };
-    shot = readPosition(shot, raw, rng);
+    shot = raw.trace.aimedShot || aimAt(keeper, shot, raw.trace, rng);
+    raw = { ...raw, ...triggerOnTrace(keeper, shot, raw.trace, raw.x) };
     raw = positionInput(keeper, shot, raw, rng);
   }
   // 축구화는 손가락이 만든 값이 아니라 신고 나온 값이다. 프로브 전체가 같은 값을 쓰므로
