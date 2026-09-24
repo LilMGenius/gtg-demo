@@ -1,3 +1,4 @@
+import { auditConditions } from './condition-probe.mjs';
 import { chromium } from "playwright";
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -5,6 +6,7 @@ import { readFileSync } from 'node:fs';
 const RELEASE = JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version;
 import { COIN_SAVE, COIN_CONCEDED, COIN_DRILL, COIN_FAME_STEP, CASH_RATE } from "../web/src/state/wallet.mjs";
 import { BOTS } from "../web/src/state/bot.mjs";
+import { conditionLabel } from "../web/src/state/condition.mjs";
 import { BUFFS } from "../web/src/state/buff.mjs";
 import { LIKE_BASE, LIKE_PER_CITY, MUTUAL_STEP, MUTUAL_CAP, SELFIE_BASE } from "../web/src/state/gram.mjs";
 import { PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP } from "../src/roster.mjs";
@@ -44,7 +46,7 @@ const WANT = {
 /* 줄 단위로 맞대는 둘. 집합으로만 물으면 판단력 칸과 분 칸이 통째로 바뀌어도 같은 수가 다 있으니 통과한다.
    실측으로 봇 두 줄을 DOM에서 맞바꾼 대조군이 집합 비교는 통과하고 이 비교는 잡는다. */
 const ROWS = {
-  bot: BOTS.map((b) => [b.name, S(b.judge), S(b.minutes), S(b.cost)]),
+  bot: BOTS.map((b) => [b.name, S(b.judge), S(b.minutes), S(b.cost), conditionLabel(b.condition) || '없음']),
   buff: BUFFS.map((b) => [b.name, b.note, S(b.shots), S(b.cost)])
 };
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
@@ -644,6 +646,8 @@ try {
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 
+  const conditions = await auditConditions(p);
+  check('condition:text-progress-price-and-lock', conditions.pass, JSON.stringify(conditions.rows));
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
   console.log("표본 범위: 선언된 카테고리 전부 × 본문 표. 수를 싣는 6칸은 상수와 맞대고 봇과 버프는 줄 단위로 맞댄다. 뷰포트 1280x720과 740x360");

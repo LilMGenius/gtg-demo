@@ -1,3 +1,4 @@
+import { auditConditions } from './condition-probe.mjs';
 import { readFileSync } from "node:fs";
 import { chromium } from "playwright";
 import { KEEPERS, KICKERS } from "../src/roster.mjs";
@@ -463,6 +464,8 @@ try {
     console.log("  " + "len 1".padEnd(8) + kitOrder.map((s) => hemAt(row, "flat", s.tag).hem.toFixed(3).padStart(9)).join("")
       + "   " + bandAt(row, "flat").toFixed(3) + "   " + spreadOf(row, "flat").toFixed(3));
   }
+  const conditions = await auditConditions(p);
+  check('condition:text-progress-price-and-lock', conditions.pass, JSON.stringify(conditions.rows));
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
   console.log(fails.length ? "fitshot FAIL " + fails.length : "fitshot PASS " + notes.length);

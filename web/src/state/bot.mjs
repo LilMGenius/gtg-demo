@@ -7,7 +7,8 @@
 export const BOTS = [
   { tier: 1, name: '중고 훈련용 더미', cost: 150, minutes: 20, judge: 3, note: '판단력 3짜리 고철. 서 있기는 한다' },
   { tier: 2, name: '동네 공업사 클론', cost: 390, minutes: 45, judge: 6, note: '판단력 6. 사람 흉내는 낸다' },
-  { tier: 3, name: '연구소 유출 피지컬 AI', cost: 840, minutes: 90, judge: 9, note: '판단력 9. 어디서 나왔는지 묻지 않는다' }
+  // HOTL: 수동 반응 200개 씨앗에서 840골드 도달 중앙값 레벨 19의 다음 목표는 20이다.
+  { condition: { key: 'level', min: 20 }, tier: 3, name: '연구소 유출 피지컬 AI', cost: 840, minutes: 90, judge: 9, note: '판단력 9. 어디서 나왔는지 묻지 않는다' }
 ];
 
 export const MAX_BOT = BOTS.length;
