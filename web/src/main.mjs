@@ -366,7 +366,7 @@ const STAT_ICON = {
   // 스톱워치. 모서리를 깎아야 사각 판이 아니라 시계로 보인다.
   reflex: G('반응속도', R(9, 0, 6, 3) + R(6, 3, 12, 3) + R(3, 6, 18, 12) + R(6, 18, 12, 3)),
   // 걸어간 자리 셋과 도착점. 공 없이 자리를 잡는 일이다.
-  offball: G('오프더볼', R(3, 18, 3, 3) + R(9, 15, 3, 3) + R(15, 12, 3, 3) + R(18, 3, 6, 6)),
+  offball: G('위치 선정', R(3, 18, 3, 3) + R(9, 15, 3, 3) + R(15, 12, 3, 3) + R(18, 3, 6, 6)),
   // 전구. 저울은 이 크기에서 접시가 기둥에 붙어 화살표로 읽힌다.
   judgement: G('판단력', R(6, 3, 12, 9) + R(9, 12, 6, 3) + R(9, 15, 6, 3) + R(9, 18, 6, 3)),
   // 오른쪽으로 꺾인 화살촉 하나. 작은 화살표 둘로 나누면 점 여섯 개로 흩어진다.
@@ -2146,7 +2146,7 @@ const PULL_STATS = {
   kicker: ['finishing', 'power', 'composure', 'curve', 'flair']
 };
 // 키커 칸 이름. 키퍼 쪽은 ledger의 CAUSE_LABEL이 이미 소유하므로 여기 다시 적지 않는다.
-const KICKER_LABEL = { finishing: '결정력', power: '슛파워', composure: '침착성', curve: '슛커브', flair: '개인기' };
+const KICKER_LABEL = { finishing: CAUSE_LABEL.kickerFinishing, power: CAUSE_LABEL.kickerPower, composure: CAUSE_LABEL.composure, curve: CAUSE_LABEL.kickerCurve, flair: '개인기' };
 
 // 카드가 든 사람의 능력치 줄. 키퍼 칸이 없으면 키커다.
 function pullStatRows(k) {

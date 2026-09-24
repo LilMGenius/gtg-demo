@@ -6,6 +6,53 @@ title: "장비"
 
 <p>헤어와 수염은 별도 선반이다. 키퍼는 면도한 얼굴로 시작하고 수염을 선택해 착용한다. 등급을 사면 그 등급의 색 변형도 함께 열리며 변형 교체는 무료다. 착용한 수염은 키퍼마다 저장된다. 수염 색은 헤어 염색과 별개다.</p>
 <p>헤어, 수염, 타투의 소문 확산은 합산하되 외형 효과의 기존 상한을 넘지 않는다. 키커의 수염은 선수 고유 외모다.</p>
+<p>효과 이름은 판정 단계 순으로 읽는다. 확률의 변화는 퍼센트포인트, 첫발 지연은 시간, 행인 수는 인원, 팔로워 배율은 비율이다.</p>
+<table>
+<thead>
+<tr>
+<th>이름</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>장갑 벗겨짐</td>
+<td>장갑이 벗겨지는 사고</td>
+</tr>
+<tr>
+<td>흘림</td>
+<td>손에서 흘리는 사고</td>
+</tr>
+<tr>
+<td>첫발 지연</td>
+<td>첫 발이 뜨는 데 걸리는 시간</td>
+</tr>
+<tr>
+<td>강슛 밀림</td>
+<td>정면 강슛에 같이 밀려 들어가는 사고</td>
+</tr>
+<tr>
+<td>착지 실수</td>
+<td>착지에 실패하는 사고</td>
+</tr>
+<tr>
+<td>그물 흡수</td>
+<td>그물이 공을 먼저 먹는 확률</td>
+</tr>
+<tr>
+<td>행인 등장</td>
+<td>눈에 띄는 행인이 지나갈 확률</td>
+</tr>
+<tr>
+<td>행인 수</td>
+<td>동네에 서 있는 행인 수</td>
+</tr>
+<tr>
+<td>팔로워 배율</td>
+<td>소문이 퍼지는 배율</td>
+</tr>
+</tbody>
+</table>
 <h3>장갑</h3><table><thead><tr><th>이름</th><th>효과</th></tr></thead><tbody><tr><th scope="row">장터 목장갑</th><td>아무것도 안 샀을 때 끼고 있는 것</td></tr><tr><th scope="row">고무코팅 목장갑</th><td>젖은 공을 한 번은 붙잡는다</td></tr><tr><th scope="row">송진 범벅 장갑</th><td>손에서 공이 잘 안 떨어진다</td></tr><tr><th scope="row">문어 빨판 장갑</th><td>안 떨어진다. 벗겨지지도 않는다</td></tr></tbody></table>
 <h3>축구화</h3><table><thead><tr><th>이름</th><th>효과</th></tr></thead><tbody><tr><th scope="row">학교 앞 실내화</th><td>아무것도 안 샀을 때 신고 있는 것</td></tr><tr><th scope="row">바닥 닳은 조기축구화</th><td>그래도 미끄러지지는 않는다</td></tr><tr><th scope="row">스터드 여섯 개 축구화</th><td>흙을 물고 첫 발이 빨리 뜬다</td></tr><tr><th scope="row">육상용 스파이크</th><td>축구화는 아니다. 제일 빨리 뜬다</td></tr></tbody></table>
 <h3>유니폼</h3><table><thead><tr><th>이름</th><th>효과</th></tr></thead><tbody><tr><th scope="row">아빠 옷장 면티</th><td>아무것도 안 샀을 때 입고 있는 것</td></tr><tr><th scope="row">학교 체육복 상의</th><td>적어도 땀은 먹는다</td></tr><tr><th scope="row">조기회 단체복</th><td>등에 동네 철물점 이름이 박혀 있다</td></tr><tr><th scope="row">패드 박은 골키퍼 저지</th><td>어깨에 스펀지가 들었다. 밀려도 덜 밀린다</td></tr></tbody></table>
