@@ -538,10 +538,13 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
     const jawPos = chin.attributes.position, jawUV = chin.attributes.uv;
     for (let i = 0; i < jawPos.count; i++) {
       const u = jawUV.getX(i), v = jawUV.getY(i);
-      const lip = goatee ? -0.58 : -0.45 - 0.20 * Math.sin(Math.PI * u) ** 2; // 가운데는 입 아래로 파고 양옆은 아래턱을 따라 완만히 오른다.
+      const lip = goatee ? -0.58 : stubble ? -0.45 - 0.20 * Math.sin(Math.PI * u) ** 2 : -0.30 - 0.28 * Math.sin(Math.PI * u) ** 2; // 풍성한 수염의 볼 가장자리는 -0.30에서 시작해 입 아래 -0.58까지 둥글게 내려간다. // 가운데는 입 아래로 파고 양옆은 아래턱을 따라 완만히 오른다.
       const begin = Math.acos(lip / shell), theta = begin + (Math.PI - begin) * (1 - v); // 기존 구의 위도를 다시 배치해 일자 턱띠를 없앤다.
       const phi = Math.atan2(jawPos.getZ(i), jawPos.getX(i));
-      jawPos.setXYZ(i, r * shell * Math.sin(theta) * Math.cos(phi), r * shell * Math.cos(theta), r * shell * Math.sin(theta) * Math.sin(phi));
+      const full = !stubble && !goatee;
+      const depth = full ? Math.sin((1 - v) * Math.PI) * r * 0.35 : 0; // 중간 턱만 머리 반경의 삼분의 일 앞으로 불려 둥근 볼륨을 만든다.
+      const drop = full ? (1 - v) * r * 0.32 : 0; // 밑턱을 짧게 내려 덥수룩한 덩어리를 만들고 볼과 입은 비운다.
+      jawPos.setXYZ(i, r * shell * Math.sin(theta) * Math.cos(phi), r * shell * Math.cos(theta) - drop, r * shell * Math.sin(theta) * Math.sin(phi) + dir * depth);
     }
     if (goatee) chin.scale(1, 1.08, 1); // 턱끝에만 짧은 술을 내려 둥근 공처럼 보이지 않게 한다.
     chin.computeVertexNormals();
