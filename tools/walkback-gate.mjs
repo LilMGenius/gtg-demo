@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { pinClock } from "./clock.mjs";
 import { clearDraw } from "./draw.mjs";
 
@@ -329,6 +329,18 @@ async function carrySample(browser, routed, seed, dir, home) {
 }
 
 // 한 판의 궤적을 수로 옮긴다. 리셋 프레임과 다음 구의 발 떠나는 프레임이 이 표본의 두 경계다.
+function returnSteps(rec) {
+  let worst=0,worstAt=-1,frames=0;
+  for(let i=1;i<rec.length;i++){
+    // 입력 경로의 다이빙은 꼬리가 열리기 전에 움직인다. 복귀 소유자가 있는 경계와 구간만 보행으로 잰다.
+    if(!rec[i].w&&!rec[i-1].w)continue;
+    if(rec[i].k&&rec[i].k!==rec[i-1].k)continue;
+    frames++;
+    const d=Math.hypot(rec[i-1].x,rec[i-1].z-KEEPER_Z)-Math.hypot(rec[i].x,rec[i].z-KEEPER_Z);
+    if(d>worst){worst=d;worstAt=i;}
+  }
+  return {worst,worstAt,frames};
+}
 function analyseCarry(rec, branch) {
   const off = (r) => Math.hypot(r.x, r.z - KEEPER_Z);
   const rounds = [];
@@ -361,19 +373,13 @@ function analyseCarry(rec, branch) {
     if (d > 0.002) steps.push(d);
   }
   steps.sort((a, b) => a - b);
-  /* 최악 프레임은 고른 판이 아니라 기록 전체에서 찾는다. 순간이동은 어느 판에서 나든 순간이동이다.
-     새 꼬리가 열리는 프레임만 뺀다. 그 프레임은 이동이 아니라 컷이고, 새 꼬리의 연출이 몸을
-     자기 시작 자세로 다시 세운다(실측: 잡기에서 돌진으로 넘어가며 z가 한 프레임에 0.9미터 줄었다).
-     그 컷은 이 절이 아니라 꼬리 연출의 문제이고 이 랩에서 안 건드린다. */
-  for (let i = 1; i < rec.length; i += 1) {
-    if (rec[i].k && rec[i].k !== rec[i - 1].k) continue;
-    const d = off(rec[i - 1]) - off(rec[i]);
-    if (d > worst) { worst = d; worstAt = i; }
-  }
+  /* 기록 전체의 복귀 구간과 양쪽 경계에서 최악 프레임을 찾는다. 활성 다이빙과 새 꼬리의 컷은 보행이 아니다. 복귀 시작과 종료 경계는 소유자가 한쪽에만 있어도 포함해 순간이동을 놓치지 않는다. */
+  const returning=returnSteps(rec);
+  worst=returning.worst;worstAt=returning.worstAt;
   // 다음 구를 손가락이 눌러야 하는 순간. main.mjs가 비행의 72퍼센트에 둔다.
   const flight = arrive > 0 && strike > 0 ? rec[arrive].t - rec[strike].t : -1;
   return {
-    rounds: rounds.length, kind: rec[o].k, landed: off(rec[o]), resetAge: rec[r0 - 1].a, awayAtReset: off(rec[r0 - 1]),
+    returnFrames:returning.frames, rounds: rounds.length, kind: rec[o].k, landed: off(rec[o]), resetAge: rec[r0 - 1].a, awayAtReset: off(rec[r0 - 1]),
     afterReset: off(rec[r0]), worst, worstAt: worstAt > 0 ? rec[worstAt].f : -1,
     median: steps.length ? steps[Math.floor(steps.length / 2)] : 0, n: steps.length,
     why: rec[Math.min(rec.length - 1, r0 + 1)].w,
@@ -472,6 +478,18 @@ try {
     const s = await carrySample(browser, routed, seed, dir, home);
     for (const e of s.errs) errAll.push(e);
     const a = analyseCarry(s.rec, branch);
+    const planted=s.rec.map(r=>({...r}));
+    const spot=planted.findIndex((r,i)=>i>0&&r.w&&Math.hypot(planted[i-1].x,planted[i-1].z-KEEPER_Z)>AWAY_BAR);
+    if(spot>0){
+      const before=planted[spot-1],distance=Math.hypot(before.x,before.z-KEEPER_Z);
+      const scale=(distance+STEP_CAP*4)/distance; // 기존 상한 네 배의 복귀 순간이동을 심어 상태 필터가 결함을 숨기지 않는지 묻는다.
+      before.x*=scale;before.z=KEEPER_Z+(before.z-KEEPER_Z)*scale;
+    }
+    const control=returnSteps(planted);
+    say('instrument:return-frames-exist '+tag,Boolean(a&&a.returnFrames>0),'frames '+(a?.returnFrames||0));
+    say('control:return-teleport-is-rejected '+tag,spot>0&&control.worst>STEP_CAP,'planted '+control.worst+' cap '+STEP_CAP);
+    const evidence=new URL('../.omo/evidence/vq2/',import.meta.url);mkdirSync(evidence,{recursive:true});
+    writeFileSync(new URL('walkback-'+tag+'.json',evidence),JSON.stringify({invocation:'node tools/walkback-gate.mjs',observed:a,control,frames:s.rec},null,2));
     if (!a) { say("instrument:the-next-ball-arrived-while-he-was-off-his-line " + tag, false, "no round closed in " + s.rec.length + " frames"); continue; }
     console.log("  " + tag + " seed " + seed + " tail " + a.kind + " landed " + a.landed.toFixed(2)
       + "m reset@" + a.resetAge.toFixed(2) + "s away " + a.awayAtReset.toFixed(3) + "->" + a.afterReset.toFixed(3)

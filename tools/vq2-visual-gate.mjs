@@ -78,7 +78,27 @@ try {
     renderer.render(scene,cam);
   });
   await shot('keeper-beard-closeup');
-  writeFileSync(new URL('visual.json',out),JSON.stringify({invocation:'node tools/vq2-visual-gate.mjs',browser:browser.version(),artifacts,beardSamples:pictures.rows.length,errors,pass:errors.length===0&&pictures.rows.length>0},null,2));
-  console.log(errors.length?'vq2-visual FAIL':'vq2-visual PASS',JSON.stringify({artifacts,errors}));
-  if(errors.length)process.exitCode=1;
+  await page.setViewportSize({width:1280,height:480}); // 일곱 차림의 소품과 얼굴을 같은 카드 높이에서 비교한다.
+  await page.evaluate(async()=>{
+    document.body.innerHTML='';
+    const T=await import('/web/vendor/three.module.min.js'),a=await import('/web/src/render/objects/actors.mjs');
+    const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1280,480); // 비교판의 실제 출력 해상도다.
+    document.body.append(renderer.domElement);
+    const scene=new T.Scene();scene.background=new T.Color(0xdce6df); // 얼굴과 소품 색을 가리지 않는 중립 배경이다.
+    scene.add(new T.HemisphereLight(0xe7f4ff,0x9b9384,2.1)); // 키트 반구광이다.
+    const key=new T.DirectionalLight(0xffedce,3.2);key.position.set(-4,8,5);scene.add(key); // 키트의 단일 주광이다.
+    const variants=a.PASSER_VARIANTS.filter(v=>!['keeper','kicker'].includes(v.id));
+    variants.forEach((v,i)=>{const rig=a.buildWalker(v);a.poseWalker(rig,0.12,{heading:0,time:1});rig.root.position.x=(i-3)*1.65;scene.add(rig.root);}); // 같은 보폭의 정면에서 일곱 차림을 나란히 세운다.
+    const cam=new T.PerspectiveCamera(34,1280/480,0.1,100);cam.position.set(0,2.6,8.8);cam.lookAt(0,1.2,0); // 머리부터 발끝까지 한 장에 남기는 비교용 카메라다.
+    renderer.render(scene,cam);
+  });
+  await shot('walker-lineup');
+
+  const errorStart=errors.length;
+  await page.evaluate(()=>setTimeout(()=>{throw new Error('P22-VQ2 planted exception');},0)); // 오류 없는 캡처의 수집기가 실제 예외를 감지하는지 검증한다.
+  await page.waitForTimeout(100); // 비동기 예외 수집이 끝난 뒤 실제 오류와 대조군을 나눈다.
+  const exceptionControl=errors.splice(errorStart),controlPass=exceptionControl.some(e=>e.includes('P22-VQ2 planted exception'));
+  writeFileSync(new URL('visual.json',out),JSON.stringify({invocation:'node tools/vq2-visual-gate.mjs',browser:browser.version(),artifacts,beardSamples:pictures.rows.length,errors,exceptionControl,pass:errors.length===0&&pictures.rows.length>0&&controlPass},null,2));
+  console.log(errors.length||!controlPass?'vq2-visual FAIL':'vq2-visual PASS',JSON.stringify({artifacts,errors}));
+  if(errors.length||!controlPass)process.exitCode=1;
 }finally{clearTimeout(timer);await browser.close();}
