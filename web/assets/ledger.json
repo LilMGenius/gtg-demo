@@ -58,5 +58,115 @@
     "origin": "tools/og-shot.mjs",
     "rights": "self",
     "form": "png"
+  },
+  {
+    "path": "flags/LICENSE",
+    "origin": "lipis/flag-icons",
+    "rights": "MIT",
+    "license": "MIT",
+    "source": "https://raw.githubusercontent.com/lipis/flag-icons/086f7e97d657358203916dbe84f61c2bccaa81eb/LICENSE",
+    "commit": "086f7e97d657358203916dbe84f61c2bccaa81eb",
+    "sha256": "8f1195d55a2fd315a07d812328470ca9ba2abb78c8d317ff19619d5125e00cea",
+    "form": "text"
+  },
+  {
+    "path": "flags/ar.svg",
+    "origin": "lipis/flag-icons",
+    "rights": "MIT",
+    "license": "MIT",
+    "source": "https://raw.githubusercontent.com/lipis/flag-icons/086f7e97d657358203916dbe84f61c2bccaa81eb/flags/4x3/ar.svg",
+    "commit": "086f7e97d657358203916dbe84f61c2bccaa81eb",
+    "sha256": "da39bfbe83fd35fae781f605c4a297b632f03ccf72d4cb0499e86dac8370663d",
+    "form": "svg"
+  },
+  {
+    "path": "flags/br.svg",
+    "origin": "lipis/flag-icons",
+    "rights": "MIT",
+    "license": "MIT",
+    "source": "https://raw.githubusercontent.com/lipis/flag-icons/086f7e97d657358203916dbe84f61c2bccaa81eb/flags/4x3/br.svg",
+    "commit": "086f7e97d657358203916dbe84f61c2bccaa81eb",
+    "sha256": "b0a912826c3ffd7287435ebed66e18fe058e992309c00dc10b430dd41a29ba91",
+    "form": "svg"
+  },
+  {
+    "path": "flags/de.svg",
+    "origin": "lipis/flag-icons",
+    "rights": "MIT",
+    "license": "MIT",
+    "source": "https://raw.githubusercontent.com/lipis/flag-icons/086f7e97d657358203916dbe84f61c2bccaa81eb/flags/4x3/de.svg",
+    "commit": "086f7e97d657358203916dbe84f61c2bccaa81eb",
+    "sha256": "efd480af5a154a7651f29da23ee0d09dbc892410fb4041898ddf8face336c575",
+    "form": "svg"
+  },
+  {
+    "path": "flags/es.svg",
+    "origin": "lipis/flag-icons",
+    "rights": "MIT",
+    "license": "MIT",
+    "source": "https://raw.githubusercontent.com/lipis/flag-icons/086f7e97d657358203916dbe84f61c2bccaa81eb/flags/4x3/es.svg",
+    "commit": "086f7e97d657358203916dbe84f61c2bccaa81eb",
+    "sha256": "f9cfaff858e95f830733ade9591037b5322dfb5827a53b70956a3d190bb49b9a",
+    "form": "svg"
+  },
+  {
+    "path": "flags/gb-eng.svg",
+    "origin": "lipis/flag-icons",
+    "rights": "MIT",
+    "license": "MIT",
+    "source": "https://raw.githubusercontent.com/lipis/flag-icons/086f7e97d657358203916dbe84f61c2bccaa81eb/flags/4x3/gb-eng.svg",
+    "commit": "086f7e97d657358203916dbe84f61c2bccaa81eb",
+    "sha256": "53797ba9e2dd9b18cd5344255f4e9ae9fad743ecb628fc9feb98abea4f48f90e",
+    "form": "svg"
+  },
+  {
+    "path": "flags/jp.svg",
+    "origin": "lipis/flag-icons",
+    "rights": "MIT",
+    "license": "MIT",
+    "source": "https://raw.githubusercontent.com/lipis/flag-icons/086f7e97d657358203916dbe84f61c2bccaa81eb/flags/4x3/jp.svg",
+    "commit": "086f7e97d657358203916dbe84f61c2bccaa81eb",
+    "sha256": "bfea80baf9989383dc4bf7ca594ed95be0df0ff125bfc88d0bfa878eb0198022",
+    "form": "svg"
+  },
+  {
+    "path": "flags/kr.svg",
+    "origin": "lipis/flag-icons",
+    "rights": "MIT",
+    "license": "MIT",
+    "source": "https://raw.githubusercontent.com/lipis/flag-icons/086f7e97d657358203916dbe84f61c2bccaa81eb/flags/4x3/kr.svg",
+    "commit": "086f7e97d657358203916dbe84f61c2bccaa81eb",
+    "sha256": "7a6cd5b51d0e2841ed8b79b1147ad8a66cf3c09f6344d4a63b5e4413ffa5d15b",
+    "form": "svg"
+  },
+  {
+    "path": "flags/ng.svg",
+    "origin": "lipis/flag-icons",
+    "rights": "MIT",
+    "license": "MIT",
+    "source": "https://raw.githubusercontent.com/lipis/flag-icons/086f7e97d657358203916dbe84f61c2bccaa81eb/flags/4x3/ng.svg",
+    "commit": "086f7e97d657358203916dbe84f61c2bccaa81eb",
+    "sha256": "b7a2a45a6499095efce41592428ff558ec5bd83d2751858dfe5fa4589334b66f",
+    "form": "svg"
+  },
+  {
+    "path": "flags/pt.svg",
+    "origin": "lipis/flag-icons",
+    "rights": "MIT",
+    "license": "MIT",
+    "source": "https://raw.githubusercontent.com/lipis/flag-icons/086f7e97d657358203916dbe84f61c2bccaa81eb/flags/4x3/pt.svg",
+    "commit": "086f7e97d657358203916dbe84f61c2bccaa81eb",
+    "sha256": "a7a2cf0b44aaaaf4f3bdc0ee0fa308ec7085bdfedd3f72da1473d43fd2a569fb",
+    "form": "svg"
+  },
+  {
+    "path": "flags/qa.svg",
+    "origin": "lipis/flag-icons",
+    "rights": "MIT",
+    "license": "MIT",
+    "source": "https://raw.githubusercontent.com/lipis/flag-icons/086f7e97d657358203916dbe84f61c2bccaa81eb/flags/4x3/qa.svg",
+    "commit": "086f7e97d657358203916dbe84f61c2bccaa81eb",
+    "sha256": "fb955ef352ff3ba1ea980090c31d5cf15257729d32949d04b18402651e93b986",
+    "form": "svg"
   }
 ]
