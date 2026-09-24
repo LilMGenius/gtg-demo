@@ -4,7 +4,7 @@ import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, botPlan, X_MAX
 import { aimAt, diveTrigger } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
 import { KEY_MAP } from './ui/keys.mjs';
-import { KEEPERS, KICKERS, keeperCost, kickerCost, kickerByName, ROLES, ROLE_SLOTS, ELEVEN, defaultEleven, TRAITS, PULL_COST, PULL_BULK, PULL_BONUS, pullYield, TICKET_CAP, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
+import { KEEPERS, KICKERS, keeperCost, kickerCost, kickerByName, ROLES, ROLE_SLOTS, ELEVEN, FIELD, defaultEleven, TRAITS, PULL_COST, PULL_BULK, PULL_BONUS, pullYield, TICKET_CAP, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
@@ -100,12 +100,13 @@ state.posts = Array.isArray(saved?.posts) ? saved.posts.slice(-FEED_CAP) : [];
 state.wallet = readWallet(saved?.wallet);
 // 상대 전적. 키커 이름을 열쇠로 막은 수와 먹힌 수를 따로 센다.
 state.record = readRecord(saved);
-/* 키커 보유와 주전 열하나. 지금까지 판에 나오는 키커는 명단 일흔일곱에서 매 구 무작위였고,
+/* eleven은 필드 열 명의 배열이고 골키퍼는 state.keeper에 선다. 선발 열하나는 이 둘의 합이다.
+   지금까지 판에 나오는 키커는 명단 일흔일곱에서 매 구 무작위였고,
    플레이어가 상대를 고를 방법이 없었다. 잘 차는 키커는 막기 어렵지만 골대 밖으로 덜 차므로,
    주전을 고르는 것은 난도를 올려 보상 밀도를 사는 선택이다. */
 {
   const names = KICKERS.map((k) => k.name);
-  const got = readSquadKickers(saved, names, defaultEleven(), ELEVEN, (name) => kickerByName(name)?.role, ROLE_SLOTS);
+  const got = readSquadKickers(saved, names, defaultEleven(), FIELD, (name) => kickerByName(name)?.role, ROLE_SLOTS);
   state.kickers = got.kickers;
   state.eleven = got.eleven;
 }
@@ -548,7 +549,7 @@ function nextSet() {
   const form = rollForm(state.keeper, rng);
   state.form = form;
   formChip();
-  // 주전 열하나만 이 판에 선다. 명단 전체가 아니라 플레이어가 세운 사람들이 차야 그 선택이 값을 한다.
+  // 필드 열 명만 이 판에서 찬다. 명단 전체가 아니라 플레이어가 세운 사람들이 차야 그 선택이 값을 한다.
   state.shots = buildSet(rng, state.keeper.level, state.gear.city, state.eleven.map(kickerByName).filter(Boolean));
   state.i = 0;
   state.results = [];
@@ -974,8 +975,8 @@ function renderRoster() {
       + '<img alt="' + entry.name + '" src="' + thumbURL('face', entry, lookOf({}, entry.name)) + '">'
       + '<span class="nm">' + entry.name + '</span><em>' + PRICE(cost) + '</em></button>';
   }).join('');
-  /* 포지션 줄. 골키퍼 한 명과 필드 열하나는 다른 질문이라 같은 목록에 못 섞는다.
-     골키퍼는 세우는 사람이 하나뿐이고, 키커는 정원 안에서 열하나를 고른다. */
+  /* 포지션 줄. 선발 열하나는 골키퍼 한 명과 필드 열 명이다.
+     골키퍼는 세우는 사람이 하나뿐이고, 키커는 포지션 정원 안에서 열 명을 고른다. */
   /* 지금 어느 자리를 보는지는 색이 아니라 aria-selected로 선다. 색만 칠하면 그 상태가 화면에만
      있고, 누른 탭과 안 누른 탭이 계기에게 같은 모양이라 탭이 도는지를 아무도 못 잰다. */
   const tabs = '<div class="kinds" role="tablist">' + ['gk'].concat(ROLES)
@@ -988,7 +989,7 @@ function renderRoster() {
         : '<div class="note dim"><span></span></div>')
     : kickerPane(squadTab);
   const count = squadTab === 'gk' ? '보유 ' + state.squad.length + '명'
-    : '주전 ' + state.eleven.length + ' / ' + ELEVEN + '명';
+    : '주전 ' + (state.eleven.length + ELEVEN - FIELD) + ' / ' + ELEVEN + '명';
   box.innerHTML = '<h4>선수단<small>' + count + '</small></h4>' + tabs + pane
     + '<button class="close">닫기</button>';
   for (const b of box.querySelectorAll('.kind')) b.onclick = () => { squadTab = b.dataset.pos; renderRoster(); };
@@ -2235,7 +2236,7 @@ function paintPull() {
   };
 }
 
-/* 첫 진입. 가입 직후 아무것도 안 뽑고 시작하면 첫 키퍼와 주전 열하나가 조용히 배정된다.
+/* 첫 진입. 가입 직후 아무것도 안 뽑고 시작하면 첫 키퍼와 필드 열 명이 조용히 배정된다.
    플레이어는 자기가 무엇을 들고 시작하는지를 본 적이 없고, 이 장르가 파는 첫 순간을 건너뛴다.
    그래서 직접 눌러 연다. 0은 키퍼 한 장, 1은 키커 열 장(보너스로 열한 장), 2는 끝난 상태다.
    키퍼 한 장은 결과가 동네형으로 못 박혀 있다. 첫 판이 무작위로 갈리면 처음 오는 사람마다
@@ -2278,7 +2279,7 @@ function onboardStep() {
   if (!drawn.length) { state.onboard = ONBOARD_DONE; return false; }
   for (const k of drawn) state.kickers.push(k.name);
   /* 뽑은 사람으로 주전을 다시 세운다. 정원 안에서 뽑힌 사람을 먼저 넣고 모자란 자리는
-     시작 열하나가 채운다. 뽑았는데 아무도 안 뛰면 그 열한 장이 무엇을 산 것인지 화면에 없다. */
+     시작 필드 열 명이 채운다. 뽑았는데 아무도 안 뛰면 그 열한 장이 무엇을 산 것인지 화면에 없다. */
   const filled = [];
   for (const role of ROLES) {
     const want = ROLE_SLOTS[role];
@@ -2650,7 +2651,7 @@ window.__earn = (open) => { if (open) openWiki(HUD_LINKS.purse.cat); else closeW
 window.__wiki = (open, cat) => { if (open) openWiki(cat); else closeWiki(); };
 // 이용권 잔고. 완봉 보상과 뽑기 차감을 계기가 데이터에서 읽는다.
 window.__tickets = () => state.tickets;
-// 주전 열하나. 계기는 화면 글자가 아니라 장부를 읽어야 마크업이 바뀌어도 판정이 안 흔들린다.
+// 필드 열 명. 계기는 화면 글자가 아니라 장부를 읽어야 마크업이 바뀌어도 판정이 안 흔들린다.
 window.__eleven = () => state.eleven.slice();
 // 계기가 심은 값을 저장까지 밀어 넣는 자리. 계정이 갈리는지는 저장에 닿아야 재진다.
 window.__persist = () => { persist(); return true; };
@@ -2798,7 +2799,7 @@ stage.setGoal(state.gear.frame, state.gear.frameSkin);
   /* 처음 온 사람은 공보다 카드가 먼저다. 판은 뒤에서 이미 돌고 있고 개봉 화면이 그 위를 덮으므로,
      닫는 순간 바로 첫 구가 온다. 이미 하던 사람에게는 아무 일도 안 일어난다. */
   /* veteran 표본은 그 절차를 카드 없이 끝까지 돌린 사람이다. 단계를 건너뛰는 것이 아니라
-     다 돌리고 화면만 안 세우므로, 받는 것도 주전 열하나도 사람이 클릭했을 때와 같다. */
+     다 돌리고 화면만 안 세우므로, 받는 것도 필드 열 명도 사람이 클릭했을 때와 같다. */
   if (state.onboardSkip) {
     while (onboardStep());
     stopReveal();

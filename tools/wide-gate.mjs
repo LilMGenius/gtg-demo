@@ -1,6 +1,6 @@
 // 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 // 헛구의 자. 모든 슛이 골문 안으로 갔다. 키커는 절대 빗나가지 않는 존재였고,
-// 그래서 주전 열하나를 고르는 일이 난도만 정하고 판의 밀도는 안 정했다.
+// 그래서 필드 열 명을 고르는 일이 난도만 정하고 판의 밀도는 안 정했다.
 // 못 차는 키커를 세우면 막기는 쉬운데 그 쉬움에 대가가 없었다.
 //
 // 축은 셋이다. 헛구가 나는가, 잘 차는 키커일수록 덜 나는가, 보상이 실점과 세이브 사이인가.
@@ -9,7 +9,7 @@
 // 표본 범위: 키퍼는 한 사람으로 고정한다. 재는 것은 키커 쪽 확률이라 키퍼가 결론을 안 바꾼다.
 
 import { makeRng, resolve, keeperAtLevel, autoInput, followerGain } from "./position-pop.mjs";
-import { KICKERS, kickerByName, defaultEleven } from "../src/roster.mjs";
+import { KICKERS, FIELD, kickerByName, defaultEleven } from "../src/roster.mjs";
 import { coinGain, COIN_SAVE, COIN_CONCEDED, COIN_WIDE } from "../web/src/state/wallet.mjs";
 
 const N = 20000;
@@ -35,8 +35,8 @@ function run(pool) {
 }
 
 const cheap = defaultEleven().map(kickerByName);
-// 명단에서 가장 잘 차는 열하나. 침착성과 결정력이 헛구를 산다.
-const dear = KICKERS.slice().sort((a, b) => (b.composure + b.finishing) - (a.composure + a.finishing)).slice(0, 11);
+// 명단에서 가장 잘 차는 필드 열 명. 침착성과 결정력이 헛구를 산다.
+const dear = KICKERS.slice().sort((a, b) => (b.composure + b.finishing) - (a.composure + a.finishing)).slice(0, FIELD);
 const a = run(cheap);
 const b = run(dear);
 

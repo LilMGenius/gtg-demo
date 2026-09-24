@@ -1,15 +1,16 @@
 import { chromium } from "playwright";
-import { KICKERS, ROLES, ROLE_SLOTS, ELEVEN, defaultEleven, kickerByName } from "../src/roster.mjs";
+import { KICKERS, ROLES, ROLE_SLOTS, FIELD, defaultEleven, kickerByName } from "../src/roster.mjs";
+import { TEAM_RULE } from "../src/reality.mjs";
 import { makeRng, buildSet } from "../src/chain.mjs";
 
-// 주전 열하나의 자. 판에 나오는 키커가 명단 일흔일곱에서 매 구 무작위였다.
+// 필드 열 명의 자. 판에 나오는 키커가 명단 일흔일곱에서 매 구 무작위였다.
 // 플레이어가 상대를 고를 방법이 없으면 잘 차는 키커를 영입할 이유도 없고, 난도와 보상을
 // 스스로 올리는 축이 통째로 없다. 고르는 화면이 서는 것과 그 선택이 판에 닿는 것은 다른 명제다.
 //
 // 축은 셋이다. 정원이 지켜지는가, 고른 사람만 판에 서는가, 화면에서 세우고 내릴 수 있는가.
-// 대조군은 명단 전체다. 아무나 나오는 판과 고른 열하나가 나오는 판이 같은 수를 주면 못 가른다.
+// 대조군은 명단 전체다. 아무나 나오는 판과 고른 필드 열 명이 나오는 판이 같은 수를 주면 못 가른다.
 // 표본 범위: 키퍼는 안 세운다. 누가 차는가만 재므로 키퍼 능력치가 결론을 안 바꾼다.
-// 시드 하나로 이천 구를 돌린다. 열하나 밖의 이름이 한 번이라도 나오면 그 자리에서 빨개진다.
+// 시드 하나로 이천 구를 돌린다. 필드 열 명 밖의 이름이 한 번이라도 나오면 그 자리에서 빨개진다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const LINE = String.fromCharCode(10);
@@ -20,22 +21,27 @@ const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 
 const eleven = defaultEleven();
+const rule = TEAM_RULE.values;
+const legal = (slots) => rule.goalkeepers + Object.values(slots).reduce((a, b) => a + b) === rule.maximum;
+check("squad:formation-obeys-law-3.1", legal(ROLE_SLOTS), TEAM_RULE.source.clause);
+// 잘못된 4-4-3은 골키퍼를 더하면 IFAB 최대 인원을 넘는다.
+check("control:4-4-3-plus-keeper-is-rejected", !legal({ 수비수: 4, 미드필더: 4, 공격수: 3 }), "4-4-3 rejected");
 check("instrument:the-default-eleven-is-a-real-eleven",
-  eleven.length === ELEVEN && eleven.every((n) => kickerByName(n)),
+  eleven.length === rule.maximum - rule.goalkeepers && eleven.every((n) => kickerByName(n)),
   eleven.length + " names, all on the roster");
 const perRole = {};
 for (const n of eleven) { const k = kickerByName(n); perRole[k.role] = (perRole[k.role] || 0) + 1; }
 check("squad:the-default-eleven-fills-every-position-to-its-quota",
   ROLES.every((r) => perRole[r] === ROLE_SLOTS[r]),
   ROLES.map((r) => r + " " + (perRole[r] || 0) + "/" + ROLE_SLOTS[r]).join(", "));
-// 시작 열하나가 명단에서 싼 쪽이어야 영입이 살 것을 판다.
-const startFame = eleven.reduce((s, n) => s + kickerByName(n).fame, 0) / ELEVEN;
+// 시작 필드 열 명이 명단에서 싼 쪽이어야 영입이 살 것을 판다.
+const startFame = eleven.reduce((s, n) => s + kickerByName(n).fame, 0) / FIELD;
 const allFame = KICKERS.reduce((s, k) => s + k.fame, 0) / KICKERS.length;
 check("squad:the-starting-eleven-leaves-room-to-buy-better",
   startFame < allFame, "starting fame " + startFame.toFixed(2) + " under roster " + allFame.toFixed(2));
 
-/* 고른 사람만 판에 서는가. 열하나를 넘긴 이름이 한 번이라도 나오면 그 선택은 화면 장식이다.
-   대조군으로 명단 전체를 넘긴 판을 같이 돌린다. 거기서는 열하나 밖 이름이 나와야 한다. */
+/* 고른 사람만 판에 서는가. 필드 열 명을 넘긴 이름이 한 번이라도 나오면 그 선택은 화면 장식이다.
+   대조군으로 명단 전체를 넘긴 판을 같이 돌린다. 거기서는 필드 열 명 밖 이름이 나와야 한다. */
 const draw = (pool) => {
   const rng = makeRng(31);
   const seen = new Set();
@@ -45,10 +51,10 @@ const draw = (pool) => {
 const mine = draw(eleven.map(kickerByName));
 const anyone = draw(undefined);
 check("squad:only-the-eleven-take-the-shots",
-  [...mine].every((n) => eleven.includes(n)) && mine.size === ELEVEN,
+  [...mine].every((n) => eleven.includes(n)) && mine.size === rule.maximum - rule.goalkeepers,
   mine.size + " distinct kickers over 2000 balls");
 check("control:without-a-chosen-eleven-the-whole-roster-shoots",
-  anyone.size > ELEVEN, anyone.size + " distinct of " + KICKERS.length);
+  anyone.size > FIELD, anyone.size + " distinct of " + KICKERS.length);
 
 let b;
 try {
@@ -64,6 +70,8 @@ try {
   await p.waitForTimeout(900);
   await p.evaluate(() => window.__roster(true));
   await p.waitForSelector("#roster .kind", { timeout: 8000 });
+  const keepers = await p.locator('#roster .row.mine [data-at].here').count();
+  check("squad:one-goalkeeper-starts", keepers === rule.goalkeepers, keepers + " goalkeeper");
 
   const tabs = await p.evaluate(() => [...document.querySelectorAll("#roster .kind")].map((e) => e.dataset.pos));
   check("squad:the-panel-splits-by-position", tabs.length === 4 && tabs[0] === "gk", tabs.join(", "));
@@ -71,6 +79,8 @@ try {
   await p.click('#roster .kind[data-pos="공격수"]');
   await p.waitForTimeout(500);
   const before = await p.evaluate(() => window.__eleven());
+  const label = await p.locator('#roster h4 small').innerText();
+  check("squad:the-label-includes-the-goalkeeper", label === '주전 ' + rule.maximum + ' / ' + rule.maximum + '명', label);
   // 카드가 실제로 읽히는가. 이름과 값이 잘려 사라지면 세울 사람을 얼굴로만 골라야 한다.
   const cards = await p.evaluate(() => [...document.querySelectorAll("#roster .row.mine [data-kick]")]
     .map((e) => ({ h: e.offsetHeight, t: e.textContent.trim().length })));
@@ -98,7 +108,7 @@ try {
     if (b2) b2.click();
     return window.__eleven().length;
   });
-  check("squad:the-quota-cannot-be-exceeded", over <= 11, over + " starters");
+  check("squad:the-quota-cannot-be-exceeded", over + rule.goalkeepers <= rule.maximum, over + " field starters");
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 } finally {
