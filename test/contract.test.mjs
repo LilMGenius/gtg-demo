@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolve, makeRng, newKeeper, buildSet, rollForm } from "../src/chain.mjs";
+import { resolve, makeRng, newKeeper, buildSet, rollForm } from "../tools/position-pop.mjs";
 import { LEDGER } from "../src/ledger.mjs";
 
 // C1. 한 구는 단계 넷에서 끊기고 롤은 여섯까지 굴러간다.

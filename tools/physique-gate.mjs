@@ -3,7 +3,7 @@
 // 실측 연구가 말하는 것은 하나다. 슛 난이도를 통제하면 신장과 세이브율에 유의한 상관이 없다.
 // 그래서 상단과 하단이 반대로 움직이고 합이 대략 0이어야 통과다.
 
-import { resolve, makeRng, buildSet, keeperAtLevel } from "../src/chain.mjs";
+import { resolve, makeRng, buildSet, keeperAtLevel } from "./position-pop.mjs";
 import { CAUSE_LABEL } from "../src/ledger.mjs";
 
 const BALLS = 30000;

@@ -1,4 +1,4 @@
-// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+// 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { makeRng, buildSet, resolve, keeperAtLevel, newKeeper } from "./position-pop.mjs";
 
 // 성장 곡선을 감시한다. 판정 상수 하나가 움직이면 세이브율 전체가 따라 움직이는데,
@@ -33,7 +33,7 @@ const at = (lv) => {
     // 레벨 표본은 성장 씨앗을 따로 쓴다. 판정 rng와 같은 씨앗을 쓰면 키퍼와 슛이 상관을 갖는다.
     const k = lv === null ? newKeeper() : keeperAtLevel(lv, makeRng(s + 7));
     for (const shot of buildSet(makeRng(s + 1), 5, 0)) {
-      const r = resolve({ keeper: k, shot, rng, input: { dive: shot.side, errMs: 0, advance: 0, auto: false } });
+      const r = resolve({ keeper: k, shot, rng, mode: 'hand-react' });
       /* 키커가 골문 밖으로 찬 구는 키퍼의 성적이 아니다. 그런 구를 분모에 넣으면 못 차는 키커를
          만난 것이 키퍼의 성장으로 읽히고, 이 곡선이 재는 것이 실력에서 상대 수준으로 바뀐다.
          축의 문장은 그대로다. 세이브율은 언제나 시험받은 구 중 막아 낸 비율이었고,

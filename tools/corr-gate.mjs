@@ -1,4 +1,4 @@
-// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+// 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 // 이 게이트의 모집단은 keeperAtLevel 기준 모집단(N칸 중 셋, 레벨당 3포인트)이며 제품 모집단은 tools/product-pop-gate.mjs가 잰다.
 import { modifierContract } from "./modifier-contract.mjs";
 import { resolve, makeRng, buildSet, keeperAtLevel, rollForm, newKeeper } from "./position-pop.mjs";
@@ -9,7 +9,7 @@ import { GROWABLE } from "../src/ledger.mjs";
 
    기준선은 신규 키퍼다. 만렙 근처에서 재면 클램프에 눌려 모든 칸이 0으로 수렴한다.
    변종끼리 같은 시드를 써서 같은 구를 받는다. 다른 구를 받으면 그 차이가 칸의 효과와 섞인다.
-   입력은 완벽 수동이다. 자동 입력을 쓰면 손가락의 오판이 칸의 효과 위에 얹힌다.
+   수동은 공유 hand-react 정책이며 자동은 botPlan이다. 자동 다이빙의 오독도 제품 스탯이 소유한다.
 
    재는 것은 셋이다. 표본이 선언한 만큼인가, 재시작 칸이 세이브율에 안 붙는가,
    세이브 경로 칸이 양수인가. 순위와 크기는 재지 않는다. 그것은 20번 항목이 소유한 열린 질문이고,
@@ -32,7 +32,7 @@ const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 
 // 한 변종의 세이브율. 시드마다 키퍼를 새로 만들고 그 자리에서 한 칸만 올린다.
-function rate(bump, level = 1, mode = 'perfect', limit = BALLS, seedOffset = 0) {
+function rate(bump, level = 1, mode = 'hand-react', limit = BALLS, seedOffset = 0) {
   let saved = 0;
   let balls = 0;
   for (let s = 0; s < Math.ceil(limit / SET); s += 1) {
@@ -42,9 +42,8 @@ function rate(bump, level = 1, mode = 'perfect', limit = BALLS, seedOffset = 0) 
     if (bump) keeper[bump] = Math.min(10, (Number(keeper[bump]) || 1) + 1);
     for (const shot of buildSet(rng, level)) {
       if (balls >= limit) break;
-      // 완벽 수동. 방향은 맞고 타이밍은 정확하다. 손가락을 상수로 고정해야 칸만 남는다.
-      const input = { dive: shot.side, errMs: 0, advance: 0, auto: false };
-      const r = resolve(mode === 'perfect' ? { keeper, shot, rng, input } : { keeper, shot, rng });
+      // 같은 손 반응 정책과 짝 난수로 스탯 변화만 비교한다.
+      const r = resolve({ keeper, shot, rng, mode: mode === 'hand-react' ? 'hand-react' : 'bot' });
       balls += 1;
       if (!r.conceded) saved += 1;
     }
@@ -87,11 +86,10 @@ modifierContract({ gate: "corr", fields: ["studs"], engine: { makeRng, buildSet,
 // Reuse corr's one-point probe at the frozen research seeds (12,000 shots per cell).
 // Bars are lap hypotheses, not player preference: DaedalGames/daedal-games docs/gamedev/judgement.md.
 // This population includes untested shots; the original level-one table keeps its own seeds and size.
-// Positivity is asserted on perfect input only. Auto input layers finger misjudgement on the stat
-// effect (see the header), so its signed gains are printed and only its share cap is a bar.
+// 양수 문턱은 손 반응 정책에 적용한다. 봇은 부호 있는 이득을 출력하고 비중 상한을 잰다.
 function measureOfferDominance() {
   const savePath = GROWABLE.filter(k => !RESTART.includes(k) && !FAME.includes(k));
-  for (const mode of ['perfect', 'auto']) {
+  for (const mode of ['hand-react', 'bot']) {
     for (const level of [1, 5, 13]) {
       const baseline = rate(null, level, mode, 12000, level * 7919);
       const gains = savePath.map(k => ({ k, d: rate(k, level, mode, 12000, level * 7919).pct - baseline.pct }))
@@ -99,12 +97,12 @@ function measureOfferDominance() {
       const positiveSum = gains.reduce((sum, row) => sum + Math.max(0, row.d), 0);
       const [top, second] = gains;
       const share = positiveSum > 0 ? 100 * top.d / positiveSum : Infinity;
-      const cap = mode === 'perfect' ? 45 : 40;
+      const cap = mode === 'hand-react' ? 45 : 40;
       const nonpositive = gains.filter(row => row.d <= 0);
       const details = `${mode} Lv${level} share=${share.toFixed(1)}% <= ${cap}% ratio=${second.d > 0 ? (top.d / second.d).toFixed(2) : 'inf'} regret=${(top.d - second.d).toFixed(2)}pp base=${baseline.pct.toFixed(2)}% balls=${baseline.balls}`
         + (Math.abs(share - cap) < 0.05 ? ` unrounded-share=${share}%` : '');
       check('corr:no-single-slot-dominates-at-the-offer', baseline.balls === 12000 && share <= cap, details);
-      if (mode === 'perfect') check('corr:every-offered-save-path-slot-is-strictly-positive', nonpositive.length === 0,
+      if (mode === 'hand-react') check('corr:every-offered-save-path-slot-is-strictly-positive', nonpositive.length === 0,
         `Lv${level} ` + (nonpositive.map(row => `${row.k}=${row.d.toFixed(4)}pp`).join(', ') || `${gains.length} positive`));
       console.log(`offer-marginals ${mode} Lv${level} ` + gains.map(row => `${row.k}=${row.d.toFixed(4)}pp`).join(', '));
     }

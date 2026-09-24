@@ -1,4 +1,4 @@
-// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+// 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { resolve, makeRng, buildSet, keeperAtLevel, rollForm } from "./position-pop.mjs";
 import { LEDGER } from "../src/ledger.mjs";
 

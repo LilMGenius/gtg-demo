@@ -39,9 +39,6 @@ export function positionInput(keeper, shot, rng, mode = 'hand-react', pRead = P_
   return fromTrace([{ ms: -1000, x: 0 }, { ms: -500, x: 0 }, { ms: 0, x: clampX(side * speed * 0.5) }], false);
 }
 
-// 기존 계기의 자동 입력 호출은 봇 자취로 치환한다. 수동 방향 서술자는 resolve에서 손 이동으로 바꾼다.
-export const autoInput = (keeper, shot, rng) => positionInput(keeper, shot, rng, 'bot');
-
 function movingAtRead(shot, raw) {
   if (raw.trace.aimedShot || shot.aimed || shot.chip || shot.side === 0) return false;
   // U1 관측시점 식을 읽어 계측의 난수 경계를 맞춘다. 계수 변경은 아래 식에도 반영한다.
@@ -61,7 +58,8 @@ export function resolve(arg) {
   // 32비트 시드 셋으로 정책, 자동 다이빙, 이후 사슬을 분리한다. 분기 수가 달라도 같은 구를 짝짓는다.
   const seed = () => Math.floor(arg.rng() * 4294967296);
   const policy = chain.makeRng(seed()), position = chain.makeRng(seed()), outcome = chain.makeRng(seed());
-  const raw = Array.isArray(arg.input?.trace) ? arg.input : positionInput(arg.keeper, arg.shot, policy, arg.input?.auto === false ? 'hand-react' : 'bot');
+  if (arg.input !== undefined && !Array.isArray(arg.input?.trace)) throw new TypeError('위치 모집단 입력에는 trace가 필요하다');
+  const raw = arg.input ?? positionInput(arg.keeper, arg.shot, policy, arg.mode ?? 'bot');
   const prefix = [];
   const draw = () => { const u = position(); prefix.push(u); return u; };
   if (movingAtRead(arg.shot, raw)) draw();

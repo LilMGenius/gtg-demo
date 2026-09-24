@@ -1,4 +1,4 @@
-// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+// 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { makeRng, buildSet, resolve, newKeeper, followerGain } from "./position-pop.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 
@@ -19,7 +19,7 @@ const sweep = (k, opt) => {
   for (let s = 0; s < SEEDS; s += 1) {
     const rng = makeRng(s + 90001);
     for (const shot of buildSet(makeRng(s + 1), 5, city)) {
-      const r = resolve({ keeper: k, shot, rng, input: { dive: shot.side, errMs: 0, advance: 0, auto: false },
+      const r = resolve({ keeper: k, shot, rng, mode: 'hand-react',
         focusAid: opt.focusAid || 1, rosin: !!opt.rosin });
       shots += 1;
       if (!r.conceded) saved += 1;

@@ -1,4 +1,4 @@
-// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+// 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 // 손에 들어온 공은 손이 공 쪽으로 갔을 때만이라는 자.
 // 반대로 뛰었는데 공이 멈춘 구가 전부 잡았다로 끝나서, 화면은 키퍼가 한쪽으로 날아간 뒤
 // 공이 반대편 장갑으로 순간이동하는 그림을 그렸다. 판정이 결과 종류를 안 갈라 놓았기 때문이고,
@@ -8,7 +8,7 @@
 // 막히기는 하는가, 막힌 공이 살아 있는가, 그리고 잡은 쪽이 여전히 더 이득인가.
 // 대조군 없이 첫 축만 재면 잘못 뛴 구를 아예 안 만드는 표본으로도 초록이 된다.
 
-import { makeRng, buildSet, resolve, keeperAtLevel, autoInput, ballInHand, restartDelay } from "./position-pop.mjs";
+import { makeRng, buildSet, resolve, positionInput, keeperAtLevel, ballInHand, restartDelay } from "./position-pop.mjs";
 
 const N = 20000;
 // 판단력이 방향 읽기를 사므로 레벨마다 잘못 뛰는 빈도가 다르다. 세 구간을 다 본다.
@@ -31,7 +31,7 @@ for (const lv of LEVELS) {
     for (const shot of buildSet(rng, lv, 0)) {
       if (balls >= N) break;
       balls += 1;
-      const input = autoInput(k, shot, rng);
+      const input = positionInput(k, shot, rng, 'bot');
       const r = resolve({ keeper: k, shot, rng, input, grip: 0, studs: 0, pads: 0, socks: 0, frame: 0, focusAid: 1, rosin: false, gazeAid: 1 });
       const kinds = r.events.map((e) => e.t);
       const inHand = kinds.some((x) => x === "catch" || x === "save");
