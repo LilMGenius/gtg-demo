@@ -226,29 +226,10 @@ export function createScene(canvas) {
      4:2 5:3 6:15 7:22 8:17 9:8 10:10). 이 선에서 74퍼센트가 발등, 26퍼센트가 발 안쪽인데,
      판정이 레벨로 -2에서 +1.2를 얹으므로 낮은 레벨에서는 그 비가 뒤집힌다. */
   const KICK_POWER_AT = 7;
-  /* 착지는 목이 내려오기를 멈춘 프레임이다. 자세가 목표 각도에 도착하는 것과는 다른 순간이다.
-     관절 각도는 실측으로 사건 뒤 8에서 17프레임에 도착하는데, 그 뒤로도 꼬리가 0.8초에 걸쳐 몸통을
-     눕히므로 목은 44에서 50프레임까지 계속 내려간다. 각도로 걸면 아직 떨어지는 중인 몸을 누르게 된다.
-     이만큼은 내려와야 착지라고 부른다. 그 프레임까지 머리가 내려온 깊이를 열다섯 사건에서 재면
-     바닥에 닿는 넷이 lost 0.301, downed 0.315, reboundMiss 0.385, carriedIn 0.454이고,
-     두 발로 끝나는 몸은 빈 골대의 허리 접기가 0.239, 뛰쳐나감이 0.357이다. 0.28은 그 넷 중 가장
-     얕은 0.301과 허리 접기 0.239 사이이고 양쪽으로 0.02와 0.04가 남는다.
-     깊이 문턱은 하나다. 착지를 부르는 깊이와 무게가 실리는 깊이를 두 상수로 두면 큰 쪽만 일하고
-     작은 쪽은 이름만 남아, 그것을 반으로 낮춰도 화면이 안 움직인다(실측: 0.20을 0.05로 내려도
-     눌리는 프레임 넷이 그대로였다). */
-  const LAND_FALL = 0.28;
-  /* 떨어지던 속도가 가장 빨랐던 값의 이 비율 아래로 꺾이면 닿은 것이다. 절대 속도로 걸면 사건마다
-     낙하 속도가 달라 같은 뜻이 안 된다. 실측한 목 속도는 사건에 따라 초속 3에서 11미터로 떨어지고,
-     닿는 프레임에서 한두 프레임 만에 최고값의 10퍼센트대로 꺾인다. 끌려 들어가는 사건만 낙하가 두 번
-     오고, 0.10에서는 두 번째 낙하 끝까지 밀렸다(실측 25프레임, 첫 낙하가 끝나는 자리는 16).
-     0.15는 그 사건까지 첫 접지에서 걸린다. */
-  const LAND_SLOW = 0.15;
-  /* 착지한 몸이 누웠는가. 목과 두 무릎의 수평 거리이고 그늘이 이미 쓰던 수다.
-     깊이와 누움은 각자 다른 몸을 걸러 낸다. 깊이만 물으면 멀리 떨어졌다가 두 발로 버틴 몸이
-     통과하고(제껴짐과 뛰쳐나감이 그렇게 0.28을 넘는다), 누움만 물으면 허리를 접고 선 몸이
-     통과한다(빈 골대의 허리 접기는 누움이 눌리는 넷보다도 높다). 그래서 둘을 함께 묻는다.
-     0.56은 서서 끝나는 몸의 누움 위, 바닥에 누운 몸의 누움 아래에서 고른 자리다. */
-  const LAND_LIE = 0.56;
+  // 머리 중심의 하강이 충분히 깊고 느려진 뒤, 누운 몸에만 착지 눌림을 준다.
+  const LAND_FALL = 0.28; // 첫 충돌의 하강 0.32~0.39보다 낮은 기존 연출 문턱을 유지한다. 전체 낙하 깊이와 첫 충돌 깊이는 다르다.
+  const LAND_SLOW = 0.10; // 관측 최고 하강 속도의 10%까지 감속한 순간이 보이는 몸의 착지다.
+  const LAND_LIE = 0.90; // 골반 기준 길이로 정규화한 수평 길이 0.90부터 누운 몸으로 판정한다.
   // 0.30은 슬로모션으로 읽혔고 0.02는 프레임이 멈춘 것으로 읽혔다. 0.08이 걸리는 느낌이다.
   const HIT_SCALE = 0.08;
 
@@ -1161,7 +1142,8 @@ const TOUCHED = new Set(['contact']);
       loose = gl;
       keeper.userData.bareHands[gi].visible = true;
     }
-    tail = { kind, t0: vnow, from: ball.position.clone(), kx: keeper.position.x };
+    const headStartY = keeper.userData.head.getWorldPosition(new THREE.Vector3()).y; // 사건 첫 프레임의 낙하도 속도와 깊이에 포함하도록 움직이기 전에 기준을 잡는다.
+    tail = { kind, t0: vnow, from: ball.position.clone(), kx: keeper.position.x, neckTop: headStartY, neckWas: headStartY };
     // 눈맞음이 어느 갈래인지. 자막을 고른 쪽이 넘겨 주므로 화면과 글자가 같은 갈래를 본다.
     tail.act = flavour || null;
     // 화면 전용 편차. 판정 rng가 아니라 여기서 뽑으므로 시드 재현 게이트를 흔들지 않는다.
@@ -2244,21 +2226,23 @@ const TOUCHED = new Set(['contact']);
        (실측: 자빠짐이 4프레임에 눌리고 몸은 15프레임에 닿았다).
        무게가 실렸는지는 몸이 누웠는지로 가른다. 두 발로 서서 끝나는 사건에는 실릴 무게가 없다. */
     if (tail) {
-      /* 목이 얼마나 내려왔고 지금 얼마나 빠르게 내려오는가. 프레임당 변위가 아니라 초속으로 잰다.
+      /* 머리 중심이 얼마나 내려왔고 지금 얼마나 빠르게 내려오는가. 프레임당 변위가 아니라 초속으로 잰다.
          히트스톱이 걸린 프레임은 세계시간이 8퍼센트로 흐르므로 변위만 보면 떨어지는 중인 몸이
          멈춘 것으로 읽힌다(실측: 그렇게 걸었더니 자빠짐이 16프레임에, 놓친 공이 8프레임에 눌렸다). */
-      if (tail.neckTop === undefined) tail.neckTop = headW.y;
-      const fell = tail.neckWas === undefined ? 0 : tail.neckWas - headW.y;
-      tail.neckWas = headW.y;
+      const headFallY = keeper.userData.head.getWorldPosition(new THREE.Vector3()).y; // 목과 달리 회전하는 머리의 실제 높이가 화면의 낙하를 소유한다.
+      const bodyScale = keeper.userData.joints.spine.getWorldPosition(new THREE.Vector3()).distanceTo(keeper.position);
+      if (tail.neckTop === undefined) tail.neckTop = headFallY;
+      const fell = tail.neckWas === undefined ? 0 : tail.neckWas - headFallY;
+      tail.neckWas = headFallY;
       tail.mps = stepDt > 0 ? fell / stepDt : 0;
       tail.peak = Math.max(tail.peak ?? 0, tail.mps);
       tail.conv = tail.aim && tail.d0 > 0 ? 1 - poseDist(poseNow.keeper, tail.aim) / tail.d0 : 1;
-      if (!tail.landed && tail.neckTop - headW.y >= LAND_FALL && tail.mps <= tail.peak * LAND_SLOW) {
+      if (!tail.landed && tail.neckTop - headFallY >= LAND_FALL && tail.mps <= tail.peak * LAND_SLOW) {
         tail.landed = true;
         tail.landLie = span;
-        tail.landFall = tail.neckTop - headW.y;
+        tail.landFall = tail.neckTop - headFallY;
         // 깊게 내려왔고 그 끝이 누운 몸일 때만 무게가 실린다. 하나만 보면 접고 선 몸이 통과한다.
-        if (span >= LAND_LIE) landSq = LAND_FOR;
+        if (span / bodyScale >= LAND_LIE) landSq = LAND_FOR;
       }
     }
     keeperShadow.position.set((headW.x + footX) * 0.5, 0.03, (headW.z + footZ) * 0.5);

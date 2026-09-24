@@ -648,11 +648,21 @@ function buildBody(o) {
   // 품과 기장을 등급이 정한다. 뼈대는 안 건드린다. 관절을 같이 늘리면 팔이 몸통에서 떨어진다.
   const kc = o.kitCut || { girth: 1, len: 1, pad: 0 };
   const rigRadius = o.tag === 'keeper' ? o.torsoR * 0.55 / 0.85 : 0.16; // 기존 관절 높이를 보존해 몸통 폭이 사건 포즈의 누움 판정을 바꾸지 않게 한다.
-  const neckY = (o.torsoLen + rigRadius) * kc.len - rigRadius * 0.18; // 사건 포즈의 기존 목 앵커다.
+  const torsoHeight = o.tag === 'keeper' ? 0.85 : 1; // 비평의 15% 단축을 목에도 적용해 머리를 짧은 장난감 몸통에 붙인다.
+  const neckY = ((o.torsoLen + rigRadius) * kc.len - rigRadius * 0.18) * torsoHeight; // 사건 포즈의 기존 목 앵커다.
   const torsoGeo = capsuleGeometry(o.torsoR, o.torsoLen);
   torsoGeo.translate(0, o.torsoLen / 2, 0);
   torsoGeo.scale(kc.girth, kc.len, kc.girth);
   torsoGeo.scale(1, (neckY - o.headR * 0.1) / ((o.torsoLen + o.torsoR) * kc.len), 1); // 넓힌 몸통의 윗끝을 턱 아래로 내려 얼굴과 수염을 가리지 않는다.
+  if (o.tag === 'keeper') {
+    const positions = torsoGeo.attributes.position;
+    for (let i = 0; i < positions.count; i++) {
+      const lower = 1 - THREE.MathUtils.clamp(positions.getY(i) / neckY, 0, 1); // 목에서 골반까지 기존 높이를 정규화한다.
+      const breadth = 1 + 0.15 * lower * kc.girth * kc.girth; // 기본 몸의 골반은 15% 넓히고 품이 큰 면티는 밑단을 더 퍼뜨려 몸에 붙는 체육복과 구별한다.
+      positions.setXYZ(i, positions.getX(i) * breadth, positions.getY(i), positions.getZ(i) * breadth);
+    }
+    torsoGeo.computeVertexNormals();
+  }
   // 유니폼 한 장이 단색이면 사람이 아니라 색 견본이다. 구겨진 명암이 옷을 옷으로 만든다.
   const torso = new THREE.Mesh(torsoGeo, flat(o.shirt));
   torso.name = tag;
@@ -871,9 +881,10 @@ export function buildKeeper(height, weight, look) {
     hipY: h * 0.47,
     torsoR: w * 0.85, torsoLen: h * 0.27, // 넉넉한 키트 몸통을 기존 척추 길이에 붙인다.
     headR: h * 0.14, faceDir: 1, // 머리를 몸통 폭과 비슷하게 키워 장난감 비율로 읽힌다.
-    shoulderX: w * 0.56, armR: h * 0.048,
+    shoulderX: w * 0.644, armR: h * 0.048, // 0.56×1.15인 어깨 폭으로 팔이 넓어진 옷 안에 잠기지 않게 한다.
     upperLen: h * 0.17, foreLen: h * 0.16,
-    hipX: w * 0.48, legR: w * 0.45, // 몸통 반폭의 절반에 두툼한 다리를 두어 막대처럼 보이는 후면을 고친다.
+    hipX: w * 0.48 * 1.15, legR: w * 0.45 * 1.15, // 비평의 15% 하반신 확장을 다리 간격에도 주어 발 사이 틈을 보존한다.
+    // 몸통 반폭의 절반에 두툼한 다리를 두어 막대처럼 보이는 후면을 고친다.
     thighLen: h * 0.21, shinLen: h * 0.20,
     gloveSize: h * 0.115, bootLen: h * 0.14,
     // 반바지·양말·축구화가 전부 검정에 가까워 하반신이 기둥 하나로 뭉쳤다.
