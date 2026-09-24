@@ -75,7 +75,7 @@ try {
     seen[spec.kind] = await read();
     if (spec.kind === "tonic") {
       await p.evaluate(() => window.__resumeRound());
-      await p.locator('.move-arrow[data-move="-1"]').dispatchEvent("pointerdown");
+      await p.locator('.move-arrow[data-move="-1"]').click({ force: true });
       await p.waitForFunction(() => document.querySelector('#aura .tag[data-kind="tonic"] b')?.textContent === "11",
         null, { timeout: 24000 });
       const after = await p.evaluate(() => ({ applied: window.__lastBuff, remaining: window.__buff().shots,

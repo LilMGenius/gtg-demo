@@ -144,8 +144,9 @@ check("control:deplete-then-read-loses-the-last-shot",
   durations.every((d) => d.oldEffective === d.sold - 1), JSON.stringify(durations));
 
 const main = readFileSync(new URL("../web/src/main.mjs", import.meta.url), "utf8");
-const commitStart = main.indexOf("function commit(dive) {");
-const commitEnd = main.indexOf("\nfunction chooseDive(", commitStart);
+// 위치 발동 함수의 실제 경계만 읽고 버프 시뮬레이션과 소모 순서 문턱은 유지한다.
+const commitStart = main.indexOf("function commit() {");
+const commitEnd = main.indexOf("\nfunction rollCaptions(", commitStart);
 const commit = main.slice(commitStart, commitEnd);
 const captureAt = commit.indexOf("const applied = state.buff");
 const depleteAt = commit.indexOf("state.buff = spendBuff(state.buff)");

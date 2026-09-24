@@ -105,7 +105,7 @@ state.record = readRecord(saved);
    주전을 고르는 것은 난도를 올려 보상 밀도를 사는 선택이다. */
 {
   const names = KICKERS.map((k) => k.name);
-  const got = readSquadKickers(saved, names, defaultEleven(), ELEVEN);
+  const got = readSquadKickers(saved, names, defaultEleven(), ELEVEN, (name) => kickerByName(name)?.role, ROLE_SLOTS);
   state.kickers = got.kickers;
   state.eleven = got.eleven;
 }
@@ -620,6 +620,8 @@ function commit() {
   shotBuff = applied;
   // 버프는 실제로 굴린 구에서만 닳는다. 시간으로 닳으면 상점에 둔 채로 증발한다.
   state.buff = spendBuff(state.buff);
+  // 발동 때 소모한 슛 수를 배지에도 바로 반영한다.
+  aura();
   const trace = sampleTrace((positioning.elapsed - SET_SECONDS - RUN_SECONDS) * 1000);
   const input = { x: keeperX, vx: keeperVx, trace, auto: ran };
   if (ran) window.__autoCalls += 1;

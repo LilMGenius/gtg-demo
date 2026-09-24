@@ -78,7 +78,7 @@ const padOpen = (page) => page.waitForFunction(() => {
 const planAfterDive = (page, side, kind, lead) => page.evaluate(([s, k, n]) => new Promise((done) => {
   let left = 240;
   const tick = () => {
-    if (window.__lastInput && window.__lastInput.dive === s) {
+    if (window.__position().resolved && window.__lastInput && window.__lastInput.dive === s) {
       const f = window.__frames() + n;
       window.__plan(f, k, -1);
       done(f);
@@ -245,7 +245,11 @@ async function lap(br, nomark, tag) {
     let at = -1;
     for (let k = 0; k < 8 && at < 0; k += 1) {
       await padOpen(p);
-      await p.keyboard.press(side > 0 ? "ArrowRight" : "ArrowLeft");
+      // 기존 BARED의 12프레임만 반대쪽으로 서서 자동 다이빙이 나갈 공간을 남긴다.
+      const key = side > 0 ? 'ArrowLeft' : 'ArrowRight';
+      await p.keyboard.down(key);
+      await waitFrames(p, BARED);
+      await p.keyboard.up(key);
       at = await planAfterDive(p, side, KINDS[i], PRE);
     }
     if (at < 0) { console.log(tag + "NODIVE " + KINDS[i] + "  FAIL"); process.exit(1); }
