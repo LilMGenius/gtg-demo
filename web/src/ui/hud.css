@@ -1075,6 +1075,11 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 /* 값은 오른쪽 아래 구석에 못 박힌다. 넉 장을 훑는 눈이 같은 자리에서 값만 맞대 본다.
    auto 여백이 배지를 카드 바닥으로 밀어, 이름이 두 줄인 카드에서도 배지가 같은 높이에 선다. */
 #shop .card.gear .foot{display:flex;justify-content:flex-end;margin-top:auto}
+/* 조건이 추가된 선반은 내부 스크롤을 없애 가격까지 함께 보인다. 짧은 화면은 상점 전체가 스크롤된다. */
+#shop .rack:has(.condition){max-height:none;overflow:visible}
+/* 조건은 별도 버튼이다. 1.3줄 간격으로 조건과 진행도를 구분하고 기존 본문 크기를 유지한다. */
+#shop .card.gear .condition{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--gap-1);width:100%;padding:var(--gap-1);text-align:left;font-size:var(--fs-body);line-height:1.3;background:var(--panel);color:var(--ink);border:var(--line) solid var(--edge);cursor:pointer}
+#shop .card.gear .condition small{font:inherit;white-space:nowrap}
 /* 봇과 버프의 기간·횟수는 가격 배지 밖의 보조 칸이다. 효과 한 줄 끝에 붙어 한 줄로 읽힌다. */
 #shop .card.gear .duration{flex:0 0 auto;margin-left:var(--gap-2);color:var(--dim);font-size:var(--fs-body);
   font-style:normal;font-weight:700;white-space:nowrap}

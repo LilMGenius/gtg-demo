@@ -1,3 +1,4 @@
+import { auditConditions } from './condition-probe.mjs';
 import { chromium } from "playwright";
 import { GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, BEARDS, TATTOOS } from "../web/src/state/gear.mjs";
 
@@ -297,12 +298,14 @@ try {
       for (const s of m.SHELF_NOTES_FOR_WIKI) for (const g of (s && s.rows) || []) out.push(g && g.note);
       return out;
     }).catch(() => null);
+    const conditions = await auditConditions(p);
     await ctx.close();
-    return { count, rare, fit, parked, dur, align, rows, plant };
+    return { count, rare, fit, parked, dur, align, rows, plant, conditions };
   };
   const full = await at(WIDE, 720);
   const thin = await at(NARROW, 720);
   const hand = await at(HAND_W, HAND_H);
+  check('condition:all-widths-match-progress-and-price', [full, thin, hand].every(view => view.conditions.pass), JSON.stringify([full.conditions, thin.conditions, hand.conditions]));
   const wide = full.count;
   const narrow = thin.count;
 

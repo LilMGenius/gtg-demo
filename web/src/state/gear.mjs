@@ -12,7 +12,8 @@ export const GLOVES = [
   { grip: 0, name: '장터 목장갑', cost: 0, note: '아무것도 안 샀을 때 끼고 있는 것' },
   { grip: 1, name: '고무코팅 목장갑', cost: 140, note: '젖은 공을 한 번은 붙잡는다' },
   { grip: 2, name: '송진 범벅 장갑', cost: 360, note: '손에서 공이 잘 안 떨어진다' },
-  { grip: 3, name: '문어 빨판 장갑', cost: 820, note: '안 떨어진다. 벗겨지지도 않는다' }
+  // HOTL: 수동 반응·균등 훈련 200개 씨앗의 820골드 도달 중앙값이 핸들링 6이다.
+  { condition: { key: 'handling', min: 6 }, grip: 3, name: '문어 빨판 장갑', cost: 820, note: '안 떨어진다. 벗겨지지도 않는다' }
 ];
 
 /* 장갑 변형. bulk는 손 전체 배율, cuff는 손목밴드 길이 배율, pips는 손바닥 빨판 수다.
@@ -50,7 +51,8 @@ export const BOOTS = [
   { studs: 0, name: '학교 앞 실내화', cost: 0, note: '아무것도 안 샀을 때 신고 있는 것' },
   { studs: 1, name: '바닥 닳은 조기축구화', cost: 160, note: '그래도 미끄러지지는 않는다' },
   { studs: 2, name: '스터드 여섯 개 축구화', cost: 400, note: '흙을 물고 첫 발이 빨리 뜬다' },
-  { studs: 3, name: '육상용 스파이크', cost: 880, note: '축구화는 아니다. 제일 빨리 뜬다' }
+  // HOTL: 880골드 도달 때 민첩성 중앙값 6을 구매 문턱으로 둔다.
+  { condition: { key: 'agility', min: 6 }, studs: 3, name: '육상용 스파이크', cost: 880, note: '축구화는 아니다. 제일 빨리 뜬다' }
 ];
 
 /* 축구화 변형. pips는 바닥에 박힌 돌기 수, sole은 밑창 두께 배율,
@@ -88,7 +90,8 @@ export const KITS = [
   { pads: 0, name: '아빠 옷장 면티', cost: 0, note: '아무것도 안 샀을 때 입고 있는 것' },
   { pads: 1, name: '학교 체육복 상의', cost: 150, note: '적어도 땀은 먹는다' },
   { pads: 2, name: '조기회 단체복', cost: 370, note: '등에 동네 철물점 이름이 박혀 있다' },
-  { pads: 3, name: '패드 박은 골키퍼 저지', cost: 850, note: '어깨에 스펀지가 들었다. 밀려도 덜 밀린다' }
+  // HOTL: 850골드 도달 중앙값은 레벨 19다. 둥근 레벨 20을 바로 다음 목표로 둔다.
+  { condition: { key: 'level', min: 20 }, pads: 3, name: '패드 박은 골키퍼 저지', cost: 850, note: '어깨에 스펀지가 들었다. 밀려도 덜 밀린다' }
 ];
 
 /* 상의 변형. girth는 품 배율, len은 기장 배율, pad는 어깨에 박힌 스펀지 두께다.
@@ -155,7 +158,8 @@ export const GOALS = [
   { frame: 0, name: '기울어진 동네 철골대', cost: 0, note: '아무것도 안 샀을 때 뒤에 서 있는 것' },
   { frame: 1, name: '구멍 기운 나일론 그물', cost: 145, note: '뚫린 데는 없다. 그게 전부다' },
   { frame: 2, name: '팽팽하게 당겨 맨 그물', cost: 385, note: '맞으면 팅 소리가 난다' },
-  { frame: 3, name: '공을 먹는 촘촘한 겹그물', cost: 860, note: '들어간 공이 안 나온다. 튄 공도 안 나온다' }
+  // HOTL: 860골드 도달 때 전적의 세이브 중앙값 29회에 가장 가까운 둥근 기록은 30회다.
+  { condition: { key: 'saves', min: 30 }, frame: 3, name: '공을 먹는 촘촘한 겹그물', cost: 860, note: '들어간 공이 안 나온다. 튄 공도 안 나온다' }
 ];
 
 /* 골대 변형. cell은 그물코 한 변의 미터, dim은 실의 진하기, sag는 가운데가 늘어지는 깊이,
@@ -343,7 +347,8 @@ export const TATTOOS = [
   { ink: 1, name: '지워지는 문신 스티커', cost: 140, note: '땀에 번진다. 그래도 있어 보인다' },
   { ink: 2, name: '팔뚝에 새긴 이름 석 자', cost: 380, note: '누구 이름인지는 안 밝힌다' },
   // 먹토시는 위팔을 통째로 덮는다. 소매가 하나 더 있다는 이름이 그 뜻이다.
-  { ink: 3, name: '어깨까지 채운 먹토시', cost: 870, note: '반팔을 입으면 소매가 하나 더 있다' }
+  // HOTL: 870골드 도달 때 팔로워 중앙값 8649명 바로 위인 9000명을 목표로 둔다.
+  { condition: { key: 'fans', min: 9000 }, ink: 3, name: '어깨까지 채운 먹토시', cost: 870, note: '반팔을 입으면 소매가 하나 더 있다' }
 ];
 
 export const MAX_INK = TATTOOS.length - 1;

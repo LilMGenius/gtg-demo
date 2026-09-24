@@ -12,6 +12,7 @@ import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dmLine, gazeAct } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord, readSquadKickers, useAccount, saveKey } from './state/save.mjs';
 import { autoTrain, trainStat } from './state/coach.mjs';
+import { purchaseCondition } from './state/condition.mjs';
 import { currentId } from './state/account.mjs';
 import { coinGain, readWallet, COIN_DRILL, cashPrice, pay } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
@@ -1818,7 +1819,7 @@ function fittingRoom() {
      그만큼 아래 효과 표가 잘린다. */
   const chips = tried.map((f) => '<i data-off="' + f + '">' + nameOfField(f, fitting[f]) + '<b>X</b></i>').join('');
   // 합계에서 한 번 올림한다. 개별 캐시 값을 더하면 묶음과 단품의 환산 정책이 갈린다.
-  const canAll = tried.length > 0 && affordable(bill);
+  const canAll = tried.length > 0 && tried.every(f => purchaseCondition(shelfOfField(f).at(fitting[f]), state).met) && affordable(bill);
   /* 합계 배지는 사는 버튼이 든다. 시착 게이트가 청구서를 이 버튼 안의 .px[data-coin]에서 읽으므로
      배지를 버튼 밖으로 빼면 값을 재는 자가 눈을 잃는다. 모자라도 합계는 같은 수다. */
   const badge = tried.length ? PRICE(bill) : '';
@@ -1853,6 +1854,14 @@ function nameOfField(field, rank) {
   return s ? s.at(rank).name : '';
 }
 
+// 조건과 진행도는 구매 핸들러와 같은 판정 함수에서 읽는다. 가격은 별도 버튼에 그대로 둔다.
+function conditionHTML(item) {
+  if (!item.condition) return '';
+  const c = purchaseCondition(item, state);
+  return '<button class="condition" data-route="' + c.route + '" data-value="' + c.value + '" data-min="' + c.min + '">'
+    + '<span>' + (c.met ? '🔓' : '🔒') + ' 구매 조건 · ' + c.label + '</span><small>' + c.value.toLocaleString('ko-KR') + '/' + c.min.toLocaleString('ko-KR') + '</small></button>';
+}
+
 function gearShelf(kind) {
   const s = SHELVES[kind];
   const have = state.gear[s.field];
@@ -1873,6 +1882,7 @@ function gearShelf(kind) {
       off = !affordable(g.cost);
       bad = true;
     }
+    if (!purchaseCondition(g, state).met) off = true;
     // 썸네일 자리는 마크업에서 비워 두고 그림은 bindGear가 굽는다. 굽는 데 렌더러가 필요해서
     // 문자열을 만드는 자리에서는 그릴 수 없다. 자리가 없으면 카드 높이가 그림을 받고 나서 뛴다.
     // 변형 조각. 등급 하나가 여러 모양을 들고 있으면 그 조각들을 값 버튼 위에 깐다.
@@ -1893,7 +1903,7 @@ function gearShelf(kind) {
        그림이 카드에서 차지하는 몫이 그만큼 줄어 다시 글자가 먼저 읽힌다. */
     return '<div class="card gear" data-spec="' + kind + '" data-at="' + rank + '" data-rare="' + rank + '">'
       + '<div class="pic"><div class="shot" data-kind="' + kind + '" data-rank="' + rank + '"></div>' + skins + '</div>'
-      + '<b>' + g.name + '</b><em>' + cardLine(kind, rank) + '</em>'
+      + '<b>' + g.name + '</b><em>' + cardLine(kind, rank) + '</em>' + conditionHTML(g)
       + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
   return '<h4>' + s.head + '</h4><div class="rack">' + rows.join('') + '</div>';
@@ -1995,7 +2005,7 @@ function bindGear(box) {
     const rank = g[s.field];
     if (rank > state.gear[s.field]) {
       card.onclick = (e) => {
-        if (e.target.closest('.buy')) return;
+        if (e.target.closest('.buy, .condition')) return;
         if (fitting[s.field] === rank) delete fitting[s.field];
         else fitting[s.field] = rank;
         stopSpin();
@@ -2033,7 +2043,7 @@ function bindGear(box) {
       if (b.disabled) return;
       const s = SHELVES[b.dataset.kind];
       const g = s.at(b.dataset.rank);
-      if (!purchase(g.cost)) return;
+      if (!purchaseCondition(g, state).met || !purchase(g.cost)) return;
       state.gear[s.field] = g[s.field];
       // 걸쳐 보던 변형이 있으면 그 변형으로 산다. 안 옮기면 미리 본 것과 산 것이 다르다.
       if (fitting[s.field + 'Skin'] !== undefined) {
@@ -2406,12 +2416,13 @@ function botShelf() {
       label = '상위 보유';
       off = true;
     }
+    if (!purchaseCondition(b, state).met) off = true;
     // 봇도 장비와 같은 카드다. 파는 것이 클론의 모습이므로 글자보다 그림이 먼저 선다.
     return '<div class="card gear" data-spec="bot" data-at="' + b.tier + '" data-rare="' + b.tier + '">'
       + '<div class="pic"><div class="shot" data-kind="bot" data-rank="' + b.tier + '"></div></div>'
       + '<b>' + b.name + '</b>'
       // 효과 문장만 접는다. 기간과 횟수는 그 접기 밖에 서야 안 잘린다.
-      + '<em><span class="eff">' + cardLine('bot', b.tier) + '</span><small class="duration">' + duration + '</small></em>'
+      + '<em><span class="eff">' + cardLine('bot', b.tier) + '</span><small class="duration">' + duration + '</small></em>' + conditionHTML(b)
       + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-bot="' + b.tier + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
   return '<h4>봇</h4><div class="rack">' + rows.join('') + '</div>';
@@ -2439,7 +2450,7 @@ function bindBot(box) {
     b.onclick = () => {
       if (b.disabled) return;
       const spec = botAt(b.dataset.bot);
-      if (!spec || !purchase(spec.cost)) return;
+      if (!spec || !purchaseCondition(spec, state).met || !purchase(spec.cost)) return;
       state.bot.tier = spec.tier;
       state.coach = true;
       // 6시간 상한. 무한 적립이면 방치가 아니라 영구 봇이 된다.
@@ -2538,7 +2549,7 @@ function renderShop() {
     // 값이 붙는 칸만 청구서에 오르고, 옮기는 것은 걸쳐 본 전부다. 변형은 값이 없지만 같이 입는다.
     const tried = Object.keys(fitting).filter((f) => shelfOfField(f));
     const bill = tried.reduce((n, f) => n + costOfField(f, fitting[f]), 0);
-    if (!purchase(bill)) return;
+    if (!tried.every(f => purchaseCondition(shelfOfField(f).at(fitting[f]), state).met) || !purchase(bill)) return;
     for (const f of Object.keys(fitting)) state.gear[f] = fitting[f];
     fitting = {};
     if (state.gear.city !== undefined) stage.setCity(state.gear.city, state.gear.citySkin);
@@ -2551,6 +2562,12 @@ function renderShop() {
   for (const t of box.querySelectorAll('.tab')) {
     t.onclick = () => { shopTab = t.dataset.tab; legendShowcase = false; renderShop(); };
   }
+  for (const button of box.querySelectorAll('.condition')) button.onclick = (event) => {
+    event.stopPropagation();
+    closeShop();
+    if (button.dataset.route === 'gym') openGym();
+    else if (button.dataset.route === 'gram') openGram();
+  };
   bindSpec(box);
   const showcase = box.querySelector('.show-legends');
   if (showcase) showcase.onclick = () => { legendShowcase = true; renderShop(); };

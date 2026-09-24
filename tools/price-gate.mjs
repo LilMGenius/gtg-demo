@@ -1,3 +1,8 @@
+import { auditConditions, CONDITION_ITEMS } from './condition-probe.mjs';
+import { conditionLabel } from '../web/src/state/condition.mjs';
+// 구매 조건의 구분점은 요청된 카드 문법이다. 실제 조건 표와 정확히 같은 문구만 허용한다.
+const CONDITION_TEXTS = new Set(CONDITION_ITEMS.flatMap(({ item }) => ['🔒', '🔓'].map(icon => icon + ' 구매 조건 · ' + conditionLabel(item.condition))));
+const hasUnapprovedBullet = text => !CONDITION_TEXTS.has(text.trim()) && BULLETS.some(dot => text.includes(dot));
 import { chromium } from "playwright";
 
 // 값 표기의 자. 상단 잔고는 아이콘인데 상점 버튼은 '140 골드'처럼 글자였다.
@@ -70,7 +75,7 @@ const LABEL_NODES = "button, .px, .held, .tried i";
 // 이름이 서는 자리. 선반 탭과 갈래 버튼과 명단 카드와 걸친 목록은 상품과 사람의 이름을 든다.
 // 이름에는 두 글자 자를 못 대지만 마침표 자는 그대로 받는다.
 // 쇼케이스 진입은 상품 영역의 이름이며 가격 버튼의 짧은 값 검사는 그대로 유지한다.
-const NAME_SLOTS = "#shop .show-legends, .tab, .kind, #roster .row button, #shop .fitting .tried i[data-off]";
+const NAME_SLOTS = "#shop .condition, #shop .show-legends, .tab, .kind, #roster .row button, #shop .fitting .tried i[data-off]";
 
 // 한 판의 버튼과 배지를 재서 계약을 어긴 글자만 돌려준다. 판이 없으면 null이라 0건과 안 섞인다.
 // 재는 단위는 그려진 글자 토막 하나다. 버튼 글자를 통째로 이으면 사유 배지와 값이 붙어
@@ -151,7 +156,7 @@ try {
       const unit = seen.find((s) => new RegExp("(?:[0-9]|" + HAN_ONE + ") ?" + SHOT).test(s));
       if (unit && !unitAll) unitAll = (tab || id) + ": " + unit.trim();
       // 값을 잇는 기호. 문장 안의 낱말이 아니라 값 사이에 선 자리만 결함이다.
-      const dotted = seen.find((s) => BULLETS.some((d) => s.indexOf(d) >= 0));
+      const dotted = seen.find((s) => hasUnapprovedBullet(s));
       if (dotted && !dotAll) dotAll = (tab || id) + ": " + dotted.trim();
       const px = await p.evaluate((q) => {
         const es = [...document.querySelectorAll(q + " .px")].filter((e) => e.getClientRects().length);
@@ -185,7 +190,7 @@ try {
     if (hit && !letters) letters = id + ": " + hit.trim();
     const unit = seen.find((s) => new RegExp("(?:[0-9]|" + HAN_ONE + ") ?" + SHOT).test(s));
     if (unit && !oldUnit) oldUnit = id + ": " + unit.trim();
-    const dotted = seen.find((s) => BULLETS.some((d) => s.indexOf(d) >= 0));
+    const dotted = seen.find((s) => hasUnapprovedBullet(s));
     if (dotted && !dots) dots = id + ": " + dotted.trim();
     if (hook) { await p.evaluate((h) => { window[h](false); }, hook); await p.waitForTimeout(120); }
   }
@@ -210,7 +215,7 @@ try {
   check("instrument:a-planted-currency-word-is-caught", Boolean(gotIt), gotIt ? gotIt.trim() : "missed");
   const gotUnit = planted.find((s) => new RegExp("(?:[0-9]|" + HAN_ONE + ") ?" + SHOT).test(s));
   check("instrument:a-planted-round-unit-is-caught", Boolean(gotUnit), gotUnit ? gotUnit.trim() : "missed");
-  const gotDot = planted.find((s) => BULLETS.some((d) => s.indexOf(d) >= 0));
+  const gotDot = planted.find((s) => hasUnapprovedBullet(s));
   check("instrument:a-planted-bullet-is-caught", Boolean(gotDot), gotDot ? gotDot.trim() : "missed");
   await p.evaluate(() => { const q = document.getElementById("priceProbe"); if (q) q.remove(); });
 
@@ -646,6 +651,8 @@ try {
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();
 
+  const conditions = await auditConditions(p);
+  check('condition:text-progress-price-and-lock', conditions.pass, JSON.stringify(conditions.rows));
   if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
   console.log(fails.length ? "price FAIL " + fails.length : "price PASS " + notes.length);
