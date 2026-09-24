@@ -836,6 +836,7 @@ function buildBody(o) {
   g.userData.arms = arms;
   g.userData.head = head;
   g.userData.torso = torso;
+  g.userData.contactFeet = boots; // 장갑 없는 키커도 발 접촉 음영에 같은 앵커를 제공한다.
   setPose(g, o.rest, 0);
   standOnGround(g);
   if (gloves.length) {

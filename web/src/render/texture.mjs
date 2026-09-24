@@ -12,14 +12,19 @@ function canvas(size) {
   return cv;
 }
 
+function sampled(t){
+  const pixel=typeof location!=='undefined'&&new URLSearchParams(location.search).get('pix')==='1';
+  t.magFilter=pixel?THREE.NearestFilter:THREE.LinearFilter;
+  t.minFilter=pixel?THREE.NearestFilter:THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps=!pixel; // 세 표면 경로 모두 같은 스위치에서만 먼 표면의 픽셀 잡음을 남긴다.
+}
+
 function finish(cv, repeat) {
   const t = new THREE.CanvasTexture(cv);
   // 캔버스 바이트는 sRGB다. 선언하지 않으면 선형으로 오독돼 중간톤이 눌린다.
   t.colorSpace = THREE.SRGBColorSpace;
-  // 보간하면 잡티가 뿌옇게 번져 저해상도 화면에서 아예 안 읽힌다.
-  t.magFilter = THREE.NearestFilter;
-  t.minFilter = THREE.NearestFilter;
-  t.generateMipmaps = false;
+  // 표면 보간도 픽셀 모드의 같은 스위치를 따른다.
+  sampled(t);
   t.wrapS = THREE.RepeatWrapping;
   t.wrapT = THREE.RepeatWrapping;
   if (repeat) t.repeat.set(repeat[0], repeat[1]);
@@ -238,9 +243,7 @@ export function scuffTex() {
     paintScuffBase(c);
     const t = new THREE.CanvasTexture(cv);
     t.colorSpace = THREE.SRGBColorSpace;
-    t.magFilter = THREE.NearestFilter;
-    t.minFilter = THREE.NearestFilter;
-    t.generateMipmaps = false;
+    sampled(t);
     t.wrapS = THREE.ClampToEdgeWrapping;
     t.wrapT = THREE.ClampToEdgeWrapping;
     return t;
@@ -314,9 +317,7 @@ export function cloudTex() {
       c.restore();
     }
     const t = new THREE.CanvasTexture(cv);
-    t.magFilter = THREE.NearestFilter;
-    t.minFilter = THREE.NearestFilter;
-    t.generateMipmaps = false;
+    sampled(t);
     t.wrapS = THREE.RepeatWrapping;
     t.wrapT = THREE.ClampToEdgeWrapping;
     return t;
@@ -579,4 +580,17 @@ export function inkTex(base, tone, grade, span, girth) {
     }
     return finish(cv);
   });
+}
+
+// 키트 app.mjs의 Canvas 방사형 접촉 음영을 공유한다. 화면 전체 AO 대신 발밑만 부드럽게 잇는다.
+let contact;
+export function contactTex(){
+  if(contact)return contact;
+  const cv=canvas(64),ctx=cv.getContext('2d'); // 작은 방사형 맵을 모든 발 그림자가 공유한다.
+  const g=ctx.createRadialGradient(32,32,0,32,32,32); // 중앙에서 면 끝까지 투명도를 연속으로 줄인다.
+  g.addColorStop(0,'rgba(255,255,255,0.24)'); // 발에 가까운 부분만 진하게 두어 검은 원판이 되지 않게 한다.
+  g.addColorStop(1,'rgba(255,255,255,0)'); // 가장자리는 완전히 사라져 바닥과 경계선이 생기지 않는다.
+  ctx.fillStyle=g;ctx.fillRect(0,0,64,64); // 맵의 전체 면을 같은 방사형 음영으로 채운다.
+  contact=new THREE.CanvasTexture(cv);contact.colorSpace=THREE.SRGBColorSpace;
+  return contact;
 }
