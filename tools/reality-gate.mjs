@@ -123,8 +123,10 @@ const withoutMidfield = fallback.filter((n) => roleOf(n) !== '미드필더');
 full(read({ kickers: old, eleven: [] }, withoutMidfield));
 console.log('  ok migration:saved-order-overflow-benched-ownership-preserved-idempotent-deficits-filled');
 // 구별력 있는 실물 수치만 검사한다. 일반적인 정수까지 잡으면 배치와 규칙을 구분할 수 없다.
+// 벌칙 구역 깊이 16.5는 뺀다. 아이콘 좌표 같은 일반 소수와 겹쳐(main.mjs 공격수 아이콘의 R(12, 16.5, 3, 3)) 규칙이 아닌 줄을 잡았고,
+// 벌칙 구역은 PITCH_MARKS의 너비가 지킨다. 거짓 빨강이 쌓이면 사람이 이 자를 안 읽게 된다.
 const fingerprints = [reality.GOAL.values.width, reality.GOAL.values.height, reality.GOAL.values.width / 2,
-  reality.PITCH_MARKS.values.boxW, reality.PITCH_MARKS.values.areaW, reality.PITCH_MARKS.values.boxD,
+  reality.PITCH_MARKS.values.boxW, reality.PITCH_MARKS.values.areaW,
   reality.PITCH_MARKS.values.arcR, reality.SOUND.values.speed];
 const literal = new RegExp('(?<![\\d.])(?:' + fingerprints.map(n => String(n).replace('.', '\\.')).join('|') + ')(?![\\d.])');
 const named = new RegExp('\\b(?:reality|' + entries.map(([name]) => name).join('|') + ')\\b');
@@ -134,6 +136,7 @@ const planted = 'const uncited = 7.32;'; // GOAL 오류 대조군
 assert.equal(scan(planted).length, 1);
 assert.equal(scan('// 속도 343m/s').length, 1); // SOUND의 단위가 붙어도 검출해야 한다.
 assert.equal(scan('const cited = GOAL.values.width;').length, 0);
+assert.equal(scan("  + R(18, 10.5, 3, 3) + R(15, 13.5, 3, 3) + R(12, 16.5, 3, 3))").length, 0); // 아이콘 좌표는 실물 수치가 아니다
 console.log('  ok controls:uncited-world-literal-rejected');
 const root = fileURLToPath(new URL('../', import.meta.url));
 function walk(dir) {
