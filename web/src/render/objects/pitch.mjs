@@ -148,7 +148,7 @@ export function buildPitch(scene) {
 
   // 박스 안은 더 밟힌다. 같은 잡티를 다른 배율로 물려야 한 장이 두 땅으로 읽힌다.
   const scuff = scuffTex();
-  const box = new THREE.Mesh(new THREE.PlaneGeometry(16.5, 16.5), flatLit(0xb08e58, scuff));
+  const box = new THREE.Mesh(new THREE.PlaneGeometry(16.5, 16.5), flatLit(0xb08e58, scuff)); // reality 규정선과 별개인 연출용 흙판의 폭이다.
   box.rotation.x = -Math.PI / 2;
   box.position.set(0, 0.01, BOX_Z);
   box.name = 'box';
@@ -164,9 +164,9 @@ export function buildPitch(scene) {
     sctx.globalAlpha = 0.05;
     paintScuffBase(sctx);
     sctx.globalAlpha = 1;
-    const px = ((wx + 8.25) / 16.5) * scv.width;
-    const py = ((wz + 0.05) / 16.5) * scv.height;
-    const L = (len / 16.5) * scv.width;
+    const px = ((wx + 8.25) / 16.5) * scv.width; // reality 규정이 아닌 흙판 UV 좌표다.
+    const py = ((wz + 0.05) / 16.5) * scv.height; // reality 규정이 아닌 흙판 UV 좌표다.
+    const L = (len / 16.5) * scv.width; // reality 규정이 아닌 흙판 UV 길이다.
     sctx.save();
     sctx.translate(px, py);
     sctx.rotate(ang);

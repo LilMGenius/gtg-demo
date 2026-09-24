@@ -1,3 +1,4 @@
+import { BALL } from "../src/reality.mjs";
 import { chromium } from "playwright";
 import { pinClock } from "./clock.mjs";
 import { execFileSync } from "node:child_process";
@@ -30,7 +31,7 @@ const constant = (name) => {
   if (matches.length !== 1 || !(Number(matches[0][1]) > 0)) throw new Error("Expected one positive " + name);
   return Number(matches[0][1]);
 };
-const BALL_REAL_D = constant("BALL_REAL_D");
+const BALL_REAL_D = BALL.values.diameter;
 const BALL_MIN_H = constant("BALL_MIN_H");
 const units = readFileSync(new URL("../web/src/render/units.mjs", import.meta.url), "utf8");
 const radius = [...units.matchAll(/export const BALL_R = ([0-9.]+);/g)];

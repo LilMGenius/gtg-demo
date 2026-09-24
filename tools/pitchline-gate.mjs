@@ -1,6 +1,7 @@
+import { PITCH_MARKS } from '../src/reality.mjs';
 import { chromium } from "playwright";
 
-// 경기장 선의 자. 판정 단위와 렌더 미터가 같은 판이라 골대는 실물 7.32 x 2.44로 서 있는데
+// 경기장 선의 자. 판정 단위와 렌더 미터가 같은 판이라 골대는 실물 GOAL 규격으로 서 있는데
 // 선만 축소판을 쓰면 한 화면이 두 경기장을 그린 것이 된다.
 //
 // 재는 것은 둘이다. 그은 선이 실제 규격인가, 그 선이 화면에 실제로 찍히는가.
@@ -10,8 +11,8 @@ import { chromium } from "playwright";
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
 const LINE = String.fromCharCode(10);
-// 실제 규격. 페널티 에어리어 40.32 x 16.5, 골 에어리어 18.32 x 5.5, 스팟 11, 아크 반지름 9.15.
-const WANT = { boxW: 40.32, boxD: 16.5, areaW: 18.32, areaD: 5.5, spot: 11, arcR: 9.15 };
+// PITCH_MARKS의 출처 조문을 reality 게이트가 독립 검증한다.
+const WANT = PITCH_MARKS.values;
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);
 t.unref();
 
@@ -49,7 +50,7 @@ try {
     (arR.x - arL.x).toFixed(2) + "m wide, " + arF.z.toFixed(2) + "m deep");
   // 비율은 두 사각형이 같은 규격표에서 나왔는지를 묻는다. 하나만 맞으면 우연일 수 있다.
   check("pitchline:the-two-boxes-share-one-rulebook",
-    near((boxR.x - boxL.x) / (arR.x - arL.x), 2.2009, 0.01) && near(boxF.z / arF.z, 3, 0.01),
+    near((boxR.x - boxL.x) / (arR.x - arL.x), WANT.boxW / WANT.areaW, 0.01) && near(boxF.z / arF.z, WANT.boxD / WANT.areaD, 0.01),
     ((boxR.x - boxL.x) / (arR.x - arL.x)).toFixed(3) + " wide, " + (boxF.z / arF.z).toFixed(3) + " deep");
   const arc = by("arc"), spot = by("spot");
   const half = Math.acos((WANT.boxD - WANT.spot) / WANT.arcR);

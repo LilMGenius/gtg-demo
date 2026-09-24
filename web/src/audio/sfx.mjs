@@ -7,6 +7,7 @@
 // 그래프를 만드는 함수는 전부 (ac, out, t0)를 받는다. 실시간 컨텍스트를 안 잡으므로
 // OfflineAudioContext로 그대로 렌더해서 파형을 잴 수 있다. 귀 없이 소리를 검사하는 유일한 경로다.
 
+import { SOUND, BAR_MODES, airAbsorption } from '../../../src/reality.mjs';
 import { readVolume } from './volume.mjs';
 
 export const SFX_NAMES = ['kick', 'post', 'dribble', 'place', 'step'];
@@ -78,13 +79,18 @@ function clipper(ac, out) {
 // 킥의 고역 비중이 0.331에서 0.286으로, 골대 중심주파수가 1960Hz에서 1794Hz로 내려갔다.
 // 콘크리트는 전대역을 그대로 돌려준다.
 //
-// 카메라 z=-5.1, 키커 z=10.5, 아파트 전면 z=38. 직접음 15.6m,
-// 벽을 맞고 오는 경로 27.5+43.1=70.6m. 차이 55m를 343m/s로 나누면 160ms 뒤 한 번 돌아온다.
-const WALL_DELAY = 0.16;
-// 20도 50% 습도에서 공기가 먹는 양은 4kHz에서 55m당 1dB, 8kHz에서 4dB다. 6kHz로 자르면 벽 소리만 저역 덩어리가 되어 직접음의 밝기를 깎는다.
-const WALL_LP = 10000;
-// 거리 제곱 감쇠로 15.6m 대 70.6m는 -13.1dB. 아파트 전면은 통유리 한 장이 아니라 베란다와 창이 파인 면이라 되돌아오는 양보다 흩어지는 양이 많다. 합쳐서 -18.4dB.
-const WALL_GAIN = 0.12;
+// 장면 배치의 직접 경로와 벽 반사 경로다. 규칙 수치가 아닌 연출 배치이며 차이가 지연을 정한다.
+const WALL_DIRECT = 15.6, WALL_PATH = 70.6;
+const WALL_EXTRA = WALL_PATH - WALL_DIRECT;
+const WALL_DELAY = WALL_EXTRA / SOUND.values.speed;
+// AIR_ABSORPTION의 ISO 식은 추가 경로에서 4 kHz에 1.632 dB, 8 kHz에 5.791 dB 손실을 준다.
+// 기존 단일 저역통과 근사를 유지하고 두 비교 대역의 응답을 함께 맞춘다.
+const WALL_BANDS = [4000, 8000];
+// dB/km를 추가 경로의 dB로 바꾸고 전력 손실 배수로 환산한다.
+const WALL_LOSSES = WALL_BANDS.map(frequency => airAbsorption(frequency) * WALL_EXTRA / 1000);
+// 직접 경로 대비 반사 경로의 음압 감소에 기존 표면 산란 가설을 곱해 이전 게인을 유지한다.
+const WALL_SCATTER = 0.12 * WALL_PATH / WALL_DIRECT;
+const WALL_GAIN = WALL_DIRECT / WALL_PATH * WALL_SCATTER;
 // 반사를 거는 것은 킥과 골대뿐이다. 놓기와 발소리는 피크가 0.1과 0.27이라
 // -18dB를 먹이면 되돌아오는 소리가 애초에 안 들린다. 그 세기로는 55m 밖 벽을 울리지 못한다.
 // 조용한 소리에 억지로 걸면 place의 꼬리만 길어진다.
@@ -93,7 +99,19 @@ function wall(ac, src, out) {
   d.delayTime.value = WALL_DELAY;
   const lp = ac.createBiquadFilter();
   lp.type = 'lowpass';
+  // 쌍일차 변환의 왜곡을 역산하고 이차 저역통과의 두 손실식에서 차단점과 Q를 푼다.
+  const warped = WALL_BANDS.map(frequency => Math.tan(Math.PI * frequency / ac.sampleRate));
+  // 주파수비의 제곱은 이차 필터 분모의 두 측정 지점을 잇는다.
+  const k = (warped[1] / warped[0]) ** 2;
+  // 전력 dB는 십진 지수의 열 배다. 분모의 상수항을 빼면 두 식이 이차항과 일차항만 갖는다.
+  const [a, b] = WALL_LOSSES.map(loss => 10 ** (loss / 10) - 1);
+  const x = Math.sqrt((b - k * a) / (k * k - k));
+  // Web Audio 저역통과 Q는 dB라 선형 Q를 음압 dB로 환산한다.
+  const q = 1 / Math.sqrt((a - x * x) / x + 2);
+  // 표본률 48 kHz에서 약 8246 Hz다. 실제 값은 ISO의 두 대역 손실과 현재 표본률이 정한다.
+  const WALL_LP = ac.sampleRate / Math.PI * Math.atan(warped[0] / Math.sqrt(x));
   lp.frequency.value = WALL_LP;
+  lp.Q.value = 20 * Math.log10(q);
   const g = ac.createGain();
   g.gain.value = WALL_GAIN;
   src.connect(d).connect(lp).connect(g).connect(out);
@@ -159,9 +177,10 @@ function kick(ac, out, noise, t0, power = 0.6) {
 
 // 골대 맞는 소리. 알루미늄 관의 배음은 정수배가 아니다.
 // 정수배로 쌓으면 종소리가 되고 축구장이 아니라 교회가 된다.
-// 관의 굽힘 모드는 1 : 2.76 : 5.40 : 8.93 근처에 선다. 눈대중으로 고른 값은
-// 정수배로 미끄러지고 그러면 종소리가 된다. 측정 게이트가 그걸 잡아냈다.
-const POST_MODES = [712, 1965, 3845, 6358];
+// BAR_MODES의 비정수 배음을 쓴다. 실제 용접 골대의 고유진동수를 측정한 주장은 아니다.
+// 기음은 기존 합성의 음색을 유지하는 연출 선택이며 자유단 보 비율만 물리 모델이다.
+const POST_FUNDAMENTAL = 712;
+const POST_MODES = BAR_MODES.values.ratios.map(ratio => POST_FUNDAMENTAL * ratio);
 // 알루미늄 관은 기음보다 중간 모드가 크게 운다. 저역 편중으로 쌓으면 나무 기둥이 된다.
 const POST_PEAKS = [0.14, 0.24, 0.26, 0.20];
 const POST_DECAY = [0.45, 0.80, 0.85, 0.70];

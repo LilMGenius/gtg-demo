@@ -1,3 +1,4 @@
+import { BALL } from '../../../src/reality.mjs';
 // 연출. 판정은 이 파일에 없다.
 // 롤은 이미 굴렀고 여기서는 확정된 결과를 연기할 뿐이다.
 import * as THREE from '../../vendor/three.module.min.js';
@@ -473,8 +474,8 @@ export function createScene(canvas) {
   // 공이 화면에서 차지하는 높이 비율. 화소가 아니라 비율로 잡아야 해상도가 바뀌어도 같은 그림이 나온다.
   // 0.028은 720p에서 약 20px로, 페널티 지점의 실물 대비 약 1.71배다. P9에 따라 flight 하한도 여기서 유도한다.
 const BALL_MIN_H = 0.028;
-// IFAB Law 2의 둘레 68~70cm를 지름으로 바꾼 중간값이다. https://www.theifab.com/laws/2025-26/the-ball/
-const BALL_REAL_D = 0.22;
+// BALL의 IFAB 둘레 중간값에서 유도한 실물 지름이다.
+const BALL_REAL_D = BALL.values.diameter;
 // 골라인 목표 1.3배보다 0.05배 작게 잡아 비스듬한 화면 투영에도 상한을 지킨다.
 const BALL_NEAR_X = 1.25;
 const BALL_GAIN_CAP = 2.4;
@@ -905,7 +906,7 @@ const TOUCHED = new Set(['contact']);
      냈고 그것은 걸음이 아니라 미끄러짐이다. 정상 보폭이 프레임당 0.0292미터이므로 그 네 배인
      초속 7미터에서 끊는다. 프레임당 0.117미터이고 walkback 게이트가 순간이동으로 세는 0.18 아래다. */
   const CARRY_MPS_MAX = 7.0;
-  // 복귀로 칠 최소 이탈. 골문 반폭 3.66의 1.4퍼센트라 이 안쪽은 화면에서 제자리로 읽힌다.
+  // 복귀로 칠 최소 이탈. GOAL의 골문 반폭의 1.4퍼센트라 이 안쪽은 화면에서 제자리로 읽힌다.
   const OFF_LINE = 0.05;
   // 판이 서기 전 첫 배치. 그 한 번은 복귀가 아니라 시작 자리이므로 걷게 두지 않는다.
   let placed = false;
@@ -1490,7 +1491,7 @@ const TOUCHED = new Set(['contact']);
             sfx.post();
             // 골포스트는 옆으로, 크로스바는 아래위로 튕긴다. 들어간 공은 안쪽으로,
             // 안 들어간 공은 바깥으로 밀린다. 판정은 chain.mjs가 이미 끝냈으므로 결과는 건드리지 않는다.
-            // 0.45는 골대 반폭 R_HALF_W(3.66)의 약 1/8이다. 이보다 작으면 화면에서 안 읽히고
+            // 0.45는 GOAL에서 유도한 반폭 R_HALF_W의 약 1/8이다. 이보다 작으면 화면에서 안 읽히고
             // 크면 조준점을 뭉개서 어디를 노렸는지가 사라진다.
             const side = result.conceded ? -1 : 1;
             if (nearPost) cue.deflect = { x: side * Math.sign(ball.position.x || 1) * 0.45, y: 0 };
@@ -1981,10 +1982,10 @@ const TOUCHED = new Set(['contact']);
             // 카메라 쪽으로 당기면 가로대 아래로 내려오고 얼굴도 커진다. 키퍼(0.9)보다는 멀리 둔다.
             passers[0].position.set(lerp(side * 11.5, endX + side * 1.25, walk), 0, lerp(18, endZ + 0.4, walk));
             // 카메라는 골대 뒤에서 +z를 본다. 이 각도가 음수면 행인은 렌즈에 등을 진다.
-            // 얼굴을 붙여놓고도 화면에는 뒤통수만 남았다. 걸어오는 방향(2.44)에서
+            // 얼굴을 붙여놓고도 화면에는 뒤통수만 남았다. reality 규칙과 별개인 걸어오는 연출 방향(2.44)에서
             // 키퍼 쪽(3.02)으로 틀어야 눈과 볼이 렌즈에 들어온다.
             // 오른쪽에서 걸어오면 같은 각도가 그대로 뒤통수가 된다. 쪽을 따라 뒤집는다.
-            passers[0].rotation.y = lerp(-side * 2.44, -side * 3.02, walk);
+            passers[0].rotation.y = lerp(-side * 2.44, -side * 3.02, walk); // reality의 물리값이 아니라 시선 연출 각도다.
             passers[0].rotation.z = Math.sin(e * 9) * 0.18;
           }
           // 카메라는 골대 뒤에서 +z를 본다. 키퍼가 그대로 서 있으면 뒤통수가 하트 눈을 가린다.
