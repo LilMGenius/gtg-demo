@@ -31,7 +31,6 @@ const constant = (name) => {
   return Number(matches[0][1]);
 };
 const BALL_REAL_D = constant("BALL_REAL_D");
-const BALL_NEAR_X = constant("BALL_NEAR_X");
 const BALL_MIN_H = constant("BALL_MIN_H");
 const units = readFileSync(new URL("../web/src/render/units.mjs", import.meta.url), "utf8");
 const radius = [...units.matchAll(/export const BALL_R = ([0-9.]+);/g)];
@@ -49,7 +48,9 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 let b;
 try {
   b = await chromium.launch({ executablePath: EXE });
-  const ctx = await b.newContext({ viewport: { width: 1280, height: 720 } });
+  // 과제의 두 화면에서 같은 실물 배율 상한을 검증한다.
+  const viewport = process.argv.includes('--phone') ? { width: 740, height: 360 } : { width: 1280, height: 720 };
+  const ctx = await b.newContext({ viewport });
   // 세계시계를 프레임에 못 박는다. 페이지가 열리기 전에 걸어야 손잡이가 생기는 그 틱에 켜진다.
   await pinClock(ctx, STEP);
   const p = await ctx.newPage();
@@ -126,10 +127,12 @@ try {
   const distance = near ? BALL_R * near.height / (near.angularPx * Math.tan(near.fov * Math.PI / 360)) : NaN;
   const realDiameter = BALL_REAL_D * near?.height / (2 * distance * Math.tan(near?.fov * Math.PI / 360));
   const multiple = 2 * near?.screenRadius / realDiameter;
-  const nearOK = Number.isFinite(multiple) && multiple > 0 && multiple <= BALL_NEAR_X + 0.05;
-  const nearAxis = "ballsize:the-near-ball-reads-as-at-most-BALL_NEAR_X-real-balls";
+  // 파운더의 골라인 실물 대비 상한이다. 구현 상수를 올려도 이 상한은 같이 움직이지 않는다.
+  const NEAR_CAP = 1.3;
+  const nearOK = Number.isFinite(multiple) && multiple > 0 && multiple <= NEAR_CAP;
+  const nearAxis = "ballsize:the-near-ball-stays-within-1.3-real-balls";
   const nearDetail = "diameter=" + (2 * near?.screenRadius).toFixed(3) + "px real=" + realDiameter.toFixed(3)
-    + "px distance=" + distance.toFixed(3) + "m multiple=" + multiple.toFixed(4) + " bar<=" + (BALL_NEAR_X + 0.05);
+    + "px distance=" + distance.toFixed(3) + "m multiple=" + multiple.toFixed(4) + " bar<=" + NEAR_CAP;
   if (controlRef) {
     console.log("  parent " + controlRef + " " + nearAxis + " " + (nearOK ? "GREEN" : "RED") + " " + nearDetail);
     check("control:the-oversized-parent-reddens-the-near-axis", served > 0 && Number.isFinite(multiple) && multiple > 0 && !nearOK,
@@ -137,6 +140,11 @@ try {
   } else check(nearAxis, nearOK, nearDetail);
   const rest = rec.find((r) => r.z === 11 && round(r));
   const restDiameter = 2 * rest?.screenRadius;
+  // 페널티 지점에서는 가독성 확대를 실물의 두 배까지만 허용한다.
+  const FAR_CAP = 2;
+  const farMultiple = restDiameter / (rest?.angularPx * BALL_REAL_D / (2 * BALL_R));
+  check('ballsize:penalty-spot-stays-within-two-real-balls', Number.isFinite(farMultiple) && farMultiple > 0 && farMultiple <= FAR_CAP,
+    'multiple=' + farMultiple.toFixed(4) + ' bar<=' + FAR_CAP);
   const floor = Math.floor(BALL_MIN_H * (rest?.height || 720)) - 1;
   check("ballsize:the-far-ball-keeps-the-readability-floor", restDiameter >= floor,
     "rest=" + restDiameter.toFixed(3) + "px bar>=" + floor);
