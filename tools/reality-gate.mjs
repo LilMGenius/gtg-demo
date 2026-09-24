@@ -128,7 +128,9 @@ console.log('  ok migration:saved-order-overflow-benched-ownership-preserved-ide
 const fingerprints = [reality.GOAL.values.width, reality.GOAL.values.height, reality.GOAL.values.width / 2,
   reality.PITCH_MARKS.values.boxW, reality.PITCH_MARKS.values.areaW,
   reality.PITCH_MARKS.values.arcR, reality.SOUND.values.speed];
-const literal = new RegExp('(?<![\\d.])(?:' + fingerprints.map(n => String(n).replace('.', '\\.')).join('|') + ')(?![\\d.])');
+// 앞 경계는 낱말 문자 전체로 잡는다. 숫자만 막으면 행인 셔츠의 16진 색 끝자리가 SOUND의 음속으로 읽힌다.
+// 뒤 경계는 숫자와 점만 막아 SOUND의 음속에 m/s처럼 단위가 붙어도 계속 잡는다.
+const literal = new RegExp('(?<![\\w.])(?:' + fingerprints.map(n => String(n).replace('.', '\\.')).join('|') + ')(?![\\d.])');
 const named = new RegExp('\\b(?:reality|' + entries.map(([name]) => name).join('|') + ')\\b');
 const scan = source => source.split(/\r?\n/).flatMap((line, i) => literal.test(line) && !named.test(line) ? [{ line: i + 1, text: line }] : []);
 // GOAL 양성 대조군은 소스 문자열에만 심고 작업 트리는 오염시키지 않는다.
@@ -136,6 +138,7 @@ const planted = 'const uncited = 7.32;'; // GOAL 오류 대조군
 assert.equal(scan(planted).length, 1);
 assert.equal(scan('// 속도 343m/s').length, 1); // SOUND의 단위가 붙어도 검출해야 한다.
 assert.equal(scan('const cited = GOAL.values.width;').length, 0);
+assert.equal(scan("{id:'student',shirt:0xe8b343}").length, 0); // 16진 색의 일부는 실물 수치가 아니다
 assert.equal(scan("  + R(18, 10.5, 3, 3) + R(15, 13.5, 3, 3) + R(12, 16.5, 3, 3))").length, 0); // 아이콘 좌표는 실물 수치가 아니다
 console.log('  ok controls:uncited-world-literal-rejected');
 const root = fileURLToPath(new URL('../', import.meta.url));
