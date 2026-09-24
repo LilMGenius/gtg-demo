@@ -910,3 +910,114 @@ export function buildKicker(face) {
   });
   return g;
 }
+
+const T = THREE; // 검증한 키트의 Three.js 기하와 관절 배선을 같은 렌더 모듈에서 쓴다.
+// Three.js MIT CapsuleGeometry와 Quaternion.setFromUnitVectors를 그대로 사용하고 비율만 바꾼다: https://threejs.org/docs/pages/CapsuleGeometry.html
+// 수치는 세계 미터 대신 머리가 넉넉한 장난감 비율이며 캡슐 끝이 관절을 덮도록 정했다.
+const C = {cap:6, radial:16, sphere:20, rings:14, roughness:0.9, hip:0.73, chest:1.13, head:1.87, radius:0.37, torso:0.35, length:0.32, shoulder:0.4, arm:0.12, leg:0.14, foot:0.105, stride:0.92, lift:0.19};
+// 피부와 옷은 참조 화면처럼 무광의 큰 색면으로 나누고 소품마다 실루엣을 다르게 잡았다.
+export const PASSER_VARIANTS = [
+  {id:'keeper',name:'골키퍼',shirt:0x168f89,pants:0x233d55,skin:0xdca078,hair:0x322821,width:1.08,height:1,prop:'gloves'}, // 넓은 상체와 청록색은 골키퍼를 먼저 읽게 한다.
+  {id:'kicker',name:'키커',shirt:0xe56b4b,pants:0xf0e8d7,skin:0x995f42,hair:0x292627,width:0.96,height:1.04,prop:'band'}, // 주황과 밝은 반바지는 키퍼와 반대 색면이다.
+  {id:'student',name:'학생',shirt:0xe8b343,pants:0x354d72,skin:0xe7b893,hair:0x332c36,width:0.92,height:0.92,prop:'pack'}, // 작은 체격과 큰 가방이 학생의 실루엣이다.
+  {id:'office',name:'직장인',shirt:0x465e80,pants:0x27364f,skin:0xbf8465,hair:0x282b31,width:1.02,height:1.06,prop:'tie'}, // 길고 단정한 상체가 직장인 비율이다.
+  {id:'delivery',name:'배달원',shirt:0xf0ba3c,pants:0x364346,skin:0xd59d72,hair:0x313332,width:1.14,height:0.98,prop:'helmet'}, // 헬멧과 상자 폭이 배달원의 원거리 표식이다.
+  {id:'jogger',name:'운동객',shirt:0xdf6478,pants:0x633d64,skin:0x87533d,hair:0x252c2c,width:0.88,height:1.03,prop:'visor'}, // 좁은 몸과 바이저가 운동객을 구별한다.
+  {id:'tourist',name:'관광객',shirt:0x76b8a9,pants:0xc89768,skin:0xe2ad85,hair:0x665047,width:1.18,height:0.98,prop:'hat'}, // 넓은 몸과 챙 모자가 관광객의 외곽선을 만든다.
+  {id:'elder',name:'어르신',shirt:0xa28aad,pants:0x5f6178,skin:0xc9977e,hair:0xdbd7cc,width:0.98,height:0.89,prop:'cane'}, // 낮은 키와 지팡이로 과도한 허리 굽힘 없이 구별한다.
+  {id:'fashion',name:'패셔니스타',shirt:0xb84f56,pants:0x763b49,skin:0xe6b28c,hair:0x413036,width:0.94,height:1.07,prop:'bag'} // 성인 코트, 선글라스와 가방으로만 매력을 표현한다.
+];
+const sphere = new T.SphereGeometry(1,C.sphere,C.rings); // 단위 구를 공유해 얼굴과 소품의 생성 비용을 줄인다.
+const up = new T.Vector3(0,1,0); // 캡슐의 기본 축이다.
+const mats = new Map();
+function material(color){if(!mats.has(color))mats.set(color,new T.MeshStandardMaterial({color,roughness:C.roughness}));return mats.get(color);}
+function ball(parent,color,pos,scale){const m=new T.Mesh(sphere,material(color));m.position.set(...pos);m.scale.set(...scale);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
+function capsule(parent,color,r,length,pos){const m=new T.Mesh(capsuleGeometry(r,length),material(color));m.position.set(...pos);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
+function group(parent,pos){const g=new T.Group();g.position.set(...pos);parent.add(g);return g;}
+function limb(parent,color,r){return capsule(parent,color,r,0.15,[0,0,0]);} // 중심 구간을 짧은 0.15 구간으로 만들어 늘려도 둥근 관절 끝이 납작해지지 않게 한다.
+function between(m,a,b,r){const av=new T.Vector3(...a),bv=new T.Vector3(...b);m.position.copy(av).add(bv).multiplyScalar(0.5);m.quaternion.setFromUnitVectors(up,bv.clone().sub(av).normalize());m.scale.y=(av.distanceTo(bv)+r)/(0.15+2*r);} // 반구를 포함한 0.15 구간의 전체 길이로 보정하고 반경만큼 겹쳐 관절 틈을 없앤다.
+export function buildWalker(v=PASSER_VARIANTS[0]){
+  const root=new T.Group(), hips=group(root,[0,C.hip,0]), chest=group(hips,[0,C.chest-C.hip,0]); // 원점은 지면이고 골반과 가슴은 따로 회전한다.
+  root.scale.set(v.width,v.height,v.width);
+  capsule(chest,v.shirt,C.torso,C.length,[0,0,0]);
+  ball(hips,v.pants,[0,0,0],[0.31,0.23,0.25]); // 바지의 둥근 골반은 몸통과 다리의 틈만 채운다.
+  const head=group(chest,[0,C.head-C.chest,0]);
+  ball(head,v.skin,[0,0,0],[C.radius,C.radius*1.04,C.radius*0.94]); // 머리는 몸통보다 크고 정면만 살짝 평평하다.
+  const hair=new T.Mesh(new T.SphereGeometry(C.radius*1.02,C.sphere,C.rings,0,Math.PI*2,0,Math.PI*0.43),material(v.hair)); // 정수리만 덮어 턱을 감싸는 머리카락 회귀를 막는다.
+  hair.scale.y=1.08;head.add(hair);hair.castShadow=true; // 머리의 세로 배율보다 높여 정수리에 피부가 뚫리지 않게 한다.
+  for(const side of [-1,1]){ // 양쪽 귀와 눈을 같은 정면에 둔다.
+    ball(head,v.skin,[side*0.35,-0.015,0],[0.07,0.1,0.065]); // 귀는 실루엣을 깨되 머리보다 작다.
+    ball(head,0xfaf7e9,[side*0.135,0.035,0.321],[0.075,0.086,0.035]); // 눈 간격은 코가 겹치지 않는 머리 폭의 삼분의 일이다.
+    ball(head,0x272c31,[side*0.135,0.03,0.352],[0.032,0.048,0.019]); // 검은 눈동자는 축소해도 한 점으로 남는다.
+  }
+  ball(head,v.skin,[0,-0.058,0.352],[0.069,0.062,0.065]); // 작은 코가 측면 얼굴의 방향을 보여 준다.
+  ball(head,0x6b3e38,[0,-0.17,0.305],[0.072,0.022,0.025]); // 얇은 입은 얼굴에 검은 덩어리를 만들지 않는다.
+  const arms=[],legs=[],feet=[];
+  for(const side of [-1,1]){
+    const arm=limb(chest,v.shirt,C.arm),fore=limb(chest,v.skin,C.arm*0.92); // 소매와 맨팔은 두 마디로 나누어 접힌다.
+    const hand=ball(chest,v.prop==='gloves'?0xf6df8a:v.skin,[0,0,0],[0.145,0.17,0.135]); // 장갑은 얼굴보다 작고 손보다는 크다.
+    arms.push({side,arm,fore,hand});
+    legs.push({side,thigh:limb(root,v.pants,C.leg),shin:limb(root,v.pants,C.leg*0.85)}); // 짧고 두툼한 다리를 두 마디로 유지한다.
+    feet.push(ball(root,0x303b49,[side*0.19,C.foot,0.05],[0.16,C.foot,0.25])); // 넓은 신발은 접지와 전진 방향을 읽게 한다.
+  }
+  const accessory=group(chest,[0,0,0]);
+  const prop=v.prop;
+  if(prop==='pack'||prop==='helmet')ball(accessory,prop==='pack'?0x5b887a:0xe7773f,[0,0,-0.36],[0.29,0.36,0.18]); // 등짐은 뒤쪽으로만 돌출한다.
+  if(prop==='helmet')ball(head,0xf0b52d,[0,0.15,-0.025],[0.41,0.31,0.37]); // 헬멧은 눈 위에서 끝나 얼굴을 가리지 않는다.
+  if(['hat','visor','band'].includes(prop)){
+    ball(head,prop==='hat'?0xe3c68e:0xf5e8cf,[0,0.19,0.07],[0.43,0.045,0.42]); // 챙은 눈보다 높고 넓게 돌출한다.
+    if(prop==='hat')ball(head,0xe3c68e,[0,0.32,-0.025],[0.29,0.19,0.28]); // 관광 모자의 낮은 크라운이다.
+  }
+  if(prop==='tie'){
+    capsule(accessory,0xeac3a0,0.045,0.23,[0,0.05,0.32]); // 넥타이는 상의 앞면에만 선다.
+    ball(accessory,0x513f35,[0.52,-0.43,0],[0.21,0.23,0.1]); // 서류 가방으로 손쪽 실루엣을 구별한다.
+  }
+  if(prop==='hat')ball(accessory,0x354a50,[0,-0.13,0.34],[0.16,0.115,0.09]); // 카메라가 관광객을 읽게 한다.
+  if(prop==='cane'){
+    capsule(accessory,0x805d40,0.035,0.84,[0.54,-0.57,0.16]); // 지팡이 끝이 지면에 닿는 길이다.
+    ball(head,v.hair,[0,0.25,-0.13],[0.3,0.17,0.29]); // 흰 머리의 낮은 덩어리다.
+  }
+  if(prop==='bag'){
+    ball(chest,v.shirt,[0,-0.26,0],[0.38,0.28,0.29]); // 코트 밑단을 넓혀 바지 차림과 실루엣이 갈리게 한다.
+    for(const side of [-1,1])ball(head,0x283740,[side*0.145,0.065,0.342],[0.125,0.075,0.035]); // 선글라스는 눈 높이에만 둔다.
+    capsule(head,v.hair,0.15,0.3,[0,0.02,-0.3]); // 단발은 뒤통수에서 끝나 턱을 감싸지 않는다.
+    ball(accessory,0xe6bb74,[0.48,-0.4,0.12],[0.19,0.23,0.11]); // 옆 가방이 코트와 다른 색면을 만든다.
+    const handle=new T.Mesh(new T.TorusGeometry(0.12,0.026,8,20),material(0xe6bb74)); // 손잡이는 가방 폭에 맞춘 작은 고리다.
+    handle.position.set(0.48,-0.15,0.12);accessory.add(handle); // 가방 바로 위에 손잡이를 붙인다.
+  }
+  const rig={root,hips,chest,head,arms,legs,feet,accessory,v};
+  poseWalker(rig,0);return rig; // 생성 즉시 땅에 선 자세를 보장한다.
+}
+// 감쇠 조화진동 해를 사용해 프레임 간격과 무관하게 겹동작을 재생한다. https://en.wikipedia.org/wiki/Harmonic_oscillator
+export function poseWalker(rig,distance,{mode='walk',time=0,heading=0}={}){
+  const {root,hips,chest,head,arms,legs,feet,v}=rig;
+  const cycle=distance/C.stride,phase=cycle*Math.PI*2; // 한 주기의 이동 거리를 보폭에 묶는다.
+  const sway=Math.sin(phase)*0.045; // 작게 흔들어 허리보다 전신 리듬을 보이게 한다.
+  root.rotation.set(0,heading,0);hips.rotation.set(0,sway,0);chest.rotation.set(0,-sway*1.4,-sway*0.4); // 가슴은 골반 반대 방향으로 돌아간다.
+  head.rotation.z=Math.exp(-time*2.8)*Math.sin(time*10)*0.09+sway*0.3; // 감쇠율은 삼 초 안에 잔동작이 가라앉는 범위다.
+  rig.accessory.rotation.z=Math.exp(-time*2.4)*Math.sin(time*8)*0.08-sway; // 소품은 머리보다 느리게 뒤따른다.
+  for(let i=0;i<legs.length;i++){
+    const {side,thigh,shin}=legs[i];
+    const q=T.MathUtils.euclideanModulo(cycle+i*0.5,1); // 두 발은 반 주기만큼 어긋난다.
+    const stance=q<0.5,u=(q-0.5)*2; // 절반은 지면 고정이고 절반은 공중 회수다.
+    const z=stance?C.stride*(0.25-q):T.MathUtils.lerp(-C.stride*0.25,C.stride*0.25,T.MathUtils.smoothstep(u,0,1)); // 지지 구간의 역이동이 루트 이동을 정확히 상쇄한다.
+    const y=C.foot+(stance?0:Math.sin(u*Math.PI)*C.lift); // 공중에서만 발끝을 들고 양 끝에서 지면에 붙인다.
+    const x=side*(v.prop==='bag'?0.155:0.19); // 코트 걸음은 발 간격만 좁히고 신체 부위는 강조하지 않는다.
+    feet[i].position.set(x,y,z);feet[i].userData.stance=stance;
+    const knee=[x,0.41,z*0.5+0.12]; // 무릎은 앞쪽으로만 접혀 역관절을 막는다.
+    between(thigh,[x,C.hip,0],knee,C.leg);between(shin,knee,[x,y,z],C.leg*0.85); // 신발까지 끊기지 않는 두 마디다.
+  }
+  for(const {side,arm,fore,hand} of arms){
+    const swing=Math.sin(phase+(side>0?Math.PI:0))*0.19; // 팔과 반대 다리가 함께 전진한다.
+    const elbow=[side*0.43,-0.22,swing],end=[side*0.47,-0.5,swing*1.3]; // 팔을 몸에서 조금 벌려 외곽선을 유지한다.
+    if(mode==='shuffle'){elbow[2]=0.25;end[1]=-0.05;end[2]=0.43;} // 셔플은 장갑을 앞에 들고 공을 향한다.
+    if(mode==='dive'){elbow[0]=side*0.3;elbow[1]=0.9;end[0]=side*0.24;end[1]=1.45;end[2]=0.12;} // 누운 몸의 머리 위로 양손이 함께 뻗는다.
+    between(arm,[side*C.shoulder,0.2,0],elbow,C.arm);between(fore,elbow,end,C.arm*0.92);hand.position.set(...end); // 같은 관절 배선을 세 동작이 공유한다.
+  }
+  if(mode==='shuffle'){
+    for(const f of feet){const old=f.position.z;f.position.z=0;f.position.x+=old;} // 셔플만 보폭 축을 옆으로 바꾼다.
+    for(let i=0;i<legs.length;i++){const l=legs[i],f=feet[i].position,k=[l.side*0.2,0.36,0.14];between(l.thigh,[l.side*0.19,C.hip,0],k,C.leg);between(l.shin,k,f.toArray(),C.leg*0.85);} // 옆으로 벌어진 발까지 무릎을 다시 연결한다.
+  }
+  if(mode==='dive')root.rotation.z=-Math.PI*0.43; // 수평에 가까운 옆다이빙이며 발이 손을 따라가는 실루엣이다.
+  root.updateMatrixWorld(true);
+}

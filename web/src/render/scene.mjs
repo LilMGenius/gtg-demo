@@ -10,7 +10,7 @@ import {
   flat, flatVertex, BALL_R, VIEW_X, KICKER_OFF, BALL_PAST, REST_Z, REST_Y,
   R_HALF_W, R_H, SX, SY, MOUTH_X, lerp, ease
 } from './units.mjs';
-import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, pushPose, setPose, poseDist, KICK_WIND, beatOf } from './objects/actors.mjs';
+import { pupilMat, buildKeeper, buildKicker, poseWalker, POSES, JOINTS, lerpPose, pushPose, setPose, poseDist, KICK_WIND, beatOf } from './objects/actors.mjs';
 import { buildPitch, buildPassers, BOX_Z } from './objects/pitch.mjs';
 import { skinAt, placeAt } from '../state/gear.mjs';
 import { gazeMood } from '../ui/lines.mjs';
@@ -948,6 +948,7 @@ const TOUCHED = new Set(['contact']);
   function applyBack(b) {
     if (!returnHeld?.()) keeper.position.x = b.from.x * b.hb;
     keeper.position.z = KEEPER_Z + (b.from.z - KEEPER_Z) * b.hb;
+    keeper.userData.locomotion = 'shuffle'; // 키퍼 복귀는 공을 보는 옆걸음이며 행인의 이동 방향 회전을 적용하지 않는다.
     keeper.rotation.y = b.from.ry * b.hb;
     // 기운 몸으로 걸으면 걷는 것이 아니라 기울어진 채 미끄러지는 것이다. 일어서는 동안 세운다.
     keeper.rotation.z = b.from.rz * (1 - ease(b.r));
@@ -2269,7 +2270,7 @@ const TOUCHED = new Set(['contact']);
         p.userData.gaze = Math.min(1, p.userData.gaze + dt / 1.6);
         const w = ease(p.userData.gaze);
         p.position.set(lerp(-17, -11.5, w), 0, lerp(29, 18, w));
-        p.rotation.z = Math.sin(vnow * 9) * 0.13;
+
       } else {
         // 프레임당 상수로 걸으면 세계시간이 멈춰도 행인만 계속 간다.
         // 정지 프레임을 두 장 찍어 비교하는 계측이 그 걸음을 전부 잡음으로 읽는다.
@@ -2281,8 +2282,16 @@ const TOUCHED = new Set(['contact']);
           // 같은 줄로 돌아오면 다섯이 영원히 같은 순서로 지나간다.
           p.position.z = p.userData.homeZ + (p.userData.phase % 1) * 3.2 - 1.6;
         }
-        p.rotation.z = Math.sin(vnow * 6 * p.userData.speed + p.userData.phase) * 0.06;
+
       }
+      const d=p.userData, prev=d.walkPrevious;
+      if(prev){
+        const dx=p.position.x-prev.x,dz=p.position.z-prev.z,step=Math.hypot(dx,dz);
+        // 화면 밖 순환과 사건 재배치는 보폭에 누적하지 않는다. 여섯 단위는 한 프레임 보행보다 넉넉한 연출 경계다.
+        if(step>0.000001 && step<6){d.walkDistance+=step;d.heading=Math.atan2(dx,dz);} // 미세 오차보다 실제 이동이 클 때만 방향을 바꾼다.
+      }
+      d.walkPrevious={x:p.position.x,z:p.position.z};
+      poseWalker(d.walker,d.walkDistance/p.scale.x,{heading:d.heading,time:d.walkDistance}); // 멈추면 위상과 마지막 방향도 그대로 남는다.
       // 걸음보다 먼저 놓으면 그림자는 한 프레임 뒤처진 자리에 선다.
       // 세계시간이 멈춘 첫 프레임이 그 한 걸음을 따라잡아 정지 프레임 두 장이 갈린다.
       passerShadows[i].position.set(p.position.x, 0.03, p.position.z);

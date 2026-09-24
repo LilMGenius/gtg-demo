@@ -6,7 +6,7 @@ import { loadDecor } from '../decor.mjs';
 import { placeGeo } from './places.mjs';
 import { jitterMesh, seeded, addOutline, INK } from '../handmade.mjs';
 import { MARK_LINES, ARC_R, ARC_HALF, SPOT_Z, FAR_W } from './markspec.mjs';
-import { addFace } from './actors.mjs';
+import { buildWalker, PASSER_VARIANTS } from './actors.mjs';
 import { skinAt } from '../../state/gear.mjs';
 import { PERSONAS, personaKindAt } from '../../state/passer.mjs';
 
@@ -551,159 +551,23 @@ export function buildPitch(scene) {
 // 드로우콜을 썼고 번화가에서 134콜이었다. 몸통과 팔과 머리와 소지품을 한 지오메트리로 붙이면
 // 한 명이 셋이고, 얼굴이 붙는 0번만 넷이다.
 export function buildPassers(scene, count = 5) {
-  const passers = [];
-  // 0번은 키커와 나란히 서는 유일한 행인이다. 붉은 계열을 주면 키커 셔츠(0xc9483a)와
-  // 같은 빨간 캡슐 둘이 되고, 화면에서 사람이 바뀐 것 자체가 안 읽힌다.
-  const shirt = [0xf2e9ff, 0x4a72c4, 0xe0a23c, 0x7a4fb0, 0x3fa37a];
-  // 코트 색 셋. 직장인 넷이 같은 코트를 입으면 페르소나가 제복이 된다.
-  const coat = [0x3f4450, 0x6b5a44, 0x2f3a3f];
-  const rnd = seeded(0x9a55e7);
+  const passers = [], rnd = seeded(0x9a55e7); // 기존 배치 시드를 유지해 동네별 가시 인원 비교를 보존한다.
+  // 판정의 번호와 이름은 그대로 두고 렌더 차림만 명시적으로 매핑한다.
+  const wardrobe = ['fashion','student','office','elder','jogger','delivery','tourist','office','tourist','elder','delivery'];
   for (let i = 0; i < count; i += 1) {
-    const tint = shirt[i % shirt.length];
-    const kind = personaKindAt(i);
-    const P = PERSONAS[kind];
-    const g = new THREE.Group();
-    // 회차마다 흔드는 것은 크기 하나다. 비율까지 흔들면 실루엣 비를 재는 자가 재는 것이
-    // 페르소나가 아니라 그날 굴린 난수가 된다. 0.92에서 1.12는 원경에서 키가 갈려 읽히는 폭이다.
-    const s = 0.92 + rnd() * 0.2;
-    const tall = P.tall * s;
-    const wide = P.wide * s;
-    // 다리가 짧으면 골반과 머리가 그만큼 내려앉는다. 발은 어느 페르소나에서도 땅에 있다.
-    const legLen = 0.46 * tall * P.leg;
-    const drop = 0.46 * tall - legLen;
-    const hipY = 0.86 * tall - drop + P.bob;
-    const torsoR = 0.22 * wide;
-    // 몸에 붙는 것은 전부 골반 기준 좌표다. 노인은 이 덩어리를 골반에서 통째로 굽히므로
-    // 여기에 월드 높이를 그대로 적으면 굽힐 때 소지품만 제자리에 남는다.
-    const at = (y) => (y - 0.86) * tall;
-    const parts = [new THREE.CapsuleGeometry(torsoR, 0.62 * tall, 3, 6)];
-    const colors = [tint];
-    const armLen = 0.62 * tall;
-    for (const side of [-1, 1]) {
-      const a = new THREE.CapsuleGeometry(0.072 * wide, armLen, 3, 5);
-      // 캡슐은 중앙이 원점이다. 그대로 돌리면 어깨가 아니라 팔 한가운데가 축이 된다.
-      a.translate(0, -armLen / 2, 0);
-      // 팔이 몸에서 벌어지는 각은 페르소나가 정한다. 원경에서 사람을 가르는 것이 이 각이다.
-      a.rotateZ(-side * P.arm);
-      // 어깨는 몸통 꼭대기가 아니라 그 한 칸 아래다. 꼭대기에 달면 목에서 팔이 난다.
-      a.translate(side * (torsoR + 0.05), 0.22 * tall, 0);
-      parts.push(a);
-      colors.push(0xe0b48c);
-    }
-    if (kind === 'beauty') {
-      // 긴 머리 한 덩이. 반경 0.17은 머리(0.15)보다 커서 얼굴을 삼켰다. 뒤통수 쪽으로 물린다.
-      const hair = new THREE.CapsuleGeometry(0.115 * wide, 0.34 * tall, 3, 6);
-      hair.translate(0, at(1.44), -0.13);
-      parts.push(hair);
-      colors.push(0x2b1d14);
-      // 머리 하나만으로는 멀리서 남녀가 안 갈린다. 치마가 실루엣 밑변을 벌려 준다.
-      const skirt = new THREE.ConeGeometry(0.27 * wide, 0.42 * tall, 8);
-      skirt.translate(0, at(0.62), 0);
-      parts.push(skirt);
-      colors.push(0xb98ad6);
-    } else if (kind === 'student') {
-      // 등에 가방 하나, 옆으로 멘 가방 하나. 등가방은 앞에서 안 보이므로 옆가방이 폭을 만든다.
-      const bag = new THREE.BoxGeometry(0.34 * wide, 0.42 * tall, 0.2);
-      bag.translate(0, at(0.92), -0.24);
-      parts.push(bag);
-      colors.push(0x2f4f43);
-      const satchel = new THREE.BoxGeometry(0.26 * wide, 0.3 * tall, 0.16);
-      satchel.translate(0.42 * wide, at(0.6), 0.06);
-      parts.push(satchel);
-      colors.push(0x6b4f2f);
-    } else if (kind === 'worker') {
-      // 무릎까지 오는 코트. 몸통과 허벅지를 한 통으로 덮어 실루엣이 위아래로 곧게 선다.
-      const c = new THREE.CylinderGeometry(0.27 * wide, 0.32 * wide, 0.72 * tall, 8);
-      c.translate(0, at(0.6), 0);
-      parts.push(c);
-      colors.push(coat[i % coat.length]);
-    }
-    if (kind !== 'beauty') {
-      // 얼굴이 붙는 것은 0번뿐이다. 나머지 머리는 몸에 붙여 드로우콜을 안 늘린다.
-      const hd = new THREE.SphereGeometry(0.15, 8, 6);
-      hd.translate(0, at(1.36), 0);
-      parts.push(hd);
-      colors.push(0xe0b48c);
-    }
-    const bodyGeo = mergeGeos(parts, colors);
-    // 노인. 굽은 등이 실루엣의 전부다. 조각을 하나씩 기울이면 어깨와 머리가 따로 논다.
-    // 실측: 0.62라디안은 실루엣 비 1.42를 냈고 학생 1.39와 2.2퍼센트밖에 안 갈렸다.
-    // 0.88은 머리가 골반 앞으로 확실히 나와 비가 1.1대로 내려가면서도 얼굴은 아직 앞을 본다.
-    if (kind === 'elder') bodyGeo.rotateX(0.88);
-    const bodyMat = flatVertex(0xffffff);
-    bodyMat.map = clothTex();
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = hipY;
-    // 다리 한 덩어리는 옆에 선 키퍼의 두 다리와 나란히 놓이면 통짜 기둥으로 읽힌다.
-    // 0.082 반경에 0.08 간격은 두 캡슐이 서로 파묻혀 다시 한 기둥이 됐다. 사이로 흙이 보여야 갈린다.
-    const legGeos = [];
-    const legCols = [];
-    const legsY = 0.15 * tall + legLen / 2;
-    for (const side of [-1, 1]) {
-      const l = new THREE.CapsuleGeometry(0.068 * wide, legLen, 3, 5);
-      // 보폭. 한 발이 앞이고 한 발이 뒤다. 나란히 두면 걷는 사람이 아니라 세워 둔 인형이다.
-      l.translate(side * 0.115 * wide, 0, side * P.stride * 0.14);
-      legGeos.push(l);
-      legCols.push(0x30384a);
-    }
-    if (kind === 'elder') {
-      // 짚는 막대. 굽은 등과 짝이라 하나만 있으면 그냥 굽은 사람이다.
-      // 다리 덩어리에 붙인다. 몸에 붙이면 등을 굽힐 때 막대도 같이 굽어 땅에서 떨어진다.
-      // 위는 손에 붙고 아래는 몸 밖으로 벌어진다. 곧게 세우면 다리 옆에 붙은 막대라
-      // 실루엣 폭이 안 늘고, 그러면 노인과 학생의 비가 2.2퍼센트밖에 안 갈린다(실측).
-      const cane = new THREE.CylinderGeometry(0.03 * wide, 0.03 * wide, 0.95 * tall, 5);
-      cane.rotateZ(0.2);
-      cane.translate(0.49 * wide, 0.95 * tall * 0.5 - legsY, 0.12);
-      legGeos.push(cane);
-      legCols.push(0x8a6b4a);
-    }
-    const legs = new THREE.Mesh(mergeGeos(legGeos, legCols), flatVertex(0xffffff));
-    legs.position.y = legsY;
-    const meshes = [body, legs];
-    if (kind === 'beauty') {
-      /* 이 행인은 한눈팔기 연출에서 골대 앞까지 걸어온다. 화면 한복판에 서는데 얼굴이 없으면
-         키퍼만 눈이 있고 옆에는 달걀이 선다. 하트가 떠도 왜 한눈파는지가 화소에 없다.
-         머리 반경 0.15는 치마와 몸통 옆에서 전구만 해졌다. 몸통은 두고 머리만 키운다. */
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), flat(0xe0b48c));
-      head.scale.setScalar(1.3);
-      // 몸통 캡슐 꼭대기가 1.39*tall이다. 머리 중심을 1.4에 두면 목까지 몸에 묻힌다.
-      head.position.y = 1.54 * tall - drop + P.bob;
-      addFace(head, 0.15, 1, 0xe0b48c);
-      // 볼 두 점. 눈만으로는 행인 넷과 안 갈린다. 둘을 한 지오메트리로 붙여 드로우콜은 하나다.
-      const blush = [];
-      for (const side of [-1, 1]) {
-        const bl = new THREE.SphereGeometry(0.045, 6, 5);
-        bl.scale(1.1, 0.7, 0.4);
-        bl.translate(side * 0.088, -0.022, 0.126);
-        blush.push(bl);
-      }
-      head.add(new THREE.Mesh(mergeGeos(blush), new THREE.MeshBasicMaterial({ color: 0xff8fa3 })));
-      // 눈에 띄는 사람은 화면에서도 눈에 띄어야 한다. 머리 위 반짝임 하나가 시선을 잡는다.
-      // 연출이 이것을 돌리고 키우므로 병합하지 않고 메시로 남긴다.
-      const spark = new THREE.Mesh(new THREE.OctahedronGeometry(0.11, 0), new THREE.MeshBasicMaterial({ color: 0xffe98a }));
-      spark.position.y = 1.88 * tall - drop + P.bob;
-      g.userData.spark = spark;
-      meshes.push(head, spark);
-    }
-    for (const [pi, m] of meshes.entries()) { jitterMesh(m, 0.02, 70 + i * 5 + pi); m.userData.probeIgnore = true; }
-    addOutline(body, 0.03);
-    g.add(...meshes);
-    // 9.5씩 끊어 놓으면 다섯이 같은 간격으로 지나간다. 행렬이지 행인이 아니다.
-    // 깊이까지 흩어야 원근이 크기를 갈라 준다. 한 줄에 세우면 키만 다른 같은 인형이다.
-    // 0번은 한눈팔기 연출에서 골대 앞까지 걸어오므로 거리 밴드를 그대로 둔다.
-    const z = i === 0 ? 31.6 + rnd() * 1.8 : 26.8 + rnd() * 12.4;
-    // 9.5씩 밀면 여섯 번째부터 화면 오른쪽 되돌림 지점(42) 밖에서 태어난다. [-42, 42]로 감는다.
-    const raw = -25 + i * 9.5 + (rnd() - 0.5) * 9.8;
-    g.position.set(((raw + 42) % 84 + 84) % 84 - 42, 0, z);
-    // 걷는 속도는 보폭에서 나온다. 노인이 학생을 따라 걸으면 보폭 표가 화면에 없는 것이 된다.
-    // scene.mjs가 이 값으로 걸음과 대기 흔들림 주기를 같이 돌린다.
-    g.userData.speed = 1.05 + P.stride * 0.95;
-    g.userData.phase = rnd() * Math.PI * 2;
-    g.userData.homeZ = g.position.z;
-    // 계기가 어느 몸인지 되물을 수 있어야 한다. 실루엣이 갈렸다는 주장은 임자를 알아야 재진다.
-    g.userData.persona = kind;
-    scene.add(g);
-    passers.push(g);
+    const kind = personaKindAt(i), P = PERSONAS[kind];
+    const v = PASSER_VARIANTS.find(v => v.id === wardrobe[i % wardrobe.length]);
+    const rig = buildWalker(v), g = rig.root;
+    const s = 0.92 + rnd() * 0.2; // 기존 원경 크기 분산만 유지하고 키트의 몸 비율은 보존한다.
+    g.scale.multiplyScalar(s);
+    const z = i === 0 ? 31.6 + rnd() * 1.8 : 26.8 + rnd() * 12.4; // 기존 배치 밴드로 골대 연출과 원근을 보존한다.
+    const raw = -25 + i * 9.5 + (rnd() - 0.5) * 9.8; // 기존 불규칙 간격을 재사용한다.
+    g.position.set(((raw + 42) % 84 + 84) % 84 - 42, 0, z); // 화면 밖 순환 구간을 보존한다.
+    Object.assign(g.userData,{walker:rig,head:rig.head,variantId:v.id,persona:kind,
+      speed:1.05+P.stride*0.95,phase:rnd()*Math.PI*2,homeZ:z,walkDistance:0,heading:Math.PI/2}); // 기존 속도는 유지하고 첫 방향은 +x 보행이다.
+    g.rotation.y=g.userData.heading;
+    g.traverse(m=>{if(m.isMesh)m.userData.probeIgnore=true;});
+    scene.add(g);passers.push(g);
   }
   return passers;
 }
