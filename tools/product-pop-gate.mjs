@@ -61,7 +61,7 @@ function population(policy, level, rng) {
   return keeper;
 }
 
-function measure(policy, level, mode, contrast = null) {
+function measure(policy, level, mode, contrast = null, coupledShots = false) {
   const gains = (policy === 'fixed-order' ? [] : contrast ? [contrast] : PATH).map(stat => ({ stat, eligible: 0, tested: 0, baseSaved: 0, bumpSaved: 0, n10: 0, n01: 0 }));
   let conceded = 0, tested = 0, gold = 0;
   const causes = {};
@@ -70,7 +70,8 @@ function measure(policy, level, mode, contrast = null) {
     const source = makeRng(1000003 + s + level * 7919);
     const keeper = population(policy, level, source);
     rollForm(keeper, source);
-    const shots = buildSet(source, level);
+    // 훈련 정책의 난수 소비가 상대 표본을 바꾸지 않게 기존 셀 시드를 별도로 재생한다. 결합 경로는 음성 대조에만 남긴다.
+    const shots = buildSet(coupledShots ? source : makeRng(1000003 + s + level * 7919), level);
     const variants = gains.map(g => {
       if (keeper[g.stat] >= 10) return null;
       g.eligible++;
@@ -251,11 +252,18 @@ for (const r of rows.filter(r => r.policy === 'coach')) {
   const top = Object.entries(r.causes).sort((a, b) => b[1] - a[1])[0];
   verdict('cause:the-concession-label-is-not-one-stat-on-the-coach-population', 'DIAGNOSTIC', `${r.mode} Lv${r.level} top=${top?.[0] || 'none'} share=${f(100 * (top?.[1] || 0) / r.conceded)}%`);
 }
+// 같은 상대와 결과 난수에서는 미시험 슛도 같아야 두 분모의 순서를 비교할 수 있다.
+const sameOrder = group => group.every(a => group.every(b => Math.sign(a.nonconcession - b.nonconcession) === Math.sign(a.testedSave - b.testedSave)));
+for (const mode of ['hand-bait-react', 'hand-bait']) {
+  const legacy = POLICIES.map(policy => measure(policy, LEVELS[0], mode, null, true));
+  verdict('control:policy-coupled-shots-break-denominator-order', !sameOrder(legacy) ? 'PASS' : 'FAIL', `${mode} Lv${LEVELS[0]} old-order-verdict=${sameOrder(legacy) ? 'PASS' : 'FAIL'} tested=${legacy.map(r => r.tested).join(',')}`);
+}
 for (const mode of MODES) for (const level of LEVELS) {
   const group = rows.filter(r => r.mode === mode && r.level === level);
+  verdict('instrument:policies-share-tested-shot-population', group.every(r => r.tested === group[0].tested) ? 'PASS' : 'FAIL', `${mode} Lv${level} tested=${group.map(r => r.tested).join(',')}`);
   const ordered = key => [...group].sort((a, b) => b[key] - a[key]).map(r => r.policy).join('>');
   // Compare pairwise signs too: a tie in only one denominator is disagreement.
-  const agrees = group.every(a => group.every(b => Math.sign(a.nonconcession - b.nonconcession) === Math.sign(a.testedSave - b.testedSave)));
+  const agrees = sameOrder(group);
   verdict('instrument:both-denominators-agree-in-ordering', agrees ? 'PASS' : 'FAIL', `${mode} Lv${level} nonconcession=${ordered('nonconcession')} tested-save=${ordered('testedSave')}`);
 }
 console.log(`product-pop ${Object.entries(counts).map(([status, count]) => `${status} ${count}`).join('; ')}; elapsed=${f((Date.now() - started) / 1000)}s`);
