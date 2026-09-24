@@ -2,7 +2,7 @@ import { BALL } from '../../../src/reality.mjs';
 // 연출. 판정은 이 파일에 없다.
 // 롤은 이미 굴렀고 여기서는 확정된 결과를 연기할 뿐이다.
 import * as THREE from '../../vendor/three.module.min.js';
-import { GOAL_HALF_W, GOAL_H } from '../../../src/chain.mjs';
+import { GOAL_HALF_W, GOAL_H, keeperDepthAt } from '../../../src/chain.mjs';
 import { mountSfx } from '../audio/sfx.mjs';
 import { createBallProbe, opaqueBlocker } from '../diagnostics/ball-probe.mjs';
 import { createStageProbe, goalFraming, footY, faceToCamera } from '../diagnostics/stage-probe.mjs';
@@ -1532,7 +1532,11 @@ const TOUCHED = new Set(['contact']);
             : Math.min(1, Math.max(0, (t - cue.diveAt) / Math.max(Number.EPSILON, runup + flight - cue.diveAt)));
           const span = Math.min(R_HALF_W - 0.5, 1.05 + 0.06 * cueKeeperDiving());
           keeper.position.x = lerp(cue.startX ?? 0, (cue.startX ?? 0) + VIEW_X * input.dive * span, ease(dp));
-          keeper.position.z = lerp(KEEPER_Z, KEEPER_Z + input.advance, ease(Math.min(1, dp * 1.4)));
+          // 판정의 골라인 원점은 렌더의 KEEPER_Z에 대응한다. 전진 깊이는 접촉 뒤 자취를 그대로 읽는다.
+          // 기존 강제 포즈 표본은 깊이 자취가 없으므로 원래 전진 보간을 보존한다.
+          keeper.position.z = input.depthTrace
+            ? KEEPER_Z + keeperDepthAt(input, (t - runup) * 1000)
+            : lerp(KEEPER_Z, KEEPER_Z + input.advance, ease(Math.min(1, dp * 1.4)));
           // 관절이 뻗는 방향을 이미 보여주므로 몸통 회전은 거들기만 한다.
           keeper.rotation.z = lerp(0, VIEW_X * -input.dive * 0.86, ease(dp));
           // 온전한 반원 호는 정점이 dp 0.5, 즉 비행의 63% 지점에 온다. 공이 골라인에 닿는 순간

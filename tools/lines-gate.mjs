@@ -1,5 +1,5 @@
 // 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
-import { makeRng, buildSet, resolve, keeperAtLevel, autoInput, rollForm } from "./position-pop.mjs";
+import { makeRng, buildSet, resolve, keeperAtLevel, autoInput, positionInput, rollForm } from "./position-pop.mjs";
 import { POOLS, KEYLESS, lineKey, eventLine, LINE_POOL, SET_END, SET_END_POOL, setEndLine, gazeAct } from "../web/src/ui/lines.mjs";
 
 // 결과 자막 게이트. 사건마다 문장이 하나뿐이라 방치형에서 로그처럼 읽히던 것을 고친 뒤,
@@ -28,16 +28,22 @@ const lineRng = makeRng(0x5eed);
 // 돌리면 900판에 1회라 네 줄짜리 풀이 다 안 나온다. 둘째 겹은 반응속도만, 셋째 겹은
 // 민첩성을 뺀 나머지를 전부 상한에 붙인 키퍼다. 둘 다 성장으로 도달하는 상태다.
 const CAPPED = ["diving", "reflex", "offball", "composure", "resilience"];
-for (const mode of [0, 1, 2]) {
+// 기존 성장 표본에 각 원인을 고립한 상한 대조와 수동 자리 실패를 더한다. 문턱과 시드 수는 보존한다.
+for (const mode of ["normal", "agility", "only-agility", "composure", "reflex", "manual-position"]) {
   for (let s = 1; s <= 900; s++) {
     const rng = makeRng(s >>> 0);
     const keeper = keeperAtLevel(1 + (s % 40), rng);
-    if (mode === 1 && keeper.agility < 10) keeper.reflex = 10;
-    if (mode === 2) { for (const k of CAPPED) keeper[k] = 10; keeper.agility = Math.min(keeper.agility, 5); }
+    if (mode === "agility" && keeper.agility < 10) keeper.reflex = 10;
+    if (mode === "only-agility") { for (const k of CAPPED) keeper[k] = 10; keeper.agility = Math.min(keeper.agility, 5); }
+    // 상한 10으로 다른 시간 원인의 한 칸 이득을 닫고 목표 칸은 하한 1에서 양성 대조한다.
+    if (mode === "composure" || mode === "reflex") {
+      for (const k of [...CAPPED, "agility", "judgement"]) keeper[k] = 10;
+      keeper[mode] = 1;
+    }
     rollForm(keeper, rng);
     const shots = buildSet(rng, keeper.level);
     for (const shot of shots) {
-      const input = autoInput(keeper, shot, rng);
+      const input = mode === "manual-position" ? positionInput(keeper, shot, rng, "hand-bait") : autoInput(keeper, shot, rng);
       const result = resolve({ keeper, shot, rng, input });
       let last = null;
       const ctx = { downed: false };

@@ -21,6 +21,15 @@ function agrees(entry, name = 'TEAM_RULE') {
     case 'TEAM_RULE':
       parsed = { maximum: readNumber(q, /maximum of (\w+) players/), goalkeepers: readNumber(q, /; (\w+) must be the goalkeeper/) };
       break;
+    case 'PENALTY_RULE':
+      // Law 14 접촉과 골라인의 좌표 원점은 0이다. 필요한 발 수는 확인한 조문에서 다시 읽는다.
+      if (!q.includes('until the ball is kicked.') || !q.includes('or behind, the goal line.')) return false;
+      parsed = { contactMs: 0, lineDepth: 0, minimumFeet: readNumber(q, /part of (\w+) foot/) };
+      break;
+    case 'PENALTY_OBSERVATION':
+      // 표의 마지막 백분율이 중앙 슛 전체 비중이며 백분율의 분모로 확률을 유도한다.
+      parsed = { centerKickProbability: readNumber(q, /Center [\d.% ]+ ([\d.]+)%$/) / 100 };
+      break;
     case 'GOAL':
       parsed = { width: readNumber(q, /posts is ([\d.]+) m/), height: readNumber(q, /ground is ([\d.]+) m/) };
       break;

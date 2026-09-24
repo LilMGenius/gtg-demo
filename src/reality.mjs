@@ -10,6 +10,28 @@ export const TEAM_RULE = {
   }
 };
 
+// IFAB 14.1의 접촉 시각과 골라인을 판정 좌표의 원점으로 둔다. 앞섬은 그 뒤에만 시작한다.
+// Bar-Eli 외 표 1의 중앙 슛 비중이다. 오독 시 대기 비중으로 쓰는 것은 별도 제품 가설이다.
+export const PENALTY_OBSERVATION = {
+  // 논문이 보고한 백분율을 확률로 변환한 값이며 전 모집단의 중앙 슛 비중이다.
+  values: { centerKickProbability: 0.287 },
+  source: { name: 'Bar-Eli et al., Action Bias among Elite Soccer Goalkeepers, Table 1',
+    url: 'https://mpra.ub.uni-muenchen.de/4477/1/MPRA_paper_4477.pdf',
+    clause: 'Kick direction Center 14.3% 3.5% 10.8% 28.7%', checked: '2026-09-25' },
+  derivation: '중앙 슛 비중의 백분율을 확률로 바꾼다. 키퍼의 중앙 대기 관측률이 아니다.'
+};
+
+export const PENALTY_RULE = {
+  values: { contactMs: 0, lineDepth: 0, minimumFeet: 1 },
+  source: {
+    name: 'IFAB Laws of the Game 2026/27, Law 14.1',
+    url: 'https://www.theifab.com/laws/latest/the-penalty-kick/',
+    clause: 'until the ball is kicked. … at least part of one foot touching, in line with, or behind, the goal line.',
+    checked: '2026-09-25'
+  },
+  derivation: '발 하나 이상이 선에 닿거나 같은 선상 또는 뒤에 있어야 한다. 골라인과 킥 접촉을 좌표 원점으로 정한다.'
+};
+
 // 폭과 높이는 IFAB 골문 안쪽 규격이다.
 export const GOAL = {
   "units": "m",
