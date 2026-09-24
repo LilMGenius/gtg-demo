@@ -106,11 +106,17 @@ export async function positionGate(name) {
         await advance(p,0.5);const run=await snap(p);check(tag+'-runup-unresolved',!run.resolved&&run.ball.z===start.ball.z,{elapsed:run.elapsed,ball:run.ball,resolved:run.resolved});
         await advance(p,0.1);const contact=await snap(p);check(tag+'-contact-starts-ball',contact.ball.z<start.ball.z,{before:start.ball.z,after:contact.ball.z});
         check(tag+'-contact-does-not-resolve',contact.contacted&&!contact.resolved,{contacted:contact.contacted,resolved:contact.resolved});
+        check(tag+'-aim-once-at-contact',contact.aimCalls===1&&contact.resolveCalls===0,{aim:contact.aimCalls,resolve:contact.resolveCalls});
         await p.keyboard.down('ArrowRight');await advance(p,0.1);await p.keyboard.up('ArrowRight');const follow=await snap(p);
         check(tag+'-post-contact-movement',follow.x>contact.x&&!follow.resolved,{before:contact.x,after:follow.x,resolved:follow.resolved});
-        await advance(p,0.1);const final=await snap(p);
+        // 판정 시각은 체인이 소유한다. 최대 비행 1.1초 안에서 실제 발동을 기다린다.
+        await advance(p,0.1);let final=await snap(p);
+        while(!final.resolved&&final.elapsed-final.set-final.runup<1.1){await advance(p,STEP);final=await snap(p);}
         check(tag+'-trace-sampled',final.input?.trace?.length>=21&&final.input.trace.filter(x=>x.ms<=0).every((x,i)=>Math.abs(x.ms-(-1000+i*50))<0.001),final.input?.trace);
         check(tag+'-off-centre-dive',Math.abs(final.result?.input?.x)>0.1,final.result?.input?.x);
+        // 접촉 때 0이던 판정 호출이 발동 때 하나가 되는 양성 대조군을 함께 읽는다.
+        check(tag+'-resolve-once-at-trigger',final.resolved&&final.aimCalls===1&&final.resolveCalls===1,{aim:final.aimCalls,resolve:final.resolveCalls});
+        check(tag+'-trace-includes-post-contact',final.input.trace.at(-1).ms>0&&final.input.trace.some(x=>x.ms<0),final.input.trace.at(-1));
         const locked=final.x;await p.keyboard.down('ArrowRight');await advance(p,0.1);await p.keyboard.up('ArrowRight');
         check(tag+'-input-after-dive-ignored',(await snap(p)).x===locked,{before:locked,after:(await snap(p)).x});
         // 발동 0.25초 뒤라 뻗는 몸이 실제로 보이는 중간 프레임을 남긴다.
@@ -137,6 +143,19 @@ export async function positionGate(name) {
         // 몸 앞에 오는 공은 도착 직전까지 서 있으므로 비행 0.7초를 모두 지난다.
         await advance(p,0.8);const result=await snap(p);
         check((paid?'bot':'idle')+'-credit-attribution',result.input?.auto===paid,result.input?.auto);
+        await context.close();
+      }
+      // 만렙 판단력은 접촉 뒤 반응이 발동보다 먼저 오는 실제 봇 자취를 노출한다.
+      {
+        const context=await browser.newContext();const p=await context.newPage();
+        await p.goto(BASE.replace('veteran,rich','maxed,veteran,rich'));await p.waitForSelector('#go');
+        await p.evaluate(()=>{window.__freeze(true);Object.assign(window.__bot(),{tier:1,ms:60000});document.getElementById('auto').onpointerdown();});
+        await p.click('#go',{force:true});await advance(p,2.5);const sample=await snap(p);
+        const post=sample.frames.filter(f=>f.ms>0),plan=sample.plan;
+        const at=ms=>{for(let i=1;i<plan.length;i++){if(ms<=plan[i].ms){const a=plan[i-1],b=plan[i];return a.x+(b.x-a.x)*(ms-a.ms)/(b.ms-a.ms);}}return plan.at(-1).x;};
+        const distance=Math.max(...post.map(f=>f.x))-Math.min(...post.map(f=>f.x));
+        const error=Math.max(...post.map(f=>Math.abs(f.x-at(f.ms))));
+        check('bot-post-contact-follows-plan',distance>0&&error<0.02,{distance,error,samples:post.length});
         await context.close();
       }
       const context=await browser.newContext();const p=await context.newPage();await p.goto(BASE);await p.waitForSelector('#go');

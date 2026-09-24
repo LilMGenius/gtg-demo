@@ -155,9 +155,21 @@ async function open(browser) {
   for (const [f, body] of routed) {
     await page.route("**/" + f, (r) => r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body }));
   }
+  // 옛 자는 1.5초 뒤에 눌렀지만 최대 대기 1.1+0.26초에 이미 가운데 입력이 실행됐다. 그 서 있는 시작 자세를 보존한다.
+  const main = readFileSync(ROOT + 'web/src/main.mjs', 'utf8');
+  await page.route('**/web/src/main.mjs', r => r.fulfill({contentType:'text/javascript; charset=utf-8',body:main + `
+window.__poseIdle = () => { window.__lockRound(); stage.reset(); };
+window.__poseStart = () => {
+  window.__lockRound();
+  stage.diving = state.keeper.diving;
+  stage.play(state.shots[0],{dive:0,advance:false},{conceded:false,events:[]},()=>{});
+  return window.__frames();
+};` }));
   await page.goto(BASE, { waitUntil: "load" });
   await page.waitForSelector("#go", { timeout: 15000 });
   await page.click("#go", { force: true });
+  // LEAD_STEPS 동안 준비 자세로 수렴시켜 이전 봇 옆걸음이 착지 표본에 섞이지 않게 한다.
+  await page.evaluate(() => window.__poseIdle());
   return { ctx, page, errs };
 }
 
@@ -283,7 +295,7 @@ try {
     const { ctx, page, errs } = await open(b);
     const base = await page.evaluate(() => window.__frames());
     await at(page, base + LEAD_STEPS);
-    await page.keyboard.press("ArrowLeft");
+    const diveAt = await page.evaluate(() => window.__poseStart());
     /* 프레임마다 적는다. 몸통 배율은 60밀리초만 살고 도착은 사건마다 다른 프레임에 오므로,
        밖에서 폴링하면 둘 다 놓친다. 렌더 루프가 먼저 등록돼 있어 이 콜백은 같은 프레임의 쓰기 다음에 돈다. */
     await page.evaluate(() => {
@@ -299,7 +311,7 @@ try {
       };
       requestAnimationFrame(tick);
     });
-    const actAt = base + LEAD_STEPS + DIVE_STEPS;
+    const actAt = diveAt + DIVE_STEPS;
     const stopAt = actAt + WINDOW;
     await page.evaluate(([a, kk, s]) => window.__plan(a, kk, s), [actAt, k, stopAt]);
     await at(page, stopAt);
