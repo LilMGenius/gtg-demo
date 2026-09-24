@@ -805,7 +805,10 @@ function buildBody(o) {
       const bc = o.bootCut || { sole: 1, long: 1, wide: 1, pips: 0, pip: 0, girth: 1 };
       const sole = o.legR * 0.9 * bc.sole;
       const span = o.bootLen * (bc.long || 1);
-      const parts = [new THREE.BoxGeometry(o.legR * 1.5 * (bc.wide || 1), sole, span)];
+      // Three.js MIT 구를 기존 신발 봉투에 맞춰 눌러 둥근 발끝을 만들고 장비별 치수를 보존한다.
+      const toe = new THREE.SphereGeometry(1, KIT.sphere, KIT.rings); // 공유 키트의 분할을 사용한다.
+      toe.scale(o.legR * 1.5 * (bc.wide || 1) / 2, sole / 2, span / 2); // 기존 상자 폭과 높이와 길이의 절반이 구의 반축이다.
+      const parts = [toe];
       // 돌기는 두 줄로 깐다. 한 줄이면 발바닥이 아니라 톱니로 읽힌다.
       const rows = Math.ceil(bc.pips / 2);
       for (let n = 0; n < bc.pips; n++) {
@@ -860,7 +863,7 @@ export function buildKeeper(height, weight, look) {
     headR: h * 0.14, faceDir: 1, // 머리를 몸통 폭과 비슷하게 키워 장난감 비율로 읽힌다.
     shoulderX: w * 0.56, armR: h * 0.048,
     upperLen: h * 0.17, foreLen: h * 0.16,
-    hipX: w * 0.34, legR: w * 0.24,
+    hipX: w * 0.48, legR: w * 0.45, // 몸통 반폭의 절반에 두툼한 다리를 두어 막대처럼 보이는 후면을 고친다.
     thighLen: h * 0.21, shinLen: h * 0.20,
     gloveSize: h * 0.115, bootLen: h * 0.14,
     // 반바지·양말·축구화가 전부 검정에 가까워 하반신이 기둥 하나로 뭉쳤다.
@@ -897,7 +900,7 @@ export function buildKicker(face) {
     headR: 0.26, faceDir: -1, // 키커 얼굴도 같은 키트의 큰 머리 비율이다.
     shoulderX: 0.17, armR: 0.05,
     upperLen: 0.30, foreLen: 0.28,
-    hipX: 0.10, legR: 0.085,
+    hipX: 0.15, legR: 0.14, // 키퍼와 같은 짧고 두툼한 장난감 다리 비율이며 양발 사이 틈을 남긴다.
     thighLen: 0.40, shinLen: 0.38,
     gloveSize: 0, bootLen: 0.24,
     // 카메라가 골대 뒤에 있어 크로스바가 키커의 다리를 가로로 자른다.
