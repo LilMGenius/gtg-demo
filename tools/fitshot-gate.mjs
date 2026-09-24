@@ -21,7 +21,7 @@ import { KEEPERS, KICKERS } from "../src/roster.mjs";
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 // 몸에 걸치는 여덟 선반. 시착실은 선반과 같이 다시 그려지므로 탭마다 새로 굽힌다.
-const TABS = ["glove", "boot", "kit", "sock", "frame", "city", "hair", "ink"];
+const TABS = ["glove", "boot", "kit", "sock", "frame", "city", "hair", "beard", "ink"];
 // 로스터의 두 극단 바깥까지 벌린다. 168과 200 사이만 재면 프레임이 체격을 따라가는지가 안 드러난다.
 const BODIES = [[205, 96], [165, 62]];
 // 화면에 거는 두 폭. 계획이 정한 모바일 하한과 데스크톱 기준이다.

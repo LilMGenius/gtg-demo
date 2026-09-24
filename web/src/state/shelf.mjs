@@ -1,6 +1,6 @@
 // 선반 어휘. 상점 화면과 위키 둘 다 이 표를 읽는다. 화면 파일에 두면 위키를 짓는 node가 못 읽고,
 // 위키 파일에 두면 상점이 위키를 import한다. DOM을 모르는 이 자리가 둘의 공통 조상이다.
-import { GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, TATTOOS } from './gear.mjs';
+import { GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, BEARDS, TATTOOS } from './gear.mjs';
 import { GEAR_STEP } from '../../../src/chain.mjs';
 
 // 장비 칸 둘의 규칙이 같으므로 선반도 하나로 둔다. 선반을 칸마다 복제하면
@@ -16,6 +16,7 @@ export const SHELF_WORDS = {
   frame: { head: '골대', list: GOALS, field: 'frame' },
   city: { head: '동네', list: CITIES, field: 'city' },
   hair: { head: '헤어', list: HAIRS, field: 'hair' },
+  beard: { head: '수염', list: BEARDS, field: 'beard' },
   ink: { head: '타투', list: TATTOOS, field: 'ink' }
 };
 

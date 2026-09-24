@@ -14,7 +14,7 @@ import { autoTrain, trainStat } from './state/coach.mjs';
 import { currentId } from './state/account.mjs';
 import { coinGain, readWallet, COIN_DRILL, cashPrice, pay } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
-import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
+import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, BEARDS, MAX_BEARD, beardAt, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { AXIS_WORD, AXIS_UNIT, SHELF_NOTES_FOR_WIKI } from './state/shelf.mjs';
 export { SHELF_NOTES_FOR_WIKI };
 import { BUFFS, BUFF_CAP, newBuff, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
@@ -287,6 +287,8 @@ const TAB_ICON = {
   // 높이가 다른 건물 두 채. 동네는 사람이 아니라 스카이라인으로 읽힌다.
   city: G('동네', R(3, 9, 6, 12) + R(12, 3, 9, 18)),
   // 빗. 머리 실루엣은 이 크기에서 골대와 같은 뒤집힌 ㄷ자가 되어 둘이 안 갈린다.
+  // 입 아래 세 칸이 턱수염의 앞면 윤곽이다. 기존 24칸 아이콘 격자를 쓴다.
+  beard: G('수염', R(5, 12, 14, 4) + R(8, 16, 8, 4)),
   hair: G('헤어', R(3, 6, 18, 6) + R(3, 12, 3, 6) + R(9, 12, 3, 6) + R(15, 12, 3, 6)),
   // 번개. 문신 도안 중 이 크기에서 형태가 안 뭉개지는 몇 안 되는 모양이다.
   ink: G('타투', R(12, 0, 6, 6) + R(9, 6, 6, 6) + R(6, 12, 6, 6) + R(9, 18, 3, 6)),
@@ -297,7 +299,7 @@ const TAB_ICON = {
 };
 
 // 탭 차례. 뽑는 칸이 먼저 서고, 몸에 걸치는 여섯, 꾸미는 둘, 소모형 둘이 뒤를 잇는다.
-const SHOP_TABS = ['pull', 'glove', 'boot', 'kit', 'sock', 'frame', 'city', 'hair', 'ink', 'bot', 'buff'];
+const SHOP_TABS = ['pull', 'glove', 'boot', 'kit', 'sock', 'frame', 'city', 'hair', 'beard', 'ink', 'bot', 'buff'];
 
 /* 능력치 아이콘. 열다섯 칸이 글자로만 서면 훈련장도 내 정보도 이름을 읽어야 어느 칸인지 안다.
    탭과 조작이 쓰는 3px 격자 픽셀 관례를 그대로 쓴다. 키는 ledger의 이름이라 둘이 갈릴 수 없다. */
@@ -1468,7 +1470,7 @@ function renderMe() {
   };
   const wear = '<div class="wear"><span class="shot"><img alt="' + name + '" src="'
     + thumbURL('body', k, lookOf(state.gear, state.keeper.name)) + '"></span>'
-    + '<div class="on"><h5>몸에 걸친 것</h5>' + ['glove', 'boot', 'kit', 'sock', 'hair', 'ink'].map(wearRow).join('')
+    + '<div class="on"><h5>몸에 걸친 것</h5>' + ['glove', 'boot', 'kit', 'sock', 'hair', 'beard', 'ink'].map(wearRow).join('')
     + '<h5>서 있는 자리</h5>' + ['frame', 'city'].map(wearRow).join('') + '</div></div>';
   const grid = GROWABLE.map((s) => {
     const v = k[s];
@@ -1721,6 +1723,7 @@ const SHELVES = {
   frame: { head: '골대', list: GOALS, field: 'frame', worn: '착용', past: '보유', top: MAX_FRAME, at: frameAt },
   city: { head: '동네', list: CITIES, field: 'city', worn: '착용', past: '보유', top: MAX_CITY, at: cityAt },
   hair: { head: '헤어', list: HAIRS, field: 'hair', worn: '착용', past: '보유', top: MAX_HAIR, at: hairAt },
+  beard: { head: '수염', list: BEARDS, field: 'beard', worn: '착용', past: '보유', top: MAX_BEARD, at: beardAt },
   ink: { head: '타투', list: TATTOOS, field: 'ink', worn: '착용', past: '보유', top: MAX_INK, at: inkAt }
 };
 
@@ -1984,7 +1987,10 @@ function bindGear(box) {
     const s = SHELVES[shot.dataset.kind];
     if (!s) continue;
     const g = s.at(shot.dataset.rank);
-    const look = lookOf(Object.assign({}, state.gear, { [s.field]: g[s.field] }), state.keeper.name);
+    // 수염의 면도 카드가 다른 등급에 착용한 변형을 물려받으면 면도에도 수염이 보인다.
+    const variant = fitting[s.field] === g[s.field] ? fitting[s.field + 'Skin']
+      : state.gear[s.field] === g[s.field] ? state.gear[s.field + 'Skin'] : 0;
+    const look = lookOf(Object.assign({}, state.gear, { [s.field]: g[s.field], [s.field + 'Skin']: variant }), state.keeper.name);
     // 골대와 동네는 몸이 아니라 장면이라 외형 묶음이 아니라 등급 자체를 받는다.
     // 장면 칸은 외형 묶음이 아니라 등급과 변형 둘을 받는다. 걸쳐 본 변형이 있으면 그것으로 굽는다.
     const pickSkin = fitting[s.field + 'Skin'] !== undefined ? fitting[s.field + 'Skin'] : state.gear[s.field + 'Skin'];
@@ -2056,7 +2062,7 @@ function bindGear(box) {
       // 머리와 타투는 사면 그 자리에서 키퍼 껍데기 색이 바뀐다. 안 보이면 산 것이 아니다.
       // 머리와 잉크만 몸을 다시 세우고 있었다. 장갑과 축구화와 유니폼과 양말도
       // 이제 색을 가지므로 같이 다시 세운다. 골대와 동네는 몸이 아니라 빠진다.
-      if (['hair', 'ink', 'grip', 'studs', 'pads', 'socks'].includes(s.field)) stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
+      if (isWorn(s.field)) stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
       // 산 것은 걸쳐 본 목록에서 빠진다. 안 빼면 이미 내 것이 장바구니에 남아 값이 두 번 잡힌다.
       if (fitting[s.field] !== undefined && fitting[s.field] <= state.gear[s.field]) delete fitting[s.field];
       persist();
@@ -2481,6 +2487,8 @@ function renderShop() {
   const goods = SHELVES[shopTab] ? gearShelf(shopTab) : shopTab === 'bot' ? botShelf() : shopTab === 'buff' ? buffShelf() : pullShelf(pool);
   box.innerHTML = '<div class="shopbody">' + fittingRoom() + '<div class="goods">' + tabs + goods + '</div></div>'
     + '<button class="close">닫기</button>';
+  // 탭을 다시 그려도 선택한 선반이 가로 스크롤 밖으로 사라지지 않게 브라우저가 위치를 맞춘다.
+  box.querySelector('.tab[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   box.querySelector('.close').onclick = closeShop;
   // 전부 사기. 걸쳐 본 것을 한 번에 치른다. 값이 모자라면 아무것도 안 산다.
   // 되는 것만 골라 사면 무엇이 빠졌는지를 화면이 안 말해 주고, 남은 잔고로 다시 계산하게 된다.

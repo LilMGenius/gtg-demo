@@ -1394,6 +1394,10 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
   #pull .done i{min-width:52px;height:24px;padding:0 6px}
   /* 확률 표는 위로 편다. 아래로 펴면 마지막 등급 줄이 화면 밖으로 나간다. */
   #shop .odds em{top:auto;bottom:calc(100% + var(--gap-1))}
+  /* 가로 폰에서 추가 선반이 탭을 세 줄로 밀어 가격을 가리지 않게 한 줄로 넘긴다.
+     폭은 진열 기둥을 그대로 쓰고 패딩은 기존 간격 토큰이라 카드 크기는 바뀌지 않는다. */
+  #shop .tabs{flex-wrap:nowrap;justify-content:flex-start;width:100%;overflow-x:auto;padding:var(--gap-1)}
+  #shop .tab{flex-shrink:0}
 }
 @keyframes flip{from{transform:translateY(6px) scaleY(.4)}to{transform:none}}
 #shop .close{padding:9px 26px 11px;border:var(--line) solid var(--edge);

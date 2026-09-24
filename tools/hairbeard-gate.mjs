@@ -15,7 +15,7 @@ try {
   await page.route("**/web/src/render/objects/actors.mjs", async route => {
     const response = await route.fetch();
     let body = await response.text();
-    const pattern = /shellColors.push\((?:hairTone === undefined \? 0x1c1712 : hairTone|0x1c1712)\);/g;
+    const pattern = /shellColors.push\((?:hairTone === undefined \? 0x1c1712 : hairTone|0x1c1712|face\.beardTone \?\? 0x1c1712)\);/g;
     if ([...body.matchAll(pattern)].length !== 1) throw new Error("beard control anchor");
     body = body.replace(pattern, match => "if (face.forceHairChin) shellColors.push(hairTone); else " + match);
     await route.fulfill({ response, body });

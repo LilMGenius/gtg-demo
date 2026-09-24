@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, TATTOOS } from "../web/src/state/gear.mjs";
+import { GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, BEARDS, TATTOOS } from "../web/src/state/gear.mjs";
 
 // 선반이 화면 폭을 쓰는지 재는 자.
 // 상품을 한 열로 세우면 폭의 대부분이 비고 넷째 장은 스크롤 뒤로 숨는다. 눌러 볼 생각이 들려면
@@ -21,7 +21,7 @@ const HAND_H = 360;
 /* 선반 데이터가 들고 있는 설명 문장 전부. 카드는 이제 효과 한 줄만 들으므로 이 문장들은
    화면에서 내려왔고, 내려온 글이 아무도 안 읽는 값으로 남으면 다음 청소가 죽은 데이터로 지운다.
    수를 여기 적지 않고 데이터에서 센다. 적어 두면 등급이 하나 늘어난 날 이 자만 옛 수를 말한다. */
-const NOTES = [GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, TATTOOS]
+const NOTES = [GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, BEARDS, TATTOOS]
   .reduce((all, rows) => all.concat(rows.map((g) => g.note)), []).filter((s) => s);
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
