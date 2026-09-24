@@ -16,7 +16,7 @@ import { purchaseCondition } from './state/condition.mjs';
 import { currentId } from './state/account.mjs';
 import { coinGain, readWallet, COIN_DRILL, cashPrice, pay } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
-import { COSMETIC_FIELDS, ownsCosmetic, rememberCosmetic, GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, BEARDS, MAX_BEARD, beardAt, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
+import { COSMETIC_FIELDS, ownsCosmetic, rememberCosmetic, GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, BEARDS, MAX_BEARD, beardAt, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, venueAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { AXIS_WORD, AXIS_UNIT, SHELF_NOTES_FOR_WIKI } from './state/shelf.mjs';
 export { SHELF_NOTES_FOR_WIKI };
 import { BUFFS, BUFF_CAP, newBuff, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
@@ -339,7 +339,7 @@ const TAB_ICON = {
   // 골대 세 변. 그물은 이 크기에서 뭉치므로 뼈대만 남긴다.
   frame: G('골대', R(3, 6, 18, 3) + R(3, 9, 3, 12) + R(18, 9, 3, 12)),
   // 높이가 다른 건물 두 채. 동네는 사람이 아니라 스카이라인으로 읽힌다.
-  city: G('동네', R(3, 9, 6, 12) + R(12, 3, 9, 18)),
+  city: G('경기장', R(3, 9, 6, 12) + R(12, 3, 9, 18)),
   // 빗. 머리 실루엣은 이 크기에서 골대와 같은 뒤집힌 ㄷ자가 되어 둘이 안 갈린다.
   // 입 아래 세 칸이 턱수염의 앞면 윤곽이다. 기존 24칸 아이콘 격자를 쓴다.
   beard: G('수염', R(5, 12, 14, 4) + R(8, 16, 8, 4)),
@@ -501,6 +501,7 @@ function setPad(on) {
 
 // 저장은 항상 보유 목록 전체로 나간다. 뛰는 키퍼만 저장하면 나머지가 다음 저장에서 지워진다.
 function persist() {
+  for (const venue of CITIES) purchaseCondition(venue, state);
 save(state.squad, state.pick, state.auto, state.fans, state.points, state.wallet, state.posts, state.record, state.gear, state.bot, state.buff, state.rapport, state.tickets, state.social, state.kickers, state.eleven, state.onboard, undefined, state.coach);
 }
 
@@ -1706,7 +1707,7 @@ const SHELVES = {
   kit: { head: '유니폼', list: KITS, field: 'pads', worn: '착용', past: '보유', top: MAX_KIT, at: kitAt },
   sock: { head: '양말', list: SOCKS, field: 'socks', worn: '착용', past: '보유', top: MAX_SOCK, at: sockAt },
   frame: { head: '골대', list: GOALS, field: 'frame', worn: '착용', past: '보유', top: MAX_FRAME, at: frameAt },
-  city: { head: '동네', list: CITIES, field: 'city', worn: '착용', past: '보유', top: MAX_CITY, at: cityAt },
+  city: { head: '경기장', list: CITIES, field: 'city', worn: '착용', past: '보유', top: MAX_CITY, at: cityAt },
   hair: { head: '헤어', list: HAIRS, field: 'hair', worn: '착용', past: '보유', top: MAX_HAIR, at: hairAt },
   beard: { head: '수염', list: BEARDS, field: 'beard', worn: '착용', past: '보유', top: MAX_BEARD, at: beardAt },
   ink: { head: '타투', list: TATTOOS, field: 'ink', worn: '착용', past: '보유', top: MAX_INK, at: inkAt }
@@ -1868,11 +1869,22 @@ function conditionHTML(item) {
     + '<small>' + c.value.toLocaleString('ko-KR') + '/' + c.min.toLocaleString('ko-KR') + '</small></span></button>').join('');
 }
 
+// 예고 타일은 출시된 상품의 잠금과 달리 진행도를 갖지 않는다. 누르면 해당 모드의 설명이 열린다.
+// 80×40 좌표의 경기장 윤곽과 반지름 5의 공은 작은 예고 칸에서 읽히도록 단순화한 제품 도형이다.
+function venueModes(venue) {
+  return '<div class="venue-modes"><span class="venue-shipped">' + venue.shipped + (venue.subtitle ? ' · ' + venue.subtitle : '') + '</span>' + venue.coming.map(mode =>
+    '<button class="mode-coming" type="button" data-preview="' + mode + '" aria-expanded="false"><svg viewBox="0 0 80 40" aria-hidden="true"><path d="M4 36L18 8H62L76 36ZM18 8V24H62V8M40 8V36"/><circle cx="40" cy="26" r="5"/></svg><span>' + mode + '</span><small>업데이트 예정</small></button>').join('') + '<p class="mode-preview" role="status" hidden></p></div>';
+}
+
 function gearShelf(kind) {
   const s = SHELVES[kind];
   const have = state.gear[s.field];
   const rows = s.list.map((g) => {
     const rank = g[s.field];
+    const selected = fitting.city === rank ? fitting.citySkin ?? state.gear.citySkin : state.gear.city === rank ? state.gear.citySkin : 0;
+    const host = kind === 'city' ? venueAt(rank, selected) : null;
+    const locked = host && !purchaseCondition(g, state).met;
+    const badge = host ? '<img class="venue-flag" src="./assets/flags/' + host.flag + '.svg" alt="" aria-label="개최국 ' + host.country + '">' : '';
     let label = PRICE(g.cost);
     let off = false;
     let bad = false;
@@ -1909,10 +1921,10 @@ function gearShelf(kind) {
     /* 그림이 먼저 서고 이름과 효과 한 줄이 따라오며 값 배지가 오른쪽 아래를 받는다.
        변형 조각은 썸네일 위에 겹쳐 눕는다. 값 버튼 위에 한 줄로 깔면 그 줄만큼 카드가 길어지고,
        그림이 카드에서 차지하는 몫이 그만큼 줄어 다시 글자가 먼저 읽힌다. */
-    return '<div class="card gear" data-spec="' + kind + '" data-at="' + rank + '" data-rare="' + rank + '">'
-      + '<div class="pic"><div class="shot" data-kind="' + kind + '" data-rank="' + rank + '"></div>' + skins + '</div>'
-      + '<b>' + g.name + '</b><em>' + cardLine(kind, rank) + '</em>' + (ownsCosmetic(state.keeper.worn, s.field, rank) ? '' : conditionHTML(g))
-      + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
+    return '<div class="card gear' + (locked ? ' venue-locked' : '') + '" data-state="' + (locked ? 'locked' : 'available') + '" data-spec="' + kind + '" data-at="' + rank + '" data-rare="' + rank + '">'
+      + '<div class="pic"><div class="shot" data-kind="' + kind + '" data-rank="' + rank + '"></div>' + skins + '</div>' + badge
+      + '<b>' + (host ? host.name : g.name) + '</b><em>' + cardLine(kind, rank) + '</em>' + (ownsCosmetic(state.keeper.worn, s.field, rank) ? '' : conditionHTML(g))
+      + (host ? venueModes(g) : '') + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
   return '<h4>' + s.head + '</h4><div class="rack">' + rows.join('') + '</div>';
 }
@@ -1997,7 +2009,7 @@ function bindGear(box) {
     // 장면 칸은 외형 묶음이 아니라 등급과 변형 둘을 받는다. 걸쳐 본 변형이 있으면 그것으로 굽는다.
     const pickSkin = fitting[s.field + 'Skin'] !== undefined ? fitting[s.field + 'Skin'] : state.gear[s.field + 'Skin'];
     const arg = (s.field === 'frame' || s.field === 'city')
-      ? { rank: g[s.field], skin: fitting[s.field] === g[s.field] ? pickSkin : 0 }
+      ? { rank: g[s.field], skin: fitting[s.field] === g[s.field] ? pickSkin : s.field === 'city' && state.gear[s.field] === g[s.field] ? state.gear[s.field + 'Skin'] : 0 }
       : look;
     const url = thumbURL(s.field, state.keeper, arg);
     if (!url) continue;
@@ -2014,6 +2026,8 @@ function bindGear(box) {
     if (!ownsCosmetic(state.keeper.worn, s.field, rank) && (COSMETIC_FIELDS.includes(s.field) || rank > state.gear[s.field])) {
       card.onclick = (e) => {
         if (e.target.closest('.buy, .condition')) return;
+        const door = purchaseCondition(g, state);
+        if (s.field === 'city' && !door.met) { card.querySelector('.condition[data-route="' + door.route + '"]')?.click(); return; }
         if (fitting[s.field] === rank) delete fitting[s.field];
         else fitting[s.field] = rank;
         stopSpin();
@@ -2586,6 +2600,15 @@ function renderShop() {
     closeShop();
     if (button.dataset.route === 'gym') openGym();
     else if (button.dataset.route === 'gram') openGram();
+  };
+  for (const button of box.querySelectorAll('[data-preview]')) button.onclick = (event) => {
+    event.stopPropagation();
+    const preview = button.parentElement.querySelector('.mode-preview');
+    const mode = button.dataset.preview;
+    const descriptions = { '풋살 5대5': '좁은 코트에서 빠른 패스와 슛을 막습니다.', '중거리 슛': '먼 거리에서 날아오는 슛을 막습니다.', '코너킥 헤딩': '코너킥 뒤 헤딩 슛에 대응합니다.', '프리킥': '수비벽 너머 휘어지는 슛을 막습니다.', '11대11': '팀과 함께 정규 경기를 치릅니다.', '프로 리그': '프로 무대의 시즌 경기에 도전합니다.' };
+    preview.hidden = false;
+    preview.textContent = mode + ' · ' + descriptions[mode];
+    for (const tile of button.parentElement.querySelectorAll('[data-preview]')) tile.setAttribute('aria-expanded', String(tile === button));
   };
   bindSpec(box);
   const showcase = box.querySelector('.show-legends');
