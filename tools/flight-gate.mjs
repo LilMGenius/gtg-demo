@@ -1,6 +1,5 @@
 import { chromium } from "playwright";
 import { readFileSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 
 // 날아오는 공과 그 잔상이 화면에 남는지 화소로 재는 자.
 // 앞선 판은 __flightVis가 돌려주는 씬 그래프 값만 읽었다. 투영 크기 33.8px, 잔상 여덟 장 전부 켜짐,
@@ -29,6 +28,7 @@ const floorMatches = [...sceneSource.matchAll(/^const BALL_MIN_H = ([0-9.]+);$/g
 if (floorMatches.length !== 1) throw new Error("Expected one BALL_MIN_H constant");
 const BALL_MIN_H = Number(floorMatches[0][1]);
 if (!Number.isFinite(BALL_MIN_H) || BALL_MIN_H <= 0) throw new Error("Invalid BALL_MIN_H");
+// P9: 720p의 약 20px 지름에서 래스터 경계 한 화소를 빼 19px를 지킨다. 실물 배율 변경과 같은 커밋에서 갱신한다.
 const BAR_BALL = Math.floor(BALL_MIN_H * H) - 1;
 const BAR_RATIO = 1.5;
 // 리본이 경로를 걸치는 비율. 실측 네 라운드 1.04 1.08 1.04 1.04. 1을 넘는 것은 링에 꼬리 반지름이
@@ -256,21 +256,20 @@ try {
   if (errs.length) fail += 1;
   await ctx.close();
 
-  // Reuse ballsize-gate.mjs --control's git-show/page.route mechanism; replace only the gain
-  // so the same pixel measurement must reject a served ball without the readability floor.
-  const headSource = execFileSync("git", ["show", "HEAD:web/src/render/scene.mjs"], {
-    cwd: new globalThis.URL("../", import.meta.url), encoding: "utf8",
-  });
+  // ballsize 게이트의 응답 교체를 재사용한다. 검사 중인 소스와 같은 소스에 결함만 주입한다.
+  // 0.25배는 기존 공 기하의 사분의 일이라 실물 크기로 줄인 뒤에도 가독성 하한을 명백히 밑돈다.
+  const CONTROL_GAIN = 0.25;
+  const headSource = sceneSource;
   const gainPattern = /const BALL_FAR_GAIN = [^;]+;/g;
   if ([...headSource.matchAll(gainPattern)].length !== 1) throw new Error("Expected one BALL_FAR_GAIN constant");
-  let body = headSource.replace(gainPattern, "const BALL_FAR_GAIN = 1.0;");
+  let body = headSource.replace(gainPattern, "const BALL_FAR_GAIN = " + CONTROL_GAIN + ";");
   if (body === headSource) throw new Error("Control did not change BALL_FAR_GAIN");
-  // The distance curve has two anchors; remove near enlargement as well for an unscaled control.
+  // 거리 양끝을 같이 줄여 가까운 끝의 확대가 작은 공 대조군을 되살리지 않게 한다.
   const nearPattern = /const ballNearGain = [^;]+;/g;
   const nearMatches = [...body.matchAll(nearPattern)];
   if (headSource.includes("const distanceGain =")) {
     if (nearMatches.length !== 1) throw new Error("Expected one ballNearGain anchor");
-    body = body.replace(nearPattern, "const ballNearGain = 1.0;");
+    body = body.replace(nearPattern, "const ballNearGain = " + CONTROL_GAIN + ";");
   }
   const controlCtx = await br.newContext({ viewport: { width: W, height: H } });
   const controlPage = await controlCtx.newPage();
@@ -286,7 +285,7 @@ try {
   const controlNoise = Math.max(...controlRows.map((r) => r.noise));
   const controlPass = served > 0 && controlErrors.length === 0 && controlNoise < BAR_NOISE
     && controlDia > 0 && controlDia < BAR_BALL && minDia >= BAR_BALL;
-  console.log("control:a-ball-without-the-floor-reds-the-size-bar " + (controlPass ? "PASS" : "FAIL")
+  console.log("control:a-deliberately-undersized-ball-reds-the-size-bar " + (controlPass ? "PASS" : "FAIL")
     + " MIN_DIA " + controlDia + "px (bar " + BAR_BALL + ") " + (controlDia < BAR_BALL ? "RED" : "PASS")
     + " rows=" + controlRows.length + " served=" + served + " noise=" + controlNoise + " errors=" + controlErrors.length);
   if (!controlPass) fail += 1;

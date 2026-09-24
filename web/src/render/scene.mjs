@@ -471,11 +471,12 @@ export function createScene(canvas) {
     return trail[trail.length - 1].clone();
   };
   // 공이 화면에서 차지하는 높이 비율. 화소가 아니라 비율로 잡아야 해상도가 바뀌어도 같은 그림이 나온다.
-  // 0.047은 720p에서 지름 34px이다. 실측으로 비행 중 최소 17.7px까지 내려갔고 그 크기에서는
-  // 공이 오는지 서 있는지가 안 읽혔다. 잔상도 그 점 안에 갇혀 같이 죽었다.
-const BALL_MIN_H = 0.047;
+  // 0.028은 720p에서 약 20px로, 페널티 지점의 실물 대비 약 1.71배다. P9에 따라 flight 하한도 여기서 유도한다.
+const BALL_MIN_H = 0.028;
+// IFAB Law 2의 둘레 68~70cm를 지름으로 바꾼 중간값이다. https://www.theifab.com/laws/2025-26/the-ball/
 const BALL_REAL_D = 0.22;
-const BALL_NEAR_X = 2.0;
+// 골라인 목표 1.3배보다 0.05배 작게 잡아 비스듬한 화면 투영에도 상한을 지킨다.
+const BALL_NEAR_X = 1.25;
 const BALL_GAIN_CAP = 2.4;
 let ballGain = 1;
 // 이번 프레임에 비행 쪽이 이미 크기를 걸었는가. 두 곳이 같은 프레임에 걸면 짜부라짐이 지워진다.
@@ -757,7 +758,7 @@ const TOUCHED = new Set(['contact']);
   const ballFarDistance = new THREE.Vector3(0, BALL_R, 11).distanceTo(CAM_BASE);
   const ballFarAngular = BALL_R / (ballFarDistance * Math.tan(BASE_FOV * Math.PI / 360));
   const BALL_FAR_GAIN = Math.max(1, Math.min(BALL_GAIN_CAP, BALL_MIN_H / ballFarAngular));
-  // Reuse the far readability anchor; log-distance interpolation makes BALL_NEAR_X the near-size switch.
+  // 기존 로그 거리 보간을 유지해 다가오는 공의 원근이 뒤집히지 않게 한다.
   const ballNearDistance = new THREE.Vector3(0, BALL_R, 0).distanceTo(CAM_BASE);
   const ballNearGain = BALL_NEAR_X * BALL_REAL_D / (2 * BALL_R);
   const distanceGain = () => {
