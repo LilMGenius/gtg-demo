@@ -36,7 +36,7 @@ const CARD_H = 269;
 const sizeOf = (kind) => ((kind === "body" || kind === "kicker") ? [BODY_W, BODY_H]
   : kind === "bot" || kind === "buff" ? [CARD_W, CARD_H] : [BAKE_W, BAKE_H]);
 
-// 상품마다 봐야 할 곳이 다르다. 장갑을 온몸 썸네일로 보여 주면 손은 여덟 화소가 된다.
+// 착용 카드는 아래 wornCamera가 관절 봉투를 맞춘다. 이 표는 다른 카드와 옛 겨냥 대조군도 지원한다.
 // part는 무엇을 겨냥하는지, dist는 그 부위가 칸을 채우는 거리, lift는 시선 높이 보정,
 // high는 눈높이 배율이다. 파는 면이 위에 있으면 내려다보고 밑에 있으면 올려다본다.
 const AIM = {
@@ -56,7 +56,7 @@ const AIM = {
      어깨는 같이 들어온다. 고정 보정이 지키려던 것이 어깨인데 실측으로 그 보정이 어깨를 이미
      잘랐다. 스펀지를 넣은 저지가 키 188에서 위팔 상자 위끝 -0.131이고 키 205에서는 네 등급이
      전부 칸 밖이었다. 목을 잡으면 그 위끝이 가장 높은 칸에서도 0.145라 어깨가 칸에 남는다. */
-  pads: { part: "neck", dist: 2.1, lift: 0.1, high: 0.1, yaw: -0.7 }, // 넓은 키트 어깨와 큰 머리를 함께 담는다.
+  pads: { part: "neck", dist: 2.1, lift: 0.1, high: 0.1, yaw: -0.35 }, // 각도 -0.35로 양쪽 어깨 패드가 서로 가려지지 않게 한다.
   socks: { part: "shin", dist: 1.05, lift: 0.02 },
   // 겨냥점은 머리 한가운데인데 파는 것은 그 위에 얹힌 껍데기다. 보정 없이 잡으면
   // 모히칸의 무게중심이 칸 위에서 13퍼센트 지점에 걸려 볏이 잘린다.
@@ -254,7 +254,7 @@ function botRig(pick, keeper) {
   grp.add(spine);
   /* 온몸이 아니라 머리부터 허리까지 잡는다. 서 있는 사람을 가로 칸에 통째로 담으면
      사람이 칸 폭의 16퍼센트만 쓰고, 그 크기에서 회로는 점 몇 개가 된다. */
-  return { grp, at: new THREE.Vector3(0, h * 0.7, 0), dist: h, high: 0.04 };
+  return { grp, body, at: new THREE.Vector3(0, h * 0.7, 0), dist: h, high: 0.04 };
 }
 
 /* 버프 한 통. 마시고 뿌리고 던지는 물건이라 손에 쥐는 그 하나가 곧 상품이다.
@@ -329,6 +329,67 @@ function boot() {
     cam = new THREE.PerspectiveCamera(32, BAKE_W / BAKE_H, 0.01, 40);
 }
 
+// 착용 상품은 실제 관절과 메시의 봉투를 함께 담는다. Three.js MIT Box3의 경계를 원근 화각에 맞춘다.
+const WORN = new Set(["grip", "studs", "pads", "socks", "ink", "hair", "beard"]);
+function previewPose(kind, body) {
+  if (kind === "hair") setPose(body, {...POSES.ready, neck:[0.4, 0, 0]}); // 목을 0.4만큼 숙여 정수리 형태와 눈을 함께 보여 준다.
+  if (kind === "grip") setPose(body, POSES.clutch); // 잡은 손을 얼굴 가까이 올리는 기존 자세를 재사용한다.
+  if (kind === "studs" || kind === "socks") {
+    // 허벅지 -2.6은 발을 가슴까지 올리고 벌림 -0.35와 무릎 0.3은 신발이 얼굴을 가리지 않게 한다.
+    setPose(body, {...POSES.ready, hipL: [kind === "socks" ? -2.85 : -2.6, 0, -0.35], knL: [kind === "socks" ? 0.1 : 0.3, 0, 0]}); // 양말은 허벅지 -2.85와 무릎 0.1로 더 들어 정강이를 카드 가운데에 둔다.
+  }
+
+}
+function surfacePoints(object) {
+  const points = [];
+  object.traverse(o => {
+    if (!o.isMesh || !o.visible) return;
+    const pos = o.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) points.push(new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld));
+  });
+  return points;
+}
+function shoulderPoints(body) {
+  return body.userData.arms.map(sh => sh.children.filter(ch => ch.isMesh && ["SphereGeometry", "BoxGeometry"].includes(ch.geometry.type)).flatMap(surfacePoints));
+}
+function wornCamera(kind, body, yaw) {
+  const points = surfacePoints(body.userData.head).concat(...shoulderPoints(body));
+  const add = object => points.push(...surfacePoints(object));
+  const j = body.userData.joints;
+  if (kind === "grip") for (const glove of body.userData.gloves) add(glove);
+  if (kind === "studs") add(body.userData.boots[0]);
+  if (kind === "socks") for (const ch of j.knL.children) if (ch.isMesh) add(ch);
+  if (kind === "ink") for (const ch of j.shL.children) if (ch.isMesh) add(ch);
+  const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+  const viewPoints = points.map(p => new THREE.Vector3(p.dot(right), p.y, p.dot(forward)));
+  if (kind === "pads") {
+    // 척추에서 목까지의 아래 사분점도 담아 저지와 어깨가 얼굴 아래에 남게 한다.
+    const chest = j.spine.getWorldPosition(new THREE.Vector3()).lerp(j.neck.getWorldPosition(new THREE.Vector3()), 0.25);
+    viewPoints.push(new THREE.Vector3(chest.dot(right), chest.y, chest.dot(forward)));
+  }
+  if (kind === "hair") {
+    // 머리 반경의 0.75만큼 정수리 여백을 확보해 짧은 헤어도 카드 위쪽 변에 붙지 않게 한다.
+    const top = viewPoints.reduce((a, p) => p.y > a.y ? p : a).clone();
+    top.y += body.userData.head.geometry.parameters.radius * 0.75;
+    viewPoints.push(top);
+  }
+  const center = new THREE.Box3().setFromPoints(viewPoints).getCenter(new THREE.Vector3());
+  const at = right.clone().multiplyScalar(center.x).addScaledVector(forward, center.z);
+  at.y = center.y;
+  const tanY = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)); // 반각으로 실제 표면의 원근 경계를 푼다.
+  const tanX = tanY * cam.aspect;
+  let distance = 0;
+  for (const p of viewPoints) {
+    const q = p.clone().sub(center);
+    distance = Math.max(distance, q.z + Math.max(Math.abs(q.x) / tanX, Math.abs(q.y) / tanY));
+  }
+  distance *= 1.04; // 실제 정점 봉투에 4퍼센트만 더해 화소 반올림 여백을 남긴다.
+  cam.position.copy(at).addScaledVector(forward, distance);
+  cam.lookAt(at);
+  cam.userData.distance = distance;
+}
+
 function partPoint(k, part) {
   const v = new THREE.Vector3();
   const j = k.userData.joints;
@@ -361,6 +422,7 @@ export function yawOf(kind, aim) {
 // over는 겨냥 한 칸만 덮어쓰는 자리다. 계기가 반사실을 구울 때만 쓰고, 화면은 안 쓴다.
 function frame(kind, keeper, look, yaw, over) {
   boot();
+  delete cam.userData.portrait;
   /* 프레임 비율은 칸마다 다르다. 세로로 긴 피사체를 가로 칸에 구우면 담기는 것은 사람이 아니라 여백이다.
      크기가 그대로면 아무것도 안 한다. 매번 다시 잡으면 굽는 한 장마다 그리기 버퍼를 새로 만든다. */
   const [fw, fh] = sizeOf(kind);
@@ -369,6 +431,8 @@ function frame(kind, keeper, look, yaw, over) {
     cam.aspect = fw / fh;
     cam.updateProjectionMatrix();
   }
+  cam.aspect = fw / fh;
+  cam.updateProjectionMatrix();
   // 장면 칸은 AIM 겨냥을 안 쓴다. 무엇을 겨냥할 몸이 없거나, 몸 자체가 상품이기 때문이다.
   if (SCENE[kind]) {
     if (rig) { scene.remove(rig); rig = null; }
@@ -384,6 +448,10 @@ function frame(kind, keeper, look, yaw, over) {
     // 눈높이는 칸이 정한다. 골대와 행인은 크기가 여섯 배 차이라 같은 각으로 보면 한쪽이 늘 잘린다.
     cam.position.set(made.at.x + Math.sin(a) * made.dist, made.at.y + made.dist * made.high, made.at.z + Math.cos(a) * made.dist);
     cam.lookAt(made.at);
+    if (kind === "bot") {
+      rig = made.body;
+      wornCamera("pads", rig, a);
+    }
     R.render(scene, cam);
     return;
   }
@@ -396,6 +464,7 @@ function frame(kind, keeper, look, yaw, over) {
     rig.rotation.y = Math.PI; // 키커 얼굴은 로컬 -z이므로 초상 카메라를 향해 반 바퀴 돌린다.
     rig.scale.set(keeper.weight / 84, keeper.height / 188, keeper.weight / 84); // 시착실 기준 체격에 대한 명단의 상대 비율로 세 선수의 체격을 구별한다.
   }
+  if (WORN.has(kind) && !(over && (over.part || over.dist || over.lift !== undefined || over.high !== undefined))) previewPose(kind, rig);
   rig.updateMatrixWorld(true);
   scene.add(rig);
   const aim = Object.assign({}, AIM[kind] || { part: "torso", dist: 1.3, lift: 0 }, over || {});
@@ -405,7 +474,42 @@ function frame(kind, keeper, look, yaw, over) {
   const high = aim.high === undefined ? 0.22 : aim.high;
   cam.position.set(at.x + Math.sin(a) * aim.dist, at.y + aim.dist * high, at.z + Math.cos(a) * aim.dist);
   cam.lookAt(at);
+  cam.userData.distance = aim.dist;
+  if (WORN.has(kind) && !(over && (over.part || over.dist || over.lift !== undefined || over.high !== undefined))) wornCamera(kind, rig, a);
+  if (kind === "ink" && !(over && (over.part || over.dist || over.lift !== undefined || over.high !== undefined))) {
+    tattooFrame(a, fw, fh);
+  } else R.render(scene, cam);
+}
+
+// 문신은 확대 면과 착용자를 한 카드에 함께 둔다. 관절을 따라가므로 체격이 바뀌어도 잘리지 않는다.
+const INK_DETAIL_SHARE = 0.68; // 오른쪽 68퍼센트는 작은 무늬를 읽고 왼쪽은 얼굴과 양 어깨를 담는다.
+function tattooFrame(yaw, width, height) {
+  const split = Math.round(width * INK_DETAIL_SHARE);
+  const portraitWidth = width - split;
+  cam.aspect = portraitWidth / height;
+  cam.updateProjectionMatrix();
+  wornCamera("ink", rig, yaw);
+  const portrait = cam.clone();
+  const j = rig.userData.joints;
+  const sh = j.shL.getWorldPosition(new THREE.Vector3());
+  const el = j.elL.getWorldPosition(new THREE.Vector3());
+  const length = sh.distanceTo(el);
+  // 어깨의 바깥면에서 두 관절의 중간 높이를 본다. 팔 중심을 향하면 무늬 대신 앞쪽 맨살을 확대한다.
+  const at = sh.clone();
+  at.y = (sh.y + el.y) / 2; // 두 관절 높이의 평균이라 체격과 자세를 그대로 따른다.
+  cam.aspect = split / height;
+  cam.updateProjectionMatrix();
+  // 위팔 길이만큼 물러나면 무늬가 확대 면을 채우고 관절 크기를 그대로 따른다.
+  cam.position.copy(at).add(new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)).multiplyScalar(length));
+  cam.lookAt(at);
+  R.setScissorTest(true);
+  R.setViewport(portraitWidth, 0, split, height); R.setScissor(portraitWidth, 0, split, height);
   R.render(scene, cam);
+  cam.copy(portrait);
+  R.setViewport(0, 0, portraitWidth, height); R.setScissor(0, 0, portraitWidth, height);
+  R.render(scene, cam);
+  R.setScissorTest(false); R.setViewport(0, 0, width, height);
+  cam.userData.portrait = {x:0, width:portraitWidth / width};
 }
 
 // over는 굽는 각을 덮어쓰는 자리다. 계기가 반사실을 구울 때만 쓰고, 화면은 안 쓴다.
@@ -508,7 +612,7 @@ export function armBox(kind, keeper, look) {
 }
 
 export function headBox(kind, keeper, look, over) {
-  if (!AIM[kind]) return null;
+  if (!AIM[kind] && kind !== "bot") return null;
   frame(kind, keeper, look, undefined, over);
   const head = rig && rig.userData.head;
   if (!head) return null;
@@ -517,7 +621,8 @@ export function headBox(kind, keeper, look, over) {
   const r = head.geometry.parameters.radius;
   const crown = at.clone();
   crown.y += r;
-  const to = (v) => ({ x: (v.x + 1) / 2, y: (1 - v.y) / 2 });
+  const port = cam.userData.portrait;
+  const to = (v) => ({ x: (port?.x || 0) + (v.x + 1) / 2 * (port?.width || 1), y: (1 - v.y) / 2 });
   const mid = to(at.clone().project(cam));
   const top = to(crown.clone().project(cam));
   const ry = Math.abs(mid.y - top.y);
@@ -540,5 +645,15 @@ export function headBox(kind, keeper, look, over) {
   }
   // 쓴 거리를 같이 돌려준다. 계기가 반사실을 구울 때 겨냥 상수를 옮겨 적지 않아도 된다.
   return { x: mid.x, y: mid.y, ry, rx: ry * (R.domElement.height / R.domElement.width), eyes, mouth,
-    dist: Object.assign({}, AIM[kind], over || {}).dist, url: R.domElement.toDataURL("image/png") };
+    dist: cam.userData.distance, url: R.domElement.toDataURL("image/png") };
+}
+
+// 착용 카드의 두 어깨를 실제 구 메시 봉투로 읽는다. 상품 축과 별개인 착용자 축의 계기다.
+export function wearerBox(kind, keeper, look, over) {
+  const head = headBox(kind, keeper, look, over);
+  const shoulders = shoulderPoints(rig).map(points => points.map(p => {
+    const q = p.clone().project(cam);
+    return {x:(cam.userData.portrait?.x || 0) + (q.x + 1) / 2 * (cam.userData.portrait?.width || 1), y:(1 - q.y) / 2}; // 장치 좌표를 카드 좌상단 기준으로 바꾼다.
+  }));
+  return {head, shoulders};
 }

@@ -493,6 +493,50 @@ try {
   // 심는 대조군. 이 자리로 겨냥을 되돌리면 기본 등급의 머리가 칸 밖으로 나가야 한다.
   /* 체격도 표본이다. 아래 두 축이 재던 몸은 188/84 하나였는데 게임은 그보다 넓은 몸을 만든다.
      BODIES가 소스에서 끌어온 봉투의 네 귀퉁이와 그 게이트 몸이고, 판정은 다섯 벌 전부다. */
+  // 모든 착용 선반이 상품과 착용자를 함께 판다. 등급과 변형과 체격 봉투를 빠짐없이 걷는다.
+  const wearers = await p.evaluate(async bodies => {
+    const m = await import("/web/src/render/thumb.mjs");
+    const g = await import("/web/src/state/gear.mjs");
+    const shelves = {grip:g.GLOVES, studs:g.BOOTS, pads:g.KITS, socks:g.SOCKS, ink:g.TATTOOS, hair:g.HAIRS, beard:g.BEARDS};
+    const rows = [];
+    for (const [kind, grades] of Object.entries(shelves)) {
+      for (const body of bodies) for (const [rank] of grades.entries()) {
+        for (const [skin] of g.skinsAt(kind, rank).entries()) {
+          const look = g.lookOf({[kind]:rank, [kind + "Skin"]:skin});
+          const box = m.wearerBox(kind, body, look);
+          rows.push({kind, rank, skin, body, ...box, head:{...box.head, url:undefined}});
+        }
+      }
+    }
+    // 봇은 세 판매 등급을 같은 체격 봉투로 검사한다. 외형 변형은 봇 카탈로그에 없다.
+    const bots = await import("/web/src/state/bot.mjs");
+    const botGrades = bots.BOTS;
+    for (const body of bodies) for (const entry of botGrades) {
+      const box = m.wearerBox("bot", body, {rank:entry.tier});
+      rows.push({kind:"bot", rank:entry.tier, body, ...box, head:{...box.head, url:undefined}});
+    }
+    // 옛 장갑 겨냥의 거리 0.94·높이 0.03·시선 0.12를 그대로 심어 상품만 남고 얼굴을 잃는 회귀를 잡는다.
+    const old = m.wearerBox("grip", bodies[0], g.lookOf({grip:0}), {part:"glove", dist:0.94, lift:0.03, high:0.12});
+    return {rows, old:{...old, head:{...old.head, url:undefined}}, expected:[...Object.entries(shelves).map(([kind, grades]) => ({kind, n:grades.reduce((n, _, rank) => n + g.skinsAt(kind, rank).length, 0) * bodies.length})), {kind:"bot", n:botGrades.length * bodies.length}]};
+  }, BODIES);
+  const pointInside = p => p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1;
+  // 리그가 반환하는 두 눈과 두 어깨의 실제 메시 정점을 모두 확인해 일부만 측정한 통과를 막는다.
+  const personInside = r => r.head && r.head.ry > 0
+    && r.head.x - r.head.rx >= 0 && r.head.x + r.head.rx <= 1
+    && r.head.y - r.head.ry >= 0 && r.head.y + r.head.ry <= 1
+    && r.head.eyes.length === 2 && r.head.eyes.every(pointInside)
+    && r.shoulders.length === 2 && r.shoulders.every(points => points.length > 0 && points.every(pointInside));
+  for (const {kind, n} of wearers.expected) {
+    const rows = wearers.rows.filter(r => r.kind === kind);
+    const lost = rows.filter(r => !personInside(r));
+    check("thumb:" + kind + ":every-worn-look-keeps-head-eyes-and-shoulders",
+      n > 0 && rows.length === n && lost.length === 0,
+      rows.length + "/" + n + " looks; outside: " + JSON.stringify(lost));
+  }
+  check("control:the-old-glove-frame-loses-its-wearer", !personInside(wearers.old)
+    && wearers.old.head.eyes.length === 2 && wearers.old.shoulders.length === 2,
+    JSON.stringify(wearers.old));
+
   const OLD_PADS_AIM = { part: "torso", lift: 0.3 };
   /* 아래 바닥 자가 심는 겨냥. 부위는 파는 그대로 목이고 lift 한 칸만 흐른 값이다. 위의 자가 옛
      겨냥을 통째로 되심는 것과 달라야 한다. 실제로 나는 회귀는 부위가 바뀌는 것이 아니라 상수
