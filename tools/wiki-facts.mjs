@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { COIN_SAVE, COIN_CONCEDED, COIN_DRILL, COIN_FAME_STEP, CASH_RATE } from '../web/src/state/wallet.mjs';
 import { BOTS } from '../web/src/state/bot.mjs';
 import { conditionLabel } from '../web/src/state/condition.mjs';
+import { CITIES, CITY_SKINS } from '../web/src/state/gear.mjs';
 import { SHELF_WORDS } from '../web/src/state/shelf.mjs';
 import { KEY_MAP } from '../web/src/ui/keys.mjs';
 import { BUFFS } from '../web/src/state/buff.mjs';
@@ -19,6 +20,10 @@ const values = {
   'like-base': LIKE_BASE, 'like-per-city': LIKE_PER_CITY, 'mutual-step': MUTUAL_STEP, 'mutual-cap': MUTUAL_CAP, 'selfie-base': SELFIE_BASE
 };
 const kv = (rows) => ({ columns: ['자리', '값'], rows });
+const venueTables = [
+    { columns: ['경기장', '연습과 경기', '구매 조건', '업데이트 예정'], rows: CITIES.map(row => [row.name, [row.subtitle, row.shipped].filter(Boolean).join(' · '), row.conditions.map(conditionLabel).join(' · ') || '없음', row.coming.join(' · ') || '없음']) },
+    { columns: ['개최지', '개최국', '시간대'], rows: CITY_SKINS.flat().map(row => [row.name, row.country, row.time]) }
+  ];
 const tables = {
   hand: [
     { columns: ['키', '하는 일'], rows: KEY_MAP.map(({ label, note }) => [label, note]) },
@@ -26,7 +31,7 @@ const tables = {
   ],
   coin: [kv([['막으면', COIN_SAVE], ['최상급', COIN_SAVE + COIN_FAME_STEP * 9], ['먹혀도', COIN_CONCEDED], ['훈련 대신', COIN_DRILL], ['캐시 한 단위', CASH_RATE]])],
   drill: [kv([['훈련 대신', COIN_DRILL]])],
-  gear: SHELF_NOTES_FOR_WIKI.map((s) => ({ head: s.head, columns: ['이름', '효과', '구매 조건'], rows: s.rows.map((g, i) => [g.name, g.note, conditionLabel(SHELF_WORDS[s.tab].list[i].condition) || '없음']) })),
+  gear: SHELF_NOTES_FOR_WIKI.map((s) => ({ head: s.head, columns: ['이름', '효과', '구매 조건'], rows: s.rows.map((g, i) => [g.name, g.note, (SHELF_WORDS[s.tab].list[i].conditions?.map(conditionLabel).join(' · ') || conditionLabel(SHELF_WORDS[s.tab].list[i].condition)) || '없음']) })),
   pull: [kv([['한 장', PULL_COST], ['묶음', PULL_BULK], ['묶음 보상', PULL_BONUS], ['이용권 한도', TICKET_CAP]]),
     { columns: ['종류', '설명'], rows: PULL_KINDS.map((k) => [k.name, k.note]) }],
   gram: [kv([['좋아요', LIKE_BASE], ['동네 한 등급', LIKE_PER_CITY], ['맞팔 한 명', MUTUAL_STEP], ['맞팔 한도', MUTUAL_CAP], ['같이 한 장', SELFIE_BASE]])],
@@ -37,6 +42,7 @@ const tables = {
     { columns: ['사고', '깎는 선반'], rows: MISHAP_SHELF }
   ]
 };
+tables.gear.push(...venueTables);
 const out = fileURLToPath(new URL('../web/wiki/facts.json', import.meta.url));
 writeFileSync(out, JSON.stringify({ values, tables }, null, 2) + '\n');
 console.log('facts ' + Object.keys(values).length + ' values, ' + Object.keys(tables).length + ' table sets');
