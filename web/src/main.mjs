@@ -2299,6 +2299,49 @@ function onboardStep() {
   return true;
 }
 
+// 시안 packs.mjs의 SVG와 플랫폼 그라디언트를 재사용한다. 외부 라이브러리 없이 포장만 이식한다.
+const titleOf = kind => kind.id === 'legend' ? '전설 선수 팩' : '동네 선수 팩';
+let legendShowcase = false;
+let pullRole = 'keeper';
+// 180×240은 봉투의 기준 좌표다. 나머지 좌표는 봉인 16, 중심 90, 문장 66폭과 대칭 주름을 정의한다.
+// 브라우저 SVG 그라디언트·패턴을 사용하며 외부 그림이나 GPL 구현은 포함하지 않는다.
+function packArt(kind) {
+  const gold = kind.id === 'legend';
+  const id = kind.id;
+  const light = gold ? '#fff0aa' : '#bdf5de';
+  const mid = gold ? '#bd8c30' : '#328975';
+  const dark = gold ? '#423019' : '#153e36';
+  const emblem = gold
+    ? '<path d="M59 102 68 123 112 123 121 102 103 110 90 89 77 110Z" fill="url(#metal-legend)"/><path d="M68 130H112" stroke="#fff0aa" stroke-width="4"/>'
+    : '<path d="M62 92H118V122Q112 144 90 151Q68 144 62 122Z" fill="url(#metal-town)"/><path d="M76 113 85 105 99 108 104 121 93 132 80 126Z" fill="#153e36"/>';
+  return `<svg class="wrapper" viewBox="0 0 180 240" role="img" aria-label="${titleOf(kind)} 포일 포장">
+    <defs><linearGradient id="metal-${id}" x2="1" y2=".4"><stop stop-color="${dark}"/><stop offset=".22" stop-color="${mid}"/><stop offset=".48" stop-color="${light}"/><stop offset=".56" stop-color="${mid}"/><stop offset=".9" stop-color="${dark}"/><stop offset="1" stop-color="${light}"/></linearGradient><pattern id="crimp-${id}" width="5" height="5" patternUnits="userSpaceOnUse"><path d="M1 0V5" stroke="${dark}" opacity=".6"/></pattern><pattern id="grain-${id}" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M0 9 9 0" stroke="${light}" opacity=".08"/></pattern></defs>
+    <path d="M7 1H173L179 9 175 231 169 239H11L5 231 1 9Z" fill="url(#metal-${id})" stroke="${light}"/>
+    <path d="M8 18 172 18 169 222H11Z" fill="${dark}" opacity=".88"/>
+    <path d="M8 18 172 18 169 222H11Z" fill="url(#grain-${id})"/>
+    <path d="M8 18 42 72 18 180 10 220M172 18 144 89 165 197 170 222" fill="none" stroke="${light}" opacity=".3"/>
+    <path d="M14 18 26 222M162 18 151 222" stroke="${light}" opacity=".12"/>
+    <path d="M5 2H175V17H5ZM9 223H172V238H9Z" fill="url(#crimp-${id})"/>
+    <path d="M23 59H157M23 181H157" stroke="${mid}"/>
+    <text x="90" y="45" text-anchor="middle" fill="${light}" font-family="Black Han Sans" font-size="15">${gold?'전설':'동네'} 선수</text>
+    <path d="M90 70 136 96 136 144 90 171 44 144 44 96Z" fill="none" stroke="${mid}"/>${emblem}
+    <text x="90" y="204" text-anchor="middle" fill="${light}" font-family="Pretendard GTG" font-size="12">${gold?'명성 높은 선수들':'새로운 경기의 시작'}</text>
+  </svg>`;
+}
+
+
+function legendHTML() {
+  // 시안의 세 장은 이름과 전신을 함께 비교할 수 있는 대표 진열 수다.
+  const showCount = 3;
+  const players = poolFor(KICKERS, 'legend').slice(0, showCount);
+  return '<section class="legend-showcase"><h4>전설 선수 쇼케이스</h4><p>경기를 바꿀 이름들</p><div class="players">'
+    + players.map(k => '<article class="player"><div class="player-inner"><span class="fame"><small>명성</small>' + k.fame
+      + '</span><img src="' + thumbURL('body', k, lookOf({}, k.name)) + '" alt="' + k.name + ' 전신"><h3>' + k.name
+      + '</h3><div class="stats"><span>골 결정력 <b>' + k.finishing + '</b></span><span>슛 파워 <b>' + k.power
+      + '</b></span></div></div></article>').join('')
+    + '</div><button class="market">이적시장</button></section>';
+}
+
 function pullShelf(all) {
   const kind = pullKindOf(pullTab);
   const pool = poolFor(all, kind.id);
@@ -2312,33 +2355,35 @@ function pullShelf(all) {
   const rows = [1, PULL_BULK].map((want) => {
     const bill = pullBill(want, held, state.wallet.coin, cost);
     const left = Math.min(want, pool.length);
-    /* 뽑기 버튼은 장르가 오래 쓴 자리를 그대로 쓴다. 큰 글씨로 몇 회인지, 그 아래 값이다.
-       내고 몇 장이라는 문장은 버튼이 할 말이 아니고, 못 사는 이유도 버튼 글자가 아니라
-       비활성 상태가 이미 말한다. 사유는 버튼 위 배지가 한 마디로 받는다. */
+    // 회차·보너스·보장은 버튼 밖의 약속 줄에 서고 버튼은 실제 결제 값만 보여 준다.
     const off = !pool.length || !affordable(bill.cost) || left < want;
     // 이용권으로 다 내는 회차는 값 대신 이용권 수를 적는다. 나가는 것이 다른 자원이다.
     const price = bill.cost > 0 ? PRICE(bill.cost) : IC_TICKET + bill.free;
     const why = !pool.length ? '품절' : (left < want ? '한도' : '');
     const bad = state.wallet.coin < bill.cost;
-    return '<button class="buy pull' + (bad && bill.cost > 0 ? ' bad-price' : '') + '" data-want="' + want + '"' + (off ? ' disabled' : '') + '>'
+    return '<div class="pack-offer"><div class="promise-lines"><span>' + want + '회 뽑기</span>'
+      + (want === PULL_BULK ? '<span class="bonus">' + PULL_BONUS + '장 더</span>' : '')
+      + (kind.floor ? '<span class="guarantee">명성 ' + kind.floor + ' 이상 확정</span>' : '')
+      + '</div><button class="buy pull' + (bad && bill.cost > 0 ? ' bad-price' : '') + '" data-want="' + want + '"' + (off ? ' disabled' : '') + '>'
       + (why ? '<u>' + why + '</u>' : '')
-      // 보너스가 붙는 회차는 그 사실이 버튼에 있어야 한다. 눌러 봐야 아는 이득은 이득이 아니다.
-      + (want === PULL_BULK ? '<s>+' + PULL_BONUS + '</s>' : '')
-      + '<b>' + want + '</b><i>' + price + '</i></button>';
+      + '<i>' + price + '</i></button></div>';
   }).join('');
   /* 확률과 남은 카드는 사는 자리가 아니라 확인하는 자리다. 본문에 깔면 살 것을 고르는 눈이
      매번 그 줄을 지나가므로, 표시 하나로 접어 두고 눌렀을 때만 선반 위에 뜬다.
      문장이 아니라 표다. 등급과 확률과 남은 수가 세 칸으로 서면 어느 등급이 몇 장 남았는지가
      한 줄에서 끝난다. */
   const odds = pool.length
-    ? '<details class="odds"><summary aria-label="확률과 남은 카드"><i>i</i></summary><em>'
+    ? '<details class="odds"><summary class="odds-link" tabindex="0" aria-label="획득 확률">획득 확률</summary><em>'
       + shopOdds(pool) + '</em></details>'
     : '';
   /* 보유 이용권은 문장이 아니라 숫자다. 지금 몇 장 있다고 말하는 대신 아이콘 옆에 수를 세운다.
      이 갈래가 이용권을 안 받으면 그 줄을 안 세운다. 없는 자원을 설명하는 줄은 읽을 것만 는다. */
   const bank = kind.ticketable ? '<span class="held">' + IC_TICKET + '<b>' + state.tickets + '</b></span>' : '';
-  return '<h4>이적시장</h4>' + tabs + '<div class="card">'
-    + '<div class="lede"><em>' + kind.note + '</em>' + bank + odds + '</div>'
+  return '<h4>이적시장</h4><div class="pack-nav"><button class="show-legends">전설 선수 쇼케이스</button>'
+    + ['keeper', 'kicker'].map(role => '<button data-role="' + role + '" aria-pressed="' + (pullRole === role) + '">' + (role === 'keeper' ? '키퍼' : '키커') + '</button>').join('') + '</div>'
+    + tabs + '<div class="card pack-card ' + kind.id + '">'
+    + '<div class="lede"><em>' + (pullRole === 'kicker' ? kind.note.replace('키퍼', '키커') : kind.note) + '</em>' + bank + '</div>'
+    + '<div class="pack-stage"><button class="pack-art" aria-label="' + titleOf(kind) + ' 구매 선택">' + packArt(kind) + '<span class="foil"></span></button></div>' + odds
     + '<div class="buys">' + rows + '</div>'
     + '</div>';
 }// 봇은 소모형이라 SHELVES에 못 넣는다. 등급을 갖는 게 아니라 분을 갖는다.
@@ -2460,7 +2505,8 @@ function bindBuff(box) {
 
 function renderShop() {
   const box = el('shop');
-  const pool = KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name));
+  const pool = pullRole === 'kicker' ? KICKERS.filter(k => !state.kickers.includes(k.name))
+    : KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name));
   // 장비를 한 탭에 몰면 카드가 여덟 장이라 720p에서 닫기 버튼이 화면 밖으로 밀린다.
   // 이름은 선반 데이터가 소유하고 이적시장과 봇과 버프만 따로 적는다. 열한 줄을 손으로 늘어놓으면
   // 선반 이름을 고친 날 탭만 옛 이름을 부른다.
@@ -2468,12 +2514,12 @@ function renderShop() {
   const tabs = '<div class="tabs">' + SHOP_TABS.map((k) =>
     '<button class="tab" data-tab="' + k + '"' + (shopTab === k ? ' aria-current="true"' : '') + '>'
     + TAB_ICON[k] + '<span>' + tabName(k) + '</span></button>').join('') + '</div>';
-  const goods = SHELVES[shopTab] ? gearShelf(shopTab) : shopTab === 'bot' ? botShelf() : shopTab === 'buff' ? buffShelf() : pullShelf(pool);
+  const goods = SHELVES[shopTab] ? gearShelf(shopTab) : shopTab === 'bot' ? botShelf() : shopTab === 'buff' ? buffShelf() : legendShowcase ? legendHTML() : pullShelf(pool);
   box.innerHTML = '<div class="shopbody">' + fittingRoom() + '<div class="goods">' + tabs + goods + '</div></div>'
     + '<button class="close">닫기</button>';
   // 탭을 다시 그려도 선택한 선반이 가로 스크롤 밖으로 사라지지 않게 브라우저가 위치를 맞춘다.
   box.querySelector('.tab[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  box.querySelector('.close').onclick = closeShop;
+  box.querySelector('.close').onclick = () => { legendShowcase = false; pullRole = 'keeper'; closeShop(); };
   // 전부 사기. 걸쳐 본 것을 한 번에 치른다. 값이 모자라면 아무것도 안 산다.
   // 되는 것만 골라 사면 무엇이 빠졌는지를 화면이 안 말해 주고, 남은 잔고로 다시 계산하게 된다.
   const all = box.querySelector('.all');
@@ -2503,9 +2549,16 @@ function renderShop() {
     renderShop();
   };
   for (const t of box.querySelectorAll('.tab')) {
-    t.onclick = () => { shopTab = t.dataset.tab; renderShop(); };
+    t.onclick = () => { shopTab = t.dataset.tab; legendShowcase = false; renderShop(); };
   }
   bindSpec(box);
+  const showcase = box.querySelector('.show-legends');
+  if (showcase) showcase.onclick = () => { legendShowcase = true; renderShop(); };
+  const market = box.querySelector('.legend-showcase .market');
+  if (market) market.onclick = () => { legendShowcase = false; pullRole = 'kicker'; pullTab = 'legend'; renderShop(); box.querySelector('.pack-art').focus(); };
+  for (const role of box.querySelectorAll('[data-role]')) role.onclick = () => { pullRole = role.dataset.role; renderShop(); };
+  const pack = box.querySelector('.pack-art');
+  if (pack) pack.onclick = () => box.querySelector('.buy.pull:not(:disabled)')?.focus();
   // 갈래를 바꾸면 값과 확률과 남은 장수가 통째로 갈리므로 선반을 다시 그린다.
   for (const k of box.querySelectorAll('.kind')) k.onclick = () => {
     pullTab = k.dataset.kind;
@@ -2537,7 +2590,10 @@ function renderShop() {
     if (!drawn.length) return;
     if (!purchase(bill.cost)) return;
     state.tickets -= bill.free;
-    for (const pick of drawn) state.squad.push(recruit(pick));
+    for (const pick of drawn) {
+      if (pullRole === 'kicker') state.kickers.push(pick.name);
+      else state.squad.push(recruit(pick));
+    }
     // 뽑은 카드로 자동 전환하지 않는다. 무작위 결과가 뛰던 키퍼를 임의로 강등시키면
     // 뽑기가 이득이 아니라 사고가 된다. 교체는 선수단에서 사람이 고른다.
     // 값은 여기서 이미 치러졌다. 뒤집기는 결과를 보여 주는 일이지 판정을 미루는 일이 아니다.

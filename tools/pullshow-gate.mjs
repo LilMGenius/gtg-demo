@@ -439,8 +439,8 @@ try {
     const open = await readOdds();
     const head = open.rows.length ? open.rows[0] : [];
     const body = open.rows.slice(1);
-    check("pullshow:the-odds-hide-behind-one-mark-on-the-market-tab",
-      shut.open === false && shut.face.length <= 1 && shut.label.length > 0 && open.open === true,
+    check("pullshow:the-odds-open-from-the-named-link-on-the-market-tab",
+      shut.open === false && shut.face === "획득 확률" && shut.label === "획득 확률" && open.open === true,
       "shut " + shut.open + ", face " + JSON.stringify(shut.face) + ", label " + JSON.stringify(shut.label)
       + ", opened " + open.open);
     check("pullshow:the-odds-are-a-table-of-grade-and-chance-and-stock",
