@@ -1,9 +1,10 @@
+// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 // 이 게이트의 모집단은 keeperAtLevel 기준 모집단(N칸 중 셋, 레벨당 3포인트)이며 제품 모집단은 tools/product-pop-gate.mjs가 잰다.
 // C2 귀속과 C3 비독점을 같이 잰다.
 // C2: 모든 실점 원인이 v0.2 원장 안에 있는가.
 // C3: 레벨 3, 5, 7, 10 네 구간에서 한 원인이 전 구간 1위를 독점하지 않는가.
 
-import { resolve, makeRng, buildSet, keeperAtLevel, rollForm } from "../src/chain.mjs";
+import { resolve, makeRng, buildSet, keeperAtLevel, rollForm } from "./position-pop.mjs";
 import { LEDGER, CAUSE_LABEL } from "../src/ledger.mjs";
 
 const args = process.argv.slice(2);

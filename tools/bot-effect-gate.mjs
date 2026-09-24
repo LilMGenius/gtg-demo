@@ -1,5 +1,6 @@
+// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { modifierContract } from "./modifier-contract.mjs";
-import { makeRng, buildSet, resolve, newKeeper, autoInput } from "../src/chain.mjs";
+import { makeRng, buildSet, resolve, newKeeper, autoInput } from "./position-pop.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 import { BOTS, botKeeper } from "../web/src/state/bot.mjs";
 

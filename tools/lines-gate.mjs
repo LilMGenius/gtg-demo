@@ -1,4 +1,5 @@
-import { makeRng, buildSet, resolve, keeperAtLevel, autoInput, rollForm } from "../src/chain.mjs";
+// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+import { makeRng, buildSet, resolve, keeperAtLevel, autoInput, rollForm } from "./position-pop.mjs";
 import { POOLS, KEYLESS, lineKey, eventLine, LINE_POOL, SET_END, SET_END_POOL, setEndLine, gazeAct } from "../web/src/ui/lines.mjs";
 
 // 결과 자막 게이트. 사건마다 문장이 하나뿐이라 방치형에서 로그처럼 읽히던 것을 고친 뒤,

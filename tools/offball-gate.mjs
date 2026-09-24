@@ -1,5 +1,6 @@
+// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { modifierContract } from "./modifier-contract.mjs";
-import { makeRng, buildSet, resolve, newKeeper, followerGain } from "../src/chain.mjs";
+import { makeRng, buildSet, resolve, newKeeper, followerGain } from "./position-pop.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 
 // 성장 칸은 올리면 나아져야 한다. 훈련장에 서 있는 칸 중 하나가 올릴수록 손해라면

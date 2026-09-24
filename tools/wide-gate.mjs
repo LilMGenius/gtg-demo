@@ -1,3 +1,4 @@
+// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 // 헛구의 자. 모든 슛이 골문 안으로 갔다. 키커는 절대 빗나가지 않는 존재였고,
 // 그래서 주전 열하나를 고르는 일이 난도만 정하고 판의 밀도는 안 정했다.
 // 못 차는 키커를 세우면 막기는 쉬운데 그 쉬움에 대가가 없었다.
@@ -7,7 +8,7 @@
 // 선수단 화면이 거꾸로 선다.
 // 표본 범위: 키퍼는 한 사람으로 고정한다. 재는 것은 키커 쪽 확률이라 키퍼가 결론을 안 바꾼다.
 
-import { makeRng, resolve, keeperAtLevel, autoInput, followerGain } from "../src/chain.mjs";
+import { makeRng, resolve, keeperAtLevel, autoInput, followerGain } from "./position-pop.mjs";
 import { KICKERS, kickerByName, defaultEleven } from "../src/roster.mjs";
 import { coinGain, COIN_SAVE, COIN_CONCEDED, COIN_WIDE } from "../web/src/state/wallet.mjs";
 

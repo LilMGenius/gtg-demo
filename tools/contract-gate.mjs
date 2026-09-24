@@ -1,4 +1,5 @@
-import { resolve, makeRng, buildSet, keeperAtLevel, rollForm } from "../src/chain.mjs";
+// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+import { resolve, makeRng, buildSet, keeperAtLevel, rollForm } from "./position-pop.mjs";
 import { LEDGER } from "../src/ledger.mjs";
 
 // 판정 계약의 자. 체인이 무엇을 돌려주기로 약속했는지를 재는 것이지, 그 수가 좋은지를 재지 않는다.

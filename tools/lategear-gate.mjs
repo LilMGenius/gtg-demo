@@ -1,5 +1,6 @@
+// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { modifierContract } from "./modifier-contract.mjs";
-import { makeRng, buildSet, resolve, newKeeper } from "../src/chain.mjs";
+import { makeRng, buildSet, resolve, newKeeper } from "./position-pop.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 
 // 장비가 만렙 키퍼에게도 값을 하는지 잰다. 판정식 여러 곳이 스탯 상한에서 0으로 클램프되므로,

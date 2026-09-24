@@ -1,4 +1,5 @@
-import { makeRng, newKeeper, keeperAtLevel, rollForm, buildSet, resolve, autoInput } from '../src/chain.mjs';
+// 위치 경로의 네 입력 모드에서 기존 문턱을 그대로 재며, 옛 완벽/자동/저장 방향은 모집단에서 제외한다.
+import { makeRng, newKeeper, keeperAtLevel, rollForm, buildSet, resolve, autoInput, positionInput, MODES } from './position-pop.mjs';
 import { GROWABLE } from '../src/ledger.mjs';
 import { autoTrain, trainStat, TRAINING_PRIORITY } from '../web/src/state/coach.mjs';
 import { coinGain } from '../web/src/state/wallet.mjs';
@@ -24,7 +25,7 @@ const TOLERANCE = 1.5, HORIZONS = [5, 13, 21], N_SETS = 10, LADDER_FLOOR = 1;
 const DEAD_UPPER = 0.1;
 // "designed 2.2-2.8x price step over flattening income, recoverable slowdown at the end of the ladder, not a dead end"
 const ACCEPTED_ASYMMETRIES = [
-  { row: 'deadend:the-next-purchase-or-unlock-is-within-N-sets', mode: 'perfect', where: 'third-rank purchases', bound: 12, record: '.omo/evidence/ai-balance-lap-7.txt ruling 2026-09-18' }
+  { row: 'deadend:the-next-purchase-or-unlock-is-within-N-sets', mode: 'hand-follow', where: 'third-rank purchases', bound: 12, record: '.omo/evidence/ai-balance-lap-7.txt ruling 2026-09-18' }
 ];
 const LEVELS = [1, ...HORIZONS];
 const MANUAL = ['lowest', 'random', 'greedy'];
@@ -70,34 +71,23 @@ function measure(policy, level, mode, contrast = null) {
     const keeper = population(policy, level, source);
     rollForm(keeper, source);
     const shots = buildSet(source, level);
-    // A cached stream lets counterfactuals look ahead without moving the base.
-    // Reset at each shot and at the autoInput/resolve boundary: conditional
-    // input draws must not change whether the kicker missed the goal.
-    const tape = [];
-    const at = i => { while (tape.length <= i) tape.push(source()); return tape[i]; };
-    let cursor = 0;
-    const rng = () => at(cursor++);
     const variants = gains.map(g => {
       if (keeper[g.stat] >= 10) return null;
       g.eligible++;
       return { ...keeper, [g.stat]: contrast ? 10 : Math.min(10, keeper[g.stat] + 1) };
     });
     for (const shot of shots) {
-      const start = cursor;
-      const input = mode === 'auto' ? undefined : { dive: mode === 'perfect' ? shot.side : Number(mode.slice(5)), errMs: 0, advance: 0, auto: false };
-      const base = resolve({ keeper, shot, rng, input });
+      // 한 구마다 정책과 판정의 씨앗을 고정해 스탯 변화가 다음 구를 밀지 않는다.
+      const shotSeed = 1000003 + s * 7919 + level * 31 + shot.index;
+      const play = who => resolve({ keeper: who, shot, rng: makeRng(shotSeed), input: positionInput(who, shot, makeRng(shotSeed + 1), mode) });
+      const base = play(keeper);
       if (policy === 'coach' && !contrast) gold += coinGain(base.conceded, base.fame, base.untested);
       if (!base.untested) tested++;
       if (base.conceded) { conceded++; causes[base.cause] = (causes[base.cause] || 0) + 1; }
-      let chainStart = start;
-      if (mode === 'auto') autoInput(keeper, shot, () => at(chainStart++));
       for (let i = 0; i < gains.length; i++) {
         const grown = variants[i];
         if (!grown) continue;
-        let pos = start;
-        const bumpedInput = mode === 'auto' ? autoInput(grown, shot, () => at(pos++)) : input;
-        pos = chainStart;
-        const bump = resolve({ keeper: grown, shot, rng: () => at(pos++), input: bumpedInput });
+        const bump = play(grown);
         if (base.untested !== bump.untested) throw new Error('Paired tested-shot membership changed');
         if (base.untested) continue;
         const g = gains[i];
@@ -124,16 +114,16 @@ console.log('population: newKeeper; 2 points/set; 1 set/level; level raised befo
 console.log(`GROWABLE order: ${GROWABLE.join(',')}; body=178-198 / 74-94; no gear/recruitment`);
 console.log(`coach fixed TRAINING_PRIORITY order: ${TRAINING_PRIORITY.join(',')}`);
 console.log('reference=keeperAtLevel, three-of-N, 3 pts/level; kicker ramp=buildSet(rng, level), follows keeper level (balance-gate uses level 5)');
-console.log('pairing: perfect x manual policies + coach; auto x coach; pref {-1,0,+1} x untrained (points unspent); auto x manual and reference are comparison controls');
-console.log('input: perfect={dive:shot.side,errMs:0,advance:0,auto:false}; auto=resolve without input, bare autoInput bot floor, not botKeeper; pref={dive:state.pref,errMs:0,advance:0,auto:false}');
+console.log('pairing: four position modes x reference/coach/lowest/random/greedy; hand-centre x untrained is the untouched-browser control');
+console.log('input: hand-centre x=0; hand-follow p_read=0.9 starts -500ms; hand-bait x=0.3 starts -600ms toward larger side; bot=botPlan; all use trace and stat-owned auto dive');
 console.log('denominators: nonconcession=100*(balls-conceded)/balls; tested-save=100*(tested-conceded)/tested; tested excludes r.untested');
 console.log('marginals: eligible keeper stat<10; baseline restricted to same keepers; paired common shot/input/resolution streams; set streak evolves separately; tested membership asserted identical');
 console.log('eligibility: stats capped in more than 50% of keepers are excluded from ranking and dead verdicts; marginals are still printed with their eligibility');
 console.log(`HOTL hypothesis 2026-09-18: tolerance=${TOLERANCE}pp horizons=${HORIZONS} N=${N_SETS} sets ladder floor=${LADDER_FLOOR}pp/5 levels; N milestone timing uses the purchase walk; human intended experience is not measured here`);
 console.log(`HOTL hypothesis 2026-09-18 instrument choices: DEAD_UPPER=${DEAD_UPPER}pp; 50% majority eligibility filter`);
 const rows = [];
-for (const mode of ['perfect', 'auto', 'pref:-1', 'pref:0', 'pref:1']) {
-  for (const level of LEVELS) for (const policy of mode.startsWith('pref:') ? ['untrained'] : POLICIES) {
+for (const mode of MODES) {
+  for (const level of LEVELS) for (const policy of mode === 'hand-centre' ? [...POLICIES, 'untrained'] : POLICIES) {
     const r = measure(policy, level, mode);
     rows.push(r);
     console.log(`CELL ${mode} Lv${level} ${policy} nonconcession=${f(r.nonconcession)} tested-save=${f(r.testedSave)} balls=${BALLS} tested=${r.tested} conceded=${r.conceded}`);
@@ -141,9 +131,17 @@ for (const mode of ['perfect', 'auto', 'pref:-1', 'pref:0', 'pref:1']) {
   }
 }
 
+// 1.5%p는 기존 허용 오차다. 손 우위도 그보다 커야 눈에 보이는 이득으로 판정한다.
+for (const level of LEVELS) for (const policy of POLICIES) {
+  const follow = rows.find(r => r.mode === 'hand-follow' && r.level === level && r.policy === policy);
+  const centre = rows.find(r => r.mode === 'hand-centre' && r.level === level && r.policy === policy);
+  const bot = rows.find(r => r.mode === 'bot' && r.level === level && r.policy === policy);
+  verdict('skill:follow-beats-centre', follow.testedSave - centre.testedSave > TOLERANCE ? 'PASS' : 'FAIL', policy + ' Lv' + level + ' delta=' + f(follow.testedSave - centre.testedSave));
+  verdict('trade:bot-below-follow', bot.testedSave < follow.testedSave ? 'PASS' : 'FAIL', policy + ' Lv' + level + ' bot=' + f(bot.testedSave) + ' hand=' + f(follow.testedSave));
+}
 const precision = [];
-for (const mode of ['perfect', 'auto', 'pref:-1', 'pref:0', 'pref:1']) {
-  for (const policy of mode.startsWith('pref:') ? ['untrained'] : POLICIES) {
+for (const mode of MODES) {
+  for (const policy of mode === 'hand-centre' ? [...POLICIES, 'untrained'] : POLICIES) {
     const group = HORIZONS.map(level => rows.find(r => r.mode === mode && r.policy === policy && r.level === level));
     const tops = group.map(r => r.gains.filter(g => g.eligibility >= 0.5).sort((a, b) => b.d - a.d));
     const uncertain = tops.some(rank => rank.length < 2 || unresolved(rank[0]) || unresolved(rank[1]));
@@ -160,7 +158,7 @@ for (const mode of ['perfect', 'auto', 'pref:-1', 'pref:0', 'pref:1']) {
     // can buy. Saved-direction populations buy nothing; fixed input disables
     // branches (center disables balance's landing branch; a wrong side makes
     // diving's reach irrelevant). A zero there describes the input, not the stat.
-    const inputLimited = mode.startsWith('pref:');
+    const inputLimited = policy === 'untrained';
     let dead = false, unknown = false;
     const details = [];
     for (const stat of PATH) {
@@ -186,7 +184,7 @@ for (const mode of ['perfect', 'auto', 'pref:-1', 'pref:0', 'pref:1']) {
     verdict('dead:every-offered-save-path-stat-pays-at-some-horizon', inputLimited ? 'DIAGNOSTIC' : dead ? 'FAIL' : unknown ? 'INSUFFICIENT EVIDENCE' : 'PASS', inputLimited ? `${mode}/${policy} not applicable: points unspent, nothing is offered on this population; marginals are input-limited` : `${mode}/${policy} ${details.join(',') || 'all eligible stats pay'}`);
   }
 }
-for (const mode of ['perfect', 'auto']) for (const level of HORIZONS) {
+for (const mode of ['hand-follow', 'bot']) for (const level of HORIZONS) {
   const group = rows.filter(r => r.mode === mode && r.level === level);
   const coach = group.find(r => r.policy === 'coach');
   const best = group.filter(r => MANUAL.includes(r.policy)).sort((a, b) => b.nonconcession - a.nonconcession)[0];
@@ -196,12 +194,12 @@ for (const mode of ['perfect', 'auto']) for (const level of HORIZONS) {
   precision.push({ row: `coach ${mode} Lv${level}`, hw });
   verdict('coach:regret-vs-best-manual-policy-is-inside-tolerance', regret > TOLERANCE && regret - hw > 0 ? 'FAIL' : regret + hw <= TOLERANCE ? 'PASS' : 'INSUFFICIENT EVIDENCE', `${mode} Lv${level} best=${best.policy} best=${f(best.nonconcession)} coach=${f(coach.nonconcession)} regret=${f(regret)} +/-${f(hw)}pp`);
 }
-const ladder = HORIZONS.map(level => rows.find(r => r.mode === 'perfect' && r.policy === 'coach' && r.level === level));
+const ladder = HORIZONS.map(level => rows.find(r => r.mode === 'hand-follow' && r.policy === 'coach' && r.level === level));
 // deadend:the-next-meaningful-decision-is-within-N-sets has ladder and economy halves.
 // AUTONOMY, Gate axis correction: the ramped roster sits inside nonconcession;
 // tested-save is the keeper's rate against that same ramp. Keep floor and horizons.
 verdict('deadend:coach-ladder-gains-at-least-the-floor-per-five-levels', ladder.slice(1).every((r, i) => r.testedSave - ladder[i].testedSave >= LADDER_FLOOR * (r.level - ladder[i].level) / 5) ? 'PASS' : 'FAIL', `perfect Lv${HORIZONS.join('/')} tested-save ${ladder.map(r => f(r.testedSave)).join(' -> ')}; nonconcession ${ladder.map(r => f(r.nonconcession)).join(' -> ')}; floor=1.60pp per 8 levels`);
-const control = HORIZONS.map(level => measure('fixed-order', level, 'perfect'));
+const control = HORIZONS.map(level => measure('fixed-order', level, 'hand-follow'));
 console.log(`control:the-fixed-order-coach-on-the-same-column perfect Lv${HORIZONS.join('/')} tested-save ${control.map(r => f(r.testedSave)).join(' -> ')}; gains ${control.slice(1).map((r, i) => f(r.testedSave - control[i].testedSave)).join(',')}pp; first uncapped TRAINING_PRIORITY, 2 points/set; informative second population, not a verdict`);
 
 // Reuses tools/deadend.local.mjs's cheapest-unbought walk, with shipped prices
@@ -236,7 +234,7 @@ function purchaseWalk(anchors, mode, incomeScale = 1) {
     : exception && gaps.every((gap, i) => gap <= N_SETS || purchases[i].cost >= 800) && longest.gap <= exception.bound ? 'ACCEPTED' : 'FAIL';
   return { bought, gaps, longest, status, exception };
 }
-for (const mode of ['perfect', 'auto']) {
+for (const mode of ['hand-follow', 'bot']) {
   const anchors = LEVELS.map(level => rows.find(r => r.mode === mode && r.policy === 'coach' && r.level === level));
   console.log(`gold-per-set: ${mode}/coach ${anchors.map(r => `L${r.level}=${f(r.goldPerSet)}`).join(' ')}; linear between anchors, last slope extended to L30; coinGain(conceded,fame,untested) over 5 shots`);
   const { bought, gaps, longest, status, exception } = purchaseWalk(anchors, mode);
@@ -244,7 +242,7 @@ for (const mode of ['perfect', 'auto']) {
     ? `${mode} longest=${longest.gap} <= bound ${exception.bound} at third ranks; accepted asymmetry, ${exception.record}; N=${N_SETS} remains the trigger elsewhere`
     : `${mode} N=${N_SETS} sets; purchases=${bought}/${purchases.length} within 400 sets; gaps=${gaps.join(',')}; longest=${longest?.gap ?? 'unavailable'} sets${longest ? ` at sets ${longest.from}->${longest.set} ${longest.purchase.name} cost=${longest.purchase.cost}` : ''}; HOTL hypothesis, lap record decides the red`);
 }
-const halvedIncome = purchaseWalk(LEVELS.map(level => rows.find(r => r.mode === 'perfect' && r.policy === 'coach' && r.level === level)), 'perfect', 0.5);
+const halvedIncome = purchaseWalk(LEVELS.map(level => rows.find(r => r.mode === 'hand-follow' && r.policy === 'coach' && r.level === level)), 'hand-follow', 0.5);
 verdict('control:a-halved-income-walk-still-fails-the-N-sets-row', halvedIncome.status === 'FAIL' ? 'PASS' : 'FAIL', `perfect income=0.5 longest=${halvedIncome.longest?.gap ?? 'unavailable'} sets; N-sets verdict=${halvedIncome.status}`);
 verdict('experience:intended-experience-is-human-judged', 'HITL', 'absent; recorded 2026-09-18; a play session is scheduled by the loop and the row never blocks a lap');
 const imprecise = precision.filter(({ hw }) => !(hw < TOLERANCE));
@@ -253,7 +251,7 @@ for (const r of rows.filter(r => r.policy === 'coach')) {
   const top = Object.entries(r.causes).sort((a, b) => b[1] - a[1])[0];
   verdict('cause:the-concession-label-is-not-one-stat-on-the-coach-population', 'DIAGNOSTIC', `${r.mode} Lv${r.level} top=${top?.[0] || 'none'} share=${f(100 * (top?.[1] || 0) / r.conceded)}%`);
 }
-for (const mode of ['perfect', 'auto', 'pref:-1', 'pref:0', 'pref:1']) for (const level of LEVELS) {
+for (const mode of MODES) for (const level of LEVELS) {
   const group = rows.filter(r => r.mode === mode && r.level === level);
   const ordered = key => [...group].sort((a, b) => b[key] - a[key]).map(r => r.policy).join('>');
   // Compare pairwise signs too: a tie in only one denominator is disagreement.

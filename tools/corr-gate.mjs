@@ -1,6 +1,7 @@
+// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 // 이 게이트의 모집단은 keeperAtLevel 기준 모집단(N칸 중 셋, 레벨당 3포인트)이며 제품 모집단은 tools/product-pop-gate.mjs가 잰다.
 import { modifierContract } from "./modifier-contract.mjs";
-import { resolve, makeRng, buildSet, keeperAtLevel, rollForm, newKeeper } from "../src/chain.mjs";
+import { resolve, makeRng, buildSet, keeperAtLevel, rollForm, newKeeper } from "./position-pop.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 
 /* 상관계수 표의 자. 한 칸을 올리면 세이브율이 얼마나 움직이는지를 칸마다 잰다.

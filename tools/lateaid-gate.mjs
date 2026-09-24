@@ -1,4 +1,5 @@
-import { makeRng, buildSet, resolve, newKeeper, followerGain } from "../src/chain.mjs";
+// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+import { makeRng, buildSet, resolve, newKeeper, followerGain } from "./position-pop.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 
 // 보조 수단이 만렙에서 어떻게 되는지는 그것이 판정식의 어느 자리에 얹혔는지가 정한다.

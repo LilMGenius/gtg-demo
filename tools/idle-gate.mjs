@@ -1,4 +1,5 @@
-import { makeRng, buildSet, resolve, newKeeper, keeperAtLevel } from "../src/chain.mjs";
+// 위치 모집단: 수동 서술자는 hand-follow(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
+import { makeRng, buildSet, resolve, newKeeper, keeperAtLevel } from "./position-pop.mjs";
 
 // 방치형에서 방치가 벌이면 안 된다. 훈련 없는 대조군은 손가락만 대신하므로,
 // 켜 두고 자리를 비우면 레벨이 오르고 키커가 세지는데 스탯은 그대로 남는다.
