@@ -16,7 +16,7 @@ import { purchaseCondition } from './state/condition.mjs';
 import { currentId } from './state/account.mjs';
 import { coinGain, readWallet, COIN_DRILL, cashPrice, pay } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
-import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, BEARDS, MAX_BEARD, beardAt, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
+import { COSMETIC_FIELDS, ownsCosmetic, rememberCosmetic, GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, BEARDS, MAX_BEARD, beardAt, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { AXIS_WORD, AXIS_UNIT, SHELF_NOTES_FOR_WIKI } from './state/shelf.mjs';
 export { SHELF_NOTES_FOR_WIKI };
 import { BUFFS, BUFF_CAP, newBuff, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
@@ -1873,7 +1873,9 @@ function gearShelf(kind) {
     if (rank === have) {
       label = s.worn;
       off = true;
-    } else if (rank < have) {
+    } else if (ownsCosmetic(state.keeper.worn, s.field, rank)) {
+      label = '장착';
+    } else if (rank < have && !COSMETIC_FIELDS.includes(s.field)) {
       label = s.past;
       off = true;
     } else if (state.wallet.coin < g.cost) {
@@ -1882,7 +1884,7 @@ function gearShelf(kind) {
       off = !affordable(g.cost);
       bad = true;
     }
-    if (!purchaseCondition(g, state).met) off = true;
+    if (!ownsCosmetic(state.keeper.worn, s.field, rank) && !purchaseCondition(g, state).met) off = true;
     // 썸네일 자리는 마크업에서 비워 두고 그림은 bindGear가 굽는다. 굽는 데 렌더러가 필요해서
     // 문자열을 만드는 자리에서는 그릴 수 없다. 자리가 없으면 카드 높이가 그림을 받고 나서 뛴다.
     // 변형 조각. 등급 하나가 여러 모양을 들고 있으면 그 조각들을 값 버튼 위에 깐다.
@@ -1903,7 +1905,7 @@ function gearShelf(kind) {
        그림이 카드에서 차지하는 몫이 그만큼 줄어 다시 글자가 먼저 읽힌다. */
     return '<div class="card gear" data-spec="' + kind + '" data-at="' + rank + '" data-rare="' + rank + '">'
       + '<div class="pic"><div class="shot" data-kind="' + kind + '" data-rank="' + rank + '"></div>' + skins + '</div>'
-      + '<b>' + g.name + '</b><em>' + cardLine(kind, rank) + '</em>' + conditionHTML(g)
+      + '<b>' + g.name + '</b><em>' + cardLine(kind, rank) + '</em>' + (ownsCosmetic(state.keeper.worn, s.field, rank) ? '' : conditionHTML(g))
       + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
   return '<h4>' + s.head + '</h4><div class="rack">' + rows.join('') + '</div>';
@@ -2003,7 +2005,7 @@ function bindGear(box) {
     // 카드를 누르면 산 것이 아니라 걸쳐 본다. 값은 buy 버튼이 따로 받는다.
     // 이미 가진 등급이나 지나간 등급은 걸쳐 볼 것이 없다.
     const rank = g[s.field];
-    if (rank > state.gear[s.field]) {
+    if (!ownsCosmetic(state.keeper.worn, s.field, rank) && (COSMETIC_FIELDS.includes(s.field) || rank > state.gear[s.field])) {
       card.onclick = (e) => {
         if (e.target.closest('.buy, .condition')) return;
         if (fitting[s.field] === rank) delete fitting[s.field];
@@ -2022,7 +2024,9 @@ function bindGear(box) {
       const field = sw.dataset.field;
       const rank = Number(sw.dataset.rank);
       const at = Number(sw.dataset.skin);
-      if (rank <= state.gear[field]) {
+      if (ownsCosmetic(state.keeper.worn, field, rank) || (!COSMETIC_FIELDS.includes(field) && rank <= state.gear[field])) {
+        rememberCosmetic(state.keeper.worn, field, rank);
+        if (COSMETIC_FIELDS.includes(field)) { delete fitting[field]; delete fitting[field + 'Skin']; }
         state.gear[field] = rank;
         state.gear[field + 'Skin'] = at;
         // 자리 칸은 몸이 아니라 장면이라 키퍼를 다시 세우는 것으로는 안 바뀐다.
@@ -2043,10 +2047,16 @@ function bindGear(box) {
       if (b.disabled) return;
       const s = SHELVES[b.dataset.kind];
       const g = s.at(b.dataset.rank);
-      if (!purchaseCondition(g, state).met || !purchase(g.cost)) return;
+      const owned = ownsCosmetic(state.keeper.worn, s.field, g[s.field]);
+      if (!owned && (!purchaseCondition(g, state).met || !purchase(g.cost))) return;
+      rememberCosmetic(state.keeper.worn, s.field, g[s.field]);
       state.gear[s.field] = g[s.field];
       // 걸쳐 보던 변형이 있으면 그 변형으로 산다. 안 옮기면 미리 본 것과 산 것이 다르다.
-      if (fitting[s.field + 'Skin'] !== undefined) {
+      // 단일 변형은 무료 면도의 유일한 기본 색 번호로 돌아간다. 다른 등급의 시착 색을 물려받지 않는다.
+      if (skinsAt(s.field, g[s.field]).length === 1) {
+        state.gear[s.field + 'Skin'] = 0;
+        delete fitting[s.field + 'Skin'];
+      } else if (fitting[s.field + 'Skin'] !== undefined) {
         state.gear[s.field + 'Skin'] = fitting[s.field + 'Skin'];
         delete fitting[s.field + 'Skin'];
       }
@@ -2058,7 +2068,7 @@ function bindGear(box) {
       // 이제 색을 가지므로 같이 다시 세운다. 골대와 동네는 몸이 아니라 빠진다.
       if (isWorn(s.field)) stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
       // 산 것은 걸쳐 본 목록에서 빠진다. 안 빼면 이미 내 것이 장바구니에 남아 값이 두 번 잡힌다.
-      if (fitting[s.field] !== undefined && fitting[s.field] <= state.gear[s.field]) delete fitting[s.field];
+      if (COSMETIC_FIELDS.includes(s.field) || (fitting[s.field] !== undefined && fitting[s.field] <= state.gear[s.field])) delete fitting[s.field];
       persist();
       pips();
       renderShop();
@@ -2550,7 +2560,10 @@ function renderShop() {
     const tried = Object.keys(fitting).filter((f) => shelfOfField(f));
     const bill = tried.reduce((n, f) => n + costOfField(f, fitting[f]), 0);
     if (!tried.every(f => purchaseCondition(shelfOfField(f).at(fitting[f]), state).met) || !purchase(bill)) return;
-    for (const f of Object.keys(fitting)) state.gear[f] = fitting[f];
+    for (const f of Object.keys(fitting)) {
+      rememberCosmetic(state.keeper.worn, f, fitting[f]);
+      state.gear[f] = fitting[f];
+    }
     fitting = {};
     if (state.gear.city !== undefined) stage.setCity(state.gear.city, state.gear.citySkin);
     if (state.gear.frame !== undefined) stage.setGoal(state.gear.frame, state.gear.frameSkin);

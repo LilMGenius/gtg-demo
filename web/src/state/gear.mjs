@@ -353,6 +353,26 @@ export const TATTOOS = [
 
 export const MAX_INK = TATTOOS.length - 1;
 
+// 외형 선반의 보유 기록은 현재 착용과 별개로 키퍼의 worn에 저장한다.
+// readGear의 범위 정규화와 Set의 중복 제거를 재사용한다. 0은 언제나 소유한 무료 등급이다.
+export const COSMETIC_FIELDS = ['hair', 'beard', 'ink'];
+export function cosmeticTiers(worn, field) {
+  if (!COSMETIC_FIELDS.includes(field)) return [];
+  const top = SKINS[field].length - 1;
+  const current = Math.max(0, Math.min(top, Math.floor(Number(worn?.[field]) || 0)));
+  const saved = worn?.[field + 'Owned'];
+  // 옛 저장은 아래 등급도 보유로 표시했으므로 그 범위를 이어받는다. 새 구매는 실제 산 등급만 더한다.
+  const ranks = Array.isArray(saved) ? saved.filter(rank => Number.isInteger(rank) && rank >= 0 && rank <= top)
+    : Array.from({ length: current + 1 }, (_, rank) => rank);
+  return [...new Set([0, current, ...ranks])];
+}
+export function ownsCosmetic(worn, field, rank) {
+  return cosmeticTiers(worn, field).includes(Number(rank));
+}
+export function rememberCosmetic(worn, field, rank) {
+  if (COSMETIC_FIELDS.includes(field)) worn[field + 'Owned'] = [...new Set([...cosmeticTiers(worn, field), Number(rank)])];
+}
+
 export function newGear() {
   const g = { grip: 0, studs: 0, pads: 0, socks: 0, frame: 0, city: 0, hair: 0, beard: 0, ink: 0 };
   for (const f of SKIN_FIELDS) g[f + 'Skin'] = 0;
