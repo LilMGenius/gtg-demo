@@ -239,7 +239,7 @@ export const HAIRS = [
 
 export const MAX_HAIR = HAIRS.length - 1;
 
-// 수염은 헤어와 같은 등급 가격을 쓴다. 기본 면도는 무료이며 무료 변형도 선택해야 착용된다.
+// 수염은 헤어와 같은 등급 가격을 쓴다. 기본 면도는 무료이며 칠할 털이 없어 변형이 하나다.
 export const BEARDS = HAIRS.map((row, beard) => ({ beard, cost: row.cost,
   name: ['면도', '짧은 수염', '염소수염', '풍성한 수염'][beard],
   note: ['깔끔한 맨턱', '턱에 얇게 남긴 수염', '턱끝에 모은 수염', '앞턱을 넓게 덮는 수염'][beard] }));
@@ -247,9 +247,7 @@ export const MAX_BEARD = BEARDS.length - 1;
 // 0은 면도, 1은 짧은 턱수염, 2는 풍성한 수염이다. 기존 선수 얼굴의 등급을 그대로 쓴다.
 // 염소수염은 같은 턱수염 등급에서 앞면 폭으로 구별한다. 색은 염색과 독립된 갈색·검정·회색이다.
 export const BEARD_SKINS = [
-  [{ name: '면도', tone: 0x1c1712, cut: { beard: 0, shape: 'stubble' } },
-   { name: '턱끝 수염', tone: 0x1c1712, cut: { beard: 1, shape: 'goatee' } },
-   { name: '하루 수염', tone: 0x45382c, cut: { beard: 1, shape: 'stubble' } }],
+  [{ name: '면도', tone: 0x1c1712, cut: { beard: 0, shape: 'stubble' } }],
   [{ name: '갈색 수염', tone: 0x45382c, cut: { beard: 1, shape: 'stubble' } },
    { name: '검은 수염', tone: 0x1c1712, cut: { beard: 1, shape: 'stubble' } },
    { name: '회색 수염', tone: 0x74716b, cut: { beard: 1, shape: 'stubble' } }],

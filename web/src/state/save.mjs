@@ -48,6 +48,11 @@ export function load() {
     // 구버전은 키퍼 하나만 저장했다. 보유 목록이 없어도 살려서 읽는다.
     const head = s && (Array.isArray(s.squad) ? s.squad[Number(s.pick) || 0] : s.keeper);
     if (!head || typeof head !== 'object' || !Number.isFinite(head.level)) return null;
+    // 면도 0등급의 옛 변형 1·2는 무료였으므로 기본 0번으로 접어도 유료 구매는 잃지 않는다.
+    // 키퍼별 착용과 구버전 공용 장비를 함께 옮기고 다른 등급·재화·보유품은 그대로 둔다.
+    for (const gear of [s.gear, s.keeper?.worn, ...(Array.isArray(s.squad) ? s.squad.map(k => k?.worn) : [])]) {
+      if (gear?.beard === 0 && [1, 2].includes(gear.beardSkin)) gear.beardSkin = 0;
+    }
     /* 얼굴표가 재배열된 판을 모르는 저장이다. 읽는 자리에서 한 번만 옮기고 판번호를 찍는다.
        저장된 바이트는 그대로 두고 다음 save가 새 판번호로 덮는다. 매번 옛 바이트에서 다시 옮기므로
        두 번 옮기는 일은 없다. 도장은 하나인데 옮길 지도는 여러 장이다. 어느 지도를 옮길지는 각 모듈이
