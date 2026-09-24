@@ -7,7 +7,7 @@ export const STAT_CAUSES = [
   "kickerFinishing", "kickerPower", "kickerCurve"
 ];
 
-export const INPUT_CAUSES = ["direction", "timing", "greed"];
+export const INPUT_CAUSES = ["direction", "timing", "greed", "position"];
 
 export const LEDGER = STAT_CAUSES.concat(INPUT_CAUSES);
 
@@ -32,6 +32,7 @@ export const CAUSE_LABEL = {
   kickerPower: "키커 슛파워",
   kickerCurve: "키커 슛커브",
   direction: "방향",
+  position: "자리",
   timing: "타이밍",
   greed: "욕심"
 };

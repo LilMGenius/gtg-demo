@@ -9,6 +9,13 @@ import { KICKERS } from "./roster.mjs";
 export const GOAL_HALF_W = 2.2;
 export const GOAL_H = 1.9;
 
+// 판정 반폭 2.2는 실물 3.66m이며 기둥에서 0.4단위 떨어져 선다(P15 HOTL 가설).
+export const X_MAX = GOAL_HALF_W - 0.4;
+// 서서 뻗는 0.45단위는 약 0.75m다(P15 HOTL 가설).
+const STAND = 0.45;
+// 옆걸음은 민첩성 1~10에서 약 1.9~4.0m/s가 된다(P15 HOTL 가설).
+export const moveSpeed = (keeper) => 1.0 + 0.14 * clamp(keeper.agility, 1, 10);
+
 // 서서 손을 뻗었을 때 닿는 기준선. 수직 반경은 여기서부터 잰다.
 const SHOULDER = 0.90;
 
@@ -175,17 +182,17 @@ export function buildSet(rng, level = 5, city = 0, pool) {
   const from = Array.isArray(pool) && pool.length ? pool : KICKERS;
   for (let i = 0; i < 5; i++) {
     const k = scaleKicker(from[Math.floor(rng() * from.length)], level);
-    let aimX, aimY, forced;
+    let aimX, aimY, forced, sideU;
     if (i < 2) {
-      aimX = (rng() < 0.5 ? -1 : 1) * (0.65 + rng() * 0.5);
+      aimX = ((sideU = rng()) < 0.5 ? -1 : 1) * (0.65 + rng() * 0.5);
       aimY = 0.35 + rng() * 1.15;
       forced = false;
     } else if (i === 4) {
-      aimX = (rng() < 0.5 ? -1 : 1) * (1.45 + rng() * 0.6);
+      aimX = ((sideU = rng()) < 0.5 ? -1 : 1) * (1.45 + rng() * 0.6);
       aimY = 0.5 + rng() * 1.35;
       forced = true;
     } else {
-      const side = rng() < 0.4 ? 0 : rng() < 0.5 ? -1 : 1;
+      const side = rng() < 0.4 ? 0 : (sideU = rng()) < 0.5 ? -1 : 1;
       aimX = side * (1.0 + rng() * 0.9);
       aimY = 0.3 + rng() * 1.55;
       forced = false;
@@ -207,7 +214,7 @@ export function buildSet(rng, level = 5, city = 0, pool) {
     // 칩은 세게 차는 공이 아니다. 둘이 같이 서면 몸싸움 롤과 칩 롤이 한 구에 겹쳐 상한을 넘긴다.
     const strong = chip ? false : pct(rng, 20 + k.power * 6);
     shots.push({
-      index: i, kicker: k, aimX, aimY, forced, strong, chip, gaze, passer, bend,
+      index: i, kicker: k, aimX, aimY, forced, strong, chip, gaze, passer, bend, sideU,
       side: aimX < -0.55 ? -1 : aimX > 0.55 ? 1 : 0,
       course: courseOf(aimX, aimY),
       // 슛파워가 시간을 줄인다. 판정 창을 직접 압박하는 항이다.
@@ -283,6 +290,8 @@ function contactMargin(keeper, shot, input, over) {
 }
 
 function bareContactMargin(keeper, shot, input, over) {
+  const positional = Array.isArray(input.trace);
+  if (positional) input = positionDive(keeper, shot, input, over);
   const form = keeper.form || 0;
   const s = (k) => clamp((over && k in over ? over[k] : keeper[k]) + form, 1, 10);
   const k = shot.kicker;
@@ -300,7 +309,9 @@ function bareContactMargin(keeper, shot, input, over) {
 
   const SCALE_MS = 200;
   // 시간 항은 judgeWindow가 소유한다. 화면의 자가 그리는 그 창이 여기서 그대로 쓰인다.
-  const slack = judgeWindow(keeper, shot, input, over).slackMs - Math.abs(input.errMs);
+  // P15 가설: 전속 이동 중 미숙한 자리잡기는 최대 60ms의 준비 시간을 잃는다.
+  const unset = positional ? 60 * Math.min(1, Math.abs(input.vx) / moveSpeed({ agility: s("agility") })) * (10 - offball) / 9 : 0;
+  const slack = judgeWindow(keeper, shot, input, over).slackMs - Math.abs(input.errMs) - unset;
   // 상한을 두지 않는다. 늦으면 늦은 만큼 손이 짧아져야 그 늦음이 원인으로 잡힌다.
   const timing = clamp(slack / SCALE_MS, -1.2, 1.35);
 
@@ -312,14 +323,17 @@ function bareContactMargin(keeper, shot, input, over) {
   const quality = clamp(0.55 + 0.33 * timing, 0.05, 1.05) * input.dirQuality;
 
   let margin;
+  const distance = Math.abs(shot.aimX - (positional ? input.x : 0));
   if (shot.course === "상단") {
     margin = vert * quality - (shot.aimY - SHOULDER + bend * 0.6) * closing;
+    // 높은 공도 수평으로 닿아야 한다. 두 축 중 모자란 쪽이 접촉을 결정한다.
+    if (positional) margin = Math.min(margin, horiz * quality - (distance + lateral + bend) * closing);
   } else {
-    const gap = (Math.abs(shot.aimX) + lateral + bend) * closing;
+    const gap = (distance + lateral + bend) * closing;
     margin = horiz * quality - gap;
   }
   // 정면 슛의 일부는 서 있기만 해도 몸에 맞는다. 무거울수록 넓다.
-  if (shot.course === "정면") margin += 0.10 + (keeper.weight - 84) * W_FRONT;
+  if (positional ? distance <= STAND : shot.course === "정면") margin += 0.10 + (keeper.weight - 84) * W_FRONT;
   return margin;
 }
 
@@ -346,10 +360,20 @@ function attributeContact(keeper, shot, input) {
        ["kickerPower", { kickerPower: shot.kicker.power - 1 }],
        ["kickerCurve", { bendSub: 0.028 }]];
   let best = probes[0][0];
+  // 자동 읽기와 타이밍은 같은 난수로 판단력 한 칸을 재평가한다.
+  if (Array.isArray(input.trace)) probes.push(["judgement", { judgement: keeper.judgement + 1 }]);
   let bestGain = -Infinity;
+  let restored = false;
   for (const [cause, over] of probes) {
     const gain = contactMargin(keeper, shot, input, over) - base;
+    restored ||= base + gain > 0;
     if (gain > bestGain) { bestGain = gain; best = cause; }
+  }
+  if (Array.isArray(input.trace)) {
+    // 자동 다이빙의 오독은 손의 위치가 아니라 판단력이 소유한다.
+    if (input.dirQuality < 1) return "judgement";
+    // 수동 자리 탓은 스탯 한 칸으로 복원되지 않으며 공 앞에 섰을 때 닿는 경우뿐이다.
+    if (!input.auto && !restored && contactMargin(keeper, shot, { ...input, x: clamp(shot.aimX, -X_MAX, X_MAX) }, null) > 0) return "position";
   }
   return best;
 }
@@ -377,16 +401,107 @@ function dirQualityOf(dive, shot) {
   return 0.1;
 }
 
+// 관측 사이에는 선형 보간한다. 접촉 뒤 표본은 키커의 미래 정보가 되므로 버린다.
+function positionAt(trace, ms, fallback) {
+  const samples = trace.filter(p => Number.isFinite(p.ms) && p.ms <= 0 && Number.isFinite(p.x))
+    .map(p => ({ ms: p.ms, x: clamp(p.x, -X_MAX, X_MAX) })).sort((a, b) => a.ms - b.ms);
+  if (!samples.length) return { x: fallback, vx: 0 };
+  if (ms < samples[0].ms) return { x: samples[0].x, vx: 0 };
+  for (let i = 1; i < samples.length; i++) {
+    const a = samples[i - 1], b = samples[i];
+    if (ms > b.ms || b.ms === a.ms) continue;
+    // 밀리초 표본의 기울기를 초당 이동량으로 바꾸는 단위 환산이다.
+    return { x: a.x + (b.x - a.x) * (ms - a.ms) / (b.ms - a.ms), vx: (b.x - a.x) * 1000 / (b.ms - a.ms) };
+  }
+  return { x: samples.at(-1).x, vx: 0 };
+}
+
+function readPosition(shot, raw, rng) {
+  // van der Kamp(2006)의 접촉 400~600ms 전 방향 전환 결과를 참고한 P15 가설이다.
+  const readMs = 900 - 65 * (shot.kicker.composure - 1);
+  const observed = positionAt(raw.trace, -readMs, raw.x);
+  if (shot.chip || shot.side === 0) return { ...shot, readMs, xRead: observed.x };
+  // Masters 외(2007)의 현장값 9.95cm·59.2%를 우선해 폭을 0.32단위(약 53cm)로 둔다: 편위 0.06에서 59%, 0.13/0.26/0.53에서 69/84/96%로 Weigelt와 Memmert(2012)의 지시된 실험 과제보다 낮은 곡선이다(P15 HOOTL 판정).
+  const largerP = 0.5 + 0.5 * Math.tanh(Math.abs(observed.x) / 0.32);
+  const larger = observed.x >= 0 ? -1 : 1;
+  // 수제 슛은 원래 방향을 보존하고 buildSet의 슛만 기존 균등 난수로 재조준한다.
+  let side = Number.isFinite(shot.sideU) ? (shot.sideU < largerP ? larger : -larger) : shot.side;
+  // Noel 외(2015)의 선행 이동 역이용을 참고한 P15 가설: 0.3단위/s부터 움직임으로 읽는다.
+  if (Math.abs(observed.vx) > 0.3) {
+    // 새 경로 전용 난수: 침착성이 움직이는 키퍼의 역방향을 고를 확률을 소유한다.
+    if (rng() < 0.3 + 0.05 * shot.kicker.composure) side = -Math.sign(observed.vx);
+  }
+  const aimX = Math.abs(shot.aimX) * side;
+  return { ...shot, aimX, side, course: courseOf(aimX, shot.aimY), readMs, xRead: observed.x };
+}
+
+function positionDive(keeper, shot, raw, over) {
+  const j = clamp(over?.judgement ?? keeper.judgement, 1, 10);
+  const rel = shot.aimX - raw.x;
+  // 몸 앞은 오독 없이 서고, 먼 공은 방향 단서가 커진다는 P15 가설이다.
+  const readP = Math.min(0.995, 0.50 + 0.04 * j + 0.10 * Math.min(1, (Math.abs(rel) - STAND) / 1.0) + 0.03 * (keeper.botTier || 0));
+  const standing = Math.abs(rel) <= STAND;
+  const correct = standing || raw.readU < readP;
+  // 오독의 절반은 역동작(품질 0.1), 절반은 주저(품질 0.5)라는 P15 가설이다.
+  const wrong = raw.missU < 0.5;
+  const dive = standing ? 0 : correct ? Math.sign(rel) : wrong ? -Math.sign(rel) : 0;
+  // autoInput과 같은 판단력별 타이밍 분산을 재사용한다.
+  const errMs = (raw.timeU * 2 - 1) * (200 - 12 * j);
+  return { ...raw, dive, dirQuality: correct ? 1 : wrong ? 0.1 : 0.5, errMs };
+}
+
+function positionInput(keeper, shot, raw, rng) {
+  // 새 경로 전용 난수: 판단력의 방향 읽기, 오독 형태, 타이밍을 짝지어 보존한다.
+  const readU = rng(), missU = rng(), timeU = rng();
+  // 새 경로 전용 난수: autoInput의 판단력별 전진 결정을 그대로 따른다.
+  const wantOut = shot.forced || pct(rng, 16 + keeper.judgement * 2);
+  // 새 경로 전용 난수: autoInput과 같은 전진 거리와 잠긴 수비범위 상한이다.
+  const advance = wantOut ? clamp(0.6 + rng() * 0.9, 0, 1.3 + 0.19 * LOCKED.sweeping) : 0;
+  return positionDive(keeper, shot, { ...raw, readU, missU, timeU, advance });
+}
+
+// 봇은 샷을 바꾸지 않고 접촉 전의 자취만 만든다. 소비자는 마지막 표본을 x로 쓴다.
+export function botPlan(keeper, shot, rng) {
+  // P15 가설: 오프더볼 1의 표준편차 0.12단위가 만렙에서 사라진다.
+  const sigma = 0.12 * (10 - clamp(keeper.offball, 1, 10)) / 9;
+  // 새 경로 전용 난수: Box-Muller 표준정규 변환으로 위치 오차의 표준편차를 맞춘다.
+  const noise = Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng()) * sigma;
+  const start = clamp(noise, -X_MAX, X_MAX);
+  // 새 경로 전용 난수: 판단력 1~10의 계획 방향 적중률은 31~85%다(P15 가설).
+  const read = rng() < 0.25 + 0.06 * keeper.judgement;
+  // 새 경로 전용 난수: 계획을 못 읽으면 양쪽을 반반 고른다.
+  const randomSide = rng() < 0.5 ? -1 : 1;
+  const side = read && shot.side !== 0 ? shot.side : randomSide;
+  // P15 가설: 판단력이 높으면 더 늦게 움직여 키커에게 주는 정보를 줄인다.
+  const tMove = 350 - 10 * keeper.judgement;
+  // P15 가설: 목표 편위는 오프더볼 1~10에서 0.28~0.55단위다.
+  const target = side * (0.25 + 0.03 * keeper.offball);
+  // 이동시간을 밀리초로 환산하고 실제 도착 시점을 표본에 넣어 보간을 정확히 한다.
+  const duration = Math.abs(target - start) / moveSpeed(keeper) * 1000;
+  const finish = -tMove + duration;
+  // 1초 전부터 관측해야 가장 이른 키커의 900ms 읽기가 초기 위치를 본다.
+  const trace = [{ ms: -1000, x: start }, { ms: -tMove, x: start }];
+  if (finish < 0) trace.push({ ms: finish, x: target });
+  trace.push({ ms: 0, x: start + Math.sign(target - start) * Math.min(Math.abs(target - start), moveSpeed(keeper) * tMove / 1000) });
+  return trace;
+}
+
 export function resolve(input) {
   const keeper = input.keeper;
-  const shot = input.shot;
+  let shot = input.shot;
   const rng = input.rng;
-  const raw = input.input || autoInput(keeper, shot, rng);
+  let raw = input.input || autoInput(keeper, shot, rng);
+  const positional = Array.isArray(raw.trace);
+  if (positional) {
+    raw = { ...raw, x: clamp(Number(raw.x) || 0, -X_MAX, X_MAX), vx: Number(raw.vx) || 0 };
+    shot = readPosition(shot, raw, rng);
+    raw = positionInput(keeper, shot, raw, rng);
+  }
   // 축구화는 손가락이 만든 값이 아니라 신고 나온 값이다. 프로브 전체가 같은 값을 쓰므로
   // 원인 귀속에서 이 항은 상쇄되고, 장비가 실점 원인으로 잡히는 일은 없다.
   // 가산 위 유계 승산의 E는 활성 장비를 한 버킷에 모으므로 독립 구매 승수가 늘지 않는다.
   const gearStrength = [input.grip, input.studs, input.pads, input.socks, input.frame].reduce((sum, rank) => sum + gearRank(rank) / 3, 0) + (input.rosin ? 1 / 3 : 0);
-  const inp = Object.assign({}, raw, { dirQuality: dirQualityOf(raw.dive, shot), studs: input.studs, gearStrength });
+  const inp = Object.assign({}, raw, { dirQuality: positional ? raw.dirQuality : dirQualityOf(raw.dive, shot), studs: input.studs, gearStrength });
 
   const events = [];
   const state = { stage: 1, rolls: 0 };
@@ -403,7 +518,8 @@ export function resolve(input) {
     events.push({ t: "result", line: conceded ? "실점" : "세이브", cause: cause || null });
     // 유명한 키커를 막으면 더 오르고, 유명한 키커에게 먹히면 덜 오른다. STATS 4절의 M 경로다.
     return { events, conceded, cause: conceded ? cause : null, stage: state.stage, rolls: state.rolls,
-      fame: shot.kicker.fame, untested: Boolean(untested) };
+      fame: shot.kicker.fame, untested: Boolean(untested),
+      ...(positional ? { shot, input: inp } : {}) };
   };
 
   const place = placement(keeper, shot);
@@ -467,12 +583,14 @@ export function resolve(input) {
   state.rolls++;
   const margin = contactMargin(keeper, shot, inp, null);
   if (margin <= 0) {
-    if (inp.dirQuality <= 0.1) {
+    if (!positional && inp.dirQuality <= 0.1) {
       say("miss", "완전히 역동작이었습니다.", "direction");
       return done(true, "direction");
     }
     const cause = attributeContact(keeper, shot, inp);
     const lines = {
+      position: "공이 오는 자리에서 너무 멀리 섰습니다.",
+      judgement: "공이 오는 쪽을 늦게 읽었습니다.",
       diving: "손끝을 스치고 지나갔습니다.",
       reflex: "반응이 한 박자 늦었습니다.",
       agility: "몸이 늦게 출발했습니다.",
@@ -542,7 +660,7 @@ export function resolve(input) {
      장갑으로 순간이동하는 그림을 그렸다. 실측으로 손에 들어온 구의 15.1퍼센트(1레벨),
      10.0퍼센트(10레벨), 1.7퍼센트(30레벨)가 반대로 뛴 구였다. 판단력이 오르면 저절로 준다.
      맞은 공은 살아 있으므로 아래 리바운드 단계를 흘린 공과 그대로 공유한다. */
-  const offDir = inp.dive !== shot.side;
+  const offDir = positional ? inp.dirQuality < 1 : inp.dive !== shot.side;
   if (d2 < taken + spillP * (100 - taken) / 100 || offDir) {
     if (offDir) say("bodyBlock", "반대로 뛰었는데 몸에 맞고 튕겼습니다. 공이 아직 살아 있습니다.", null);
     else say("spill", "흘렸습니다. 공이 아직 살아 있습니다.", "handling");
