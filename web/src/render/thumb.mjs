@@ -5,7 +5,8 @@
 // 상한에 걸린 맥락은 조용히 검은 사각형이 된다. 한 대를 돌려 쓰고 결과만 이미지로 굽는다.
 import { GOAL } from '../../../src/reality.mjs';
 import * as THREE from "../../vendor/three.module.min.js";
-import { buildKeeper } from "./objects/actors.mjs";
+import { buildKeeper, buildKicker, setPose, POSES } from "./objects/actors.mjs";
+import { faceOf } from "../../../src/roster.mjs";
 import { meshPanel, buildPassers } from "./objects/pitch.mjs";
 import { placeCardGeo } from "./objects/places.mjs";
 import { flatVertex, mergeGeos } from "./units.mjs";
@@ -32,7 +33,7 @@ const BODY_H = 448;
    하나씩 실측으로 잡힌 값이라 같이 안 옮긴다. */
 const CARD_W = 448;
 const CARD_H = 269;
-const sizeOf = (kind) => (kind === "body" ? [BODY_W, BODY_H]
+const sizeOf = (kind) => ((kind === "body" || kind === "kicker") ? [BODY_W, BODY_H]
   : kind === "bot" || kind === "buff" ? [CARD_W, CARD_H] : [BAKE_W, BAKE_H]);
 
 // 상품마다 봐야 할 곳이 다르다. 장갑을 온몸 썸네일로 보여 주면 손은 여덟 화소가 된다.
@@ -55,7 +56,7 @@ const AIM = {
      어깨는 같이 들어온다. 고정 보정이 지키려던 것이 어깨인데 실측으로 그 보정이 어깨를 이미
      잘랐다. 스펀지를 넣은 저지가 키 188에서 위팔 상자 위끝 -0.131이고 키 205에서는 네 등급이
      전부 칸 밖이었다. 목을 잡으면 그 위끝이 가장 높은 칸에서도 0.145라 어깨가 칸에 남는다. */
-  pads: { part: "neck", dist: 1.7, lift: 0, high: 0.1 },
+  pads: { part: "neck", dist: 2.1, lift: 0.1, high: 0.1, yaw: -0.7 }, // 넓은 키트 어깨와 큰 머리를 함께 담는다.
   socks: { part: "shin", dist: 1.05, lift: 0.02 },
   // 겨냥점은 머리 한가운데인데 파는 것은 그 위에 얹힌 껍데기다. 보정 없이 잡으면
   // 모히칸의 무게중심이 칸 위에서 13퍼센트 지점에 걸려 볏이 잘린다.
@@ -68,8 +69,8 @@ const AIM = {
      942까지 떨어져 thumb의 하한 1000을 깼고 무게중심이 위쪽 0.12까지 올라갔다.
      정사각으로 되돌리는 갈래는 버렸다. contain이 96x96으로 줄여 넣어 옛 결함이 돌아온다. */
   // 머리와 같은 거리에서 얼굴 중심을 잡아 턱수염과 면도를 함께 비교한다.
-  beard: { part: "head", dist: 0.8, lift: 0, high: 0 },
-  hair: { part: "head", dist: 0.8, lift: 0.1, high: 0 },
+  beard: { part: "head", dist: 1.35, lift: 0, high: 0, yaw: 0.24 }, // 머리 반경 확대에 맞춰 턱 전체를 담는다.
+  hair: { part: "head", dist: 1.35, lift: 0.17, high: 0 }, // 키트 머리 배율만큼 정수리 여백을 함께 늘린다.
   /* 파는 것은 팔이 아니라 팔에 새긴 그림이다. 겨냥점이 어깨 관절이라 lift가 그 아래
      위팔 한가운데를 잡고, 0.58에서는 칸의 대부분을 소매와 유니폼이 먹어 무늬가 위쪽
      귀퉁이에 손톱만 하게 걸린다. 실측: 세 유료 등급의 무늬가 칸의 16.6과 18.4와
@@ -91,7 +92,7 @@ const AIM = {
      -0.675는 프레임 가운데를 머리 아래 몸통 중간에 놓아 발까지 담는 보정이다.
      내려다보지 않는다. 기본 눈높이 0.22로 잡으면 정수리를 위에서 보게 되어
      온몸 그림이 머리 뚜껑부터 시작한다. */
-  body: { part: "head", dist: 4.73, lift: -0.675, high: 0 }
+  body: { part: "head", dist: 5.4, lift: -0.74, high: 0 } // 큰 머리를 포함한 전신과 발끝 여백을 확보한다.
   ,
   /* 개봉 카드의 한 사람. 탈의실 칸은 정사각인데 카드는 세로로 길어서, 같은 그림을 잘라 키우면
      위아래가 남고 좌우가 깎인다. 그러면 머리가 프레임 밖으로 나간다.
@@ -103,8 +104,11 @@ const AIM = {
      한 겨냥으로 셋을 다 먹인다. 키퍼의 얼굴은 +z를 보므로 카메라도 +z에 서야 한다.
      yaw 0이 그 자리이고, 0.24만큼 틀어야 코와 귀가 실루엣을 만든다.
      겨냥점은 머리다. 몸통을 잡고 올려 맞추면 키가 다른 선수마다 얼굴이 다른 높이에 걸린다. */
-  face: { part: "head", dist: 0.62, lift: 0.02, high: 0.06, yaw: 0.24 }
+  face: { part: "head", dist: 1.06, lift: 0.034, high: 0.06, yaw: 0.24 } // 키트의 머리 확대 비율로 초상 거리와 중심을 맞춘다.
 };
+
+// 키커 전신도 시착실과 같은 프레임을 쓰되 선수 얼굴과 키커 몸을 그린다.
+AIM.kicker = AIM.body;
 
 /* 골대와 동네는 몸에 안 걸친다. 사람을 겨냥하는 AIM으로는 못 찍으므로 장면 조각을 따로 세운다.
    두 칸 다 등급이 화면을 바꾸는 물건이라, 파는 것이 곧 그 장면의 모습이다. */
@@ -386,7 +390,12 @@ function frame(kind, keeper, look, yaw, over) {
   clearScene();
   scene.background = null;
   if (rig) scene.remove(rig);
-  rig = buildKeeper(keeper.height, keeper.weight, look);
+  rig = kind === "kicker" ? buildKicker(faceOf(keeper.name)) : buildKeeper(keeper.height, keeper.weight, look);
+  if (kind === "kicker") {
+    setPose(rig, POSES.ready); // 시착 카드처럼 두 발을 딛고 선수 얼굴과 차림을 보여 준다.
+    rig.rotation.y = Math.PI; // 키커 얼굴은 로컬 -z이므로 초상 카메라를 향해 반 바퀴 돌린다.
+    rig.scale.set(keeper.weight / 84, keeper.height / 188, keeper.weight / 84); // 시착실 기준 체격에 대한 명단의 상대 비율로 세 선수의 체격을 구별한다.
+  }
   rig.updateMatrixWorld(true);
   scene.add(rig);
   const aim = Object.assign({}, AIM[kind] || { part: "torso", dist: 1.3, lift: 0 }, over || {});

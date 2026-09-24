@@ -2336,7 +2336,7 @@ function legendHTML() {
   const players = poolFor(KICKERS, 'legend').slice(0, showCount);
   return '<section class="legend-showcase"><h4>전설 선수 쇼케이스</h4><p>경기를 바꿀 이름들</p><div class="players">'
     + players.map(k => '<article class="player"><div class="player-inner"><span class="fame"><small>명성</small>' + k.fame
-      + '</span><img src="' + thumbURL('body', k, lookOf({}, k.name)) + '" alt="' + k.name + ' 전신"><h3>' + k.name
+      + '</span><img src="' + thumbURL('kicker', k) + '" alt="' + k.name + ' 전신"><h3>' + k.name
       + '</h3><div class="stats"><span>골 결정력 <b>' + k.finishing + '</b></span><span>슛 파워 <b>' + k.power
       + '</b></span></div></div></article>').join('')
     + '</div><button class="market">이적시장</button></section>';

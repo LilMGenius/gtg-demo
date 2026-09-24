@@ -218,7 +218,7 @@ try {
      -0.5는 깃이 칸 위 변에 닿는 자리다. 실측으로 상의가 칠한 첫 줄이 게이트 몸에서
      -0.2에 0.259, -0.3에 0.151, -0.4에 0.039, -0.5에 0.000이다. 다섯 벌이 모두 -0.5에서 0.000이고
      한 칸 앞인 -0.4까지는 다섯 벌 다 초록이라, 이 값은 문턱을 스치는 자리가 아니다. */
-  const PADS_DROP = { lift: -0.5 };
+  const PADS_DROP = { lift: -0.75 }; // 넓어진 카드의 실제 윗변 밖까지 깃을 보내는 결함 대조군이다.
   const shapes = await p.evaluate(async ([bodies, wide, drop]) => {
     const m = await import("/web/src/render/thumb.mjs");
     const g = await import("/web/src/state/gear.mjs");
@@ -653,7 +653,7 @@ try {
     if (all.length !== 1) throw new Error(what + " read " + all.length + " times in actors.mjs, want 1");
     return Number(ACTORS.match(re)[1]);
   };
-  const SHELL = oneOf(/addOutline\(gv, ([\d.]+)\);/, "the glove outline width");
+  const SHELL = 0; // 무광 키트에는 복제 외곽선이 없으므로 접촉 허용 폭도 없다.
   const PIP_Z = oneOf(/pip\.translate\(col \* s \* [\d.]+, row \* s \* [\d.]+, s \* ([\d.]+)\);/, "the pad z");
   const GLOVE_SIZE = oneOf(/gloveSize: h \* ([\d.]+),/, "the keeper glove size");
   const pads = await p.evaluate(async ([bodies, shell, gsize]) => {
@@ -694,13 +694,15 @@ try {
             }
             return { hi, lo, zhi };
           };
-          const palm = face(0, box);
+          const parts = gv.userData.partVertices;
+          const palm = face(0, parts[0]); // 구와 상자의 정점 수를 같은 수로 가정하지 않는다.
+          const start = parts.slice(0, 3).reduce((a, n) => a + n, 0); // 손바닥, 엄지, 손목 뒤가 빨판의 시작이다.
           let back = Infinity;
-          for (let q = 0; q < cut.pips; q += 1) back = Math.min(back, face((3 + q) * box, (4 + q) * box).lo);
-          const sz = ink.length ? ink[0].scale.z : 0;
+          for (let q = 0; q < cut.pips; q += 1) back = Math.min(back, face(start + q * box, start + (q + 1) * box).lo);
+          const sz = ink.length ? ink[0].scale.z : 1; // 외곽선이 없으면 표면 자체 배율이다.
           out.rows.push({
             body: k.height + "/" + k.weight, tag: L.rank + ":" + L.skin, hand: at,
-            verts: pos.count, want: (3 + cut.pips) * box, inks: ink.length, sz,
+            verts: pos.count, want: start + cut.pips * box, inks: ink.length, sz,
             wantSz: 1 + (shell * 2) / Math.max(0.04, bb.max.z - bb.min.z),
             s: (k.height / 100) * gsize * cut.bulk, stand: back - palm.hi,
             reach: (palm.zhi - (bb.max.z + bb.min.z) / 2) * (sz - 1)
@@ -715,7 +717,7 @@ try {
   const padEnds = (k) => Math.min.apply(null, pads.rows.map((r) => r[k])).toFixed(5)
     + ".." + Math.max.apply(null, pads.rows.map((r) => r[k])).toFixed(5);
   const padClear = pads.rows.filter((r) => !(r.stand <= r.reach));
-  const padDrift = pads.rows.filter((r) => r.verts !== r.want || r.inks !== 1
+  const padDrift = pads.rows.filter((r) => r.verts !== r.want || r.inks !== 0
     || Math.abs(r.sz - r.wantSz) > 1e-9);
   const padPlant = pads.rows.filter((r) => r.stand + (PLANT_PIP_Z - PIP_Z) * r.s > r.reach);
   const padTight = pads.rows.reduce((a, c) => (a && a.reach - a.stand <= c.reach - c.stand ? a : c), null);
@@ -772,10 +774,10 @@ try {
   const [TORSO_K] = manyOf(/torsoR: w \* ([\d.]+), torsoLen: h \* [\d.]+,/, "the keeper torso radius");
   const [W_BASE, W_AT, W_STEP] = manyOf(/const w = ([\d.]+) \+ \(weight - (\d+)\) \* ([\d.]+);/, "the girth from weight");
   const [PAD_TH_K] = manyOf(/const th = o\.armR \* ([\d.]+) \* kc\.pad;/, "the sponge thickness");
-  const [PAD_LIFT_K, PAD_SEAT_K, PAD_SEAT_DOWN] = manyOf(/pad\.position\.set\(side \* \(o\.armR \* [\d.]+ \+ Math\.max\([\d.]+, kc\.pad\) \* [\d.]+\), o\.armR \* ([\d.]+) \+ th \* ([\d.]+) - ([\d.]+), 0\);/, "the sponge seat");
+  const [PAD_LIFT_K, PAD_SEAT_K, PAD_SEAT_DOWN] = manyOf(/pad\.position\.set\(side \* \(o\.armR \* [\d.]+ \+ Math\.max\([\d.]+, kc\.pad\) \* [\d.]+\), o\.armR \* ([\d.]+) \+ th \* ([\d.]+) - ([\d.]+), o\.armR \* [\d.]+\);/, "the sponge seat");
   const [PAD_WIDE_K, PAD_GIRTH_K] = manyOf(/const wide = o\.armR \* ([\d.]+) \+ o\.torsoR \* kc\.girth \* ([\d.]+);/, "the sponge width");
   const [PAD_DEEP_K] = manyOf(/new THREE\.BoxGeometry\(wide, th, o\.armR \* ([\d.]+)\)/, "the sponge depth");
-  const [TORSO_PEN] = manyOf(/addOutline\(torso, ([\d.]+)\);/, "the torso outline width");
+  const TORSO_PEN = 0; // 키트 몸통은 복제 잉크 없이 실제 표면이 외곽선이다.
   const crowns = await p.evaluate(async ([bodies, lit, floor, halfAt]) => {
     const T = await import("/web/vendor/three.module.min.js");
     const A = await import("/web/src/render/objects/actors.mjs");
@@ -855,7 +857,7 @@ try {
   const crownSay = (r) => r.body + " " + r.tag + " hand " + r.hand + " clears by " + r.margin.toFixed(5);
   const crownEnds = (k) => Math.min.apply(null, crowns.rows.map((r) => r[k])).toFixed(5)
     + ".." + Math.max.apply(null, crowns.rows.map((r) => r[k])).toFixed(5);
-  const crownDrift = crowns.rows.filter((r) => r.boxes !== 1 || r.verts !== crowns.box || r.inks !== 1
+  const crownDrift = crowns.rows.filter((r) => r.boxes !== 1 || r.verts !== crowns.box || r.inks !== 0
     || r.padInks > 1 || !(r.fall > 0 && r.fall <= 1) || Math.abs(r.top - r.live) > 1e-9
     || Math.abs(r.wide - r.wantWide) > 1e-9 || Math.abs(r.high - r.wantHigh) > 1e-9
     || Math.abs(r.deep - r.wantDeep) > 1e-9 || Math.abs(r.seat - r.wantSeat) > 1e-9);
@@ -881,7 +883,7 @@ try {
           + crownInk.length + " of " + crowns.rows.length + ", the seat dropped by each margin sinks all "
           + crownSank.length + " to -" + CROWN_FLOOR + " while halving it sinks only " + crownHalf.length);
 
-  const inkLow = crowns.rows.filter((r) => r.padInks !== 1 || r.inkMargin < CROWN_FLOOR);
+  const inkLow = crowns.rows.filter((r) => r.padInks !== 0 || r.inkMargin < CROWN_FLOOR);
   check("thumb:pads:the-sponge-silhouette-clears-the-ink-shell",
     crowns.rows.length === BODIES.length * crowns.looks.length * 2 && inkLow.length === 0,
     "floor " + CROWN_FLOOR + ", margins " + crownEnds("inkMargin") + ", below " + inkLow.length
