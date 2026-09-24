@@ -66,7 +66,12 @@ function agrees(entry, name = 'TEAM_RULE') {
         && Math.abs(Math.cos(root) - 1 / Math.cosh(root)) < 1e-10
         && equal(values.ratios[i], (root / roots[0]) ** 2));
     }
-    default: return false;
+    default: {
+      if (!/^GNI_[A-Z]{3}$/.test(name)) return false;
+      const row = JSON.parse(q);
+      if (row.indicator.id !== 'NY.GNP.PCAP.CD' || name !== 'GNI_' + row.countryiso3code) return false;
+      parsed = { year: Number(row.date), income: row.value };
+    }
   }
   return Object.keys(values).length === Object.keys(parsed).length
     && Object.entries(values).every(([key, value]) => equal(value, parsed[key]));
