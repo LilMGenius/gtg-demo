@@ -509,13 +509,18 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
        실측으로 조각의 위 끝이 머리 중심에서 반지름의 0.21 아래인데 입 윗선은 0.40 아래라
        조각이 볼 한가운데 섰다. 귀에서 내려오는 구레나룻도 그 자리에서 시작하지 않는다.
        짧은 수염은 입 아래 턱과 인중 두 덩이로 읽힌다. 그 둘만 남긴다.
-       턱 덮개는 입 아랫선 -0.49r 바로 아래인 -0.52r에서 시작해 머리 밑동까지 감싼다.
+       턱수염은 입 아랫선 -0.49r 바로 아래인 -0.52r에서 시작하고 뒷머리를 감싸지 않는다.
        인중은 입 윗선 -0.31r 위 한 줄이고 폭은 입 반폭 0.21r보다 조금 넓다.
        볼 높이에는 어느 등급도 아무것도 안 선다. */
+    // 키커의 기존 수염 정체성은 유지한다. 묶은 머리의 긴 수염은 턱끝에 모아 형태를 구별한다.
+    const shape = face.beardShape || (beard === 1 ? 'stubble' : face.tail ? 'goatee' : 'full');
     const c = beard === 2 ? { rad: 1.06, mus: 0.16 } : { rad: 1.02, mus: 0.14 };
     // 껍데기는 y를 0.06r 내려 쓰므로 높이를 위도로 바꿀 때 그만큼 되돌린다.
     const lat = (y) => Math.acos((y + 0.06) / c.rad);
-    const chin = new THREE.SphereGeometry(r * c.rad, 12, 6, 0, Math.PI * 2,
+    // 턱 앞면만 덮는다. 0.24파이는 턱끝, 0.8파이는 짧은 수염, 1.1파이는 앞턱 양옆까지다.
+    const span = Math.PI * (shape === 'goatee' ? 0.24 : shape === 'stubble' ? 0.8 : 1.1);
+    const chin = new THREE.SphereGeometry(r * c.rad, 12, 6,
+      Math.PI * (dir > 0 ? 0.5 : 1.5) - span / 2, span,
       lat(-0.52), Math.PI - lat(-0.52));
     const mus = new THREE.SphereGeometry(r * c.rad, 12, 3,
       Math.PI * (0.5 - c.mus * 0.5 + (dir > 0 ? 0 : 1)), Math.PI * c.mus,
@@ -525,7 +530,7 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
       g.translate(0, -r * 0.06, 0);
       shellGeos.push(g);
       // 수염은 독립된 짙은 갈색이다. 기존 기본색을 유지해 염색이 턱으로 새지 않는다.
-      shellColors.push(0x1c1712);
+      shellColors.push(face.beardTone ?? 0x1c1712);
     }
   }
   // 뒤로 묶은 머리. 뒤통수에서 뒤로 뻗는 덩어리 하나면 실루엣이 갈린다.

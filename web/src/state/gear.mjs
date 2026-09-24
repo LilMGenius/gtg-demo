@@ -239,6 +239,28 @@ export const HAIRS = [
 
 export const MAX_HAIR = HAIRS.length - 1;
 
+// 수염은 헤어와 같은 등급 가격을 쓴다. 기본 면도는 무료이며 무료 변형도 선택해야 착용된다.
+export const BEARDS = HAIRS.map((row, beard) => ({ beard, cost: row.cost,
+  name: ['면도', '짧은 수염', '염소수염', '풍성한 수염'][beard],
+  note: ['깔끔한 맨턱', '턱에 얇게 남긴 수염', '턱끝에 모은 수염', '앞턱을 넓게 덮는 수염'][beard] }));
+export const MAX_BEARD = BEARDS.length - 1;
+// 0은 면도, 1은 짧은 턱수염, 2는 풍성한 수염이다. 기존 선수 얼굴의 등급을 그대로 쓴다.
+// 염소수염은 같은 턱수염 등급에서 앞면 폭으로 구별한다. 색은 염색과 독립된 갈색·검정·회색이다.
+export const BEARD_SKINS = [
+  [{ name: '면도', tone: 0x1c1712, cut: { beard: 0, shape: 'stubble' } },
+   { name: '턱끝 수염', tone: 0x1c1712, cut: { beard: 1, shape: 'goatee' } },
+   { name: '하루 수염', tone: 0x45382c, cut: { beard: 1, shape: 'stubble' } }],
+  [{ name: '갈색 수염', tone: 0x45382c, cut: { beard: 1, shape: 'stubble' } },
+   { name: '검은 수염', tone: 0x1c1712, cut: { beard: 1, shape: 'stubble' } },
+   { name: '회색 수염', tone: 0x74716b, cut: { beard: 1, shape: 'stubble' } }],
+  [{ name: '갈색 염소수염', tone: 0x45382c, cut: { beard: 2, shape: 'goatee' } },
+   { name: '검은 염소수염', tone: 0x1c1712, cut: { beard: 2, shape: 'goatee' } },
+   { name: '회색 염소수염', tone: 0x74716b, cut: { beard: 2, shape: 'goatee' } }],
+  [{ name: '갈색 턱수염', tone: 0x45382c, cut: { beard: 2, shape: 'full' } },
+   { name: '검은 턱수염', tone: 0x1c1712, cut: { beard: 2, shape: 'full' } },
+   { name: '회색 턱수염', tone: 0x74716b, cut: { beard: 2, shape: 'full' } }]
+];
+
 /* 선반 길이가 등급 수에 묶여 있었다. 등급을 늘리면 값 사다리와 팔로워 승수가 같이 늘어나
    그 둘을 여는 결정이 날 때까지 콘텐츠 수가 넷에서 멈춘다.
    변형은 그 매듭 밖이다. 같은 등급, 같은 값, 같은 승수에 모양과 색만 다르다.
@@ -297,7 +319,7 @@ export const INK_SKINS = [
 
 /* 변형을 파는 선반 표. 여기 든 칸만 변형이 있고, 칸 이름에 Skin을 붙인 것이 그 선택을 담는 자리다.
    선반마다 다른 함수를 두면 새 선반이 늘 때마다 상점과 게이트가 그 이름을 손으로 들어야 한다. */
-export const SKINS = { grip: GLOVE_SKINS, studs: BOOT_SKINS, pads: KIT_SKINS, socks: SOCK_SKINS, hair: HAIR_SKINS, ink: INK_SKINS, frame: GOAL_SKINS, city: CITY_SKINS };
+export const SKINS = { grip: GLOVE_SKINS, studs: BOOT_SKINS, pads: KIT_SKINS, socks: SOCK_SKINS, hair: HAIR_SKINS, beard: BEARD_SKINS, ink: INK_SKINS, frame: GOAL_SKINS, city: CITY_SKINS };
 export const SKIN_FIELDS = Object.keys(SKINS);
 
 export function skinsAt(field, rank) {
@@ -329,7 +351,7 @@ export const TATTOOS = [
 export const MAX_INK = TATTOOS.length - 1;
 
 export function newGear() {
-  const g = { grip: 0, studs: 0, pads: 0, socks: 0, frame: 0, city: 0, hair: 0, ink: 0 };
+  const g = { grip: 0, studs: 0, pads: 0, socks: 0, frame: 0, city: 0, hair: 0, beard: 0, ink: 0 };
   for (const f of SKIN_FIELDS) g[f + 'Skin'] = 0;
   return g;
 }
@@ -337,7 +359,7 @@ export function newGear() {
 /* 갈래 둘. 몸에 걸치는 것은 그 키퍼의 것이고, 서는 자리는 계정의 것이다.
    장갑을 낀 것은 그 사람이지만 골대와 동네는 누가 뛰든 같은 곳이라, 키퍼를 바꿨을 때
    앞의 여섯은 따라 바뀌고 뒤의 둘은 그대로여야 한다. */
-const WORN_BASE = ['grip', 'studs', 'pads', 'socks', 'hair', 'ink'];
+const WORN_BASE = ['grip', 'studs', 'pads', 'socks', 'hair', 'beard', 'ink'];
 const PLACE_BASE = ['frame', 'city'];
 // 변형 칸은 그 등급 칸을 따라간다. 몸에 걸치는 것의 변형은 키퍼의 것이고 자리의 변형은 계정의 것이라,
 // 이 둘이 갈리지 않으면 키퍼를 바꿀 때 하늘색이 같이 따라 바뀐다.
@@ -360,6 +382,7 @@ export function readGear(raw) {
   if (Number.isFinite(raw.frame)) g.frame = Math.min(MAX_FRAME, Math.max(0, Math.floor(raw.frame)));
   if (Number.isFinite(raw.city)) g.city = Math.min(MAX_CITY, Math.max(0, Math.floor(raw.city)));
   if (Number.isFinite(raw.hair)) g.hair = Math.min(MAX_HAIR, Math.max(0, Math.floor(raw.hair)));
+  if (Number.isFinite(raw.beard)) g.beard = Math.min(MAX_BEARD, Math.max(0, Math.floor(raw.beard)));
   if (Number.isFinite(raw.ink)) g.ink = Math.min(MAX_INK, Math.max(0, Math.floor(raw.ink)));
   // 변형은 그 등급의 목록 안에서만 산다. 범위 밖 숫자는 기본으로 접는다.
   for (const f of SKIN_FIELDS) {
@@ -397,6 +420,10 @@ export function hairAt(hair) {
   return HAIRS[Math.min(MAX_HAIR, Math.max(0, Math.floor(Number(hair) || 0)))];
 }
 
+export function beardAt(beard) {
+  return BEARDS[Math.min(MAX_BEARD, Math.max(0, Math.floor(Number(beard) || 0)))];
+}
+
 export function inkAt(ink) {
   return TATTOOS[Math.min(MAX_INK, Math.max(0, Math.floor(Number(ink) || 0)))];
 }
@@ -406,6 +433,7 @@ export function inkAt(ink) {
 // 0등급은 지금 색 그대로라 신규 저장의 그림은 안 바뀐다.
 // 렌더가 읽는 두 색을 한 곳에서 뽑는다. buildKeeper 인자와 상점 미리보기가 같은 값을 쓴다.
 export function lookOf(gear, name) {
+  const b = skinAt('beard', gear && gear.beard, gear && gear.beardSkin);
   const t = skinAt('ink', gear && gear.ink, gear && gear.inkSkin);
   const h = skinAt('hair', gear && gear.hair, gear && gear.hairSkin);
   const gl = skinAt('grip', gear && gear.grip, gear && gear.gripSkin);
@@ -421,7 +449,7 @@ export function lookOf(gear, name) {
     hair: bought ? h.tone : undefined,
     hairCut: bought ? h.cut : undefined,
     // 이름이 얼굴의 정본이다. 저장에 안 실으므로 옛 저장도 그대로 얼굴을 갖는다.
-    face: name === undefined ? undefined : faceOf(name),
+    face: { ...(name === undefined ? {} : faceOf(name)), beard: b.cut.beard, beardShape: b.cut.shape, beardTone: b.tone },
     // 팔 무늬는 등급이 고른다. 색과 덮는 비율만 넘기면 렌더가 스티커와 먹토시를 못 가른다.
     ink: t.tone, inkSpan: t.cut.span, inkGirth: t.cut.girth, inkGrade: inkAt(gear && gear.ink).ink,
     glove: gl.tone, gloveCut: gl.cut,
@@ -431,9 +459,9 @@ export function lookOf(gear, name) {
   };
 }
 
-// 팔로워 승수. 두 선반 최고 등급을 다 채워도 1.3배다. 동네 최고 등급(1.36배)을 넘기지 않게 잡았다.
+// 팔로워 승수. 수염을 포함한 외형 선반을 다 채워도 기존 상한 1.3배다. 동네 최고 등급(1.36배)을 넘기지 않게 잡았다.
 // 넘기면 실점을 감수하는 동네 선택이 외형 구매로 무력화된다.
 export function lookBoost(gear) {
-  const rank = hairAt(gear && gear.hair).hair + inkAt(gear && gear.ink).ink;
+  const rank = Math.min(MAX_HAIR + MAX_INK, hairAt(gear && gear.hair).hair + inkAt(gear && gear.ink).ink + beardAt(gear && gear.beard).beard);
   return 1 + 0.05 * rank;
 }

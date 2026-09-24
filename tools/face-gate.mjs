@@ -116,11 +116,13 @@ try {
     const lum = (d, i) => 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
     const wear = (name, beard, rank) => {
       const lk = g.lookOf(rank === undefined ? {} : { hair: rank }, name);
+      // 얼굴 형태 표본은 키커의 정체성을 직접 쓰고, 헤어 선반은 구매하지 않은 키퍼의 맨턱을 쓴다.
+      if (rank === undefined) lk.face = r.faceOf(name);
       return beard === undefined ? lk
         : Object.assign({}, lk, { face: Object.assign({}, lk.face, { beard }) });
     };
     const one = async (kind, name, rank) => {
-      const own = r.faceOf(name).beard;
+      const own = rank === undefined ? r.faceOf(name).beard : 0;
       // 민 얼굴이 기준 틀이다. 수염이 실루엣을 바꾸므로 눈과 입 자리는 수염 없는 쪽에서 읽는다.
       const hb = m.headBox(kind, body, wear(name, 0, rank));
       const off = await read(hb.url);
@@ -202,7 +204,7 @@ try {
   check("face:a-beard-sits-on-the-chin-not-the-cheeks",
     bushy.length >= 6 && worst(bushy, "cheek") <= CHEEK && lean(bushy, "chin") >= CHIN,
     bushy.length + " bearded faces, worst cheek " + worst(bushy, "cheek") + " px, thinnest chin " + lean(bushy, "chin") + " px");
-  check("face:the-hair-shelf-shows-the-wearers-own-beard",
+  check("face:the-hair-shelf-keeps-unpurchased-beards-shaved",
     cards.length === 8 && cards.every((f) => f.worn === f.beard)
       && worst(cards, "cheek") <= CHEEK && lean(cards, "chin") >= CHIN,
     cards.length + " cards, own beard " + cards.every((f) => f.worn === f.beard)
