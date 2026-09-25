@@ -3,6 +3,7 @@
 // 그래서 p50/p95/p99와 최악 프레임, 그리고 드로우콜과 삼각형을 같이 남긴다.
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
+import { clearDraw } from './draw.mjs';
 
 const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
 const URL = 'http://127.0.0.1:10310/web/index.html?seed=11';
@@ -38,10 +39,21 @@ try {
   await page.goto(URL, { waitUntil: 'load' });
   await page.waitForTimeout(900);
   await page.click('#go', { force: true });
+  // 개봉 카드를 닫은 실제 경기에서 프레임과 기하 예산을 함께 잰다.
+  if (!await clearDraw(page)) throw Error('개봉 판이 닫히지 않아 경기를 측정할 수 없음');
   await page.waitForTimeout(1200);
 
   const out = await page.evaluate(() => new Promise((resolve) => {
     const frames = [];
+    // 실제 걷는 행인의 정점 버전은 0회 변해야 한다. 배치 행렬 갱신은 이 버전에 포함되지 않는다.
+    const walkers = window.__sceneRoot().children.filter(o => o.visible && o.userData.walker);
+    const attributes = new Set();
+    let batches = 0;
+    for (const walker of walkers) walker.traverse(o => {
+      if (o.isBatchedMesh) batches += 1;
+      if (o.isMesh) attributes.add(o.geometry.attributes.position);
+    });
+    const snapshot = [...attributes].map(a => ({a,version:a.version}));
     let last = performance.now();
     let n = 0;
     function tick() {
@@ -52,7 +64,13 @@ try {
       if (n < 420) requestAnimationFrame(tick);
       else {
         const info = window.__renderInfo ? window.__renderInfo() : null;
-        resolve({ frames: frames.slice(30), info });
+        // 같은 버전 자에 갱신을 한 번 심어 0회라는 판정이 끊긴 계기가 아님을 확인한다.
+        const plant = snapshot[0]?.a.clone();
+        const initial = plant?.version;
+        if (plant) plant.needsUpdate = true;
+        resolve({ frames: frames.slice(30), info, walkers:walkers.length, batches,
+          buffers:snapshot.length, writes:snapshot.reduce((n,{a,version})=>n+a.version-version,0),
+          plantedWrites:plant ? plant.version-initial : 0 });
       }
     }
     requestAnimationFrame(tick);
@@ -78,6 +96,13 @@ try {
   });
   ok('control:the-meter-sees-a-deliberate-120ms-stall', stall >= 110 && stall < 400, stall.toFixed(1) + 'ms');
   ok('control:frames-were-actually-collected', out.frames.length >= 350, String(out.frames.length));
+
+  ok('instrument:animated-walker-batches-were-measured', out.walkers > 0 && out.batches >= out.walkers,
+    out.walkers + ' walkers, ' + out.batches + ' batches');
+  ok('draw:walking-keeps-vertex-buffers-immutable', out.buffers > 0 && out.writes === 0,
+    out.writes + ' writes across ' + out.buffers + ' buffers');
+  ok('control:a-vertex-upload-reddens-the-immutable-axis', out.plantedWrites > 0,
+    out.plantedWrites + ' planted writes');
 
   ok('frame:p50-under-20ms', p50 < 20, p50.toFixed(2) + 'ms');
   ok('frame:p95-under-33ms', p95 < 33, p95.toFixed(2) + 'ms');

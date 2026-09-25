@@ -564,6 +564,7 @@ export function setPasserRoster(passers,tier,variant=0){
   passers.forEach((body,i)=>{
     const row=rows[i];if(body.userData.roster?.key===row.key)return;
     const old=[];body.traverse(part=>{if(part.isMesh)old.push(part.geometry);});
+    body.userData.walker?.dispose?.(); // 교체한 배치의 행렬·색 텍스처도 함께 해제한다.
     body.clear();
     const rig=buildWalker(rosterLook(row));
     body.scale.copy(rig.root.scale).multiplyScalar(body.userData.bodyScale);

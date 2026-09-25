@@ -13,7 +13,12 @@ function capsuleGeometry(radius, length) {
   if (!capsuleCache.has(key)) capsuleCache.set(key, new THREE.CapsuleGeometry(radius, length, KIT.cap, KIT.radial));
   return capsuleCache.get(key).clone();
 }
-function flat(color) { return new THREE.MeshStandardMaterial({color, roughness:KIT.roughness}); }
+// Three.js WebGLBindingStates의 기본 속성 경로로 흰 RGB 1을 주어 단색과 정점색이 한 프로그램을 공유한다.
+function flat(color) {
+  const m = new THREE.MeshStandardMaterial({color, roughness:KIT.roughness, vertexColors:true});
+  m.defaultAttributeValues = {color:[1,1,1]};
+  return m;
+}
 function flatMap(color, map) { const m=flat(color); m.map=map; return m; }
 function flatVertex(color) { const m=flat(color); m.vertexColors=true; return m; }
 // 키트는 매끈한 기하 자체로 실루엣을 만들므로 임의 정점 잡음과 복제 외곽선을 쓰지 않는다.
@@ -955,26 +960,116 @@ export const PASSER_VARIANTS = [
   {id:'elder',name:'어르신',shirt:0xa28aad,pants:0x5f6178,skin:0xc9977e,hair:0xdbd7cc,width:0.98,height:0.89,prop:'cane'}, // 낮은 키와 지팡이로 과도한 허리 굽힘 없이 구별한다.
   {id:'fashion',name:'패셔니스타',shirt:0xb84f56,pants:0x763b49,skin:0xe6b28c,hair:0x413036,width:0.94,height:1.07,prop:'bag'} // 성인 코트, 선글라스와 가방으로만 매력을 표현한다.
 ];
+// 원경은 각 분할을 절반으로 줄인다. 근경 비교판에는 원래 분할을 그대로 남긴다.
+const FAR = {sphere:10, rings:7, cap:3, radial:8};
+const walkerCapsules = new Map();
+const walkerGeometries = [new WeakMap(), new WeakMap()]; // 근경과 원경의 불변 기하를 각각 공유한다.
+function walkerCapsule(r, length) {
+  const key = r + ':' + length;
+  if (!walkerCapsules.has(key)) walkerCapsules.set(key, capsuleGeometry(r, length));
+  return walkerCapsules.get(key);
+}
+// Three.js MIT BatchedMesh, LOD와 onBeforeCompile을 재사용하고 기존 캡슐 변형만 셰이더에 옮긴다.
+// 출처: https://threejs.org/docs/pages/BatchedMesh.html · https://threejs.org/docs/pages/LOD.html · https://threejs.org/docs/pages/Material.html
+function roundedStretch(material) {
+  const stretchShader = shader => {
+    // 0은 강체, 양수는 캡슐 중심 길이다. 2로 나눈 양끝 이동은 기존 CPU 식과 같다.
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute float capsuleHeight;')
+      .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
+        if (capsuleHeight > 0.0) objectNormal.y *= length(batchingMatrix[1].xyz) / length(batchingMatrix[0].xyz);`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        if (capsuleHeight > 0.0) {
+          float stretch = length(batchingMatrix[1].xyz) / length(batchingMatrix[0].xyz);
+          float end = sign(position.y) * capsuleHeight / 2.0;
+          transformed.y = end + (position.y - end) / stretch;
+        }`);
+  };
+  // 전경 알파 태그가 나중에 연결되어도 관절 변형을 덮어쓰지 않고 두 패치를 함께 실행한다.
+  let surfaceShader = () => {};
+  Object.defineProperty(material,'onBeforeCompile',{
+    get:()=>shader=>{stretchShader(shader);surfaceShader(shader);},
+    set:shader=>{surfaceShader=shader;}
+  });
+  material.customProgramCacheKey = () => 'walker-rounded-stretch';
+  return material;
+}
+const walkerSurface = () => roundedStretch(new T.MeshStandardMaterial({color:0xffffff, roughness:C.roughness, vertexColors:true})); // 흰 재질은 리그마다 만들어 전경 알파 태그가 썸네일로 새지 않게 한다.
+const walkerDepth = roundedStretch(new T.MeshDepthMaterial()); // 본체와 그림자가 같은 둥근 끝을 쓴다.
+function walkerGeometry(source, far, stretch = false) {
+  const cache = walkerGeometries[Number(far)];
+  let variants = cache.get(source);
+  if (!variants) { variants = new Map(); cache.set(source, variants); }
+  if (variants.has(stretch)) return variants.get(stretch);
+  const p = source.parameters;
+  let geo = source.clone();
+  if (far && source.type === 'SphereGeometry') geo = new T.SphereGeometry(p.radius,FAR.sphere,FAR.rings,p.phiStart,p.phiLength,p.thetaStart,p.thetaLength);
+  if (far && source.type === 'CapsuleGeometry') geo = new T.CapsuleGeometry(p.radius,p.height,FAR.cap,FAR.radial,p.heightSegments);
+  // 색을 갖지 않는 공유 구와 캡슐에도 같은 속성을 달아 한 배치에서 재사용한다.
+  const colored = mergeGeos([geo], [0xffffff]);
+  geo.dispose();
+  colored.setAttribute('capsuleHeight',new T.Float32BufferAttribute(new Float32Array(colored.attributes.position.count).fill(stretch ? p.height : 0),1));
+  variants.set(stretch,colored);
+  return colored;
+}
+function batchWalker(rig) {
+  const moving = new Set([...rig.arms.flatMap(a=>[a.arm,a.fore,a.hand]),...rig.legs.flatMap(l=>[l.thigh,l.shin]),...rig.feet]);
+  const rigid = [rig.hips,rig.chest,rig.head,rig.accessory].map(node=>({node,parts:node.children.filter(m=>m.isMesh&&!moving.has(m))})).filter(g=>g.parts.length);
+  const records = [...rigid,...[...moving].map(node=>({node}))];
+  const lod = new T.LOD();
+  const owned = [];
+  const surface = walkerSurface();
+  const batches = [false,true].map(far=>{
+    const geometries = records.map(({node,parts})=>{
+      if (!parts) return walkerGeometry(node.geometry,far,Boolean(node.userData.limb));
+      // 같은 관절의 강체 조각만 합친다. 머리와 소품의 서로 다른 흔들림은 합치지 않는다.
+      const pieces = parts.map(m=>walkerGeometry(m.geometry,far).clone().applyMatrix4(m.matrix));
+      const geo = mergeGeos(pieces,parts.map(m=>m.material.color.getHex()));
+      pieces.forEach(g=>g.dispose());
+      geo.setAttribute('capsuleHeight',new T.Float32BufferAttribute(new Float32Array(geo.attributes.position.count),1));
+      owned.push(geo);return geo;
+    });
+    const unique = [...new Set(geometries)];
+    const batch = new T.BatchedMesh(records.length,unique.reduce((n,g)=>n+g.attributes.position.count,0),unique.reduce((n,g)=>n+g.index.count,0),surface);
+    batch.sortObjects = false;batch.perObjectFrustumCulled = false;
+    batch.castShadow = true;batch.receiveShadow = true;batch.customDepthMaterial = walkerDepth;
+    const ids = new Map(unique.map(g=>[g,batch.addGeometry(g)]));
+    const instances = geometries.map((g,i)=>{
+      const id=batch.addInstance(ids.get(g));
+      batch.setColorAt(id,records[i].parts ? new T.Color(0xffffff) : records[i].node.material.color);
+      return id;
+    });
+    // 18은 전신 비교판의 11.5 거리에서는 근경을, 펜스 너머 행인에는 원경을 선택하는 렌더 경계다.
+    lod.addLevel(batch,far ? 18 : 0);
+    return {batch,instances};
+  });
+  rig.root.traverse(m=>{if(m.isMesh)m.visible=false;});
+  rig.root.add(lod);rig.lod=lod;
+  const inverse=new T.Matrix4(),matrix=new T.Matrix4();
+  rig.sync=()=>{
+    inverse.copy(rig.root.matrixWorld).invert();
+    for (const {batch,instances} of batches) {
+      records.forEach(({node},i)=>batch.setMatrixAt(instances[i],matrix.multiplyMatrices(inverse,node.matrixWorld)));
+      batch.computeBoundingSphere();
+      batch.boundingSphere.radius += C.radius; // 압축된 관절의 둥근 끝도 머리 반경 여유 안에 들어 절두체가 자르지 않는다.
+    }
+  };
+  rig.dispose=()=>{batches.forEach(({batch})=>batch.dispose());owned.forEach(g=>g.dispose());surface.dispose();};
+  rig.sync();
+}
 const sphere = new T.SphereGeometry(1,C.sphere,C.rings); // 단위 구를 공유해 얼굴과 소품의 생성 비용을 줄인다.
 const up = new T.Vector3(0,1,0); // 캡슐의 기본 축이다.
 const mats = new Map();
 function material(color){if(!mats.has(color))mats.set(color,new T.MeshStandardMaterial({color,roughness:C.roughness}));return mats.get(color);}
 function ball(parent,color,pos,scale){const m=new T.Mesh(sphere,material(color));m.position.set(...pos);m.scale.set(...scale);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
-function capsule(parent,color,r,length,pos){const m=new T.Mesh(capsuleGeometry(r,length),material(color));m.position.set(...pos);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
+function capsule(parent,color,r,length,pos){const m=new T.Mesh(walkerCapsule(r,length),material(color));m.position.set(...pos);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
 function group(parent,pos){const g=new T.Group();g.position.set(...pos);parent.add(g);return g;}
-function limb(parent,color,r){return capsule(parent,color,r,0.15,[0,0,0]);} // 중심 구간을 짧은 0.15 구간으로 만들어 늘려도 둥근 관절 끝이 납작해지지 않게 한다.
+function limb(parent,color,r){const m=capsule(parent,color,r,0.15,[0,0,0]);m.userData.limb=true;return m;} // 중심 구간을 짧은 0.15 구간으로 만들어 늘려도 둥근 관절 끝이 납작해지지 않게 한다.
 function between(m,a,b,r){
   const av=new T.Vector3(...a),bv=new T.Vector3(...b),distance=av.distanceTo(bv);
   m.position.copy(av).add(bv).multiplyScalar(0.5); // 끝점 사이 중앙에 캡슐을 놓는다.
   m.quaternion.setFromUnitVectors(up,bv.clone().sub(av).normalize());
-  const position=m.geometry.attributes.position;
-  const rest=m.userData.restLimb || (m.userData.restLimb=position.array.slice());
-  for(let i=0;i<position.count;i++){
-    const y=rest[i*3+1]; // XYZ 정점의 세 채널 중 세로 축만 늘린다.
-    position.setY(i,y+Math.sign(y)*(distance-r-0.15)/2); // 중심 길이 0.15를 늘리되 반경만큼 덜 연장해 끝이 관절을 덮으면서 발밑으로 뚫리지 않게 한다.
-  }
-  position.needsUpdate=true;
-  m.geometry.computeBoundingSphere();
+  // 중심 원통만 늘리고 끝 반구는 배치 셰이더에서 역보정한다. 정점 버퍼는 자세마다 다시 쓰지 않는다.
+  m.scale.y=(distance-r)/m.geometry.parameters.height;
 } // 캡슐 중심선이 관절 끝점까지 닿으므로 둥근 끝이 관절을 충분히 덮는다.
 export function buildWalker(v=PASSER_VARIANTS[0]){
   const root=new T.Group(), hips=group(root,[0,C.hip,0]), chest=group(hips,[0,C.chest-C.hip,0]); // 원점은 지면이고 골반과 가슴은 따로 회전한다.
@@ -1026,7 +1121,7 @@ export function buildWalker(v=PASSER_VARIANTS[0]){
     handle.position.set(0.48,-0.15,0.12);accessory.add(handle); // 가방 바로 위에 손잡이를 붙인다.
   }
   const rig={root,hips,chest,head,arms,legs,feet,accessory,v};
-  poseWalker(rig,0);return rig; // 생성 즉시 땅에 선 자세를 보장한다.
+  poseWalker(rig,0);batchWalker(rig);return rig; // 생성 즉시 땅에 선 자세를 보장한다.
 }
 // 감쇠 조화진동 해를 사용해 프레임 간격과 무관하게 겹동작을 재생한다. https://en.wikipedia.org/wiki/Harmonic_oscillator
 export function poseWalker(rig,distance,{mode='walk',time=0,heading=0}={}){
@@ -1061,4 +1156,5 @@ export function poseWalker(rig,distance,{mode='walk',time=0,heading=0}={}){
   }
   if(mode==='dive')root.rotation.z=-Math.PI*0.43; // 수평에 가까운 옆다이빙이며 발이 손을 따라가는 실루엣이다.
   root.updateMatrixWorld(true);
+  rig.sync?.();
 }
