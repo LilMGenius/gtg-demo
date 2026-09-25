@@ -122,7 +122,7 @@ function manualOnePoint(keeper, rng) {
 }
 
 // grow가 거짓이면 훈련 없는 대조군이다. 시작 스탯을 고정하고 레벨만 올린다.
-const at = (lv, grow, stats) => {
+const at = (lv, grow, stats, testedOnly = false) => {
   let saved = 0, shots = 0;
   for (let s = 0; s < SEEDS; s += 1) {
     const rng = makeRng(s + 90001);
@@ -139,6 +139,8 @@ const at = (lv, grow, stats) => {
     if (stats) Object.assign(k, stats);
     for (const shot of buildSet(makeRng(s + 1), lv, 0)) {
       const r = resolve({ keeper: k, shot, rng, mode: 'hand-react' });
+      // 키커의 빗나간 슛은 세이브 분모에서 제외한다. balance 게이트와 같은 분모다.
+      if (testedOnly && r.untested) continue;
       shots += 1;
       if (!r.conceded) saved += 1;
     }
@@ -182,7 +184,12 @@ check("idle:does-not-decay", auto.at(-1) >= auto[0], auto.map(F).join(" -> "));
 check("idle:auto-tracks-manual", auto.at(-1) >= manualOne.at(-1) - 3,
   F(auto.at(-1)) + " vs " + F(manualOne.at(-1)));
 
-check("manual:does-not-decay", manualOne.at(-1) >= manualOne[0], manualOne.map(F).join(" -> "));
+// 끝점만 비교하면 중간 하락을 놓친다. 모든 인접 제시 레벨을 검사한다.
+const manualTested = LEVELS.map(lv => at(lv, "manual-one-point", undefined, true));
+const idleTested = LEVELS.map(lv => at(lv, false, undefined, true));
+check("manual:does-not-decay", manualTested.every((v, i) => i === 0 || v >= manualTested[i - 1]), "tested-save " + manualTested.map(F).join(" -> "));
+check("control:tested-untrained-decays", idleTested.at(-1) < idleTested[0], idleTested.map(F).join(" -> "));
+console.log("diagnostic:nonconcession-is-not-save " + manualOne.map(F).join(" -> "));
 check("idle:ceiling", auto.at(-1) <= 44, F(auto.at(-1)) + " <= 44.00");
 const steps = auto.slice(1).map((v, i) => ({ gap: LEVELS[i + 1] - LEVELS[i], delta: Number((v - auto[i]).toFixed(2)), perLevel: (v - auto[i]) / (LEVELS[i + 1] - LEVELS[i]) }));
 check("idle:smoothness", steps.every(s => s.perLevel >= -1 && s.perLevel <= 8), "delta / levelGap in [-1, 8]: " + JSON.stringify(steps));
