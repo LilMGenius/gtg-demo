@@ -1,3 +1,5 @@
+import { population } from './product-population.mjs';
+import { botTierContract } from './bot-tier-contract.mjs';
 // 위치 경로의 네 입력 모드에서 기존 문턱을 그대로 재며, 옛 완벽/자동/저장 방향은 모집단에서 제외한다.
 import { makeRng, newKeeper, keeperAtLevel, rollForm, buildSet, resolve, positionInput, MODES } from './position-pop.mjs';
 import { GROWABLE } from '../src/ledger.mjs';
@@ -42,27 +44,6 @@ function verdict(name, status, detail) {
   console.log(`${status} ${name} ${detail}`);
 }
 
-function population(policy, level, rng) {
-  if (policy === 'reference') return keeperAtLevel(level, rng);
-  let keeper = newKeeper();
-  for (let lv = 2; lv <= level; lv++) {
-    keeper.level = lv;
-    if (policy === 'untrained') continue;
-    if (policy === 'coach') keeper = autoTrain(keeper, 2, rng).keeper;
-    else for (let p = 0; p < 2; p++) {
-      const pool = GROWABLE.filter(s => keeper[s] < 10);
-      if (!pool.length) break;
-      let pick = pool[0];
-      if (policy === 'fixed-order') pick = TRAINING_PRIORITY.find(s => keeper[s] < 10);
-      else if (policy === 'random') pick = pool[Math.floor(rng() * pool.length)];
-      else for (const s of pool) if (policy === 'lowest' ? keeper[s] < keeper[pick] : keeper[s] > keeper[pick]) pick = s;
-      keeper = trainStat(keeper, pick, rng).keeper;
-    }
-  }
-  keeper.height = 178 + Math.floor(rng() * 21);
-  keeper.weight = 74 + Math.floor(rng() * 21);
-  return keeper;
-}
 
 function measure(policy, level, mode, contrast = null, coupledShots = false) {
   const gains = (policy === 'fixed-order' ? [] : contrast ? [contrast] : PATH).map(stat => ({ stat, eligible: 0, tested: 0, baseSaved: 0, bumpSaved: 0, n10: 0, n01: 0 }));
@@ -143,6 +124,7 @@ for (const level of LEVELS) for (const policy of POLICIES) {
   verdict('skill:follow-beats-centre', follow.testedSave - centre.testedSave > TOLERANCE ? 'PASS' : 'FAIL', policy + ' Lv' + level + ' delta=' + f(follow.testedSave - centre.testedSave));
   verdict('trade:bot-below-follow', bot.testedSave < follow.testedSave ? 'PASS' : 'FAIL', policy + ' Lv' + level + ' bot=' + f(bot.testedSave) + ' hand=' + f(follow.testedSave));
 }
+botTierContract({ levels: LEVELS, balls: BALLS, check: (name, ok, detail) => verdict(name, ok ? 'PASS' : 'FAIL', detail) });
 const precision = [];
 for (const mode of MODES) {
   for (const policy of mode === 'hand-centre' ? [...POLICIES, 'untrained'] : POLICIES) {

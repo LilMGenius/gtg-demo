@@ -1,3 +1,4 @@
+import { botTierContract } from './bot-tier-contract.mjs';
 // 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { modifierContract } from "./modifier-contract.mjs";
 import { makeRng, buildSet, resolve, newKeeper, positionInput } from "./position-pop.mjs";
@@ -110,6 +111,9 @@ const hand = sweep({ hand: true });
 check("bot-below-hand", rate[3] < hand.rate, "bot3 " + F(rate[3]) + " hand " + F(hand.rate));
 
 modifierContract({ gate: "bot-effect", fields: ["bot1","bot2","bot3"], engine: { makeRng, buildSet, resolve, newKeeper }, growable: GROWABLE, botKeeper, check });
+
+// 레벨 1부터 30까지 실제 제시 등급을 검사한다. 전체 레벨에 product-pop과 같은 12000구를 쓴다. 작은 표본의 역전을 따로 판정하지 않는다.
+botTierContract({ levels: Array.from({ length: 30 }, (_, i) => i + 1), balls: 12000, check });
 
 for (const n of notes) console.log("ok  " + n);
 for (const n of fails) console.log("BAD " + n);

@@ -556,8 +556,9 @@ export function botPlan(keeper, shot, rng) {
   const aimed = aimAt(keeper, shot, trace);
   // 인간 시험값 250ms를 점근 하한으로 둔다. 200ms 여유는 판단 1의 350ms에서 시작하고 등급도 같은 분모에서 값을 한다.
   const reaction = 250 + 200 / (1 + clamp(keeper.judgement, 1, 10) + (keeper.botTier || 0));
-  // 추적은 기저 .30과 판단당 .02, 등급당 .015로 최고 .545다. R3의 늦은 봇도 선행 손을 이겨 정확도를 제한한 HOTL 가설이다.
-  const tracking = readU < 0.30 + 0.02 * clamp(keeper.judgement, 1, 10) + 0.015 * (keeper.botTier || 0);
+  // 판단력 최대치의 두 배를 분모 여유로 두는 HOTL 후보다. 후기 손 역전을 막으면서 등급은 같은 .50 점근 상한을 향해 양의 값을 산다.
+  const skill = clamp(keeper.judgement, 1, 10) + (keeper.botTier || 0);
+  const tracking = readU < 0.30 + 0.20 * skill / (20 + skill);
   const x = trace.at(-1).x;
   return reactTrace(keeper, aimed, trace, reaction, tracking ? aimed.aimX : x - (aimed.aimX - x));
 }
