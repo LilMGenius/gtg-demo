@@ -19,13 +19,18 @@ function playSet(keeper, shots, seed) {
   const out = [];
   for (const shot of shots) {
     const r = resolve({ keeper: k, shot, rng });
-    out.push(r.events.map((e) => e.t).join(">") + "|" + restartDelay(k, r).toFixed(1) + "|" + followerGain(k, r));
+    // 자막은 사건 종류뿐 아니라 원인 풀로 문장을 고른다. 위치 경로는 실제 출발 위치와 발동 시각도 렌더한다.
+    // 좌표 소수 둘째 자리와 정수 ms는 부동소수 잡음만 버린다. 가시성의 사람 판독을 대신하는 문턱은 아니다.
+    const old = r.events.map(e => e.t).join(">") + "|" + restartDelay(k, r).toFixed(1) + "|" + followerGain(k, r);
+    const screen = JSON.stringify([r.events.map(e => [e.t, e.cause]), restartDelay(k, r).toFixed(1), followerGain(k, r),
+      r.input.x.toFixed(2), Math.round(r.input.triggerMs), r.input.dive, r.input.advance.toFixed(2)]);
+    out.push({ old, screen });
   }
   return out;
 }
 
 function divergence(bump) {
-  let differ = 0;
+  let differ = 0, oldDiffer = 0;
   let balls = 0;
   for (let s = 0; s < SETS; s++) {
     const seed = 900001 + s * 7919;
@@ -39,15 +44,18 @@ function divergence(bump) {
     const b = playSet(grown, shots, seed * 31);
     for (let i = 0; i < a.length; i++) {
       balls++;
-      if (a[i] !== b[i]) differ++;
+      if (a[i].screen !== b[i].screen) differ++;
+      if (a[i].old !== b[i].old) oldDiffer++;
     }
   }
-  return { pct: (differ / balls) * 100, balls };
+  return { pct: (differ / balls) * 100, oldPct: (oldDiffer / balls) * 100, balls };
 }
 
 const rows = [];
 for (const k of GROWABLE) {
-  rows.push([CAUSE_LABEL[k] || k, divergence((g) => { if (g[k] < 10) g[k] += 1; else g[k] -= 1; }).pct]);
+  const measured = divergence((g) => { if (g[k] < 10) g[k] += 1; else g[k] -= 1; });
+  rows.push([CAUSE_LABEL[k] || k, measured.pct]);
+  console.log("axis " + k + " old=" + measured.oldPct.toFixed(2) + "% screen=" + measured.pct.toFixed(2) + "%");
 }
 
 // 대조군. 아무것도 안 올리면 화면은 같아야 한다.
@@ -67,7 +75,9 @@ console.log(pad("대조군 가짜칸", 16) + padL(fakeDelta.toFixed(2) + "%", 16
 
 const BAR = 1.0;
 const dead = rows.filter(([, v]) => v < BAR);
-const controlOk = nullDelta === 0 && fakeDelta === 0;
+// 같은 문턱으로 가짜 성장과 끊긴 성장 배선을 거부해야 축 확장이 완화가 아니다.
+const controlOk = nullDelta === 0 && fakeDelta === 0 && nullDelta < BAR && fakeDelta < BAR;
+console.log("control:unchanged-and-disconnected-growth " + (controlOk ? "PASS" : "FAIL") + " planted axes FAIL at unchanged BAR=" + BAR);
 console.log("");
 if (dead.length) console.log("기준 " + BAR + "% 미달: " + dead.map(([n, v]) => n + " " + v.toFixed(2) + "%").join(", "));
 if (!controlOk) console.log("대조군이 샬다. 계측기가 칸이 아닌 것을 재고 있다.");
