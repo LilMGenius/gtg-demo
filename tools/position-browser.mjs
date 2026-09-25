@@ -134,12 +134,32 @@ export async function positionGate(name) {
           window.__freeze(true);
           if(on){Object.assign(window.__bot(),{tier:1,ms:60000});document.getElementById('auto').onpointerdown();}
         },paid);
-        await p.click('#go',{force:true});await advance(p,1);const before=await snap(p);await advance(p,0.7);const after=await snap(p);
+        await p.click('#go',{force:true});
+        // 중앙에서 준비 위치로 정렬한 뒤, 계획의 첫 시점부터 접촉 직전까지 정지를 잰다.
+        await advance(p,STEP); const initial=await snap(p);
+        // 계획은 밀리초, 브라우저 시계는 초이며 advance가 더하는 마지막 한 프레임을 뺀다.
+        await advance(p,initial.set+initial.runup+initial.plan[0].ms/1000-initial.elapsed-STEP);
+        const start=await snap(p);
+        // 두 프레임은 advance의 종료 프레임 하나와 접촉 전 여유 한 프레임이다.
+        await advance(p,start.set+start.runup-start.elapsed-2*STEP); const before=await snap(p);
+        // 기존 추적 오차 0.02를 준비 위치에도 그대로 적용한다.
+        check((paid?'bot':'idle')+'-stationary-before-contact',!before.contacted&&Math.abs(before.x-start.x)<0.02,{start:start.x,before:before.x,startMs:(start.elapsed-start.set-start.runup)*1000,beforeMs:(before.elapsed-before.set-before.runup)*1000,contacted:before.contacted});
+        // 실제 계획에서 움직이는 구간의 시작을 읽고 판정 전 프레임만 재생한다.
+        let after=before;
+        const segment=before.plan.findIndex((point,i,plan)=>i>0&&point.x!==plan[i-1].x);
+        const onset=segment<0?Infinity:before.plan[segment-1].ms;
+        do {
+          await advance(p,STEP);
+          const next=await snap(p);
+          if(next.resolved) break;
+          after=next;
+        } while((after.elapsed-after.set-after.runup)*1000<=onset||Math.abs(after.x-before.x)===0);
+
         const ms=(after.elapsed-after.set-after.runup)*1000;
         const plan=after.plan;let want=plan.at(-1).x;
         for(let i=1;i<plan.length;i++){if(ms<=plan[i].ms){const a=plan[i-1],b=plan[i];want=a.x+(b.x-a.x)*(ms-a.ms)/(b.ms-a.ms);break;}}
         // 0.02는 10ms 고정 프레임의 최대 한 걸음보다 넓은 렌더 추적 오차다.
-        check((paid?'bot':'idle')+'-follows-plan',!after.manual&&Math.abs(after.x-before.x)>0&&Math.abs(after.x-want)<0.02,{before:before.x,after:after.x,want,ms});
+        check((paid?'bot':'idle')+'-follows-plan',!after.manual&&!after.resolved&&(!Number.isFinite(onset)||ms<=onset||Math.abs(after.x-before.x)>0)&&Math.abs(after.x-want)<0.02,{before:before.x,after:after.x,want,ms,onset:Number.isFinite(onset)?onset:null,resolved:after.resolved});
         // 몸 앞에 오는 공은 도착 직전까지 서 있으므로 비행 0.7초를 모두 지난다.
         await advance(p,0.8);const result=await snap(p);
         check((paid?'bot':'idle')+'-credit-attribution',result.input?.auto===paid,result.input?.auto);
