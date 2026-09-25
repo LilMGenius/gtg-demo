@@ -93,14 +93,14 @@ try {
   check('keys:the-game-plays-without-a-mouse', shopOpen && shopTab === 1 && wikiOpen && await hidden(k, 'shop') && await hidden(k, 'wiki') && dive.selected === 'true', { shopOpen, shopTab, wikiOpen, dive });
   await k.keyboard.up('ArrowLeft');
   await k.keyboard.press('s');
-  for (let i = 0; i < 100 && !(await k.locator('#shop .buy[data-want="1"]').evaluate((b) => b === document.activeElement)); i++) await k.keyboard.press('F6');
+  for (let i = 0; i < 100 && !(await k.locator('#shop .banner[data-kind="town"] .buy[data-want="1"]').evaluate((b) => b === document.activeElement)); i++) await k.keyboard.press('F6');
   await k.keyboard.press('Enter');
   await k.waitForSelector('#pull .tap');
   await k.keyboard.press('Escape');
   check('keys:unfinished-reveal-stays-open', !(await hidden(k, 'pull')), 'Escape preserves card stages');
   for (let i = 0; i < 10 && (await k.locator('#pull .tap').textContent()).trim() !== '닫기'; i++) await k.keyboard.press('Enter');
   await k.keyboard.press('Escape');
-  check('keys:completed-reveal-closes-to-shop', await hidden(k, 'pull') && !(await hidden(k, 'shop')) && await k.locator('#shop .buy[data-want="1"]').evaluate((b) => b === document.activeElement), 'Escape closes final reveal and restores purchase button');
+  check('keys:completed-reveal-closes-to-shop', await hidden(k, 'pull') && !(await hidden(k, 'shop')) && await k.locator('#shop .banner[data-kind="town"] .buy[data-want="1"]').evaluate((b) => b === document.activeElement), 'Escape closes final reveal and restores purchase button');
   await k.context().close();
   const c = await fresh(true);
   await c.click('#gymBtn');

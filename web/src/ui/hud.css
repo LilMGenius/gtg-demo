@@ -1219,9 +1219,11 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #pull .now img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
   image-rendering:pixelated;transition:filter .22s ease-out}
 /* 0 봉인. 뒷면 무늬가 카드를 통째로 덮는다. 무엇이 나왔는지는 아직 화면에 없다. */
-#pull .now .seal{position:absolute;inset:0;z-index:3;
+#pull .now .seal{position:absolute;inset:0;z-index:3;display:grid;place-items:center;
   background:repeating-linear-gradient(-45deg,#1b2417 0 12px,#232e1d 12px 24px);
   transition:opacity .18s ease-out}
+/* 봉인 위의 포장. 카드 폭의 82%는 포장 둘레의 톱니 봉인이 카드 테에 안 먹히는 크기이고, 비율은 상점 포장과 같은 176:232다. */
+#pull .now .seal svg{width:82%;height:auto;aspect-ratio:176/232;filter:drop-shadow(0 8px 6px #000a)}
 /* 봉인은 등급 단까지 남는다. 뒷면이 먼저 걷히면 빛이 뜨기도 전에 사람 모양이 이미 서서,
    등급 신호와 실루엣이 한 단에서 같이 온다. */
 #pull .now[data-stage="2"] .seal,#pull .now[data-stage="3"] .seal,
@@ -1284,9 +1286,12 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
    34에 기둥 사이 12를 더한 46이 카드 아래에 빈 채로 남기 때문이다. */
 #pull .done{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--gap-1);
   width:min(92vw,720px);min-height:34px}
-#pull .done i{display:grid;place-items:center;min-width:64px;height:32px;padding:0 8px;
+/* 쌓인 장은 얼굴 한 칸과 이름 한 줄이다. 44px 얼굴은 열한 장이 720 폭 한 줄 반에 들어가는 크기다. */
+#pull .done i{display:flex;align-items:center;gap:4px;min-width:64px;height:32px;padding:0 8px 0 0;
   font-style:normal;font-size:var(--fs-body);font-weight:700;color:var(--ink);
-  border:2px solid var(--edge);background:#2b3a22}
+  border:2px solid var(--edge);background:#2b3a22;overflow:hidden}
+#pull .done i img{height:100%;aspect-ratio:1;object-fit:cover;object-position:50% 20%;background:#12180f;display:block}
+#pull .done i b{font-weight:700;white-space:nowrap}
 #pull .done i.rare{background:#3a3312;color:#ffd83d;border-color:#ffd83d}
 /* 확정. 방금 끝난 장이 제자리로 축소되며 줄에 앉는다. 그냥 나타나면 카드가 어디로 갔는지가 없다. */
 @keyframes pullSettle{
@@ -1312,6 +1317,12 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
    글자 사이의 빈칸은 두 flex 칸의 경계에서 접혀 사라지므로 거기에 못 맡긴다. */
 #pull .tap i{font-style:normal;font-weight:400;opacity:.72;margin-left:6px}
 #pull .tap:focus-visible{outline:2px solid var(--dim);outline-offset:-6px}
+/* 전부 열기. 판을 덮는 누름 버튼 위에 선다. 왼쪽 위는 경기 화면에서 초상 띠가 쓰는 귀지만 개봉판이 그 위를 통째로 덮는다. */
+#pull .skip{position:absolute;left:calc(var(--pad-l, 16px) + 8px);top:var(--gap-2);z-index:1;padding:5px 14px 7px;
+  border:var(--line) solid var(--edge);background:var(--panel);color:var(--ink);font:700 var(--fs-body) var(--body);cursor:pointer;
+  box-shadow:var(--lift) var(--lift) 0 var(--edge)}
+#pull .skip:hover{background:#2b3a22}
+#pull .skip:focus-visible{outline:var(--line) solid var(--ink);outline-offset:3px}
 /* 세로가 짧은 가로 모바일. 카드와 이미 나온 줄이 한 화면에 다 서야 한다.
    측정: 740x360에서 줄이기 전 능력치 다섯 줄이 카드의 3분의 2를 먹어 얼굴이 손가락 두 마디로
    남았다. 칩과 여백을 줄여 카드에 돌려준다. */
@@ -1325,7 +1336,9 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
   #pull .now .stats{margin-top:var(--gap-1)}
   #pull .now .stats span{line-height:1.1}
   #pull .now .stats b{font-size:var(--fs-body)}
-  #pull .done i{min-width:52px;height:24px;padding:0 6px}
+  /* 얼굴이 붙은 뒤로 이름까지 세우면 열한 장이 두 줄로 접혀 카드 밑을 판다. 짧은 화면에서는 얼굴만 세우고 이름은 글자로 남겨 둔다. */
+  #pull .done i{min-width:0;height:28px;padding:0}
+  #pull .done i b{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
   /* 확률 표는 위로 편다. 아래로 펴면 마지막 등급 줄이 화면 밖으로 나간다. */
   #shop .odds em{top:auto;bottom:calc(100% + var(--gap-1))}
   /* 가로 폰에서 추가 선반이 탭을 세 줄로 밀어 가격을 가리지 않게 한 줄로 넘긴다.

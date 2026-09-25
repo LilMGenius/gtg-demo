@@ -153,6 +153,29 @@ try {
       await p.screenshot({ path: shots + tag + '-drained.jpg', type: 'jpeg', quality: 80 });
     }
 
+
+    // 개봉. 봉인은 산 팩의 포장이고, 두 장 이상이면 보이는 전부 열기가 서며, 쌓인 장은 얼굴을 든다.
+    if (W === 1280) {
+      // 앞 절이 동네 풀을 비웠으므로 새로 연 판에서 잰다. 저장이 새로 고침을 넘어 살아남으므로 저장부터 지운다.
+      await p.evaluate(() => localStorage.clear()); await p.goto(BASE); await p.locator('#go').click({ force: true }); await clearDraw(p);
+      await p.evaluate(() => window.__shop(true)); await p.waitForTimeout(SETTLE);
+      const sealOf = () => p.evaluate(() => (document.querySelector('#pull .now .seal svg') || {}).getAttribute?.('aria-label') || '');
+      await p.click('.banner[data-kind="legend"] .buy[data-want="10"]', { force: true }); await p.waitForTimeout(120);
+      const legendSeal = await sealOf();
+      const skipSeen = await p.locator('#pull .skip').isVisible().catch(() => false);
+      await p.click('#pull .skip', { force: true }); await p.waitForTimeout(300);
+      const opened = await p.evaluate(() => ({ r: window.__reveal(), faces: [...document.querySelectorAll('#pull .done i img')].map((i) => i.naturalWidth), skip: document.querySelectorAll('#pull .skip').length }));
+      check(tag + ':reveal:the-seal-is-the-pack-that-was-bought', /전설/.test(legendSeal), legendSeal);
+      check(tag + ':reveal:a-visible-skip-opens-every-card', skipSeen && opened.r.shown === opened.r.drawn && opened.skip === 0, { skipSeen, ...opened.r, skipAfter: opened.skip });
+      check(tag + ':reveal:every-stacked-card-shows-a-face', opened.faces.length === opened.r.drawn - 1 && opened.faces.every((n) => n > 0), opened.faces.length + ' faces of ' + (opened.r.drawn - 1));
+      await p.evaluate(() => { document.getElementById('pull').hidden = true; window.__shop(true); }); await p.waitForTimeout(SETTLE);
+      await p.click('.banner[data-kind="town"] .buy[data-want="1"]', { force: true }); await p.waitForTimeout(120);
+      const townSeal = await sealOf();
+      const single = await p.evaluate(() => document.querySelectorAll('#pull .skip').length);
+      // 대조군. 다른 팩을 사면 봉인의 글자가 바뀌어야 봉인 축이 산 팩을 읽고 있는 것이다. 한 장은 건너뛸 것이 없다.
+      check(tag + ':control:another-pack-changes-the-seal-and-one-card-has-no-skip', /동네/.test(townSeal) && single === 0, { townSeal, single });
+      await p.evaluate(() => { document.getElementById('pull').hidden = true; window.__shop(true); }); await p.waitForTimeout(SETTLE);
+    }
     // 키커 자리에서 전설 한 장. 값이 나가고 키커가 하나 늘고 개봉이 열린다.
     if (W === 1280) {
       await p.click('[data-role="kicker"]', { force: true }); await p.waitForTimeout(SETTLE);
