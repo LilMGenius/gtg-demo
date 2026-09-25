@@ -18,6 +18,9 @@ function agrees(entry, name = 'TEAM_RULE') {
   const q = source.clause;
   let parsed;
   switch (name) {
+    case 'SAVE_RULE':
+      return q.includes('Goalkeeper preventing the ball from entering the Goal')
+        && values.requiresIntervention === true && values.missedCountsAsSave === false;
     case 'TEAM_RULE':
       parsed = { maximum: readNumber(q, /maximum of (\w+) players/), goalkeepers: readNumber(q, /; (\w+) must be the goalkeeper/) };
       break;

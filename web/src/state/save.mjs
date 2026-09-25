@@ -94,7 +94,7 @@ export function save(squad, pick, auto, fans, points, wallet, posts, record, gea
 }
 
 // 저장에서 상대 전적을 꺼낸다. 이전 배포본 저장에는 이 칸이 없고, 그때는 빈 장부에서 시작한다.
-// 두 수치만 받는다. 저장에 들어온 다른 모양은 장부를 오염시키므로 버린다.
+// 세이브·실점·빗나감 수치만 받는다. 장부 외 필드는 버린다.
 export function readRecord(saved) {
   const src = saved && saved.record;
   if (!src || typeof src !== 'object') return {};
@@ -104,7 +104,9 @@ export function readRecord(saved) {
     if (!row || typeof row !== 'object') continue;
     const saves = Number(row.saved) || 0;
     const conceded = Number(row.conceded) || 0;
-    if (saves > 0 || conceded > 0) out[name] = { saved: saves, conceded };
+    // 이전 장부에는 빗나감 칸이 없으므로 새로 관측한 슛부터 별도로 보존한다.
+    const missed = Number(row.missed) || 0;
+    if (saves > 0 || conceded > 0 || missed > 0) out[name] = { saved: saves, conceded, missed };
   }
   return out;
 }

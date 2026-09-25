@@ -1,4 +1,20 @@
 // 세계의 사실은 여기 한 곳에만 살고 조문 인용을 같이 든다; 코드가 기억으로 적은 규칙을 코드 자신의 상수로 재면 틀려도 초록이다.
+// 골문으로 가는 공을 키퍼가 막은 경우만 세이브다. 골문 밖 슛은 개입이 없으므로 세이브를 사지 않는다.
+export const SAVE_RULE = {
+  values: { requiresIntervention: true, missedCountsAsSave: false },
+  source: {
+    name: 'Stats Perform, Opta Event Definitions, Goalkeeper / Save',
+    url: 'https://www.statsperform.com/opta-event-definitions/',
+    clause: 'A Goalkeeper preventing the ball from entering the Goal with any part of their body',
+    checked: '2026-09-25'
+  }
+};
+
+export function shotOutcome({ conceded, untested }) {
+  if (conceded) return 'conceded';
+  return untested && !SAVE_RULE.values.missedCountsAsSave ? 'missed' : 'saved';
+}
+
 export const TEAM_RULE = {
   // IFAB 경기 규칙 3.1: 최대 열한 명 중 한 명은 골키퍼다.
   values: { maximum: 11, goalkeepers: 1 },

@@ -1,6 +1,7 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
 import { createTelemetry } from './telemetry.mjs';
 import { HUD_LINKS, linkAttrs } from './ui/links.mjs';
+import { recordShot } from './state/record.mjs';
 import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, botPlan, X_MAX, moveSpeed, rollForm, ballInHand, restartDelay, setBreak, followerGain, GEAR_STEP } from '../../src/chain.mjs';
 import { aimAt, diveTrigger } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
@@ -121,7 +122,7 @@ const FEED_CAP = 18;
 state.posts = Array.isArray(saved?.posts) ? saved.posts.slice(-FEED_CAP) : [];
 // 지갑은 두 갈래로 읽는다. 이전 배포본 저장에는 지갑이 없고, 그때 둘 다 0에서 시작한다.
 state.wallet = readWallet(saved?.wallet);
-// 상대 전적. 키커 이름을 열쇠로 막은 수와 먹힌 수를 따로 센다.
+// 상대 전적. 키커 이름을 열쇠로 세이브·실점·빗나감을 따로 센다.
 state.record = readRecord(saved);
 /* eleven은 필드 열 명의 배열이고 골키퍼는 state.keeper에 선다. 선발 열하나는 이 둘의 합이다.
    지금까지 판에 나오는 키커는 명단 일흔일곱에서 매 구 무작위였고,
@@ -425,7 +426,7 @@ function pips() {
   el('pips').innerHTML = state.shots.map((_, i) => {
     const r = state.results[i];
     // 지금 굴리는 칸을 표시한다. 결과를 미리 칠하면 자막이 뒤집을 것을 먼저 말해버린다.
-    const cls = r === undefined ? (i === state.i ? 'now' : '') : r ? 'gone' : 'save';
+    const cls = r === undefined ? (i === state.i ? 'now' : '') : r === null ? 'missed' : r ? 'gone' : 'save';
     return '<i class=\"' + cls + '\"></i>';
   }).join('');
   el('lv').textContent = 'Lv ' + state.keeper.level;
@@ -551,11 +552,8 @@ function botTick() {
 
 // 한 구가 끝날 때마다 그 키커 칸에 한 줄을 더한다.
 // 세트가 끝날 때 몰아 세면 중간에 탭을 닫은 구가 통째로 빠진다.
-function tally(name, conceded) {
-  if (!name) return;
-  const row = state.record[name] || (state.record[name] = { saved: 0, conceded: 0 });
-  if (conceded) row.conceded += 1;
-  else row.saved += 1;
+function tally(name, result) {
+  recordShot(state.record, name, result);
 }
 
 // 이번 구에 들어온 골드를 잔고 옆에 한 번 띄운다.
@@ -671,9 +669,10 @@ function commit() {
   stage.diving = state.keeper.diving;
   const result = resolve({ keeper: ran ? positioning.keeper : state.keeper, shot, rng, input, grip: state.gear.grip, studs: state.gear.studs, pads: state.gear.pads, socks: state.gear.socks, frame: state.gear.frame, focusAid: applied.kind === 'tonic' ? TONIC_FOCUS : 1, rosin: applied.kind === 'rosin', gazeAid: rapportGazeAid(state.rapport, state.gear.city, shot.passer) });
   positioning.resolveCalls = (positioning.resolveCalls || 0) + 1;
-  state.results[state.i] = result.conceded;
+  // null은 골문 밖 슛이다. false인 실제 세이브와 분리한다.
+  state.results[state.i] = result.untested ? null : result.conceded;
   // 판정 결과에는 키커 이름이 없다. 장부는 이 자리에서만 이름을 알 수 있다.
-  tally(shot.kicker.name, result.conceded);
+  tally(shot.kicker.name, result);
   // 비행 중에는 자막을 비운다. 자리표시자를 남기면 화면 위쪽에 말줄임표가 박힌 채 촬영된다.
   el('caption').innerHTML = '';
   positioning.resolved = true;
@@ -723,7 +722,7 @@ function rollCaptions(result) {
          굴림은 화면 쪽 난수다. 판정용 rng를 쓰면 그 뒤 모든 구가 밀려 게이트가 통째로 흔들린다. */
       const seen = state.shots[state.i].passer;
       const tier = rapportTier(state.rapport, state.gear.city, seen);
-      const post = { n: who, c: result.conceded, g: gain, t: postLine(who, result.conceded, rng),
+      const post = { n: who, c: result.conceded, u: result.untested, g: gain, t: postLine(who, result.conceded, rng),
         /* 좋아요의 밑값과 동네를 글에 박아 둔다. 남이 올린 사진은 내 팔로워가 안 오르므로 g가 0인데,
            그 0으로 좋아요를 되짚으면 화제가 없던 글로 읽힌다. 좋아요를 만든 수는 따로 남는다. */
         lb: gain, ct: state.gear.city, l: likesFor(gain, state.gear.city, roll()) };
@@ -794,16 +793,16 @@ function restart(result) {
 function endSet() {
   completedSet = true;
   track('set_complete', { mode: state.botRan ? 'bot' : 'hand' });
-  const conceded = state.results.filter(Boolean).length;
+  const saved = state.results.filter(result => result === false).length;
   // 세트 사이에 다른 자막이 끼어도 사람은 이 줄만 이어서 기억한다. 직전 요약을 따로 들고 금지한다.
-  lastSetEnd = setEndLine(5 - conceded, rng, lastSetEnd);
+  lastSetEnd = setEndLine(saved, rng, lastSetEnd);
   say(lastSetEnd, null);
   // 판이 끝나면 레벨이 오르고 훈련 두 번이 쌓인다. 자동은 바로 훈련한다.
   // 자동 팝업이 없으므로 전 스탯 만렙이어도 다음 판이 그대로 온다.
   state.keeper.level += 1;
   state.points += 2;
   // 완봉이면 이적시장 이용권 한 장. 규칙은 판정이 소유하고 화면은 그 답을 받는다.
-  state.tickets = ticketGain(state.results, state.tickets);
+  state.tickets = ticketGain(state.results.map(result => result === true), state.tickets);
   if (state.coach) trainKeeper();
   persist();
   pips();
@@ -1382,7 +1381,7 @@ function recordRows() {
   const played = state.posts.filter((p) => !p.ph && !p.sf).slice(-10);
   const recent = played.length
     ? '<div class="log">' + played.map((p) => '<span>' + p.n
-      + '<b class="' + (p.c ? 'gone' : 'save') + '"></b></span>').reverse().join('') + '</div>'
+      + '<b class="' + (p.u ? 'missed' : p.c ? 'gone' : 'save') + '"></b></span>').reverse().join('') + '</div>'
     : '<div class="note dim"><span></span></div>';
   const names = Object.keys(state.record);
   names.sort((a, b) => {
@@ -1397,16 +1396,16 @@ function recordRows() {
     const k = kickerByName(n);
     const face = k ? '<img alt="' + n + '" src="' + thumbURL('face', k, lookOf({}, n)) + '">' : '';
     return '<tr><td>' + face + '</td><td>' + n + '</td><td><em>' + r.saved
-      + '</em></td><td><i>' + r.conceded + '</i></td></tr>';
+      + '</em></td><td><i>' + r.conceded + '</i></td><td>' + (r.missed || 0) + '</td></tr>';
   }).join('');
   const table = names.length
-    ? '<table><thead><tr><th></th><th>이름</th><th>막은</th><th>먹힌</th></tr></thead><tbody>'
+    ? '<table><thead><tr><th></th><th>이름</th><th>막은</th><th>먹힌</th><th>빗나감</th></tr></thead><tbody>'
       + rows + '</tbody></table>'
     : '<div class="note dim"><span></span></div>';
   /* 표가 먼저 선다. 이 칸을 여는 이유가 누구한테 약한지라, 그 답이 굴리기 전에 서야 한다. 실측
      1280x720에서 칸이 접히는 자리가 243px인데, 최근 열 판이 위에 서면 표의 첫 줄이 접힘 아래
      214px에 선다. 최근은 그 답을 받치는 줄이라 아래로 내려가고, 아래끝 그늘이 거기 더 있다고 말한다. */
-  return '<div class="note"><b>상대 전적</b><i>막은 수 - 먹힌 수</i></div>' + table
+  return '<div class="note"><b>상대 전적</b><i>세이브 / 실점 / 빗나감</i></div>' + table
     + '<div class="note"><b>최근</b></div>' + recent;
 }
 
