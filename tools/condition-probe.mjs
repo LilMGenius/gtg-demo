@@ -10,7 +10,7 @@ export const CONDITION_ITEMS = [...Object.entries(SHELF_WORDS).flatMap(([tab, sh
 export function conditionErrors(row, expected) {
   const errors = [];
   if (!row || !row.visible) return ['조건이 보이지 않음'];
-  if (!row.text.includes('구매 조건 · ' + expected.label)) errors.push('조건 문구');
+  if (!row.text.includes('구매 조건: ' + expected.label)) errors.push('조건 문구');
   if (row.value !== expected.value || row.min !== expected.min) errors.push('판정 값');
   if (row.progress.replaceAll(',', '') !== expected.value + '/' + expected.min) errors.push('진행도');
   if (row.price !== expected.cost) errors.push('가격');

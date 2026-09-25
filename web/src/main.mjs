@@ -1903,7 +1903,7 @@ function conditionHTML(item) {
   // 복수 조건은 머리글을 한 번만 쓰고 각 버튼에서 이름과 진행도를 짝짓는다.
   const heading = condition.parts ? '<span class="condition-label">구매 조건</span>' : '';
   return heading + (condition.parts || [condition]).map(c => '<button class="condition" data-route="' + c.route + '" data-value="' + c.value + '" data-min="' + c.min + '">'
-    + '<span class="condition-label">' + (condition.met || c.met ? '🔓' : '🔒') + ' ' + (condition.parts ? '' : '구매 조건 · ') + c.label + '</span>'
+    + '<span class="condition-label">' + (condition.met || c.met ? '🔓' : '🔒') + ' ' + (condition.parts ? '' : '구매 조건: ') + c.label + '</span>'
     + '<span class="condition-progress"><progress aria-label="구매 조건 진행도" value="' + c.value + '" max="' + c.min + '"></progress>'
     + '<small>' + c.value.toLocaleString('ko-KR') + '/' + c.min.toLocaleString('ko-KR') + '</small></span></button>').join('');
 }
@@ -1911,7 +1911,7 @@ function conditionHTML(item) {
 // 예고 타일은 출시된 상품의 잠금과 달리 진행도를 갖지 않는다. 누르면 해당 모드의 설명이 열린다.
 // 80×40 좌표의 경기장 윤곽과 반지름 5의 공은 작은 예고 칸에서 읽히도록 단순화한 제품 도형이다.
 function venueModes(venue) {
-  return '<div class="venue-modes"><span class="venue-shipped">' + venue.shipped + (venue.subtitle ? ' · ' + venue.subtitle : '') + '</span>' + venue.coming.map(mode =>
+  return '<div class="venue-modes"><span class="venue-shipped">' + venue.shipped + '</span>' + (venue.subtitle ? '<span class="venue-subtitle">' + venue.subtitle + '</span>' : '') + venue.coming.map(mode =>
     '<button class="mode-coming" type="button" data-preview="' + mode + '" aria-expanded="false"><svg viewBox="0 0 80 40" aria-hidden="true"><path d="M4 36L18 8H62L76 36ZM18 8V24H62V8M40 8V36"/><circle cx="40" cy="26" r="5"/></svg><span>' + mode + '</span><small>업데이트 예정</small></button>').join('') + '<p class="mode-preview" role="status" hidden></p></div>';
 }
 
@@ -1954,7 +1954,7 @@ function gearShelf(kind) {
       const picked = fitting[key] !== undefined ? fitting[key] : state.gear[key];
       skins = '<div class="skins">' + list.map((v, i) =>
         '<button class="skin' + (rank === pickedRank && i === picked ? ' on' : '') + '" data-field="' + s.field
-        + '" data-rank="' + rank + '" data-skin="' + i + '" title="' + v.name
+        + '" data-rank="' + rank + '" data-skin="' + i + '" title="' + (s.field === 'city' ? g.name + '&#10;' + v.city : v.name)
         + '" style="--sw:#' + v.tone.toString(16).padStart(6, '0') + '"></button>').join('') + '</div>';
     }
     /* 그림이 먼저 서고 이름과 효과 한 줄이 따라오며 값 배지가 오른쪽 아래를 받는다.
@@ -1962,7 +1962,7 @@ function gearShelf(kind) {
        그림이 카드에서 차지하는 몫이 그만큼 줄어 다시 글자가 먼저 읽힌다. */
     return '<div class="card gear' + (locked ? ' venue-locked' : '') + '" data-state="' + (locked ? 'locked' : 'available') + '" data-spec="' + kind + '" data-at="' + rank + '" data-rare="' + rank + '">'
       + '<div class="pic"><div class="shot" data-kind="' + kind + '" data-rank="' + rank + '"></div>' + skins + '</div>' + badge
-      + '<b>' + (host ? host.name : g.name) + '</b><em>' + cardLine(kind, rank) + '</em>' + (ownsCosmetic(state.keeper.worn, s.field, rank) ? '' : conditionHTML(g))
+      + '<b>' + (host ? g.name + '<span class="venue-subtitle">' + host.city + '</span>' : g.name) + '</b><em>' + cardLine(kind, rank) + '</em>' + (ownsCosmetic(state.keeper.worn, s.field, rank) ? '' : conditionHTML(g))
       + (host ? venueModes(g) : '') + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
   return '<h4>' + s.head + '</h4><div class="rack">' + rows.join('') + '</div>';
@@ -2273,7 +2273,7 @@ function paintPull() {
        글자는 둘이다. 누름 하나가 하는 일이 앞에 서고, 붙들면 남은 것이 전부 열린다는 것이 뒤에 선다.
        봉인 단이 까만 판이라 손이 먼저 두드리는데 두드림은 한 단씩이라, 뒤 마디가 없으면 급한 사람이
        다섯 번을 눌러 놓고도 붙드는 길을 못 배운다. 뒤 마디는 굵기와 짙기가 한 단 아래다. */
-    + '<button class="tap">' + (over ? '닫기' : '다음<i>· 길게 누르면 전부</i>') + '</button>';
+    + '<button class="tap">' + (over ? '닫기' : '다음<i>길게 누르면 전부</i>') + '</button>';
   box.hidden = false;
   // 놓이는 동작은 클래스를 다시 붙여야 다시 돈다. 같은 노드를 재사용하면 두 번째 장이 안 움직인다.
   const now = box.querySelector('.now');
@@ -2646,7 +2646,7 @@ function renderShop() {
     const mode = button.dataset.preview;
     const descriptions = { '풋살 5대5': '좁은 코트에서 빠른 패스와 슛을 막습니다.', '중거리 슛': '먼 거리에서 날아오는 슛을 막습니다.', '코너킥 헤딩': '코너킥 뒤 헤딩 슛에 대응합니다.', '프리킥': '수비벽 너머 휘어지는 슛을 막습니다.', '11대11': '팀과 함께 정규 경기를 치릅니다.', '프로 리그': '프로 무대의 시즌 경기에 도전합니다.' };
     preview.hidden = false;
-    preview.textContent = mode + ' · ' + descriptions[mode];
+    preview.replaceChildren(Object.assign(document.createElement('strong'), {textContent:mode}), document.createElement('br'), document.createTextNode(descriptions[mode]));
     for (const tile of button.parentElement.querySelectorAll('[data-preview]')) tile.setAttribute('aria-expanded', String(tile === button));
   };
   bindSpec(box);
