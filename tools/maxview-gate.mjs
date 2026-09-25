@@ -192,23 +192,42 @@ const tabScan = async (w, h) => {
   await p.waitForTimeout(1300);
   await p.evaluate(() => window.__shop(true));
   await p.waitForTimeout(320);
-  const r = await p.evaluate((vw) => {
+  // 선택한 탭을 하나씩 가져온 뒤 띠 안에 보이는 탭만 가림을 잰다.
+  const scan = () => {
     const tabs = [...document.querySelectorAll("#shop .tab")];
-    let out = 0;
-    let hidden = 0;
+    const selected = tabs.find(t => t.getAttribute("aria-current") === "true");
+    const strip = tabs[0].parentElement.getBoundingClientRect();
     const names = [];
+    let hidden = 0;
     for (const t of tabs) {
-      const r = t.getBoundingClientRect();
-      if (r.left < -1 || r.right > vw + 1) out += 1;
-      // 사각형이 화면 안에 있다는 것과 사람 눈에 보인다는 것은 다른 명제다.
-      // 가운데 점을 누를 때 닿는 것이 그 탭이 아니면 위에 무언가가 덮어 있는 것이다.
-      const cx = Math.round(r.left + r.width / 2);
-      const cy = Math.round(r.top + r.height / 2);
+      const q = t.getBoundingClientRect(), cx = q.left + q.width / 2, cy = q.top + q.height / 2;
+      if (cx < strip.left || cx > strip.right) continue;
       const at = document.elementFromPoint(cx, cy);
-      if (!at || !(at === t || t.contains(at))) { hidden += 1; names.push(t.textContent.trim() + " under " + (at ? (at.id || at.tagName.toLowerCase() + "." + at.className) : "nothing")); }
+      if (!at || !(at === t || t.contains(at))) { hidden += 1; names.push(t.dataset.tab); }
     }
-    return { out, hidden, names, total: tabs.length };
-  }, w);
+    const q = selected?.getBoundingClientRect();
+    // 기존 화면 경계 허용 오차 1px를 스크롤 띠 양끝에도 그대로 적용한다.
+    const out = !q || q.left < Math.max(strip.left, 0) - 1 || q.right > Math.min(strip.right, innerWidth) + 1;
+    return {out:Number(out), hidden, names};
+  };
+  const keys = await p.locator("#shop .tab").evaluateAll(ts => ts.map(t => t.dataset.tab));
+  const r = {out:0, hidden:0, names:[], total:keys.length};
+  for (const key of keys) {
+    await p.evaluate(key => document.querySelector('#shop .tab[data-tab="' + key + '"]').click(), key);
+    // 기존 탭 전환 대기와 같아 스크롤 및 레이아웃이 끝난 뒤 읽는다.
+    await p.waitForTimeout(320);
+    const row = await p.evaluate(scan);
+    r.out += row.out; r.hidden += row.hidden; r.names.push(...row.names);
+  }
+  // 마지막 선택 탭 위에 뚜껑을 심어 같은 읽기가 양수로 바뀌는지 증명한다.
+  await p.evaluate(() => {
+    const tab = document.querySelector('#shop .tab[aria-current="true"]'), q = tab.getBoundingClientRect();
+    const lid = document.createElement("div");
+    // 999는 패널보다 위에서 포인터를 가로채는 심은 가림막의 층이다.
+    lid.style.cssText = "position:fixed;z-index:999;left:" + q.left + "px;top:" + q.top + "px;width:" + q.width + "px;height:" + q.height + "px";
+    document.body.appendChild(lid);
+  });
+  r.planted = (await p.evaluate(scan)).hidden;
   await ctx.close();
   return r;
 };
@@ -299,8 +318,9 @@ try {
   // 탭은 상자를 안 넘치고도 화면 밖으로 나갈 수 있다. 그것은 잔림이 아니라 밀림이다.
   // 눈으로 보고 알았다. 지금 서 있는 탭이 왼쪽으로 나가 있으면 어느 선반인지를 화면이 안 말한다.
   const tabsOut = await narrowTabs;
-  check("narrow:every-shop-tab-is-on-screen", tabsOut.out === 0, tabsOut.out + " of " + tabsOut.total + " tabs off screen");
+  check("narrow:each-selected-shop-tab-is-on-screen", tabsOut.total > 0 && tabsOut.out === 0, tabsOut.out + " of " + tabsOut.total + " tabs off screen");
   check("narrow:no-shop-tab-is-covered", tabsOut.hidden === 0, tabsOut.hidden + " of " + tabsOut.total + " tabs covered" + (tabsOut.hidden ? ": " + tabsOut.names.join(", ") : ""));
+  check("control:tab-obstruction-is-detected", tabsOut.planted > 0, String(tabsOut.planted));
   const panels = await panelCover(844, 390);
   const coverProbe = await plantedLid(844, 390);
   for (const pn of panels) console.log("  panel " + pn.id + " " + pn.total + " buttons, " + pn.seen + " on the visible box, " + pn.hits.length + " covered" + (pn.hits.length ? ": " + pn.hits.join(", ") : ""));
