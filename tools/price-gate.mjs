@@ -1,11 +1,7 @@
-import { auditConditions, CONDITION_ITEMS } from './condition-probe.mjs';
-import { conditionLabel } from '../web/src/state/condition.mjs';
-import { CITIES, CITY_SKINS } from '../web/src/state/gear.mjs';
-// 구매 조건의 구분점은 요청된 카드 문법이다. 실제 조건 표와 정확히 같은 문구만 허용한다.
-const CONDITION_TEXTS = new Set(CONDITION_ITEMS.flatMap(({ item }) => ['🔒', '🔓'].map(icon => icon + ' 구매 조건 · ' + conditionLabel(item.condition))));
-// 시설·도시 제목과 출시 설명은 경기장 계약이 지정한 정확한 표 값만 허용한다.
-const VENUE_TEXTS=new Set([...CITY_SKINS.flat().map(host=>host.name),...CITIES.map(row=>row.shipped+(row.subtitle?' · '+row.subtitle:'')),...CITIES.flatMap(row=>(row.conditions||[]).flatMap(condition=>['🔒','🔓'].map(icon=>icon+' 구매 조건 · '+conditionLabel(condition))))]);
-const hasUnapprovedBullet = text => !CONDITION_TEXTS.has(text.trim()) && !VENUE_TEXTS.has(text.trim()) && BULLETS.some(dot => text.includes(dot));
+import { auditConditions } from './condition-probe.mjs';
+import { CITIES } from '../web/src/state/gear.mjs';
+// 조건도 다른 화면 문구와 같은 구분자 규칙을 따른다. 옛 조건 문구 예외는 두지 않는다.
+const hasUnapprovedBullet = text => BULLETS.some(dot => text.includes(dot));
 import { chromium } from "playwright";
 
 // 값 표기의 자. 상단 잔고는 아이콘인데 상점 버튼은 '140 골드'처럼 글자였다.

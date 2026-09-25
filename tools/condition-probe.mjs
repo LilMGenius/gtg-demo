@@ -10,7 +10,9 @@ export const CONDITION_ITEMS = [...Object.entries(SHELF_WORDS).flatMap(([tab, sh
 export function conditionErrors(row, expected) {
   const errors = [];
   if (!row || !row.visible) return ['조건이 보이지 않음'];
-  if (!row.text.includes('구매 조건: ' + expected.label)) errors.push('조건 문구');
+  if (row.heading !== '구매 조건' || row.headings !== 1 || row.label !== expected.label.replace(/\s[\d,]+(?:회|명)?$/u, '')) errors.push('조건 문구');
+  if (row.icon !== (expected.value >= expected.min ? '조건 충족' : '조건 미충족')) errors.push('잠금 그림');
+  if (!row.bar) errors.push('진행 막대');
   if (row.value !== expected.value || row.min !== expected.min) errors.push('판정 값');
   if (row.progress.replaceAll(',', '') !== expected.value + '/' + expected.min) errors.push('진행도');
   if (row.price !== expected.cost) errors.push('가격');
@@ -43,6 +45,11 @@ async function auditPage(page) {
       const buy = card.querySelector('.buy');
       const rect = button?.getBoundingClientRect();
       return { text: button?.textContent, progress: button?.querySelector('small')?.textContent,
+        heading: card.querySelector(':scope > .condition-label')?.textContent,
+        headings: card.querySelectorAll(':scope > .condition-label').length,
+        label: button?.querySelector('.condition-name')?.textContent,
+        icon: button?.querySelector('svg')?.getAttribute('aria-label'),
+        bar: Boolean(button?.querySelector('progress')?.getBoundingClientRect().width),
         value: Number(button?.dataset.value), min: Number(button?.dataset.min),
         price: Number(buy?.querySelector('[data-coin]')?.dataset.coin), disabled: buy?.disabled,
         visible: Boolean(rect && rect.width && rect.height && rect.top < innerHeight && rect.bottom > 0),
@@ -55,7 +62,11 @@ async function auditPage(page) {
     const errors = conditionErrors(row, expected);
     // 한 칸 틀린 진행도를 심어 같은 판정이 반드시 거절하는지 본다.
     const control = conditionErrors({ ...row, progress: (value + 1) + '/' + expected.min }, expected).includes('진행도');
-    rows.push({ tab, rank, errors, control });
+    const grammarControls = [
+      { ...row, heading: '' }, { ...row, label: '구매 조건: ' + expected.label },
+      { ...row, icon: undefined }, { ...row, bar: false }
+    ].every(planted => conditionErrors(planted, expected).length > 0);
+    rows.push({ tab, rank, errors, control, grammarControls });
   }
-  return { pass: rows.length === CONDITION_ITEMS.length && rows.length > 0 && rows.every(row => !row.errors.length && row.control), rows };
+  return { pass: rows.length === CONDITION_ITEMS.length && rows.length > 0 && rows.every(row => !row.errors.length && row.control && row.grammarControls), rows };
 }
