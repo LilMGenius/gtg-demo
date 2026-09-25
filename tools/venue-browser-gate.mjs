@@ -52,7 +52,7 @@ try {
         await card.locator('.venue-flag').evaluate(img => img.decode());
         const flag = await card.locator('.venue-flag').evaluate(img => ({ label: img.getAttribute('aria-label'), src: img.getAttribute('src'), loaded: img.complete && img.naturalWidth > 0, width: img.getBoundingClientRect().width, height: img.getBoundingClientRect().height, top: getComputedStyle(img).top, right: getComputedStyle(img).right, parent: img.parentElement.dataset.spec }));
         check('flag:' + width + ':' + item.city + ':' + variant, flag.label === '개최국 ' + host.country && flag.src.endsWith('/' + host.flag + '.svg') && flag.loaded && Math.abs(flag.width - 24) < 1 && Math.abs(flag.height - 18) < 1 && flag.top === '8px' && flag.right === '8px' && flag.parent === 'city', flag);
-        check('name:' + width + ':' + item.city + ':' + variant, await card.locator(':scope > b').textContent() === host.name, host.name);
+        check('name:' + width + ':' + item.city + ':' + variant, await card.locator(':scope > b').evaluate(el => el.firstChild.textContent) === item.name && await card.locator(':scope > b .venue-subtitle').textContent() === host.city, host.name);
       }
     }
     for (const item of CITIES.filter(row => row.conditions.length)) {
