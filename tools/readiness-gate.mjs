@@ -192,6 +192,54 @@ axis('payment-sdk-scan', () => {
 });
 axis('hosting-declaration', () => { const url = read('tools/live-gate.mjs').match(/const LIVE = "([^"]+)"/)[1]; assert(new URL(url).hostname.endsWith('.github.io')); return url + '; live gate target, not a deployment verification; R25 sale trigger absent'; });
 
+// 시장 시험 준비물의 존재는 결정론이고 외부인의 결과와 게시 승인은 HITL이다.
+const marketFiles = ['README.md', 'observer.md', 'observation.csv', 'posts.md', 'clip.md', 'collectors.md', 'report.md'];
+const requireMarketFile = (load, name) => {
+  const body = load('market-test/' + name);
+  assert(body.trim(), '빈 시장 시험 파일: ' + name);
+  return body;
+};
+for (const name of marketFiles) axis('market-test:package:' + name, () => {
+  const body = requireMarketFile(read, name);
+  return name + ' ' + Buffer.byteLength(body) + ' bytes; 존재만 측정, 내용과 사람의 결과는 별도 검토';
+});
+axis('market-test:presence-controls', () => {
+  assert.throws(() => requireMarketFile(() => { throw new Error('ENOENT'); }, 'missing.md'));
+  assert.throws(() => requireMarketFile(() => '  ', 'empty.md'));
+  assert.equal(requireMarketFile(() => '준비물', 'present.md'), '준비물');
+  return '누락·빈 파일 거부, 비어 있지 않은 대조군 수락';
+});
+axis('market-test:observation-sheet', () => {
+  const csv = requireMarketFile(read, 'observation.csv').replace(/^\uFEFF/, '').trimEnd().split(/\r?\n/).map(line => line.split(','));
+  const [header, ...people] = csv;
+  // P24가 지정한 코칭 없는 외부인 표본 수다.
+  const expectedPeople = 5;
+  assert.equal(people.length, expectedPeople);
+  assert.equal(new Set(people.map(person => person.at(0))).size, expectedPeople);
+  assert(people.every(person => person.length === header.length && person.at(0) && person.slice(1).every(cell => cell === '')));
+  return '외부인 ' + people.length + '행, ' + header.length + '열; 결과 칸은 미관측';
+});
+axis('market-test:source-links', () => {
+  const posts = requireMarketFile(read, 'posts.md');
+  const telemetry = read('web/src/telemetry.mjs');
+  const allowed = [...telemetry.match(/const SOURCES = new Set\(\[([\s\S]*?)\]\)/)[1].matchAll(/'([^']+)'/g)].map(match => match[1]);
+  const root = new URL(read('README.md').match(/^플레이:\s*(https:\/\/\S+)/m)[1]);
+  const entry = new URL('web/index.html', root);
+  const channels = ['reddit', 'discord', 'itch', 'youtube', 'crazygames', 'poki'];
+  const links = [...posts.matchAll(/^https:\/\/\S+/gm)].map(match => new URL(match[0]));
+  const valid = link => link.origin === entry.origin && link.pathname === entry.pathname
+    && allowed.includes(link.searchParams.get('src'));
+  assert(links.every(valid));
+  for (const channel of channels) {
+    // 한국어와 영어 초안 각각에 하나씩 있어야 하므로 채널마다 두 링크다.
+    assert.equal(links.filter(link => link.searchParams.get('src') === channel).length, 2);
+  }
+  assert(!valid(new URL('?src=reddit', root)), '쿼리를 잃는 루트 주소가 통과함');
+  assert(!valid(new URL('?src=unknown', entry)), '허용 목록 밖 유입이 통과함');
+  return links.length + '개 링크의 실제 진입 경로·허용 유입 확인; 루트·알 수 없는 채널 거부';
+});
+row('market-test:수집기 계정·모집·게시·지출·결과 전환', 'HITL', 'HITL', 'founder', 'market-test/README.md 결정표; 실계정·외부인·시장 판정은 미측정');
+
 // Existing browser owners are references, never recycled PASS reports.
 for (const [name, owner, marker] of [
   ['HUD native buttons', 'entry', 'affordance:every-hud-click-target-is-a-button'],
