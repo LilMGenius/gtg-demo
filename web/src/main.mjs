@@ -2331,10 +2331,11 @@ function packArt(kind) {
 // 셋은 부채꼴이 양옆과 가운데를 채우는 최소 수이고, 넷부터는 포장이 가운데 장을 가린다.
 const FAN = 3;
 // 바닥이 없는 팩은 전설 바닥 아래에서만 고른다. 전설 얼굴을 걸면 이 팩에서 전설이 나온다고 약속하는 그림이 된다.
+// 그 아래가 바닥나면 부채꼴은 줄거나 빈다. 남은 전설로 채우면 같은 약속을 거꾸로 한다.
 function featured(pool, kind) {
   const top = PULL_KINDS.reduce((m, k) => Math.max(m, k.floor), 0);
   const shown = kind.floor ? pool : pool.filter((k) => (Number(k.fame) || 0) < top);
-  return (shown.length ? shown : pool).slice().sort((a, b) => (Number(b.fame) || 0) - (Number(a.fame) || 0)).slice(0, FAN);
+  return shown.slice().sort((a, b) => (Number(b.fame) || 0) - (Number(a.fame) || 0)).slice(0, FAN);
 }
 
 /* 뽑기 선반은 팩 하나를 고르게 하는 탭이 아니라 두 배너를 나란히 세운다. 가려진 탭 안의 팩은

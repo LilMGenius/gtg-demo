@@ -48,7 +48,7 @@ try {
     const scrolled = await p.evaluate(() => document.getElementById('shop').scrollTop);
     if (fixed) check(tag + ':banner:every-draw-button-shows-without-scrolling', inView(rich) && scrolled === 0, rich.map((r) => r.buys.map((x) => x.top + '-' + x.bottom)).join(' ') + ' of ' + H);
     // 부채꼴은 그 팩에서 나올 수 있는 선수다. 바닥 없는 팩이 전설 얼굴을 걸면 전설이 나온다고 약속하는 그림이 된다.
-    const honest = (list) => list.every((r) => r.fan.length === 3 && r.fan.every((f) => f.img > 0 && f.name) && (r.id === 'legend' ? r.fan.every((f) => fameOf(f.name) >= top) : r.fan.every((f) => fameOf(f.name) < top)));
+    const honest = (list) => list.every((r) => r.fan.length <= 3 && r.fan.every((f) => f.img > 0 && f.name) && (r.id === 'legend' ? r.fan.every((f) => fameOf(f.name) >= top) : r.fan.every((f) => fameOf(f.name) < top)));
     check(tag + ':banner:the-fan-shows-only-what-that-pack-can-give', honest(rich), rich.map((r) => r.id + ' ' + r.fan.map((f) => f.name + '(' + fameOf(f.name) + ')').join(' ')));
     check(tag + ':banner:enough-money-enables-both-draws', rich.every((r) => r.buys.every((x) => !x.off)), rich.map((r) => r.buys.map((x) => x.off)));
     await p.screenshot({ path: shots + tag + '-banners.jpg', type: 'jpeg', quality: 80 });
@@ -83,13 +83,34 @@ try {
     check(tag + ':banner:odds-open-as-a-table-of-the-remaining-pool', odds.open && odds.text.includes('%') && odds.stock === want, { stock: odds.stock, want });
     await p.click('.banner[data-kind="legend"] .odds summary', { force: true });
 
+    // 확률 표의 칸마다 한가운데를 누르면 그 표가 받아야 한다. 옆 배너가 덮으면 표가 있어도 못 읽는다.
+    const occluded = (id) => p.evaluate((id) => {
+      const det = document.querySelector('.banner[data-kind="' + id + '"] .odds');
+      return [...det.querySelectorAll('em span:not(.head) > *')].filter((c) => { const r = c.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return !det.contains(hit); }).length;
+    }, id);
+    for (const k of PULL_KINDS) {
+      await p.click('.banner[data-kind="' + k.id + '"] .odds summary', { force: true }); await p.mouse.move(1, 1); await p.waitForTimeout(SETTLE);
+      check(tag + ':' + k.id + ':the-open-odds-are-not-covered-by-the-other-banner', (await occluded(k.id)) === 0, (await occluded(k.id)) + ' covered cells');
+      if (k.id === 'town' && fixed) {
+        const lift = await p.addStyleTag({ content: '#shop .banner:has(.odds[open]){z-index:auto}' }); await p.waitForTimeout(SETTLE);
+        check(tag + ':control:an-unlifted-banner-reddens-the-cover-axis', (await occluded('town')) > 0 || W < 1000, (await occluded('town')) + ' covered');
+        await lift.evaluate((n) => n.remove());
+      }
+      await p.click('.banner[data-kind="' + k.id + '"] .odds summary', { force: true });
+    }
+    // 닫기도 가로 두 크기에서 굴리지 않고 보여야 한다. 상점을 여는 사람은 닫는 길부터 찾는다.
+    if (fixed) { const c = await p.locator('#shop .close').boundingBox(); check(tag + ':banner:close-shows-without-scrolling', c && c.y >= 0 && c.y + c.height <= H, c); }
+
     // 감소 동작 설정에서는 대기 빛, 금빛 회전, 기울임이 다 멈춘다.
     await p.emulateMedia({ reducedMotion: 'reduce' });
+    const fanAt = () => p.evaluate(() => [...document.querySelectorAll('.banner.legend .fan figure')].map((f) => getComputedStyle(f).rotate + ' ' + getComputedStyle(f).translate).join('|'));
+    const fanRest = await fanAt();
     const box = await p.locator('.banner[data-kind="legend"] .pack-art').boundingBox();
     await p.mouse.move(box.x + box.width * 0.95, box.y + 2); await p.waitForTimeout(SETTLE);
     const still = await p.evaluate(() => ({ running: document.querySelector('#shop .banners').getAnimations({ subtree: true }).filter((a) => a.playState === 'running').length,
       transform: getComputedStyle(document.querySelector('.banner.legend .pack-art')).transform }));
-    check(tag + ':banner:reduced-motion-stops-everything', still.running === 0 && still.transform === 'none', still);
+    const fanHover = await fanAt();
+    check(tag + ':banner:reduced-motion-stops-everything', still.running === 0 && still.transform === 'none' && fanHover === fanRest, { ...still, fan: fanHover === fanRest ? 'still' : fanRest + ' -> ' + fanHover });
     await p.emulateMedia({ reducedMotion: 'no-preference' }); await p.mouse.move(1, 1);
 
     // 모자란 잔고는 값을 바꾸지 않고 붉게 칠하고 버튼을 끈다. 같은 물건이 지갑마다 다른 수로 읽히면 안 된다.
@@ -112,6 +133,25 @@ try {
     await p.evaluate((name) => { document.querySelector('.banner[data-kind="town"] .fan figcaption').innerText = name; }, poolFor(KEEPERS, 'legend')[0].name);
     check(tag + ':control:a-legend-face-on-the-open-pack-reddens-the-honesty-axis', !honest(await read()), 'planted');
     await p.evaluate(() => window.__shop(true)); await p.waitForTimeout(SETTLE);
+
+
+    // 동네 풀을 열 장씩 비운다. 전설 아래가 바닥나도 부채꼴이 전설 얼굴로 채워지면 안 되고,
+    // 한도와 품절 글자는 값을 덮지 않는다(버튼 안 두 글자 상자가 겹치지 않는가).
+    if (W === 1280) {
+      for (let i = 0; i < 6; i += 1) {
+        const open = await p.locator('.banner[data-kind="town"] .buy[data-want="10"]:not(:disabled)').count();
+        if (!open) break;
+        await p.click('.banner[data-kind="town"] .buy[data-want="10"]', { force: true }); await p.waitForTimeout(200);
+        await p.evaluate(() => { document.getElementById('pull').hidden = true; window.__shop(true); }); await p.waitForTimeout(SETTLE);
+      }
+      const drained = await read();
+      const town = drained.find((r) => r.id === 'town');
+      check(tag + ':banner:a-drained-open-pack-never-borrows-a-legend-face', honest(drained), town.fan.map((f) => f.name + '(' + fameOf(f.name) + ')').join(' ') || 'empty fan');
+      const clash = await p.evaluate(() => [...document.querySelectorAll('.banner .buy.pull')].filter((x) => { const u = x.querySelector('u'); const i = x.querySelector('i'); if (!u || !i) return false; const a = u.getBoundingClientRect(), b = i.getBoundingClientRect(); return a.bottom > b.top + 1 && a.top < b.bottom - 1 && a.right > b.left && a.left < b.right; }).map((x) => x.dataset.kind + x.dataset.want));
+      const labels = await p.evaluate(() => [...document.querySelectorAll('.banner .buy.pull u')].map((u) => u.innerText));
+      check(tag + ':banner:a-limit-label-never-covers-the-price', labels.length > 0 && clash.length === 0, { labels, clash });
+      await p.screenshot({ path: shots + tag + '-drained.jpg', type: 'jpeg', quality: 80 });
+    }
 
     // 키커 자리에서 전설 한 장. 값이 나가고 키커가 하나 늘고 개봉이 열린다.
     if (W === 1280) {

@@ -1435,6 +1435,8 @@ body { word-break: keep-all; overflow-wrap: break-word; }
 @keyframes shop-rim-sweep{to{--rim:360deg}}
 #shop .banner:hover{translate:0 -3px;box-shadow:12px 16px 0 var(--edge),0 0 0 3px color-mix(in srgb,var(--tier),transparent 55%)}
 #shop .banner.empty .stage{filter:grayscale(1) brightness(.45)}
+/* 확률 표가 열린 배너는 옆 배너 위로 올라선다. 배너마다 쌓임 맥락이 따로라 표의 z-index만으로는 옆 배너를 못 넘는다. */
+#shop .banner:has(.odds[open]){z-index:2}
 /* 선수 카드는 포장 위로 부채꼴로 솟는다. 폭 1.5배와 높이 1.45배는 양옆 카드의 얼굴과 이름이 포장에 안 가리는 여백이다. */
 #shop .banner .stage{position:relative;width:calc(var(--pack-h) * 1.5);height:calc(var(--pack-h) * 1.45);display:grid;place-items:end center}
 #shop .banner .fan{position:absolute;inset:0;pointer-events:none}
@@ -1482,6 +1484,8 @@ body { word-break: keep-all; overflow-wrap: break-word; }
 #shop .banner .buy.pull{width:100%;min-width:0;margin:0;padding:8px 4px 10px}
 #shop .banner .buy.pull:not(:disabled){background:color-mix(in srgb,var(--tier),#101a10 62%)}
 #shop .banner .buy.pull .price{flex-wrap:wrap;justify-content:center}
+/* 한도와 품절은 배너 버튼 안에서 값 위 한 줄로 선다. 모서리 배지로 띄우면 좁은 배너 버튼에서 값을 덮는다. */
+#shop .banner .buy.pull u{position:static;translate:none;align-self:center;padding:0 6px 1px;font-size:var(--fs-body);margin-bottom:2px}
 @keyframes shop-foil{0%,55%{transform:translateX(-100%);opacity:0}65%{opacity:.65}100%{transform:translateX(100%);opacity:0}}
 @keyframes shop-sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
 @keyframes shop-rim{to{transform:rotate(360deg)}}
@@ -1489,7 +1493,13 @@ body { word-break: keep-all; overflow-wrap: break-word; }
   #shop .banner,#shop .banner *,#shop .banner::after,#shop .banner .foil::before,#shop .banner .foil::after{animation:none!important;transition:none!important}
   #shop .banner .pack-art{transform:none!important}
   #shop .banner:hover{translate:none}
+  /* 부채꼴도 호버에서 제자리다. 전이만 끄면 벌어짐이 순간 이동으로 남는다. */
+  #shop .banner:hover .fan figure.f0{rotate:-24deg;translate:-100% 4%}
+  #shop .banner:hover .fan figure.f1{translate:-50% -30%}
+  #shop .banner:hover .fan figure.f2{rotate:24deg;translate:0 4%}
 }
+/* 높이 420px 아래(가로 폰)는 포장을 84px로, 배너와 버튼 안쪽 여백을 반으로 내린다. 높이를 정하는 것은 포장이 아니라 글과 버튼 기둥이다. 27vh 바닥 108px로는 두 회차 아래 닫기가 390px 화면 밖으로 밀렸다. */
+@media (max-height:420px){#shop .banner{--pack-h:84px;padding:6px 8px}#shop .banner .side{gap:0}#shop .banner .buy.pull{padding:5px 4px 6px}}
 /* 620px 아래(세로 폰)는 두 배너가 한 열로 서고 배너 안에서도 무대가 글 위로 올라간다. 옆에 두면 두 버튼이 한 글자 폭으로 줄어든다. */
 @media(max-width:620px){#shop .banners{grid-template-columns:1fr}#shop .banner{--pack-h:150px;grid-template-columns:1fr;justify-items:center}#shop .banner .side{width:100%}}
 /* 세로 팩 진열은 회전 안내 뒤에 가리지 않는다. 경기 화면의 회전 계약은 그대로 둔다. */
