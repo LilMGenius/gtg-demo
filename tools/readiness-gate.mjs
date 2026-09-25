@@ -210,7 +210,7 @@ axis('market-test:presence-controls', () => {
   return '누락·빈 파일 거부, 비어 있지 않은 대조군 수락';
 });
 axis('market-test:observation-sheet', () => {
-  const csv = requireMarketFile(read, 'observation.csv').replace(/^\uFEFF/, '').trimEnd().split(/\r?\n/).map(line => line.split(','));
+  const csv = requireMarketFile(read, 'observation.csv').trim().split(/\r?\n/).map(line => line.split(','));
   const [header, ...people] = csv;
   // P24가 지정한 코칭 없는 외부인 표본 수다.
   const expectedPeople = 5;
