@@ -25,14 +25,51 @@ const main = read('web/src/main.mjs');
 const source = p => read(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 let largest;
 
+// URL은 만들어졌다는 이유만으로 내려받지 않는다. const 값의 모든 소비가
+// <a href> 문자열인 경우만 탐색으로 제외하고, fetch나 알 수 없는 소비가 섞이면 예산에 남긴다.
+// 기존 정적 import/URL 워커와 Node URL 해석을 재사용하며 파일명·확장자로 탐색을 추정하지 않는다.
+function moduleUrls(text) {
+  return [...text.matchAll(/new URL\(\s*['"]([^'"]+)['"]\s*,\s*import\.meta\.url\s*\)/g)].map(match => {
+    const prefix = text.slice(0, match.index);
+    const binding = prefix.match(/(?:^|[;\n])\s*const\s+([A-Za-z_$][\w$]*)\s*=\s*$/);
+    let navigation = false;
+    if (binding && /^(?:\.href)?\s*;/.test(text.slice(match.index + match[0].length))) {
+      const name = binding[1];
+      const declaration = match.index - binding[0].length;
+      const uses = [...text.matchAll(new RegExp('\\b' + name.replaceAll('$', '\\$') + '\\b', 'g'))]
+        .filter(use => use.index < declaration || use.index >= match.index + match[0].length);
+      navigation = uses.length > 0 && uses.every(use =>
+        /<a\b[^<>]*\bhref\s*=\s*["']["']\s*\+\s*$/i.test(text.slice(0, use.index))
+        && /^\s*\+\s*["']["']/.test(text.slice(use.index + name.length)));
+    }
+    return { ref: match[1], navigation };
+  });
+}
+
+function bootstrapPath(ref, parent) {
+  if (/^(data:|#)/.test(ref)) return null;
+  assert(!/^(https?:|\/\/)/.test(ref), 'Unmeasured remote bootstrap resource: ' + ref);
+  const file = fileURLToPath(new URL(ref, pathToFileURL(parent)));
+  assert(!relative(ROOT, file).startsWith('..'), 'Resource escaped repository: ' + file);
+  return file;
+}
+
+axis('bootstrap-url-consumer-controls', () => {
+  const parent = resolve(ROOT, 'web/src/control.mjs');
+  const nav = 'const target = new URL("../../../outside.html", import.meta.url).href; const link = \'<a href="\' + target + \'">열기</a>\';';
+  const collect = text => moduleUrls(text).filter(row => !row.navigation).map(row => bootstrapPath(row.ref, parent));
+  assert.deepEqual(collect(nav), []);
+  assert.throws(() => collect('fetch(new URL("../../../outside.json", import.meta.url));'), /escaped repository/);
+  assert.throws(() => collect(nav + ' fetch(target);'), /escaped repository/);
+  assert.equal(collect('fetch(new URL("../build.json", import.meta.url));')[0], resolve(ROOT, 'web/build.json'));
+  return '탐색 전용 제외; 저장소 밖 직접 fetch와 탐색/fetch 겸용 거부; 내부 fetch 포함';
+});
+
 axis('initial-byte-budget', () => {
   const files = new Map(), queue = [resolve(ROOT, 'web/index.html')];
   const add = (ref, parent) => {
-    if (/^(data:|#)/.test(ref)) return;
-    assert(!/^(https?:|\/\/)/.test(ref), 'Unmeasured remote bootstrap resource: ' + ref);
-    const file = fileURLToPath(new URL(ref, pathToFileURL(parent)));
-    assert(!relative(ROOT, file).startsWith('..'), 'Resource escaped repository: ' + file);
-    queue.push(file);
+    const file = bootstrapPath(ref, parent);
+    if (file) queue.push(file);
   };
   while (queue.length) {
     const file = queue.shift();
@@ -47,7 +84,10 @@ axis('initial-byte-budget', () => {
     if (/\.(?:mjs|js)$/.test(file)) {
       assert(!/\bimport\s*\(/.test(text), 'Dynamic import needs an explicit budget owner: ' + relative(ROOT, file));
       for (const m of text.matchAll(/\b(?:import|export)\s+(?:[^;"']*?\sfrom\s*)?["']([^"']+)["']/g)) add(m[1], file);
-      for (const m of text.matchAll(/new URL\(\s*['"]([^'"]+)['"]\s*,\s*import\.meta\.url\s*\)/g)) add(m[1], file);
+      for (const url of moduleUrls(text)) {
+        if (url.navigation) lines.push('NAVIGATION_ONLY ' + relative(ROOT, file) + ' -> ' + url.ref);
+        else add(url.ref, file);
+      }
       for (const m of text.matchAll(/loadDecor\(\s*\w+\s*,\s*['"]([^'"]+)['"]/g)) add('assets/models/' + m[1] + '.glb', resolve(ROOT, 'web/index.html'));
     }
     if (/\.(?:html|css)$/.test(file)) for (const m of text.matchAll(/url\(\s*['"]?([^)'"\s]+)['"]?\s*\)/g)) add(m[1], file);
@@ -154,7 +194,35 @@ axis('ftue-ordered-ids', () => {
 axis('wiki-searchable-odds', () => {
   const pages = JSON.parse(read('web/wiki/dist/pages.json'));
   const page = pages.find(p => p.id === 'pull' && p.categories.includes('pull'));
-  assert(page && !/[0-9]/.test(page.bodyHtml.replace(/<[^>]*>/g, ' ')));
+  assert(page);
+  // 숫자 전체는 가격·묶음 수·이용권 한도·명성 조건까지 거부하는 잘못된 대리 지표다.
+  // 퍼센트 표기와 계산된 풀 확률만 금지한다. shopOdds의 기존 실물 검증은 아래에 그대로 둔다.
+  const poolOdds = new Set();
+  for (const pool of [KEEPERS, KEEPERS.slice(1)]) {
+    const total = pool.reduce((sum, keeper) => sum + pullWeight(keeper), 0);
+    // 아래 기존 계약과 같은 명성 세 구간이며 100은 비율을 퍼센트로 바꾸는 환산이다.
+    for (const matches of [k => k.fame >= 10, k => k.fame === 9, k => k.fame <= 8]) {
+      const odd = pool.filter(matches).reduce((sum, keeper) => sum + pullWeight(keeper), 0) / total * 100;
+      poolOdds.add(odd);
+      // 현재 표시 한 자리와 과거 위키의 두 자리 모두 복사 확률로 검출한다.
+      for (const digits of [1, 2]) poolOdds.add(Number(odd.toFixed(digits)));
+    }
+  }
+  const noCopiedOdds = body => {
+    const text = body.replace(/<[^>]*>/g, ' ').replace(/&#(?:0*37|x0*25);|&percnt;/gi, '%');
+    assert(!/[%％]|퍼센트|\bpercent\b/i.test(text), 'Wiki contains a copied percentage');
+    const figures = [...text.matchAll(/\d+(?:\.\d+)?/g)].map(match => Number(match[0]));
+    assert(!figures.some(value => poolOdds.has(value)), 'Wiki contains a computed pool odd');
+  };
+  noCopiedOdds(page.bodyHtml);
+  // 실제 빌드의 가격·묶음·이용권·명성 숫자는 확률이 아니라는 허용 대조군이다.
+  noCopiedOdds('<p>가격 380, 묶음 10, 이용권 1, 명성 40, 명성 9</p>');
+  // 양성 표본의 50%는 풀 변화와 무관하게 복사 확률 표기를 거부하는지 검증한다.
+  assert.throws(() => noCopiedOdds(page.bodyHtml + '<p>확률 50%</p>'), /copied percentage/);
+  assert.throws(() => noCopiedOdds(page.bodyHtml + '<p>확률 50&#37;</p>'), /copied percentage/);
+  assert(poolOdds.size > 0);
+  for (const odd of poolOdds) assert.throws(() => noCopiedOdds(page.bodyHtml + '<p>' + odd + '</p>'), /computed pool odd/);
+  lines.push('WIKI_ODDS_CONTROLS prices=accepted; percentage=REJECTED; encoded-percentage=REJECTED; computed-odds=REJECTED ' + JSON.stringify([...poolOdds]));
   // Execute the product's pure HTML formatter with Node vm; browser visibility remains pull-gate's axis.
   const bands = [...main.matchAll(/const ODDS_BANDS = \[[\s\S]*?\n\];/g)];
   const formatters = [...main.matchAll(/function shopOdds\(pool\) \{[\s\S]*?\n\}/g)];
@@ -171,7 +239,7 @@ axis('wiki-searchable-odds', () => {
     assert.deepEqual(parsed, expected); assert(!/<canvas\b/i.test(rendered));
     lines.push('POOL_ODDS ' + JSON.stringify({ population: pool.length, totalWeight: total, odds: parsed, text: rendered.replace(/<[^>]*>/g, ' ') }));
   }
-  return 'actual shopOdds HTML text matches full and reduced pools; wiki has prose only; browser visibility owned by pull gate';
+  return 'actual shopOdds HTML text matches full and reduced pools; wiki has no copied odds; browser visibility owned by pull gate';
 });
 axis('currency-placeholder', () => {
   assert(read('web/wiki/src/cash-rate.md').includes('[[coin]]'));
