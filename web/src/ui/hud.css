@@ -1468,25 +1468,34 @@ body { word-break: keep-all; overflow-wrap: break-word; }
 
 /* 경기장은 시착 의상이 아니므로 진열에 폭을 돌린다. 그림 120픽셀과 제목 20픽셀은 네 시설의 비교 공간이다. */
 #shop:has(.card[data-spec="city"]) .fitting{display:none}
-#shop .rack:has(.card[data-spec="city"]){align-items:start}
-#shop .card[data-spec="city"] .shot{height:120px;aspect-ratio:auto}
-#shop .card[data-spec="city"]>b{font-size:20px;min-height:0}
+#shop .rack:has(.card[data-spec="city"]){align-items:stretch}
+/* 데스크톱의 그림 96픽셀과 조건의 작은 여백은 값 버튼까지 첫 화면에 담는다. */
+#shop .card[data-spec="city"] .shot{height:96px;aspect-ratio:auto}
+/* 1.3줄 간격 두 줄을 예약해 개최 도시가 길어도 효과가 같은 높이에 선다. */
+#shop .card[data-spec="city"]>b{font-size:18px;min-height:2.6em}
 /* 14픽셀 본문과 48픽셀 예고는 조건 세 줄과 가격을 데스크톱 높이에 함께 남긴다. */
 #shop .card[data-spec="city"]{font-size:14px}
 #shop .card[data-spec="city"] em,#shop .card[data-spec="city"] .condition{font-size:14px}
+/* 조건 이름은 14픽셀을 지키고 분수는 12픽셀, 여백과 간격은 2픽셀로 분리해 가격을 함께 읽는다. */
+#shop .card[data-spec="city"] .condition{padding:2px;gap:2px;line-height:1.2}
+#shop .card[data-spec="city"] .condition small{font-size:12px;line-height:1.2}
 #shop .card[data-spec="city"] .mode-coming{min-height:48px}
 /* 480픽셀 이하 가로 화면은 그림·이름과 조건을 두 열에 놓는다. 440픽셀 카드는 좌우 스크롤로 비교하고 42%는 그림 몫이다. */
 @media (orientation:landscape) and (max-height:480px){
   #shop .rack:has(.card[data-spec="city"]){display:flex;overflow-x:auto;max-height:none;align-items:stretch}
-  #shop .card[data-spec="city"]{display:grid;grid-template-columns:42% minmax(0,1fr);flex:0 0 440px;align-content:start;column-gap:var(--gap-2)}
-  #shop .card[data-spec="city"]>.pic,#shop .card[data-spec="city"]>b,#shop .card[data-spec="city"]>em{grid-column:1}
+  /* 첫 행 68·둘째 48픽셀에 그림과 조건을 놓고 이름 48·효과 54픽셀을 예약한다. 가격은 효과 옆에 두고 예고는 아래로 이어진다. */
+  #shop .card[data-spec="city"]{display:grid;grid-template-columns:42% minmax(0,1fr);flex:0 0 440px;align-content:start;grid-template-rows:68px 48px 48px 54px auto;column-gap:var(--gap-2)}
+  #shop .card[data-spec="city"]>.pic{grid-column:1;grid-row:1 / span 2}
+  #shop .card[data-spec="city"] .shot{height:120px}
+  #shop .card[data-spec="city"]>b{grid-column:1;grid-row:3}
+  #shop .card[data-spec="city"]>em{grid-column:1;grid-row:4}
   #shop .card[data-spec="city"]>.condition-label{grid-column:2;grid-row:1;align-self:start}
   #shop .card[data-spec="city"]>.condition{grid-column:2}
-  #shop .card[data-spec="city"]>.condition:nth-of-type(1){grid-row:1;margin-top:var(--gap-3);align-self:end}
+  #shop .card[data-spec="city"]>.condition:nth-of-type(1){grid-row:1;margin-top:20px;align-self:start}
   #shop .card[data-spec="city"]>.condition:nth-of-type(2){grid-row:2}
   #shop .card[data-spec="city"]>.condition:nth-of-type(3){grid-row:3}
-  #shop .card[data-spec="city"]>.venue-modes{grid-column:1 / -1}
-  #shop .card[data-spec="city"]>.foot{grid-column:1 / -1}
+  #shop .card[data-spec="city"]>.venue-modes{grid-column:1 / -1;grid-row:5}
+  #shop .card[data-spec="city"]>.foot{grid-column:2;grid-row:4;align-self:end}
 }
 /* 국기 시작값은 progression 계약의 24×18 CSS 픽셀과 안쪽 8픽셀이다. 2픽셀 모서리와 1/4픽셀 그림자는 흰 국기의 경계를 남긴다. */
 #shop .venue-flag{position:absolute;width:24px;height:18px;top:8px;right:8px;object-fit:cover;z-index:2;border-radius:2px;box-shadow:0 1px 4px #0008}
