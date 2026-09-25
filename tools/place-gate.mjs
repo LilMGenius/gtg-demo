@@ -150,6 +150,9 @@ async function personaRig([idx, rw, rh]) {
   const hold = new T.Group();
   sc.add(hold);
   const who = P.buildPassers(hold, 11);
+  const {poseWalker}=await import('/web/src/render/objects/actors.mjs');
+  // 이동 방향과 걸음 위상은 몸 비율이 아니므로 실제 리그와 같은 기준 자세에서 잰다.
+  for(const body of who)if(body.userData.walker)poseWalker(body.userData.walker,0,{heading:Math.PI/2,time:0});
   for (const g of who) { g.position.set(0, 0, 0); g.visible = false; }
   // 답을 아는 상자 둘. 자가 비를 잰다는 주장이 여기서 먼저 서야 아래 수가 뜻을 갖는다.
   const ctl = [];
@@ -253,8 +256,11 @@ async function arenaPassers() {
   const T = await import("/web/vendor/three.module.min.js");
   const s = window.__sceneRoot();
   const out = [];
+  const {poseWalker}=await import('/web/src/render/objects/actors.mjs');
   for (const c of s.children) {
-    if (c.userData.sub !== "passers") continue;
+    // 관중석 인스턴스는 관계를 맺는 행인이 아니다. 보행 위상과 방향은 격리 표본과 같게 놓는다.
+    if (c.userData.sub !== "passers" || !c.userData.persona) continue;
+    if(c.userData.walker)poseWalker(c.userData.walker,0,{heading:Math.PI/2,time:0});
     c.updateMatrixWorld(true);
     const b = new T.Box3().setFromObject(c);
     out.push({ persona: c.userData.persona || null, w: b.max.x - b.min.x, h: b.max.y - b.min.y });
@@ -310,10 +316,31 @@ async function lap(browser, lane, errs) {
   // 시계는 손잡이가 생기는 틱에 못 박힌다. evaluate로 켜면 그 전에 흐른 실시간이 세계시각에 쌓인다.
   await pinClock(ctx, STEP);
   const page = await ctx.newPage();
-  page.on("pageerror", (e) => errs.push(lane + ": " + String(e)));
+  page.on("pageerror", (e) => errs.push(lane + ": " + (e.stack || String(e))));
   page.on("console", (m) => { if (m.type() === "error") errs.push(lane + ": " + m.text()); });
   if (lane === "was") {
-    for (const [f, body] of routed) {
+    // 옛 몸에는 새 보행 리그가 없다. 옛 기하는 그대로 두고 새 리그 전용 애니메이션 호출만 건너뛴다.
+    let bridge=readFileSync(ROOT+'web/src/render/scene.mjs','utf8');
+    const anchors=[
+      ['function syncFootContacts(actor,feet,index){','function syncFootContacts(actor,feet,index){if(!feet)return;'],
+      ['poseWalker(d.walker,','if(d.walker) poseWalker(d.walker,'],
+      ['passers.forEach((p,i)=>syncFootContacts(p,p.userData.walker.feet,i+2));','passers.forEach((p,i)=>{if(p.userData.walker)syncFootContacts(p,p.userData.walker.feet,i+2);});']
+    ];
+    for(const [from,to] of anchors){if(bridge.split(from).length!==2)throw Error('옛 판 연결 위치: '+from);bridge=bridge.replace(from,to);}
+    // 개최지 차림 연결이 있는 판에서도 옛 대조군의 몸을 새 몸으로 갈아끼우지 않는다.
+    bridge=bridge.replace('setPasserRoster(passers, c, skin);','if(passers.every(p=>p.userData.walker))setPasserRoster(passers, c, skin);');
+    await page.route('**/web/src/render/scene.mjs',route=>route.fulfill({status:200,contentType:'text/javascript; charset=utf-8',body:bridge}));
+    for (const [f, historical] of routed) {
+      let body=historical;
+      // 같은 몸의 피부와 천도 같은 재질로 고정한다. 동네 대조군의 옛 배치는 pitch 파일이 소유한다.
+      if(f.endsWith('/texture.mjs'))body=readFileSync(ROOT+f,'utf8');
+      if(f.endsWith('/actors.mjs')){
+        // 문신 대조군은 같은 몸 위에 보존된 고리 분기를 탄다. 옛 몸 전체를 쓰면 체형·피부 명암까지 문신 분산에 섞인다.
+        body=readFileSync(ROOT+f,'utf8');
+        const anchor='if (Number.isFinite(ink)) {';
+        if(body.split(anchor).length!==2)throw Error('고리 대조군 분기');
+        body=body.replace(anchor,'if (false) {');
+      }
       await page.route("**/" + f, (route) => route.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body }));
     }
     // 빌림 줄이 가리키는 주소. 디스크에 없는 파일이라 여기서만 산다.
@@ -340,7 +367,16 @@ async function lap(browser, lane, errs) {
     await ctx.close();
     return null;
   }
-  const at = (n) => page.waitForFunction((m) => window.__frames() >= m, n, { timeout: 20000 });
+  const at = async (n) => {
+    try { await page.waitForFunction((m) => window.__frames() >= m, n, { timeout: 20000 }); }
+    catch(error){
+      // 문턱은 그대로 두고 렌더 예외와 도달 프레임을 남겨 느린 판과 멈춘 판을 구별한다.
+      const actual=await page.evaluate(()=>({frames:window.__frames(),visibility:document.visibilityState}));
+      const report={lane,wanted:n,actual,errors:errs};
+      writeFileSync(ROOT+'.omo/evidence/p16/place-timeout.json',JSON.stringify(report,null,2));
+      console.error(JSON.stringify(report));throw error;
+    }
+  };
   // 첫 진입은 개봉 카드 두 마디를 지난다. 안 닫으면 화면 가운데를 카드가 덮는다.
   await clearDraw(page);
   // 판을 잠근다. 안 잠그면 대기 타이머가 제 슛을 쏘고 그 슛이 정지 프레임 위에 얹힌다.
@@ -386,6 +422,14 @@ async function lap(browser, lane, errs) {
     }
   }
   const ink = await page.evaluate(inkStats, [GRADES, 16]);
+  if(lane==='live'){
+    const urls=await page.evaluate(async()=>{const G=await import('/web/src/state/gear.mjs'),TH=await import('/web/src/render/thumb.mjs');return [0,1,2,3].map(ink=>TH.armBox('ink',{height:188,weight:84},G.lookOf({ink})).url);});
+    // 상세 창 네 장을 장변 1600 아래 JPEG로 남겨 질감 수치와 실제 무늬를 함께 읽는다.
+    for(const [grade,url] of urls.entries()){
+      const jpeg=await page.evaluate(async url=>{const im=new Image();im.src=url;await im.decode();const c=document.createElement('canvas');c.width=im.width;c.height=im.height;c.getContext('2d').drawImage(im,0,0);return c.toDataURL('image/jpeg',0.85).split(',')[1];},url);
+      writeFileSync(ROOT+'.omo/evidence/p16/ink-'+grade+'.jpg',Buffer.from(jpeg,'base64'));
+    }
+  }
   const rig = lane === "live" ? await page.evaluate(personaRig, [REPR, RIG_W, RIG_H]) : null;
   const arena = lane === "live" ? await page.evaluate(arenaPassers) : null;
   if (SHOTS && lane === "live") {
@@ -474,7 +518,7 @@ try {
     if (!was) continue;
     const old = was.ink.find((y) => y.grade === x.grade);
     say("ink:grade-" + x.grade + "-beats-the-ring-method", old && x.v > old.v,
-      old ? "variance " + x.v.toFixed(1) + " vs ring " + old.v.toFixed(1) + " at " + WAS_REV : "no parent bake");
+      old ? "variance " + x.v.toFixed(1) + " vs ring " + old.v.toFixed(1) + " on the same current body with the retained legacy ring branch" : "no parent bake");
   }
 
   say("console:no-errors", errs.length === 0, errs.length ? errs[0].slice(0, 140) : "clean");
