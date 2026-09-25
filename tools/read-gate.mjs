@@ -13,25 +13,27 @@ const URL = "http://127.0.0.1:10310/web/index.html?seed=" + SEED + "&preset=vete
 const W = 1280;
 const H = 720;
 const ROUNDS = 8;
-const BALL_R = 0.14;
+// 검색 폭 3px와 대각 엣지 3px, 반올림 반 픽셀이 차지하는 최대 반경이다.
+const INNER_SUPPORT = 3 + Math.hypot(3, 3) + Math.SQRT1_2;
 const CTRL_DX = 170;
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();
 
 // 페이지 안에서 공의 화면 좌표와 화면 반지름을 구한다.
 // 반지름은 상수로 넣지 않는다. 거리에 따라 변하고, 틀린 반지름은 실루엣이 아닌 속을 재게 만든다.
-function ballScreen([w, h, r]) {
+function ballScreen([w, h, innerSupport]) {
   const c = window.__ballProbe.sample();
   if (!c || !c.ndc) return null;
   const p = window.__ballPos();
-  const o = window.__ballProbe.probeAt(p.x + r, p.y, p.z);
-  const rad = Math.hypot(o.ndc[0] - c.ndc[0], o.ndc[1] - c.ndc[1]);
+
+
   const px = (c.ndc[0] * 0.5 + 0.5) * w;
   const py = (-c.ndc[1] * 0.5 + 0.5) * h;
   // Reuse scene.mjs __flightVis screenR, as ballsize-gate does; it includes the live render scale.
   const projectedR = window.__flightVis().ballPx / 2;
   if (!Number.isFinite(projectedR) || projectedR <= 0) throw new Error("Invalid projected ball radius");
-  return { world: p, x: px, y: py, r: projectedR, oldR: Math.max(2, rad * 0.5 * w), onScreen: c.onScreen, visible: c.visible };
+  // 엣지 연산 뒤 남는 반경을 반으로 나누어 안쪽 링과 실루엣 사이에 여유를 둔다.
+  return { world: p, x: px, y: py, r: projectedR, oldR: Math.max(0, (projectedR - innerSupport) / 2), onScreen: c.onScreen, visible: c.visible };
 }
 
 // 배경의 임자를 링 바깥에서 되묻는다. 다른 재질끼리 견주면 밝기 차를 판독성 차로 읽는다.
@@ -124,9 +126,9 @@ try {
     await p.waitForTimeout(3000);
 
     // 멈춘 것을 확인하고 찍는다. 움직이는 중이면 이 라운드를 버린다.
-    const a = await p.evaluate(ballScreen, [W, H, BALL_R]);
+    const a = await p.evaluate(ballScreen, [W, H, INNER_SUPPORT]);
     await p.waitForTimeout(120);
-    const b = await p.evaluate(ballScreen, [W, H, BALL_R]);
+    const b = await p.evaluate(ballScreen, [W, H, INNER_SUPPORT]);
     if (!a || !b) continue;
     const drift = Math.hypot(b.x - a.x, b.y - a.y);
     if (drift > 1.5 || !b.visible) { console.log("skip round " + i + " drift=" + drift.toFixed(2) + " vis=" + b.visible); continue; }
@@ -160,10 +162,11 @@ try {
     const bgP95 = median(set.map((s) => s.real.bg.p95));
     const cRing = median(set.map((s) => s.fake.ring.med));
     const cBg = median(set.map((s) => s.fake.bg.p95));
-    // Keep the old world-radius measurement as a negative control on the same pixels and background bucket.
+    // bce8756의 축소 뒤 고정 월드 반지름은 실루엣에 닿는다. 같은 컷의 안쪽 링으로 잘못된 읽기를 심는다.
     const innerRing = median(set.map((s) => s.inside.ring.med));
     const innerBg = median(set.map((s) => s.inside.bg.p95));
-    const insideOk = set.every((s) => s.oldR + 3 < s.r && s.inside.ring.n > 0 && s.inside.bg.n > 0)
+    // 반지름 검색 3px, 대각 엣지 3px, 반올림 반 픽셀까지 공 안에 있어야 안쪽 대조군이다.
+    const insideOk = set.every((s) => s.oldR + INNER_SUPPORT < s.r && s.inside.ring.n > 0 && s.inside.bg.n > 0)
       && innerRing <= innerBg;
     const populated = set.every((s) => [s.real, s.fake].every((m) => m.ring.n > 0 && m.bg.n > 0));
     console.log("TARGET bg=" + main[0] + " n=" + set.length);
