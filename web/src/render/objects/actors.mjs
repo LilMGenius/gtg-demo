@@ -709,7 +709,7 @@ function buildBody(o) {
     sh.add(delt);
     // 어깨 스펀지. 상의 색이라 무엇이 두꺼워졌는지가 그 옷의 색으로 읽힌다.
     // 어깨 삼각근 구가 반지름 1.45라, 그 안에 넣으면 스펀지를 사도 화면이 그대로다.
-    // 구 위로 올려 얹어야 어깨선이 각지고 넓어진 것이 보인다.
+    // 구 위로 올려 얹어 어깨선이 둥글고 넓어진 것이 보이게 한다.
     if (kc.pad) {
       /* 폭을 팔 반지름으로만 잡으면 그 폭이 키만 따라간다. 품은 몸무게가 정하므로, 짧고 무거운 몸은
          상의가 옆으로 가장 넓어지는 자리에서 스펀지가 가장 작다. 실측 165/96에서 1등급과 3등급이 칠한
@@ -719,7 +719,10 @@ function buildBody(o) {
          0.112에서 0.047로 줄었다. */
       const th = o.armR * 1.1 * kc.pad;
       const wide = o.armR * 1.9 + o.torsoR * kc.girth * 0.9;
-      const pad = new THREE.Mesh(new THREE.BoxGeometry(wide, th, o.armR * 2.7), flat(o.shirt));
+      const padGeo = new THREE.SphereGeometry(1, KIT.sphere, KIT.rings); // 기존 머리와 같은 구 표면을 재사용해 턱 옆의 상자 모서리를 없앤다.
+      padGeo.scale(wide / 2, th / 2, o.armR * 2.7 / 2); // 기존 패드의 폭·높이·깊이를 반축으로 바꾸어 어깨 바깥의 부피만 둥글게 남긴다.
+      const pad = new THREE.Mesh(padGeo, flat(o.shirt));
+      pad.userData.shoulderPad = true;
       pad.name = tag;
 
       /* 몸통 껍질 폭 0.05를 어깨 여유의 단위로 쓴다. 준비 자세의 어깨는 기울어 있어 로컬 y만
