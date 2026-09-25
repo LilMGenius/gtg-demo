@@ -758,20 +758,29 @@ export function resolve(input) {
     // 양말 등급. 앞의 셋과 같은 이유로 선반 밖의 값은 잘라 넣는다.
     const socks = Math.min(3, Math.max(0, Math.floor(Number(input.socks) || 0)));
     const landing = Math.max(0, (10 - keeper.balance) * 11 + keeper.diving * 2 - socks * SOCK_LAND);
-    const downed = inp.dive !== 0 && roll(landing);
+    // 이동하며 서서 쳐낸 뒤에도 옆 거리만큼 자세를 회복한다. 속도와 서기 반경은 기존 제품 값을 쓴다.
+    const recovery = inp.dive !== 0 ? 0 : Math.min(1, Math.abs(inp.vx) / moveSpeed(keeper)) * Math.min(1, Math.abs(shot.aimX - inp.x) / STAND);
+    // 백분율 구간을 나누므로 0과 100은 확률 경계다. 서기 경로는 원래 재차기의 한 롤만 소비한다.
+    const recoveryP = clamp(landing * recovery, 0, 100);
+    const recoveryRoll = recoveryP > 0 ? draw() : null;
+    const downed = recoveryRoll === null ? inp.dive !== 0 && roll(landing) : recoveryRoll < recoveryP;
+    const reboundRoll = p => {
+      if (recoveryRoll === null) return roll(p);
+      const normalized = downed ? recoveryRoll / recoveryP : (recoveryRoll - recoveryP) / (100 - recoveryP);
+      return normalized * 100 < p;
+    };
     // 무거우면 일어나는 데 시간이 더 든다.
     const reboundWindow = (18 + keeper.reflex * 4.5) * (1 - (keeper.weight - 84) * 0.006);
     if (downed) {
       say("downed", "쳐냈는데 못 일어납니다.", "balance");
-      state.rolls++;
-      if (pct(rng, 60 + shot.kicker.finishing * 4)) {
+      if (reboundRoll(60 + shot.kicker.finishing * 4)) {
         say("rebound", "다시 찬 슛이 빈 골대로 들어갔습니다.", "balance");
         return done(true, "balance");
       }
       say("reboundMiss", "누운 채로 지켜봤는데 빗나갔습니다. 세이브입니다.", null);
       return done(false, null);
     }
-    if (roll(24 + shot.kicker.finishing * 5 - reboundWindow * 0.5)) {
+    if (reboundRoll(24 + shot.kicker.finishing * 5 - reboundWindow * 0.5)) {
       say("rebound", "리바운드를 밀어 넣었습니다.", "kickerFinishing");
       return done(true, "kickerFinishing");
     }
