@@ -789,7 +789,7 @@ try {
      옷의 꼭대기와 잉크의 꼭대기를 따로 잰다. 옷 위에 선 상자라도 몸통 잉크 아래면
      어깨 윗선이 없다. 자기 외곽선을 단 스펀지는 그 외곽선 정점이 몸통 외곽선보다 바닥만큼
      높아야 하고, 카드에서 몸통만 남긴 실루엣보다 위에 실제로 찍힌 행도 있어야 한다.
-     스펀지는 메시 하나다. 빨판과 달리 병합되지 않아 어깨 관절의 BoxGeometry 자식 하나가 그것이고,
+     스펀지는 메시 하나다. 빨판과 달리 병합되지 않아 어깨 관절의 shoulderPad 표식 자식 하나가 그것이고,
      하나가 아니면 축이 수 대신 그 어긋남으로 먼저 빨개진다. 폭과 두께와 깊이와 앉은 높이를
      actors.mjs에서 한 자리씩 읽어 다시 세워 맞춘다. 여기 수를 베껴 두면 그 식이 얇아진 날 이 축만
      옛 수로 초록이 난다. 자리를 손으로 옮겨 셈한 값이 pad.matrixWorld로 읽은 값과 같은지도 같이
@@ -820,13 +820,14 @@ try {
   const [PAD_TH_K] = manyOf(/const th = o\.armR \* ([\d.]+) \* kc\.pad;/, "the sponge thickness");
   const [PAD_LIFT_K, PAD_SEAT_K, PAD_SEAT_DOWN] = manyOf(/pad\.position\.set\(side \* \(o\.armR \* [\d.]+ \+ Math\.max\([\d.]+, kc\.pad\) \* [\d.]+\), o\.armR \* ([\d.]+) \+ th \* ([\d.]+) - ([\d.]+), o\.armR \* [\d.]+\);/, "the sponge seat");
   const [PAD_WIDE_K, PAD_GIRTH_K] = manyOf(/const wide = o\.armR \* ([\d.]+) \+ o\.torsoR \* kc\.girth \* ([\d.]+);/, "the sponge width");
-  const [PAD_DEEP_K] = manyOf(/new THREE\.BoxGeometry\(wide, th, o\.armR \* ([\d.]+)\)/, "the sponge depth");
+  const [PAD_DEEP_K] = manyOf(/padGeo\.scale\(wide \/ 2, th \/ 2, o\.armR \* ([\d.]+) \/ 2\)/, "the sponge depth");
+  const [PAD_SPHERE, PAD_RINGS] = manyOf(/const KIT = \{cap:\d+, radial:\d+, sphere:(\d+), rings:(\d+)/, "the rounded sponge tessellation");
   const TORSO_PEN = 0; // 키트 몸통은 복제 잉크 없이 실제 표면이 외곽선이다.
   const crowns = await p.evaluate(async ([bodies, lit, floor, halfAt]) => {
     const T = await import("/web/vendor/three.module.min.js");
     const A = await import("/web/src/render/objects/actors.mjs");
     const g = await import("/web/src/state/gear.mjs");
-    const box = new T.BoxGeometry(1, 1, 1).attributes.position.count;
+    const box = new T.SphereGeometry(1, lit.sphere, lit.rings).attributes.position.count; // 실제 패드가 쓰는 구 분할을 읽어 상자 대신 둥근 표면의 정점 수를 검증한다.
     // 스펀지를 든 장만 고른다. 등급 번호를 여기 적으면 스펀지가 다른 등급에 붙는 날 그 등급이 조용히 빠진다.
     const looks = [];
     for (let rank = 0; rank < g.KITS.length; rank += 1) {
@@ -865,9 +866,10 @@ try {
         const arms = rig.userData.arms || [];
         for (let at = 0; at < arms.length; at += 1) {
           const sh = arms[at];
-          const boxes = sh.children.filter((c) => c.isMesh && c.geometry.type === "BoxGeometry");
+          const boxes = sh.children.filter((c) => c.isMesh && c.userData.shoulderPad);
           const pad = boxes.length === 1 ? boxes[0] : null;
-          const par = pad ? (pad.geometry.parameters || {}) : {};
+          if (pad) pad.geometry.computeBoundingBox();
+          const par = pad ? pad.geometry.boundingBox.getSize(new T.Vector3()) : new T.Vector3(); // 실제 정점 봉투로 세 반축을 재므로 둥근 패드의 크기 축도 유지된다.
           const home = pad ? pad.position : new T.Vector3();
           const seatTo = (y) => topOf(pad, sh.matrixWorld, new T.Vector3(home.x, y, home.z));
           const top = pad ? seatTo(home.y) : 0;
@@ -881,9 +883,9 @@ try {
             boxes: boxes.length, verts: pad ? pad.geometry.attributes.position.count : 0,
             inks: ink.length,
             padInks: pad ? pad.children.filter((c) => c.userData && c.userData.isOutline).length : -1,
-            wide: Number(par.width) || 0, high: Number(par.height) || 0, deep: Number(par.depth) || 0,
-            wantWide: armR * lit.wideK + torsoR * cut.girth * lit.girthK,
-            wantHigh: th, wantDeep: armR * lit.deepK,
+            wide: par.x, high: par.y, deep: par.z,
+            wantWide: Math.fround((armR * lit.wideK + torsoR * cut.girth * lit.girthK) / 2) * 2,
+            wantHigh: Math.fround(th / 2) * 2, wantDeep: Math.fround(armR * lit.deepK / 2) * 2, // BufferAttribute의 Float32 반축 양끝을 합친 값과 비교하고 기존 오차 문턱은 유지한다.
             seat: home.y, wantSeat: armR * lit.liftK + th * lit.seatK - lit.seatDown,
             crown, pen: ink.length === 1 ? topOf(torso, ink[0].matrixWorld, null) - crown : 0,
             inkTop, torsoInkTop, inkMargin: inkTop - torsoInkTop,
@@ -896,7 +898,7 @@ try {
     }
     return out;
   }, [BODIES, { armK: ARM_K, torsoK: TORSO_K, wBase: W_BASE, wAt: W_AT, wStep: W_STEP, thK: PAD_TH_K,
-    liftK: PAD_LIFT_K, seatK: PAD_SEAT_K, seatDown: PAD_SEAT_DOWN, wideK: PAD_WIDE_K, girthK: PAD_GIRTH_K, deepK: PAD_DEEP_K },
+    liftK: PAD_LIFT_K, seatK: PAD_SEAT_K, seatDown: PAD_SEAT_DOWN, wideK: PAD_WIDE_K, girthK: PAD_GIRTH_K, deepK: PAD_DEEP_K, sphere: PAD_SPHERE, rings: PAD_RINGS },
   CROWN_FLOOR, PLANT_SEAT]);
   const crownSay = (r) => r.body + " " + r.tag + " hand " + r.hand + " clears by " + r.margin.toFixed(5);
   const crownEnds = (k) => Math.min.apply(null, crowns.rows.map((r) => r[k])).toFixed(5)
@@ -949,7 +951,7 @@ try {
         const look = g.lookOf({ pads: rank, padsSkin: skin });
         look.shirt = 0xff00ff;
         const s = t.spongeSurface(body, look);
-        const pads = s.rig.userData.arms.map((a) => a.children.filter((c) => c.isMesh && c.geometry.type === "BoxGeometry"));
+        const pads = s.rig.userData.arms.map((a) => a.children.filter((c) => c.isMesh && c.userData.shoulderPad));
         if (pads.length !== 2 || pads.some((a) => a.length !== 1)) throw Error("sponge pixel population drift");
         const meshes = [];
         s.rig.traverse((o) => { if (o.isMesh) meshes.push([o, o.visible]); });
