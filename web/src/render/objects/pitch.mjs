@@ -553,7 +553,8 @@ function rosterLook(row){
   const base=PASSER_VARIANTS.find(variant=>variant.id===row.id);
   // 일상복 20%·외출복 55%의 개최지 색은 직업별 원래 색면을 남기면서 두 차림을 가른다.
   const mix=row.clothing==='외출복'?0.55:0.2;
-  return {...base,shirt:new THREE.Color(base.shirt).lerp(new THREE.Color(row.shirt),mix).getHex(),
+  // 어르신의 넉넉한 외투 폭을 12% 넓혀 학생과 실루엣을 구별한다. 나라나 소득은 몸 비율에 쓰지 않는다.
+  return {...base,width:base.width*(row.id==='elder'?1.12:1),shirt:new THREE.Color(base.shirt).lerp(new THREE.Color(row.shirt),mix).getHex(),
     pants:new THREE.Color(base.pants).lerp(new THREE.Color(row.pants),mix).getHex()};
 }
 
