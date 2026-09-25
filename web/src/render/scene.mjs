@@ -42,7 +42,7 @@ export function createScene(canvas) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x86aecb);
-  scene.fog = new THREE.Fog(0x9dbdd4, 34, 96);
+  scene.fog = new THREE.Fog(0x9dbdd4, 26, 60); // 배우 앞의 26까지 원색을 두고 60에서 하늘색에 합쳐 먼 건물 창의 대비를 누른다.
 
   // 가로 화면 전제. 골대는 좌우로 긴 물건이라 세로로는 판정이 안 보인다.
   // 카메라는 골대 뒤 위쪽. 골대 폭 전체와 키커까지 한 화면에 넣는다.
