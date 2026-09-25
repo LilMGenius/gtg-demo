@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { pinClock } from './clock.mjs';
-// Reuse the project's browser, clock and served-parent control mechanism.
+// 프로젝트의 브라우저와 시계, 과거 파일 응답 대조군을 재사용한다.
 const BASE = 'http://127.0.0.1:10310/web/index.html';
 const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
 const ROOT = new URL('../', import.meta.url);
@@ -22,8 +22,15 @@ try {
    const body=execFileSync('git',['show','4eb39f9:web/'+file],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:1024*1024});
    await p.route('**/web/'+file+'*',r=>r.fulfill({status:200,contentType:file.endsWith('html')?'text/html':'text/javascript',body}));
   }
+  // 과거 main이 읽는 판정과 화면 모듈도 같은 커밋으로 응답한다.
+  if (control) await p.route(/\/(?:web\/src|src)\/.*\.mjs(?:\?.*)?$/, route => {
+   const path = new URL(route.request().url()).pathname.slice(1);
+   const body = execFileSync('git', ['show', '4eb39f9:' + path], {cwd:ROOT, encoding:'utf8'});
+   return route.fulfill({contentType:'text/javascript', body});
+  });
+  const bootError = new Promise((_, reject) => p.once('pageerror', e => reject(new Error('boot: ' + e.message))));
   await p.goto(BASE+'?seed=20&preset=veteran');
-  await p.waitForFunction(()=>typeof window.__wiki==='function');
+  await Promise.race([bootError, p.waitForFunction(()=>typeof window.__wiki==='function')]);
   return p;
  };
  const tags=p=>p.evaluate(()=>['apple-mobile-web-app-capable','apple-mobile-web-app-status-bar-style','mobile-web-app-capable'].every((name,i)=>document.querySelector('meta[name="'+name+'"]')?.content===['yes','black-translucent','yes'][i]) && Boolean(document.querySelector('link[rel="manifest"]')));
