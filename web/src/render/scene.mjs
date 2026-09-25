@@ -1701,7 +1701,8 @@ const TOUCHED = new Set(['contact']);
             ball.position.set(
               lerp(tail.from.x, chest.x, hug),
               lerp(tail.from.y, Math.max(chest.y, BALL_R + 0.02), hug),
-              lerp(tail.from.z, chest.z - (keeper.userData.girth * 0.55 + BALL_R), hug)
+              // 넓어진 몸통의 실제 앞면에서 공 반경만큼 내놓아 가슴 안에 묻히지 않게 한다.
+              lerp(tail.from.z, sightBox.setFromObject(keeper.userData.torso).min.z - BALL_R, hug)
             );
           }
           break;
