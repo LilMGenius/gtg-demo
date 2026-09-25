@@ -1,3 +1,4 @@
+import { resolution } from './seed-resolution.mjs';
 import { botTierContract } from './bot-tier-contract.mjs';
 // 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { modifierContract } from "./modifier-contract.mjs";
@@ -28,7 +29,9 @@ function sweep(opt) {
   const inputKeeper = o.tier ? botKeeper(who, { tier: o.tier }) : who;
   const keeper = o.oldPopulation ? who : inputKeeper;
   let saved = 0, shots = 0;
+  const samples = [];
   for (let s = 0; s < SEEDS; s++) {
+    const before = {saved,shots};
     const set = buildSet(makeRng(s + 1), 5, 0);
     const rng = makeRng(s + 90001);
     for (const shot of set) {
@@ -41,7 +44,9 @@ function sweep(opt) {
       shots++;
       if (!r.conceded) saved++;
     }
+    samples.push([saved-before.saved,shots-before.shots]);
   }
+  resolution("bot-effect/"+JSON.stringify(o),samples);
   return { rate: saved / shots * 100, shots };
 }
 

@@ -1,3 +1,4 @@
+import { resolution } from './seed-resolution.mjs';
 // 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 // 이 게이트의 모집단은 keeperAtLevel 기준 모집단(N칸 중 셋, 레벨당 3포인트)이며 제품 모집단은 tools/product-pop-gate.mjs가 잰다.
 // C2 귀속과 C3 비독점을 같이 잰다.
@@ -23,7 +24,7 @@ let conceded = 0;
 let balls = 0;
 
 for (const level of LEVELS) {
-  const counts = new Map();
+  const counts = new Map(), samples = [];
   let levelConceded = 0;
   let levelBalls = 0;
   let seed = level * 1000003 + 7 + arg("seed", 0);
@@ -32,6 +33,7 @@ for (const level of LEVELS) {
     const rng = makeRng(seed);
     const keeper = keeperAtLevel(level, rng);
     rollForm(keeper, rng);
+    const sample = {conceded:0,counts:{}};
     for (const shot of buildSet(rng, level)) {
       if (levelBalls >= perLevel) break;
       const r = resolve({ keeper, shot, rng });
@@ -39,12 +41,15 @@ for (const level of LEVELS) {
       balls++;
       if (!r.conceded) continue;
       levelConceded++;
+      sample.conceded++;
+      sample.counts[r.cause]=(sample.counts[r.cause] || 0)+1;
       conceded++;
       if (!LEDGER.includes(r.cause)) orphans.push(r.cause);
       counts.set(r.cause, (counts.get(r.cause) || 0) + 1);
     }
+    samples.push(sample);
   }
-  table.set(level, { counts, levelConceded, levelBalls });
+  table.set(level, { counts, levelConceded, levelBalls, samples });
 }
 
 const seen = [...new Set([...table.values()].flatMap((v) => [...v.counts.keys()]))];
@@ -96,6 +101,7 @@ let worstAt = "";
 for (const l of LEVELS) {
   const v = table.get(l);
   for (const [k, n] of v.counts) {
+    resolution(`cause/L${l}/${k}`,v.samples.map(r=>[r.counts[k] || 0,r.conceded]));
     const share = 100 * n / v.levelConceded;
     if (share > worstShare) { worstShare = share; worstAt = "Lv" + l + " " + (CAUSE_LABEL[k] || k); }
   }

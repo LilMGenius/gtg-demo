@@ -1,3 +1,4 @@
+import { resolution } from './seed-resolution.mjs';
 // 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { makeRng, buildSet, resolve, keeperAtLevel, newKeeper } from "./position-pop.mjs";
 
@@ -28,10 +29,12 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 
 const at = (lv) => {
   let saved = 0, shots = 0;
+  const samples = [];
   for (let s = 0; s < SEEDS; s += 1) {
     const rng = makeRng(s + 90001);
     // 레벨 표본은 성장 씨앗을 따로 쓴다. 판정 rng와 같은 씨앗을 쓰면 키퍼와 슛이 상관을 갖는다.
     const k = lv === null ? newKeeper() : keeperAtLevel(lv, makeRng(s + 7));
+    const before = {saved, shots};
     for (const shot of buildSet(makeRng(s + 1), 5, 0)) {
       const r = resolve({ keeper: k, shot, rng, mode: 'hand-react' });
       /* 키커가 골문 밖으로 찬 구는 키퍼의 성적이 아니다. 그런 구를 분모에 넣으면 못 차는 키커를
@@ -42,7 +45,9 @@ const at = (lv) => {
       shots += 1;
       if (!r.conceded) saved += 1;
     }
+    samples.push([saved-before.saved,shots-before.shots]);
   }
+  resolution("balance/"+(lv ?? "new"),samples);
   return Number((saved / shots * 100).toFixed(2));
 };
 

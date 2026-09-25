@@ -1,3 +1,4 @@
+import { resolution } from './seed-resolution.mjs';
 // 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 // 이 게이트의 모집단은 keeperAtLevel 기준 모집단(N칸 중 셋, 레벨당 3포인트)이며 제품 모집단은 tools/product-pop-gate.mjs가 잰다.
 import { modifierContract } from "./modifier-contract.mjs";
@@ -33,6 +34,7 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 
 // 한 변종의 세이브율. 시드마다 키퍼를 새로 만들고 그 자리에서 한 칸만 올린다.
 function rate(bump, level = 1, mode = 'hand-react', limit = BALLS, seedOffset = 0) {
+  const samples = [];
   let saved = 0;
   let balls = 0;
   for (let s = 0; s < Math.ceil(limit / SET); s += 1) {
@@ -40,6 +42,7 @@ function rate(bump, level = 1, mode = 'hand-react', limit = BALLS, seedOffset = 
     const keeper = keeperAtLevel(level, rng);
     rollForm(keeper, rng);
     if (bump) keeper[bump] = Math.min(10, (Number(keeper[bump]) || 1) + 1);
+    const before = saved, beforeBalls = balls;
     for (const shot of buildSet(rng, level)) {
       if (balls >= limit) break;
       // 같은 손 반응 정책과 짝 난수로 스탯 변화만 비교한다.
@@ -47,13 +50,15 @@ function rate(bump, level = 1, mode = 'hand-react', limit = BALLS, seedOffset = 
       balls += 1;
       if (!r.conceded) saved += 1;
     }
+    samples.push([saved - before, balls - beforeBalls]);
     if (balls >= limit) break;
   }
-  return { pct: 100 * saved / balls, balls };
+  return { pct: 100 * saved / balls, balls, samples };
 }
 
 const base = rate(null);
-const rows = GROWABLE.map((k) => ({ k, d: rate(k).pct - base.pct }));
+const pairedResolution = (name, a, b) => resolution(name, a.samples.map((row, i) => [...row, ...b.samples[i]]));
+const rows = GROWABLE.map((k) => { const grown=rate(k); pairedResolution("corr/open/"+k,grown,base); return { k, d: grown.pct-base.pct }; });
 rows.sort((a, b) => b.d - a.d);
 
 const pad = (s, n) => String(s).padEnd(n, " ");
@@ -92,7 +97,7 @@ function measureOfferDominance() {
   for (const mode of ['hand-react', 'bot']) {
     for (const level of [1, 5, 13]) {
       const baseline = rate(null, level, mode, 12000, level * 7919);
-      const gains = savePath.map(k => ({ k, d: rate(k, level, mode, 12000, level * 7919).pct - baseline.pct }))
+      const gains = savePath.map(k => { const grown=rate(k, level, mode, 12000, level * 7919); pairedResolution(`corr/${mode}/L${level}/${k}`,grown,baseline); return { k, d: grown.pct-baseline.pct }; })
         .sort((a, b) => b.d - a.d);
       const positiveSum = gains.reduce((sum, row) => sum + Math.max(0, row.d), 0);
       const [top, second] = gains;
