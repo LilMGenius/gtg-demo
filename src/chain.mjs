@@ -5,7 +5,7 @@
 
 import { LOCKED, GROWABLE } from "./ledger.mjs";
 import { KICKERS } from "./roster.mjs";
-import { PENALTY_RULE, PENALTY_OBSERVATION } from "./reality.mjs";
+import { PENALTY_RULE, PENALTY_OBSERVATION, shotOutcome } from "./reality.mjs";
 
 export const GOAL_HALF_W = 2.2;
 export const GOAL_H = 1.9;
@@ -593,7 +593,7 @@ export function resolve(input) {
   const done = (conceded, cause, untested) => {
     // 연속 실점은 상태로 남는다. 다음 구의 판정 창을 회복탄력성이 방어한다.
     keeper.streak = conceded ? (keeper.streak || 0) + 1 : 0;
-    events.push({ t: "result", line: conceded ? "실점" : "세이브", cause: cause || null });
+    events.push({ t: "result", line: conceded ? "실점" : shotOutcome({ conceded, untested }) === "missed" ? "빗나감" : "세이브", cause: cause || null });
     // 유명한 키커를 막으면 더 오르고, 유명한 키커에게 먹히면 덜 오른다. STATS 4절의 M 경로다.
     return { events, conceded, cause: conceded ? cause : null, stage: state.stage, rolls: state.rolls,
       fame: shot.kicker.fame, untested: Boolean(untested),
