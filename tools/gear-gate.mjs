@@ -1,6 +1,8 @@
 import { chromium } from "playwright";
+import { readFileSync } from "node:fs";
+import * as gearData from "../web/src/state/gear.mjs";
 
-// 장비 상점 게이트. 여덟 선반이 실제로 팔리는가.
+// 장비 상점 게이트. 선언된 모든 선반이 실제로 팔리는가.
 // 파운더가 연 상점에 게이트가 하나도 없었다. 선반은 그려졌지만 사고 나서 무엇이 변하는지 아무도 본 적이 없다.
 // 살 수 있는 상태는 주입 훅(?preset=rich)으로 앞당긴다. 판정식도 가격표도 건드리지 않는다.
 //
@@ -13,19 +15,13 @@ const BASE = "http://127.0.0.1:10310/web/index.html";
 const RANKS = 4;
 // 최상급 등급 번호. MAX_GRIP 등 여덟 상한이 모두 이 값이다.
 const TOP = 3;
-// 여덟 선반 최상급 총액. RICH_COIN 8000이 이걸 덮어야 한 판에 다 살 수 있다.
-const TOP_TOTAL = 6810;
-// 선반 정의. main.mjs의 SHELVES와 같은 순서, 같은 머리글이어야 한다.
-const SHELVES = [
-  { tab: 'glove', head: '장갑', field: 'grip' },
-  { tab: 'boot', head: '축구화', field: 'studs' },
-  { tab: 'kit', head: '유니폼', field: 'pads' },
-  { tab: 'sock', head: '양말', field: 'socks' },
-  { tab: 'frame', head: '골대', field: 'frame' },
-  { tab: 'city', head: '동네', field: 'city' },
-  { tab: 'hair', head: '헤어', field: 'hair' },
-  { tab: 'ink', head: '타투', field: 'ink' }
-];
+// 화면의 SHELVES 선언에서 머리글과 목록 이름을 읽고 실제 상품 데이터에 연결한다.
+const declaration = readFileSync(new URL('../web/src/main.mjs', import.meta.url), 'utf8').match(/const SHELVES = \{([\s\S]*?)\n\};/);
+if (!declaration) throw new Error('SHELVES declaration missing');
+const SHELVES = [...declaration[1].matchAll(/(\w+): \{ head: '([^']+)', list: (\w+), field: '([^']+)'/g)]
+  .map(([,tab,head,list,field]) => ({tab,head,field,list:gearData[list],cosmetic:gearData.COSMETIC_FIELDS.includes(field)}));
+// 외형은 개별 등급 소유라 모두 사고, 성능 선반은 최상급 하나만 산다.
+const TOP_TOTAL = SHELVES.reduce((sum,s) => sum + (s.cosmetic ? s.list.reduce((n,g) => n + g.cost, 0) : s.list.at(-1).cost), 0);
 // 지금 낀 등급과 지나온 등급의 이름표. 선반마다 달랐던 여덟 쌍이 이 두 낱말로 모였으므로
 // 선반 표에 여덟 번 적지 않는다. 여덟 줄에 같은 값을 적으면 한 줄만 어긋나도 계기가 조용하다.
 const WORN = '착용';
@@ -61,6 +57,7 @@ try {
   p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
 
   // 상점에는 전용 여는 버튼이 없다. __shop(true)가 유일한 입구다.
+  let appliedPreset;
   const boot = async (q) => {
     await p.goto(BASE + q, { waitUntil: "load" });
     await p.evaluate(() => localStorage.clear());
@@ -68,7 +65,28 @@ try {
     await p.waitForTimeout(1200);
     await p.click("#go", { force: true });
     await p.waitForTimeout(1400);
-    await p.evaluate(() => window.__shop(true));
+    appliedPreset = await p.evaluate(() => window.__preset);
+    // condition-gate의 저장 복원 방식을 재사용해 지갑과 별개로 구매 조건을 채운다.
+    await p.evaluate(shelves => {
+      window.__persist();
+      const key = window.__saveKey(), data = JSON.parse(localStorage.getItem(key));
+      const keeper = data.squad[data.pick];
+      for (const shelf of shelves) for (const item of shelf.list) {
+        for (const condition of item.conditions || (item.condition ? [item.condition] : [])) {
+          const {key:field,min} = condition;
+          if (field === 'fans') data.fans = Math.max(data.fans, min);
+          else if (field === 'saves') {
+            const record = data.record[data.kickers[0]] ||= {saved:0,conceded:0};
+            record.saved = Math.max(record.saved, min);
+          } else keeper[field] = Math.max(keeper[field], min);
+        }
+      }
+      data.keeper = structuredClone(keeper);
+      localStorage.setItem(key, JSON.stringify(data));
+    }, SHELVES);
+    await p.goto(BASE, {waitUntil:'load'});
+    await p.click('#go', {force:true});
+    await p.evaluate(() => { window.__lockRound(); window.__shop(true); });
     await p.waitForTimeout(300);
   };
 
@@ -188,11 +206,13 @@ try {
     short[s.tab] = top ? top.coin : null;
   }
 
-  // 본시험. 지갑만 앞당긴 저장에서 여덟 선반을 끝까지 산다.
+  // 본시험. 지갑과 구매 조건을 갖춘 저장에서 모든 선반을 끝까지 산다.
   await boot("?seed=20&preset=rich,veteran");
-  const applied = await p.evaluate(() => window.__preset);
+  const applied = appliedPreset;
   check("preset:rich-was-applied", Array.isArray(applied) && applied.includes("rich"), JSON.stringify(applied));
 
+  // 모든 외형 등급을 개별로 살 수 있는 총액까지 지갑만 앞당긴다.
+  await p.evaluate(total => { window.__wallet().coin = Math.max(window.__wallet().coin, total); window.__shop(true); }, TOP_TOTAL);
   const coin0 = await p.evaluate(() => window.__wallet().coin);
   const livePaint = await paintShot(SHELVES[0].tab);
   let shaped = 0, live = 0, paid = 0, worn = 0, past = 0, done = 0, open = 0;
@@ -202,21 +222,33 @@ try {
     if (pre.head === s.head && pre.rows.length === RANKS) shaped += 1;
     const top = pre.rows.find((r) => r.rank === TOP);
     if (top && !top.off) live += 1;
-    paid += top ? top.coin : 0;
+    paid += s.cosmetic ? pre.rows.reduce((sum,row) => sum + (row.coin || 0), 0) : top ? top.coin : 0;
     price[s.tab] = top ? top.coin : null;
     // 아직 다 안 산 선반. 아래의 다 산 읽기가 여기서도 참이면 그 축은 아무것도 안 재는 것이다.
     if (pre.prices > 0 && pre.rows.some((r) => !r.off)) open += 1;
-    await buyTop();
+    if (s.cosmetic) {
+      // 기본 등급은 이미 소유하며 나머지는 각자 값을 치른 뒤 최상급을 입는다.
+      for (const item of s.list.filter(g => g.cost > 0)) {
+        await p.evaluate(rank => document.querySelector('#shop .buy[data-rank="' + rank + '"]').click(), item[s.field]);
+      }
+    } else await buyTop();
     await p.waitForTimeout(120);
     const post = await shelf(s.tab);
     const bought = post.rows.find((r) => r.rank === TOP);
     if (bought && bought.off && bought.lit && bought.text === WORN) worn += 1;
     const lower = post.rows.filter((r) => r.rank < TOP);
-    if (lower.length === RANKS - 1 && lower.every((r) => r.off && r.lit && r.text === PAST)) past += 1;
+    const lowerReady = lower.length === RANKS - 1 && lower.every(r => r.lit && (s.cosmetic ? !r.off && r.text === '장착' : r.off && r.text === PAST));
+    if (lowerReady) past += 1;
     /* 다 산 선반은 살 게 없다는 말을 값의 부재로 한다. 랙 안에 값이 하나도 없고,
        네 줄이 전부 죽은 채 보이고, 최상급만 착용이고 나머지는 지나온 등급이다. */
-    if (post.prices === 0 && post.rows.length === RANKS && post.rows.every((r) => r.off && r.lit)
-      && bought && bought.text === WORN && lower.every((r) => r.text === PAST)) done += 1;
+    if (post.prices === 0 && post.rows.length === RANKS && bought?.off && bought.text === WORN && lowerReady) done += 1;
+    if (s.cosmetic) {
+      const before = await p.evaluate(() => window.__wallet().coin);
+      await p.evaluate(rank => document.querySelector('#shop .buy[data-rank="' + rank + '"]').click(), lower[0].rank);
+      const reworn = await p.evaluate(field => ({rank:window.__gear()[field],coin:window.__wallet().coin}), s.field);
+      check('after:owned-cosmetic-rewears-free:' + s.tab, reworn.rank === lower[0].rank && reworn.coin === before, JSON.stringify(reworn));
+      await buyTop();
+    }
   }
   const coin1 = await p.evaluate(() => window.__wallet().coin);
   const gear = await p.evaluate(() => window.__gear());
@@ -224,7 +256,7 @@ try {
   const stated = SHELVES.filter((s) => price[s.tab] !== null && short[s.tab] === price[s.tab]).length;
   const drawn = await repaint(deadPaint, livePaint);
 
-  check("shop:eight-shelves-render-four-ranks-under-their-own-head", shaped === SHELVES.length, shaped + "/" + SHELVES.length);
+  check("shop:all-shelves-render-four-ranks-under-their-own-head", shaped === SHELVES.length, shaped + "/" + SHELVES.length);
   check("buy:top-rank-is-live-on-every-shelf", live === SHELVES.length, live + "/" + SHELVES.length);
   check("buy:price-on-the-button-matches-the-declared-total", paid === TOP_TOTAL, paid + " want " + TOP_TOTAL);
   check("buy:wallet-drops-by-exactly-what-the-buttons-asked", coin0 - coin1 === paid, coin0 + "-" + paid + " -> " + coin1);
@@ -234,7 +266,7 @@ try {
   check("control:the-dead-button-is-drawn-dead-not-just-disabled", drawn >= DEAD_REPAINT,
     (drawn * 100).toFixed(1) + "% of the button repainted, want " + (DEAD_REPAINT * 100) + "%");
   check("after:bought-row-says-it-is-being-worn", worn === SHELVES.length, worn + "/" + SHELVES.length);
-  check("after:lower-rows-say-they-are-past", past === SHELVES.length, past + "/" + SHELVES.length);
+  check("after:lower-rows-show-ownership-or-free-reequip", past === SHELVES.length, past + "/" + SHELVES.length);
   check("after:filled-shelf-declares-nothing-left", done === SHELVES.length, done + "/" + SHELVES.length);
   check("control:an-unfinished-shelf-does-not-read-as-finished", open === SHELVES.length, open + "/" + SHELVES.length);
 
@@ -251,7 +283,7 @@ try {
   if (shot) await p.screenshot({ path: shot });
   check("console:no-errors", errs.length === 0, errs.slice(0, 3).join(" | ") || "clean");
 
-  console.log("표본 범위: 여덟 선반 × 네 등급, 지갑 세 상태(0 / " + GYM_COIN + " / " + coin0 + ")");
+  console.log("표본 범위: " + SHELVES.length + " 선반 × 네 등급, 지갑 세 상태(0 / " + GYM_COIN + " / " + coin0 + ")");
   console.log(notes.map((s) => "  ok   " + s).join("\n"));
   if (fails.length) console.log(fails.map((s) => "  FAIL " + s).join("\n"));
   console.log(fails.length ? "gear FAIL " + fails.length : "gear PASS " + notes.length);
