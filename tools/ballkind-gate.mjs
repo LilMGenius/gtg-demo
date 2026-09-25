@@ -73,10 +73,17 @@ try {
       await p.evaluate(() => window.__ballProbe.reset());
       await p.waitForFunction((m) => window.__frames() >= m, actAt + TAIL, { timeout: 20000 });
       rounds.push(await p.evaluate(() => {
-        const s = window.__ballProbe.stats;
-        return { frames: s.frames, visible: s.visible, longest: s.longestStreak, blockers: s.blockers, endVisible: Boolean(s.last && s.last.visible), endOn: Boolean(s.last && s.last.onScreen) };
+        const probe = window.__ballProbe;
+        const s = { ...probe.stats, blockers: { ...probe.stats.blockers } };
+        // 같은 광선을 마지막 자세에서 다시 쏘아 누적 장부와 마지막 가림의 이름을 가른다.
+        const last = probe.sample("final");
+        const blocker = Object.keys(probe.stats.blockers).find((name) => probe.stats.blockers[name] > (s.blockers[name] || 0)) || null;
+        // flightVis의 ballPx는 투영 지름이므로 절반이 렌더된 반지름이다.
+        const renderedRadius = window.__flightVis().ballPx / 2;
+        return { frames: s.frames, visible: s.visible, longest: s.longestStreak, blockers: s.blockers, endVisible: Boolean(last.visible), endOn: Boolean(last.onScreen), final: { last, blocker, ball: window.__ballPos(), camera: probe.camState(), size: window.__ballSize(), renderedRadius } };
       }));
     }
+    for (const [round, sample] of rounds.entries()) console.log("  final:" + kind + ":" + round + " " + JSON.stringify(sample.final));
     const fracs = rounds.map((s) => (s.frames ? s.visible / s.frames : 0));
     const worst = Math.min(...fracs);
     const longest = Math.max(...rounds.map((s) => s.longest));

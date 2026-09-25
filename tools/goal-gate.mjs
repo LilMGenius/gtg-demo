@@ -82,7 +82,11 @@ try {
   for (const kind of CONCEDE) {
     const r = await run(kind);
     const v = verdict(r.at);
-    if (v.some((x) => !x)) fail += 1;
+    if (v.some((x) => !x)) {
+      fail += 1;
+      // 쓸기가 마지막 줄만 남겨도 실패한 사건과 관측 축이 사라지지 않는다.
+      console.log("  FAIL goal:" + kind + " @" + SHOT_MS + "ms " + line(kind, r.at));
+    }
     console.log(line(kind, r.at));
     // 늦은 표본은 판정에 쓰지 않는다. 언제 증거가 서는지를 알아야 타이밍을 어디로 옮길지 정할 수 있다.
     console.log("  @1.2s".padEnd(11) + line("", r.late).trim());
