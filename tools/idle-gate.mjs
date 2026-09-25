@@ -1,3 +1,4 @@
+import { resolution } from './seed-resolution.mjs';
 // 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { makeRng, buildSet, resolve, newKeeper, keeperAtLevel } from "./position-pop.mjs";
 
@@ -124,6 +125,7 @@ function manualOnePoint(keeper, rng) {
 // grow가 거짓이면 훈련 없는 대조군이다. 시작 스탯을 고정하고 레벨만 올린다.
 const at = (lv, grow, stats, testedOnly = false) => {
   let saved = 0, shots = 0;
+  const samples = [];
   for (let s = 0; s < SEEDS; s += 1) {
     const rng = makeRng(s + 90001);
     let k = grow === true ? keeperAtLevel(lv, makeRng(s + 7)) : Object.assign(newKeeper(), { level: lv });
@@ -137,6 +139,7 @@ const at = (lv, grow, stats, testedOnly = false) => {
       }
     }
     if (stats) Object.assign(k, stats);
+    const before = {saved,shots};
     for (const shot of buildSet(makeRng(s + 1), lv, 0)) {
       const r = resolve({ keeper: k, shot, rng, mode: 'hand-react' });
       // 키커의 빗나간 슛은 세이브 분모에서 제외한다. balance 게이트와 같은 분모다.
@@ -144,7 +147,9 @@ const at = (lv, grow, stats, testedOnly = false) => {
       shots += 1;
       if (!r.conceded) saved += 1;
     }
+    samples.push([saved-before.saved,shots-before.shots]);
   }
+  resolution(`idle/L${lv}/${grow}/${JSON.stringify(stats)}/${testedOnly}`,samples);
   return Number((saved / shots * 100).toFixed(2));
 };
 

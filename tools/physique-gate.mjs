@@ -1,3 +1,4 @@
+import { resolution } from './seed-resolution.mjs';
 // 이 게이트의 모집단은 keeperAtLevel 기준 모집단(N칸 중 셋, 레벨당 3포인트)이며 제품 모집단은 tools/product-pop-gate.mjs가 잰다.
 // C4 체격. 키와 몸무게가 세이브율 총합이 아니라 방향에 붙는지 잰다.
 // 실측 연구가 말하는 것은 하나다. 슛 난이도를 통제하면 신장과 세이브율에 유의한 상관이 없다.
@@ -19,24 +20,28 @@ const COURSES = ["상단", "하단", "정면"];
 
 function run(body) {
   const byCourse = new Map(COURSES.map((c) => [c, { balls: 0, saved: 0 }]));
-  const causes = new Map();
+  const causes = new Map(), samples = [];
   let seed = 424242;
   let balls = 0;
   while (balls < BALLS) {
     seed += 1;
     const rng = makeRng(seed);
     const keeper = Object.assign(keeperAtLevel(LEVEL, rng), { height: body.height, weight: body.weight });
+    const sample = Object.fromEntries(COURSES.map(c=>[c,{saved:0,balls:0}]));
     for (const shot of buildSet(rng, LEVEL)) {
       if (balls >= BALLS) break;
       const r = resolve({ keeper, shot, rng });
       balls++;
       const slot = byCourse.get(shot.course);
       slot.balls++;
+      sample[shot.course].balls++;
+      if (!r.conceded) sample[shot.course].saved++;
       if (!r.conceded) slot.saved++;
       else causes.set(r.cause, (causes.get(r.cause) || 0) + 1);
     }
+    samples.push(sample);
   }
-  return { byCourse, causes, balls };
+  return { byCourse, causes, balls, samples };
 }
 
 const pad = (s, n) => String(s).padEnd(n, " ");
@@ -66,6 +71,7 @@ const rate = (o, c) => o.byCourse.get(c).saved / o.byCourse.get(c).balls;
 const upper = rate(tall, "상단") - rate(round, "상단");
 const lower = rate(tall, "하단") - rate(round, "하단");
 const front = rate(round, "정면") - rate(tall, "정면");
+for(const [name,course,a,b] of [["upper","상단",tall,round],["lower","하단",tall,round],["front","정면",round,tall]]) resolution("physique/"+name,a.samples.map((r,i)=>[r[course].saved,r[course].balls,b.samples[i][course].saved,b.samples[i][course].balls]));
 
 console.log("");
 console.log("전봇대 빼기 공, 상단 " + (upper * 100).toFixed(2) + "pp   하단 " + (lower * 100).toFixed(2) + "pp");

@@ -1,3 +1,4 @@
+import { resolution } from './seed-resolution.mjs';
 // 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 // 이 게이트의 모집단은 keeperAtLevel 기준 모집단(N칸 중 셋, 레벨당 3포인트)이며 제품 모집단은 tools/product-pop-gate.mjs가 잰다.
 // 성장 트립와이어. 성장 선택지 어느 것을 골라도 다음 판 화면에서 달라지는 것이 있는가.
@@ -30,6 +31,7 @@ function playSet(keeper, shots, seed) {
 }
 
 function divergence(bump) {
+  const samples = [];
   let differ = 0, oldDiffer = 0;
   let balls = 0;
   for (let s = 0; s < SETS; s++) {
@@ -42,19 +44,22 @@ function divergence(bump) {
     const shots = buildSet(makeRng(seed + 2), LEVEL);
     const a = playSet(base, shots, seed * 31);
     const b = playSet(grown, shots, seed * 31);
+    const before = differ;
     for (let i = 0; i < a.length; i++) {
       balls++;
       if (a[i].screen !== b[i].screen) differ++;
       if (a[i].old !== b[i].old) oldDiffer++;
     }
+    samples.push([differ - before, a.length]);
   }
-  return { pct: (differ / balls) * 100, oldPct: (oldDiffer / balls) * 100, balls };
+  return { pct: (differ / balls) * 100, oldPct: (oldDiffer / balls) * 100, balls, samples };
 }
 
 const rows = [];
 for (const k of GROWABLE) {
   const measured = divergence((g) => { if (g[k] < 10) g[k] += 1; else g[k] -= 1; });
   rows.push([CAUSE_LABEL[k] || k, measured.pct]);
+  resolution("growth/" + k, measured.samples);
   console.log("axis " + k + " old=" + measured.oldPct.toFixed(2) + "% screen=" + measured.pct.toFixed(2) + "%");
 }
 

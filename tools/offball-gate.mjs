@@ -1,3 +1,4 @@
+import { resolution } from './seed-resolution.mjs';
 // 위치 모집단: 수동은 hand-react(p_read=0.9), 자동은 botPlan 자취다. tools/position-pop.mjs가 난수 경계를 짝짓는다.
 import { modifierContract } from "./modifier-contract.mjs";
 import { makeRng, buildSet, resolve, newKeeper, followerGain } from "./position-pop.mjs";
@@ -15,9 +16,10 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 const sweep = (stat, v) => {
   const k = Object.assign(newKeeper(), { [stat]: v });
   let saved = 0, shots = 0, empty = 0, fans = 0, contactMisses = 0;
-  const cause = {};
+  const cause = {}, samples = [];
   for (let s = 0; s < SEEDS; s += 1) {
     const rng = makeRng(s + 90001);
+    const before = { saved, shots, empty, fans, contactMisses };
     for (const shot of buildSet(makeRng(s + 1), 5, 0)) {
       const r = resolve({ keeper: k, shot, rng, mode: 'hand-react' });
       shots += 1;
@@ -29,8 +31,9 @@ const sweep = (stat, v) => {
       // 세이브율을 내주고 화제를 사는 칸이 있다. 팬도 같이 재야 그 교환을 볼 수 있다.
       fans += followerGain(k, r, 0, 1, 1, 1);
     }
+    samples.push({saved:saved-before.saved, shots:shots-before.shots, empty:empty-before.empty, fans:fans-before.fans, contactMisses:contactMisses-before.contactMisses});
   }
-  return { rate: Number((saved / shots * 100).toFixed(2)), empty, fans, cause, contactMisses };
+  return { rate: Number((saved / shots * 100).toFixed(2)), empty, fans, cause, contactMisses, samples };
 };
 
 const c1 = sweep("offball", 3), c2 = sweep("offball", 3);
@@ -38,6 +41,7 @@ check("control", c1.rate === c2.rate && c1.empty === c2.empty, c1.rate + " " + c
 
 const lo = sweep("offball", 1);
 const hi = sweep("offball", 10);
+for (const key of ["saved", "empty", "contactMisses"]) resolution("offball/"+key,hi.samples.map((r,i)=>[r[key],r.shots,lo.samples[i][key],lo.samples[i].shots]));
 
 // 커버는 옆 공의 접촉 실패 감소로 잰다. 다이빙 원인 귀속은 참고값으로만 남긴다.
 check("offball:buys-lateral-cover-in-contact-misses", hi.contactMisses < lo.contactMisses,
@@ -60,6 +64,7 @@ check("offball:net-save-gain-in-band", hi.rate - lo.rate >= 0.5 && hi.rate - lo.
 const trap = [];
 for (const stat of GROWABLE) {
   const a = sweep(stat, 1), b = sweep(stat, 10);
+  for(const key of ["saved", "fans"]) resolution(`offball/${stat}/${key}`,b.samples.map((r,i)=>[r[key],r.shots,a.samples[i][key],a.samples[i].shots]));
   if (b.rate < a.rate && b.fans <= a.fans) trap.push(stat + " rate " + a.rate + "->" + b.rate + " fans " + a.fans + "->" + b.fans);
 }
 check("growable:every-stat-buys-something", trap.length === 0, trap.join(" | ") || "all fifteen pay in save rate or in reach");

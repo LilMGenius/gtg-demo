@@ -1,3 +1,4 @@
+import { resolution } from './seed-resolution.mjs';
 import { population, pairedTrainingStep } from './product-population.mjs';
 import { botTierContract } from './bot-tier-contract.mjs';
 // 위치 경로의 네 입력 모드에서 기존 문턱을 그대로 재며, 옛 완벽/자동/저장 방향은 모집단에서 제외한다.
@@ -46,7 +47,7 @@ function verdict(name, status, detail) {
 
 
 function measure(policy, level, mode, contrast = null, coupledShots = false) {
-  const gains = (policy === 'fixed-order' ? [] : contrast ? [contrast] : PATH).map(stat => ({ stat, eligible: 0, tested: 0, baseSaved: 0, bumpSaved: 0, n10: 0, n01: 0 }));
+  const gains = (policy === 'fixed-order' ? [] : contrast ? [contrast] : PATH).map(stat => ({ stat, eligible: 0, tested: 0, baseSaved: 0, bumpSaved: 0, n10: 0, n01: 0, samples: [] }));
   let conceded = 0, tested = 0, gold = 0;
   const causes = {};
   for (let s = 0; s < BALLS / 5; s++) {
@@ -61,6 +62,7 @@ function measure(policy, level, mode, contrast = null, coupledShots = false) {
       g.eligible++;
       return { ...keeper, [g.stat]: contrast ? 10 : Math.min(10, keeper[g.stat] + 1) };
     });
+    const before = gains.map(g=>({n10:g.n10,n01:g.n01,tested:g.tested}));
     for (const shot of shots) {
       // 한 구마다 정책과 판정의 씨앗을 고정해 스탯 변화가 다음 구를 밀지 않는다.
       const shotSeed = 1000003 + s * 7919 + level * 31 + shot.index;
@@ -83,6 +85,7 @@ function measure(policy, level, mode, contrast = null, coupledShots = false) {
         if (base.conceded && !bump.conceded) g.n01++;
       }
     }
+    gains.forEach((g,i)=>g.samples.push([g.n01-before[i].n01-g.n10+before[i].n10,g.tested-before[i].tested]));
   }
   for (const g of gains) {
     g.eligibility = g.eligible / (BALLS / 5);
@@ -90,6 +93,7 @@ function measure(policy, level, mode, contrast = null, coupledShots = false) {
     // McNemar normal approximation: paired 95% half-width =
     // 1.96 * sqrt(n10 + n01) / tested * 100 (discordant tested balls).
     g.hw = g.tested ? 1.96 * Math.sqrt(g.n10 + g.n01) / g.tested * 100 : NaN;
+    if (g.tested) resolution(`product-pop/${mode}/${policy}/L${level}/${g.stat}/${contrast ? "contrast" : "one"}`,g.samples);
   }
   return { policy, level, mode, conceded, tested, nonconcession: 100 * (BALLS - conceded) / BALLS, testedSave: 100 * (tested - conceded) / tested, gains, causes, goldPerSet: gold / (BALLS / 5) };
 }
