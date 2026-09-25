@@ -1,4 +1,5 @@
 // 화면 조립. 판정은 chain.mjs가 하고 이 파일은 입력과 자막만 옮긴다.
+import { createTelemetry } from './telemetry.mjs';
 import { HUD_LINKS, linkAttrs } from './ui/links.mjs';
 import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, botPlan, X_MAX, moveSpeed, rollForm, ballInHand, restartDelay, setBreak, followerGain, GEAR_STEP } from '../../src/chain.mjs';
 import { aimAt, diveTrigger } from '../../src/chain.mjs';
@@ -29,6 +30,22 @@ import { applyPreset, ONBOARD_KEEPER, ONBOARD_KICKERS, ONBOARD_DONE } from './st
 import { thumbURL, startSpin, stopSpin } from './render/thumb.mjs';
 import * as wikiUI from './ui/wiki.mjs';
 
+// 수집기는 부팅당 하나다. 준비 중 사건도 Promise 순서대로 기록하고 게임 부팅은 기다리지 않는다.
+const telemetry = createTelemetry();
+let telemetryMode = () => 'hand';
+const track = (name, fields = {}) => {
+  const mode = telemetryMode();
+  void telemetry.then(client => client.record(name, { mode, ...fields }));
+};
+// 오류의 내용과 스택은 수집하지 않고 기존 런타임 오류 경계의 범주만 남긴다.
+addEventListener('error', () => track('error', { category: 'runtime' }));
+addEventListener('unhandledrejection', () => track('error', { category: 'runtime' }));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') void telemetry.then(client => client.flush());
+});
+// 고리의 사본만 공개하므로 계기가 제품 사건을 만들거나 바꿀 수 없다.
+window.__telemetry = async () => (await telemetry).snapshot();
+let firstPlayable = false, firstContact = false, completedSet = false, secondSetStarted = false;
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
 // 계측 훅. 플레이테스트가 이 값을 읽고, 값이 없으면 게이트를 죽인다.
@@ -152,6 +169,8 @@ state.social = readSocial(saved?.social);
 window.__preset = applyPreset(new URLSearchParams(location.search).get('preset'), state);
 // 크레딧 없이 켜진 자동은 공짜 봇이다. 저장에서 올라온 자동은 크레딧이 있을 때만 산다.
 if (state.bot.ms <= 0) state.auto = false;
+telemetryMode = () => state.auto && state.bot.ms > 0 ? 'bot' : 'hand';
+if (saved) track('return_visit');
 window.__points = () => state.points;
 // 두 갈래가 각각 어떻게 움직였는지 게이트가 직접 읽어야 한다. 화면 글자는 증거가 아니다.
 window.__wallet = () => state.wallet;
@@ -517,6 +536,7 @@ function botTick() {
   // 크레딧이 끝나면 자동도 같이 꺼진다. 켜둔 채로 두면 봇 없는 자동이 공짜가 된다.
   state.bot.tier = 0;
   state.auto = false;
+  track('bot_off');
   autoBtn.classList.remove('on');
   persist();
   pips();
@@ -547,6 +567,10 @@ function coinPop(n) {
 }
 
 function nextSet() {
+  if (completedSet && !secondSetStarted) {
+    secondSetStarted = true;
+    track('second_set_start');
+  }
   // 기복은 판당 한 번 굴러서 그 판 내내 같은 값으로 선다.
   const form = rollForm(state.keeper, rng);
   state.form = form;
@@ -566,6 +590,7 @@ function nextShot() {
   state.phase = 'wait';
   pips();
   setPad(true);
+  if (!firstPlayable) { firstPlayable = true; track('first_playable'); }
   stage.reset();
   keeperX = stage.keeperX();
   keeperVx = 0;
@@ -584,6 +609,10 @@ function positionTimeline(event) {
   const p = positioning;
   if (state.phase !== 'wait') return null;
   if (event === 'contact') {
+    if (!firstContact) {
+      firstContact = true;
+      track('first_contact', { mode: !p.manual && state.auto && state.bot.ms > 0 ? 'bot' : 'hand' });
+    }
     const pre = sampleTrace(0);
     p.aimed = aimAt(p.keeper, state.shots[state.i], pre);
     p.aimCalls = (p.aimCalls || 0) + 1;
@@ -756,6 +785,8 @@ function restart(result) {
 }
 
 function endSet() {
+  completedSet = true;
+  track('set_complete', { mode: state.botRan ? 'bot' : 'hand' });
   const conceded = state.results.filter(Boolean).length;
   // 세트 사이에 다른 자막이 끼어도 사람은 이 줄만 이어서 기억한다. 직전 요약을 따로 들고 금지한다.
   lastSetEnd = setEndLine(5 - conceded, rng, lastSetEnd);
@@ -785,6 +816,7 @@ function trainKeeper(stat) {
   if (!result.spent) return;
   Object.assign(state.keeper, result.keeper);
   state.points -= result.spent;
+  track('training_spent', { amount: result.spent });
   if (stat === undefined) {
     const line = result.lines.at(-1);
     lastAutoTraining = '자동 훈련: ' + CAUSE_LABEL[line.stat] + ' ' + line.before + ' → ' + line.after;
@@ -2704,6 +2736,7 @@ autoBtn.onpointerdown = () => {
     return;
   }
   state.auto = !state.auto;
+  track(state.auto ? 'bot_on' : 'bot_off');
   if (state.auto) state.coach = true;
   // 켠 순간부터 재야 한다. 꺼져 있던 시간까지 차감되면 산 분이 사라진다.
   if (state.auto) botStamp = performance.now();
@@ -2823,14 +2856,14 @@ function enterFullscreen() {
   window.__fsLog.push({ t: performance.now(), call: 'requestFullscreen' });
   try {
     Promise.resolve(request.call(root, { navigationUI: 'hide' }))
-      .then(() => screen.orientation?.lock?.('landscape')).catch(() => {});
-  } catch {}
+      .then(() => screen.orientation?.lock?.('landscape')).catch(() => track('error', { category: 'runtime' }));
+  } catch { track('error', { category: 'runtime' }); }
 }
 fullscreenBtn.onclick = () => {
   if (!fullscreenSupported) return;
   if (!fullscreenElement()) return enterFullscreen();
   window.__fsLog.push({ t: performance.now(), call: 'exitFullscreen' });
-  try { Promise.resolve((document.exitFullscreen || document.webkitExitFullscreen).call(document)).catch(() => {}); } catch {}
+  try { Promise.resolve((document.exitFullscreen || document.webkitExitFullscreen).call(document)).catch(() => track('error', { category: 'runtime' })); } catch { track('error', { category: 'runtime' }); }
 };
 let startFullscreenTried = false;
 const startFullscreen = () => {
