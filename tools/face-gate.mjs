@@ -119,16 +119,14 @@ try {
       // 얼굴 형태 표본은 키커의 정체성을 직접 쓰고, 헤어 선반은 구매하지 않은 키퍼의 맨턱을 쓴다.
       if (rank === undefined) lk.face = r.faceOf(name);
       return beard === undefined ? lk
-        : Object.assign({}, lk, { face: Object.assign({}, lk.face, { beard, beardShape: "full" }) });
+        : Object.assign({}, lk, { face: Object.assign({}, lk.face, { beard }) });
     };
     const one = async (kind, name, rank) => {
       const own = rank === undefined ? r.faceOf(name).beard : 0;
       // 민 얼굴이 기준 틀이다. 수염이 실루엣을 바꾸므로 눈과 입 자리는 수염 없는 쪽에서 읽는다.
-      // 머리 중심과 기존 AIM을 공유하여 수염 유무가 투영을 바꾸지 못하게 한다.
-      const projection = { part: "head" };
-      const hb = m.headBox(kind, body, wear(name, 0, rank), projection);
+      const hb = m.headBox(kind, body, wear(name, 0, rank));
       const off = await read(hb.url);
-      const on = await read(m.thumbURL(kind, body, wear(name, own ? undefined : 2, rank), projection));
+      const on = await read(m.thumbURL(kind, body, wear(name, own ? undefined : 2, rank)));
       const w = off.w;
       const h = off.h;
       const R = hb.ry * h;

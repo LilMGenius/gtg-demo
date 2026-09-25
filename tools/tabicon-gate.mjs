@@ -1,4 +1,8 @@
 import { chromium } from "playwright";
+import { SHELF_WORDS } from "../web/src/state/shelf.mjs";
+import { mkdirSync } from "node:fs";
+// 등급 선반 외 이적시장과 봇과 버프도 아이콘을 가진다.
+const EXPECTED = [...Object.keys(SHELF_WORDS), "pull", "bot", "buff"];
 
 // 상점 탭 아이콘의 자. 열한 칸이 글자로만 서 있으면 어느 칸이 무엇을 파는지 매번 읽어야 한다.
 //
@@ -32,35 +36,50 @@ try {
   await p.evaluate(() => window.__shop(true));
   await p.waitForTimeout(320);
 
-  const scan = await p.evaluate(() => {
+  const scan = await p.evaluate(async () => {
     const tabs = [...document.querySelectorAll("#shop .tab")];
-    return tabs.map((e) => {
+    const rows = [];
+    for (const original of tabs) {
+      const key = original.dataset.tab;
+      document.querySelector('#shop .tab[data-tab="' + key + '"]').click();
+      // maxview와 같은 전환 대기로 선택 탭이 띠 안에 도착한 뒤 읽는다.
+      await new Promise(resolve => setTimeout(resolve, 320));
+      const e = document.querySelector('#shop .tab[data-tab="' + key + '"]');
       const svg = e.querySelector("svg");
       const label = e.querySelector("span");
       const r = e.getBoundingClientRect();
-      return {
+      const strip = e.parentElement.getBoundingClientRect();
+      const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      rows.push({
         tab: e.dataset.tab,
+        bounds: {left:r.left,right:r.right,top:r.top,bottom:r.bottom,stripLeft:strip.left,stripRight:strip.right,hit:at?.className},
         icons: e.querySelectorAll("svg").length,
         // 그림 자체를 지문으로 삼는다. 두 칸이 같은 사각형 묶음을 쓰면 같은 문자열이 나온다.
         ink: svg ? [...svg.querySelectorAll("rect")].map((q) => q.getAttribute("x") + "," + q.getAttribute("y") + "," + q.getAttribute("width") + "," + q.getAttribute("height")).join(" ") : "",
         named: svg ? (svg.getAttribute("aria-label") || "") : "",
         words: label ? label.textContent.trim() : "",
-        onScreen: r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth
-      };
-    });
+        // 기울어진 장식 테두리가 아닌 사람이 읽는 그림과 이름의 사각형을 잰다.
+        onScreen: [svg,label].every(node => {
+          if (!node) return false;
+          const q = node.getBoundingClientRect();
+          return q.top >= 0 && q.bottom <= innerHeight && q.left >= Math.max(0, strip.left) && q.right <= Math.min(innerWidth, strip.right);
+        }) && Boolean(at && e.contains(at))
+      });
+    }
+    return rows;
   });
 
-  check("instrument:the-shop-showed-its-tabs", scan.length === 11, scan.length + " tabs");
+  check("instrument:the-shop-showed-its-tabs", scan.length === EXPECTED.length && EXPECTED.every(key => scan.some(row => row.tab === key)), scan.length + " tabs");
   check("tabicon:every-tab-carries-exactly-one-icon", scan.every((s) => s.icons === 1),
-    scan.filter((s) => s.icons !== 1).map((s) => s.tab + ":" + s.icons).join(", ") || "11 of 11");
+    scan.filter((s) => s.icons !== 1).map((s) => s.tab + ":" + s.icons).join(", ") || scan.length + " of " + EXPECTED.length);
   check("tabicon:every-tab-keeps-its-name-beside-the-icon", scan.every((s) => s.words.length > 0),
     scan.filter((s) => !s.words).map((s) => s.tab).join(", ") || scan.map((s) => s.words).join(" "));
   const shapes = new Set(scan.map((s) => s.ink));
   check("tabicon:no-two-tabs-draw-the-same-shape", shapes.size === scan.length, shapes.size + " distinct of " + scan.length);
   const names = new Set(scan.map((s) => s.named));
   check("tabicon:every-icon-names-itself-for-a-reader", names.size === scan.length && !names.has(""), names.size + " labels");
-  check("tabicon:every-tab-is-inside-the-viewport", scan.every((s) => s.onScreen),
-    scan.filter((s) => !s.onScreen).map((s) => s.tab).join(", ") || "11 on screen");
+  check("tabicon:each-selected-icon-and-name-is-visible", scan.every((s) => s.onScreen),
+    scan.filter((s) => !s.onScreen).map((s) => s.tab + ":" + JSON.stringify(s.bounds)).join(", ") || scan.length + " selected tabs on screen");
 
   // 대조군 하나. 같은 칸을 두 번 읽으면 같은 지문이 나와야 한다. 안 그러면 위의 다름은 잡음이다.
   const again = await p.evaluate(() => {
@@ -134,10 +153,12 @@ try {
     document.body.appendChild(board);
   });
   await p.waitForTimeout(200);
-  const BOARD = "tabicons.local.png";
-  await p.screenshot({ path: BOARD });
+  const OUT = process.env.GTG_EVIDENCE_DIR || ".omo/evidence/";
+  mkdirSync(OUT, {recursive:true});
+  const BOARD = OUT + "/tabicons.jpg";
+  await p.screenshot({ path: BOARD, type:"jpeg" });
   const cells = await p.evaluate(() => document.querySelectorAll("#iconBoard > div").length);
-  check("instrument:a-board-for-the-eye-was-baked", cells === 11, cells + " icons at 120px in " + BOARD);
+  check("instrument:a-board-for-the-eye-was-baked", cells === EXPECTED.length, cells + " icons at 120px in " + BOARD);
 
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
   await ctx.close();

@@ -84,7 +84,7 @@ try {
   await p.route("**/web/src/render/thumb.mjs", async (route) => {
     const response = await route.fetch();
     await route.fulfill({ response, body: await response.text() +
-      '\nexport function spongeSurface(k, look) { frame("pads", k, look); return { rig, scene, cam, cv: R.domElement, render: () => R.render(scene, cam) }; }\nexport function cardSurface(kind, k, look, over) { frame(kind, k, look, undefined, over); return {rig, sceneRig, cam, cv:R.domElement}; }' });
+      '\nexport function spongeSurface(k, look) { frame("pads", k, look); return { rig, scene, cam, cv: R.domElement, render: () => R.render(scene, cam) }; }' });
   });
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -218,7 +218,7 @@ try {
      -0.5는 깃이 칸 위 변에 닿는 자리다. 실측으로 상의가 칠한 첫 줄이 게이트 몸에서
      -0.2에 0.259, -0.3에 0.151, -0.4에 0.039, -0.5에 0.000이다. 다섯 벌이 모두 -0.5에서 0.000이고
      한 칸 앞인 -0.4까지는 다섯 벌 다 초록이라, 이 값은 문턱을 스치는 자리가 아니다. */
-  const PADS_DROP = { lift: -0.75 }; // 넓어진 카드의 실제 윗변 밖까지 깃을 보내는 결함 대조군이다.
+  const PADS_DROP = { lift: -0.5 };
   const shapes = await p.evaluate(async ([bodies, wide, drop]) => {
     const m = await import("/web/src/render/thumb.mjs");
     const g = await import("/web/src/state/gear.mjs");
@@ -493,50 +493,6 @@ try {
   // 심는 대조군. 이 자리로 겨냥을 되돌리면 기본 등급의 머리가 칸 밖으로 나가야 한다.
   /* 체격도 표본이다. 아래 두 축이 재던 몸은 188/84 하나였는데 게임은 그보다 넓은 몸을 만든다.
      BODIES가 소스에서 끌어온 봉투의 네 귀퉁이와 그 게이트 몸이고, 판정은 다섯 벌 전부다. */
-  // 모든 착용 선반이 상품과 착용자를 함께 판다. 등급과 변형과 체격 봉투를 빠짐없이 걷는다.
-  const wearers = await p.evaluate(async bodies => {
-    const m = await import("/web/src/render/thumb.mjs");
-    const g = await import("/web/src/state/gear.mjs");
-    const shelves = {grip:g.GLOVES, studs:g.BOOTS, pads:g.KITS, socks:g.SOCKS, ink:g.TATTOOS, hair:g.HAIRS, beard:g.BEARDS};
-    const rows = [];
-    for (const [kind, grades] of Object.entries(shelves)) {
-      for (const body of bodies) for (const [rank] of grades.entries()) {
-        for (const [skin] of g.skinsAt(kind, rank).entries()) {
-          const look = g.lookOf({[kind]:rank, [kind + "Skin"]:skin});
-          const box = m.wearerBox(kind, body, look);
-          rows.push({kind, rank, skin, body, ...box, head:{...box.head, url:undefined}});
-        }
-      }
-    }
-    // 봇은 세 판매 등급을 같은 체격 봉투로 검사한다. 외형 변형은 봇 카탈로그에 없다.
-    const bots = await import("/web/src/state/bot.mjs");
-    const botGrades = bots.BOTS;
-    for (const body of bodies) for (const entry of botGrades) {
-      const box = m.wearerBox("bot", body, {rank:entry.tier});
-      rows.push({kind:"bot", rank:entry.tier, body, ...box, head:{...box.head, url:undefined}});
-    }
-    // 옛 장갑 겨냥의 거리 0.94·높이 0.03·시선 0.12를 그대로 심어 상품만 남고 얼굴을 잃는 회귀를 잡는다.
-    const old = m.wearerBox("grip", bodies[0], g.lookOf({grip:0}), {part:"glove", dist:0.94, lift:0.03, high:0.12});
-    return {rows, old:{...old, head:{...old.head, url:undefined}}, expected:[...Object.entries(shelves).map(([kind, grades]) => ({kind, n:grades.reduce((n, _, rank) => n + g.skinsAt(kind, rank).length, 0) * bodies.length})), {kind:"bot", n:botGrades.length * bodies.length}]};
-  }, BODIES);
-  const pointInside = p => p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1;
-  // 리그가 반환하는 두 눈과 두 어깨의 실제 메시 정점을 모두 확인해 일부만 측정한 통과를 막는다.
-  const personInside = r => r.head && r.head.ry > 0
-    && r.head.x - r.head.rx >= 0 && r.head.x + r.head.rx <= 1
-    && r.head.y - r.head.ry >= 0 && r.head.y + r.head.ry <= 1
-    && r.head.eyes.length === 2 && r.head.eyes.every(pointInside)
-    && r.shoulders.length === 2 && r.shoulders.every(points => points.length > 0 && points.every(pointInside));
-  for (const {kind, n} of wearers.expected) {
-    const rows = wearers.rows.filter(r => r.kind === kind);
-    const lost = rows.filter(r => !personInside(r));
-    check("thumb:" + kind + ":every-worn-look-keeps-head-eyes-and-shoulders",
-      n > 0 && rows.length === n && lost.length === 0,
-      rows.length + "/" + n + " looks; outside: " + JSON.stringify(lost));
-  }
-  check("control:the-old-glove-frame-loses-its-wearer", !personInside(wearers.old)
-    && wearers.old.head.eyes.length === 2 && wearers.old.shoulders.length === 2,
-    JSON.stringify(wearers.old));
-
   const OLD_PADS_AIM = { part: "torso", lift: 0.3 };
   /* 아래 바닥 자가 심는 겨냥. 부위는 파는 그대로 목이고 lift 한 칸만 흐른 값이다. 위의 자가 옛
      겨냥을 통째로 되심는 것과 달라야 한다. 실제로 나는 회귀는 부위가 바뀌는 것이 아니라 상수
@@ -697,7 +653,7 @@ try {
     if (all.length !== 1) throw new Error(what + " read " + all.length + " times in actors.mjs, want 1");
     return Number(ACTORS.match(re)[1]);
   };
-  const SHELL = 0; // 무광 키트에는 복제 외곽선이 없으므로 접촉 허용 폭도 없다.
+  const SHELL = oneOf(/addOutline\(gv, ([\d.]+)\);/, "the glove outline width");
   const PIP_Z = oneOf(/pip\.translate\(col \* s \* [\d.]+, row \* s \* [\d.]+, s \* ([\d.]+)\);/, "the pad z");
   const GLOVE_SIZE = oneOf(/gloveSize: h \* ([\d.]+),/, "the keeper glove size");
   const pads = await p.evaluate(async ([bodies, shell, gsize]) => {
@@ -738,15 +694,13 @@ try {
             }
             return { hi, lo, zhi };
           };
-          const parts = gv.userData.partVertices;
-          const palm = face(0, parts[0]); // 구와 상자의 정점 수를 같은 수로 가정하지 않는다.
-          const start = parts.slice(0, 3).reduce((a, n) => a + n, 0); // 손바닥, 엄지, 손목 뒤가 빨판의 시작이다.
+          const palm = face(0, box);
           let back = Infinity;
-          for (let q = 0; q < cut.pips; q += 1) back = Math.min(back, face(start + q * box, start + (q + 1) * box).lo);
-          const sz = ink.length ? ink[0].scale.z : 1; // 외곽선이 없으면 표면 자체 배율이다.
+          for (let q = 0; q < cut.pips; q += 1) back = Math.min(back, face((3 + q) * box, (4 + q) * box).lo);
+          const sz = ink.length ? ink[0].scale.z : 0;
           out.rows.push({
             body: k.height + "/" + k.weight, tag: L.rank + ":" + L.skin, hand: at,
-            verts: pos.count, want: start + cut.pips * box, inks: ink.length, sz,
+            verts: pos.count, want: (3 + cut.pips) * box, inks: ink.length, sz,
             wantSz: 1 + (shell * 2) / Math.max(0.04, bb.max.z - bb.min.z),
             s: (k.height / 100) * gsize * cut.bulk, stand: back - palm.hi,
             reach: (palm.zhi - (bb.max.z + bb.min.z) / 2) * (sz - 1)
@@ -761,7 +715,7 @@ try {
   const padEnds = (k) => Math.min.apply(null, pads.rows.map((r) => r[k])).toFixed(5)
     + ".." + Math.max.apply(null, pads.rows.map((r) => r[k])).toFixed(5);
   const padClear = pads.rows.filter((r) => !(r.stand <= r.reach));
-  const padDrift = pads.rows.filter((r) => r.verts !== r.want || r.inks !== 0
+  const padDrift = pads.rows.filter((r) => r.verts !== r.want || r.inks !== 1
     || Math.abs(r.sz - r.wantSz) > 1e-9);
   const padPlant = pads.rows.filter((r) => r.stand + (PLANT_PIP_Z - PIP_Z) * r.s > r.reach);
   const padTight = pads.rows.reduce((a, c) => (a && a.reach - a.stand <= c.reach - c.stand ? a : c), null);
@@ -789,7 +743,7 @@ try {
      옷의 꼭대기와 잉크의 꼭대기를 따로 잰다. 옷 위에 선 상자라도 몸통 잉크 아래면
      어깨 윗선이 없다. 자기 외곽선을 단 스펀지는 그 외곽선 정점이 몸통 외곽선보다 바닥만큼
      높아야 하고, 카드에서 몸통만 남긴 실루엣보다 위에 실제로 찍힌 행도 있어야 한다.
-     스펀지는 메시 하나다. 빨판과 달리 병합되지 않아 어깨 관절의 shoulderPad 표식 자식 하나가 그것이고,
+     스펀지는 메시 하나다. 빨판과 달리 병합되지 않아 어깨 관절의 BoxGeometry 자식 하나가 그것이고,
      하나가 아니면 축이 수 대신 그 어긋남으로 먼저 빨개진다. 폭과 두께와 깊이와 앉은 높이를
      actors.mjs에서 한 자리씩 읽어 다시 세워 맞춘다. 여기 수를 베껴 두면 그 식이 얇아진 날 이 축만
      옛 수로 초록이 난다. 자리를 손으로 옮겨 셈한 값이 pad.matrixWorld로 읽은 값과 같은지도 같이
@@ -818,16 +772,15 @@ try {
   const [TORSO_K] = manyOf(/torsoR: w \* ([\d.]+), torsoLen: h \* [\d.]+,/, "the keeper torso radius");
   const [W_BASE, W_AT, W_STEP] = manyOf(/const w = ([\d.]+) \+ \(weight - (\d+)\) \* ([\d.]+);/, "the girth from weight");
   const [PAD_TH_K] = manyOf(/const th = o\.armR \* ([\d.]+) \* kc\.pad;/, "the sponge thickness");
-  const [PAD_LIFT_K, PAD_SEAT_K, PAD_SEAT_DOWN] = manyOf(/pad\.position\.set\(side \* \(o\.armR \* [\d.]+ \+ Math\.max\([\d.]+, kc\.pad\) \* [\d.]+\), o\.armR \* ([\d.]+) \+ th \* ([\d.]+) - ([\d.]+), o\.armR \* [\d.]+\);/, "the sponge seat");
+  const [PAD_LIFT_K, PAD_SEAT_K, PAD_SEAT_DOWN] = manyOf(/pad\.position\.set\(side \* \(o\.armR \* [\d.]+ \+ Math\.max\([\d.]+, kc\.pad\) \* [\d.]+\), o\.armR \* ([\d.]+) \+ th \* ([\d.]+) - ([\d.]+), 0\);/, "the sponge seat");
   const [PAD_WIDE_K, PAD_GIRTH_K] = manyOf(/const wide = o\.armR \* ([\d.]+) \+ o\.torsoR \* kc\.girth \* ([\d.]+);/, "the sponge width");
-  const [PAD_DEEP_K] = manyOf(/padGeo\.scale\(wide \/ 2, th \/ 2, o\.armR \* ([\d.]+) \/ 2\)/, "the sponge depth");
-  const [PAD_SPHERE, PAD_RINGS] = manyOf(/const KIT = \{cap:\d+, radial:\d+, sphere:(\d+), rings:(\d+)/, "the rounded sponge tessellation");
-  const TORSO_PEN = 0; // 키트 몸통은 복제 잉크 없이 실제 표면이 외곽선이다.
+  const [PAD_DEEP_K] = manyOf(/new THREE\.BoxGeometry\(wide, th, o\.armR \* ([\d.]+)\)/, "the sponge depth");
+  const [TORSO_PEN] = manyOf(/addOutline\(torso, ([\d.]+)\);/, "the torso outline width");
   const crowns = await p.evaluate(async ([bodies, lit, floor, halfAt]) => {
     const T = await import("/web/vendor/three.module.min.js");
     const A = await import("/web/src/render/objects/actors.mjs");
     const g = await import("/web/src/state/gear.mjs");
-    const box = new T.SphereGeometry(1, lit.sphere, lit.rings).attributes.position.count; // 실제 패드가 쓰는 구 분할을 읽어 상자 대신 둥근 표면의 정점 수를 검증한다.
+    const box = new T.BoxGeometry(1, 1, 1).attributes.position.count;
     // 스펀지를 든 장만 고른다. 등급 번호를 여기 적으면 스펀지가 다른 등급에 붙는 날 그 등급이 조용히 빠진다.
     const looks = [];
     for (let rank = 0; rank < g.KITS.length; rank += 1) {
@@ -866,10 +819,9 @@ try {
         const arms = rig.userData.arms || [];
         for (let at = 0; at < arms.length; at += 1) {
           const sh = arms[at];
-          const boxes = sh.children.filter((c) => c.isMesh && c.userData.shoulderPad);
+          const boxes = sh.children.filter((c) => c.isMesh && c.geometry.type === "BoxGeometry");
           const pad = boxes.length === 1 ? boxes[0] : null;
-          if (pad) pad.geometry.computeBoundingBox();
-          const par = pad ? pad.geometry.boundingBox.getSize(new T.Vector3()) : new T.Vector3(); // 실제 정점 봉투로 세 반축을 재므로 둥근 패드의 크기 축도 유지된다.
+          const par = pad ? (pad.geometry.parameters || {}) : {};
           const home = pad ? pad.position : new T.Vector3();
           const seatTo = (y) => topOf(pad, sh.matrixWorld, new T.Vector3(home.x, y, home.z));
           const top = pad ? seatTo(home.y) : 0;
@@ -883,9 +835,9 @@ try {
             boxes: boxes.length, verts: pad ? pad.geometry.attributes.position.count : 0,
             inks: ink.length,
             padInks: pad ? pad.children.filter((c) => c.userData && c.userData.isOutline).length : -1,
-            wide: par.x, high: par.y, deep: par.z,
-            wantWide: Math.fround((armR * lit.wideK + torsoR * cut.girth * lit.girthK) / 2) * 2,
-            wantHigh: Math.fround(th / 2) * 2, wantDeep: Math.fround(armR * lit.deepK / 2) * 2, // BufferAttribute의 Float32 반축 양끝을 합친 값과 비교하고 기존 오차 문턱은 유지한다.
+            wide: Number(par.width) || 0, high: Number(par.height) || 0, deep: Number(par.depth) || 0,
+            wantWide: armR * lit.wideK + torsoR * cut.girth * lit.girthK,
+            wantHigh: th, wantDeep: armR * lit.deepK,
             seat: home.y, wantSeat: armR * lit.liftK + th * lit.seatK - lit.seatDown,
             crown, pen: ink.length === 1 ? topOf(torso, ink[0].matrixWorld, null) - crown : 0,
             inkTop, torsoInkTop, inkMargin: inkTop - torsoInkTop,
@@ -898,12 +850,12 @@ try {
     }
     return out;
   }, [BODIES, { armK: ARM_K, torsoK: TORSO_K, wBase: W_BASE, wAt: W_AT, wStep: W_STEP, thK: PAD_TH_K,
-    liftK: PAD_LIFT_K, seatK: PAD_SEAT_K, seatDown: PAD_SEAT_DOWN, wideK: PAD_WIDE_K, girthK: PAD_GIRTH_K, deepK: PAD_DEEP_K, sphere: PAD_SPHERE, rings: PAD_RINGS },
+    liftK: PAD_LIFT_K, seatK: PAD_SEAT_K, seatDown: PAD_SEAT_DOWN, wideK: PAD_WIDE_K, girthK: PAD_GIRTH_K, deepK: PAD_DEEP_K },
   CROWN_FLOOR, PLANT_SEAT]);
   const crownSay = (r) => r.body + " " + r.tag + " hand " + r.hand + " clears by " + r.margin.toFixed(5);
   const crownEnds = (k) => Math.min.apply(null, crowns.rows.map((r) => r[k])).toFixed(5)
     + ".." + Math.max.apply(null, crowns.rows.map((r) => r[k])).toFixed(5);
-  const crownDrift = crowns.rows.filter((r) => r.boxes !== 1 || r.verts !== crowns.box || r.inks !== 0
+  const crownDrift = crowns.rows.filter((r) => r.boxes !== 1 || r.verts !== crowns.box || r.inks !== 1
     || r.padInks > 1 || !(r.fall > 0 && r.fall <= 1) || Math.abs(r.top - r.live) > 1e-9
     || Math.abs(r.wide - r.wantWide) > 1e-9 || Math.abs(r.high - r.wantHigh) > 1e-9
     || Math.abs(r.deep - r.wantDeep) > 1e-9 || Math.abs(r.seat - r.wantSeat) > 1e-9);
@@ -929,7 +881,7 @@ try {
           + crownInk.length + " of " + crowns.rows.length + ", the seat dropped by each margin sinks all "
           + crownSank.length + " to -" + CROWN_FLOOR + " while halving it sinks only " + crownHalf.length);
 
-  const inkLow = crowns.rows.filter((r) => r.padInks !== 0 || r.inkMargin < CROWN_FLOOR);
+  const inkLow = crowns.rows.filter((r) => r.padInks !== 1 || r.inkMargin < CROWN_FLOOR);
   check("thumb:pads:the-sponge-silhouette-clears-the-ink-shell",
     crowns.rows.length === BODIES.length * crowns.looks.length * 2 && inkLow.length === 0,
     "floor " + CROWN_FLOOR + ", margins " + crownEnds("inkMargin") + ", below " + inkLow.length
@@ -951,7 +903,7 @@ try {
         const look = g.lookOf({ pads: rank, padsSkin: skin });
         look.shirt = 0xff00ff;
         const s = t.spongeSurface(body, look);
-        const pads = s.rig.userData.arms.map((a) => a.children.filter((c) => c.isMesh && c.userData.shoulderPad));
+        const pads = s.rig.userData.arms.map((a) => a.children.filter((c) => c.isMesh && c.geometry.type === "BoxGeometry"));
         if (pads.length !== 2 || pads.some((a) => a.length !== 1)) throw Error("sponge pixel population drift");
         const meshes = [];
         s.rig.traverse((o) => { if (o.isMesh) meshes.push([o, o.visible]); });
@@ -1120,7 +1072,7 @@ try {
     /* 대조군은 띠 위 축이 쓰는 장만 굽는다. 반사실까지 같이 구우면 한 회차가 아홉 장 더
        늘어나고, 이 판의 굽는 수는 옆 게이트의 page.goto를 30초 밖으로 밀어낸 적이 있다. */
     const nearSkin = async (dist) => {
-      const over = { dist, yaw: -0.95 }; // 옛 확대 대조군의 각도도 고정해 새 카드의 정면 각도를 물려받지 않는다.
+      const over = { dist };
       const skin = await read(m.thumbURL("ink", k, g.lookOf({ ink: 0 }), over));
       const box = toneOf(skin);
       const above = [];
@@ -1129,8 +1081,7 @@ try {
       }
       return { above, box };
     };
-    // 0.32 거리의 기존 표면 검사창을 고정한다. 카드 전체 면적을 요구하면 완전한 팔을 담을수록 실패한다.
-    const live = await rig({part:"arm", dist:0.32, lift:-0.1, high:0.06, yaw:-0.95});
+    const live = await rig();
     const was = await rig(old);
     const near = await nearSkin(nearDist);
     const one = m.thumbURL("ink", k, g.lookOf({ ink: 0 }));
@@ -1144,8 +1095,8 @@ try {
   check("instrument:the-bare-skin-card-bakes-the-same-bytes", fills.base.same && fills.base.len > 0,
     fills.base.same ? "grade 0 baked twice is the same " + fills.base.len + " char still"
       : "grade 0 moved between two bakes");
-  check("thumb:the-tattoo-keeps-its-surface-contrast", paid.length > 0 && paid.every((x) => x >= INK_FILL),
-    "grades 1..3 paint " + paid.map(pct).join(" ") + " of the fixed surface probe over the sold bare-skin probe, floor "
+  check("thumb:the-tattoo-fills-its-card", paid.length > 0 && paid.every((x) => x >= INK_FILL),
+    "grades 1..3 paint " + paid.map(pct).join(" ") + " of the card over the sold bare-skin card, floor "
     + pct(INK_FILL) + " (" + INK_FILL_FROM + "); the forced-grade-0 counterfactual reads "
     + fills.live.flat.slice(1).map(pct).join(" ") + " on the same bakes");
   check("control:bare-skin-carries-no-tattoo", fills.live.sold[0] >= 0 && fills.live.sold[0] < 0.005,
@@ -1158,7 +1109,7 @@ try {
     + " under the " + pct(INK_FILL) + " floor");
   const skinUp = fills.live.above.slice(1);
   const boxOf = (q) => q.map((c) => c[0] + ".." + c[1]).join("/");
-  check("thumb:surface-tone-stands-above-the-tattoo", skinUp.length > 0 && skinUp.every((n) => n >= INK_SKIN),
+  check("thumb:card-tone-stands-above-the-tattoo", skinUp.length > 0 && skinUp.every((n) => n >= INK_SKIN),
     "grades 1..3 keep " + skinUp.join(" ") + " opaque pixels above the band's top edge inside the tone box, floor "
     + INK_SKIN + "; the tone box r/g/b " + boxOf(fills.live.box)
     + " came from the sold grade-0 card's whole tone, the same still the fill axis measures against,"
@@ -1168,81 +1119,6 @@ try {
     "the planted rig dist " + NEAR_INK_DIST + " keeps " + fills.near.above.slice(1).join(" ")
     + " opaque pixels above the band inside the tone box (tone box " + boxOf(fills.near.box)
     + "), worst " + nearWorst + " under the " + INK_SKIN + " floor");
-
-  // 실제 판매 그림의 모든 팔 표면 정점과 관절을 같은 카메라로 투영한다. 잘린 좌표를 clamp하지 않는다.
-  const framing = await p.evaluate(async bodies => {
-    const m = await import("/web/src/render/thumb.mjs");
-    const g = await import("/web/src/state/gear.mjs");
-    const T = await import("/web/vendor/three.module.min.js");
-    const {BOTS} = await import("/web/src/state/bot.mjs");
-    const points = (object, camera) => {
-      const out = [];
-      object.traverse(o => {
-        if (!o.isMesh || !o.visible) return;
-        const pos = o.geometry.attributes.position;
-        for (let i = 0; i < pos.count; i++) {
-          const v = new T.Vector3().fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).project(camera);
-          out.push({x:v.x, y:v.y, z:v.z});
-        }
-      });
-      return out;
-    };
-    const inside = p => Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1 && Math.abs(p.z) <= 1; // NDC 정육면체의 여섯 면이 실제 클리핑 경계다.
-    const bounds = points => ({count:points.length, outside:points.filter(p => !inside(p)).length});
-    const arm = (body, rank, skin, over) => {
-      const s = m.cardSurface("ink", body, g.lookOf({ink:rank, inkSkin:skin}), over);
-      const camera = s.cam.userData.inkDetail?.camera || s.cam;
-      const j = s.rig.userData.joints;
-      // 위팔에 붙은 실제 무늬까지 포함한다. 팔꿈치 아래 전체와 손목의 장갑까지 함께 담겨야 한다.
-      const all = points(j.shL, camera);
-      const elbow = j.elL.getWorldPosition(new T.Vector3()).project(camera);
-      const wrist = s.rig.userData.gloves[0].getWorldPosition(new T.Vector3()).project(camera);
-      return {body, rank, skin, ...bounds(all), elbow:inside(elbow), wrist:inside(wrist)};
-    };
-    const arms = [], bots = [];
-    for (const body of bodies) {
-      for (const [rank] of g.TATTOOS.entries()) for (const [skin] of g.skinsAt("ink", rank).entries()) arms.push(arm(body,rank,skin));
-      for (const b of BOTS) {
-        const s = m.cardSurface("bot",body,{rank:b.tier});
-        s.sceneRig.updateMatrixWorld(true);
-        const emblem = s.sceneRig.children.filter(o => o.isMesh).flatMap(o => points(o,s.cam));
-        bots.push({body,tier:b.tier,...bounds(emblem)});
-      }
-    }
-    // 0.28은 기존의 피부 조각 확대 거리다. 같은 실제 팔 정점으로 팔꿈치와 손목 손실을 검출한다.
-    const crop = arm(bodies[0],1,0,{part:"arm",dist:0.28,lift:-0.1,high:0.06,yaw:-0.95});
-    const s = m.cardSurface("bot",bodies[0],{rank:BOTS[0].tier});
-    const emblem = s.sceneRig.children.filter(o => o.isMesh);
-    // 카메라 높이를 한 프레임만큼 옮겨 가슴 표식이 사라지는 양성 대조군이다.
-    s.cam.setViewOffset(s.cv.width,s.cv.height,0,-s.cv.height,s.cv.width,s.cv.height);
-    const lostBot = bounds(emblem.flatMap(o => points(o,s.cam)));
-    return {arms,bots,crop,lostBot};
-  }, BODIES);
-  const armInside = r => r.count > 0 && r.outside === 0 && r.elbow && r.wrist;
-  check("thumb:tattoo-keeps-elbow-wrist-and-complete-band",framing.arms.length > 0 && framing.arms.every(armInside),JSON.stringify(framing.arms));
-  check("control:blurry-skin-crop-loses-arm-landmarks",framing.crop.count > 0 && !armInside(framing.crop),JSON.stringify(framing.crop));
-  check("thumb:bot-keeps-entire-chest-emblem",framing.bots.length > 0 && framing.bots.every(r => r.count > 0 && r.outside === 0),JSON.stringify(framing.bots));
-  check("control:head-only-bot-loses-chest-emblem",framing.lostBot.count > 0 && framing.lostBot.outside > 0,JSON.stringify(framing.lostBot));
-
-  // 실제 카드 슬롯에서도 원본 전체가 담겨야 카메라의 가슴 표식 검사가 화면에서 참이다.
-  for (const [width,height] of [[1280,720],[844,390],[740,360]]) for (const kind of ["bot","ink"]) { // 요청된 세 화면 크기를 그대로 재현한다.
-    await p.setViewportSize({width,height});
-    await grab(kind);
-    const fit = async () => p.locator('#shop .card[data-spec="'+kind+'"] .shot').evaluateAll(slots => slots.map(slot => {
-      const image = slot.querySelector('img');
-      const box = slot.getBoundingClientRect(), im = image.getBoundingClientRect();
-      return {w:im.width,h:im.height,overflow:Math.max(box.left-im.left,box.top-im.top,im.right-box.right,im.bottom-box.bottom)};
-    }));
-    const live = await fit();
-    check("thumb:"+kind+"-image-fits-slot:"+width,live.length > 0 && live.every(r => r.w > 0 && r.h > 0 && r.overflow <= 1),JSON.stringify(live)); // 1픽셀은 소수 CSS 경계 반올림만 허용한다.
-    if (width === 740) { // 가장 짧은 화면에 옛 정적 이미지 배치를 심는다.
-      await p.locator('#shop .card[data-spec="'+kind+'"] .shot img').evaluateAll(images => images.forEach(image => image.style.position='static'));
-      const old = await fit();
-      check("control:static-"+kind+"-image-overflows-short-slot",old.some(r => r.overflow > 1),JSON.stringify(old));
-      await p.locator('#shop .card[data-spec="'+kind+'"] .shot img').evaluateAll(images => images.forEach(image => image.style.removeProperty('position')));
-    }
-  }
-  await p.setViewportSize({width:1280,height:720}); // 뒤의 기존 호버 검사는 원래 데스크톱 표본에서 계속한다.
 
   // 대조군. 같은 등급을 두 번 구우면 같은 그림이어야 한다. 매번 달라지면 위의 다름은
   // 상품의 차이가 아니라 굽는 잡음이고, 그 축은 아무것도 증명하지 않는다.

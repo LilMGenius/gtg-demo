@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, TATTOOS } from "../web/src/state/gear.mjs";
+import { SHELF_WORDS } from "../web/src/state/shelf.mjs";
 import { BOTS } from "../web/src/state/bot.mjs";
 import { BUFFS } from "../web/src/state/buff.mjs";
 
@@ -16,8 +16,7 @@ t.unref();
 // 데이터가 늘어난 날 문서와 화면이 같이 틀리고 아무도 모른다.
 const WANT = {
   pull: 1,
-  glove: GLOVES.length, boot: BOOTS.length, kit: KITS.length, sock: SOCKS.length,
-  frame: GOALS.length, city: CITIES.length, hair: HAIRS.length, ink: TATTOOS.length,
+  ...Object.fromEntries(Object.entries(SHELF_WORDS).map(([key, shelf]) => [key, shelf.list.length])),
   bot: BOTS.length, buff: BUFFS.length
 };
 

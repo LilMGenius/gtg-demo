@@ -1444,6 +1444,22 @@ h1,h2,h3,h4,h5,h6,#shop .card > b,#shop .venue-subtitle{ text-wrap:balance; }
 #shop .pack-offer .buy.pull{width:100%;min-width:0;flex:1;margin:0;padding:var(--gap-2) var(--gap-1)}
 #shop .pack-card .buy.pull>i{max-width:100%}
 #shop .pack-card .buy.pull .price{flex-wrap:wrap;justify-content:center}
+/* 포장과 구매를 두 열로 놓아 승인된 첫 화면 안에서 바로 살 수 있게 한다. 34%는 포장 그림의 기존 가로 비율을 남기는 열이다. */
+#shop .card.pack-card{display:grid;grid-template-columns:34% minmax(0,1fr);column-gap:var(--gap-3)}
+#shop .pack-card .lede{grid-column:1 / -1}
+#shop .pack-card .pack-stage{grid-column:1;grid-row:2}
+#shop .pack-card .pack-art{width:100%;height:auto;aspect-ratio:176 / 232}
+#shop .pack-card .buys{grid-column:2;grid-row:2;align-self:center}
+#shop .pack-card .odds{grid-column:1 / -1;grid-row:3}
+/* 가로 폰 360 높이에서도 탭과 가격을 함께 읽도록 포장은 112, 무대는 124 높이로 제한한다. */
+@media (orientation:landscape) and (max-height:480px){
+  #shop:has(.pack-card) .fitting{display:none}
+  #shop .pack-card .pack-stage{height:124px}
+  #shop .pack-card .pack-art{height:112px;width:auto}
+  #shop .pack-card .promise-lines{min-height:0;gap:0}
+  #shop .pack-card .pack-offer{gap:var(--gap-1)}
+  #shop .pack-card .buys{margin-top:0}
+}
 /* 무대의 65% 광원 범위는 중앙 선수를 강조하고 3장의 동일 폭 카드는 한정 상품 오인을 피한다. */
 #shop .legend-showcase{background:radial-gradient(ellipse at 50% 0,#ffd83d30,transparent 65%),var(--panel);padding:var(--gap-3) 0;text-align:center}#shop .legend-showcase h2{font:var(--fs-title) var(--disp);color:#ffd83d}#shop .legend-showcase>p{color:var(--dim);margin:var(--gap-2)}#shop .legend-showcase .players{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--gap-3);padding:var(--gap-3)}
 /* 3px 금테 바깥으로 빛이 새지 않게 격리하고 4초 주기는 전설 프레임의 신호다. */

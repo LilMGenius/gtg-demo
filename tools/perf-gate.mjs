@@ -4,11 +4,21 @@
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { clearDraw } from './draw.mjs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+
+const EVIDENCE = new URL('../.omo/evidence/p29/', import.meta.url);
+mkdirSync(EVIDENCE, { recursive: true });
+const LOAD_MS = 35; // 기존 20ms 예산을 확실히 넘는 실제 작업을 심어 하강 축을 검증한다.
+const LOAD_SPAN = 7000; // 네 단계 하강 뒤에도 부하를 유지해 하한에서 멈추는지 잰다.
+const RECOVER_WAIT = 22000; // 네 단계의 느린 회복 창과 공유 기계 여유를 포함한다.
+const SETTLE_WAIT = 20000; // 기본 화면으로 돌아온 뒤 배율이 안정될 때까지 기다리는 상한이다.
+const STABLE_MS = 3000; // 세 판단 창 동안 같은 배율이어야 기존 프레임 계측을 시작한다.
+const HEADROOM = { width: 320, height: 180 }; // 실제 그리기 면적을 줄여 회복 축에 GPU 여유를 제공한다.
 
 const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
-const URL = 'http://127.0.0.1:10310/web/index.html?seed=11';
+const PAGE_URL = 'http://127.0.0.1:10310/web/index.html?seed=11';
 
-const die = setTimeout(() => { console.log('WATCHDOG'); process.exit(1); }, 85000);
+const die = setTimeout(() => { console.log('WATCHDOG'); process.exit(1); }, 150000); // 부하·회복·안정화와 기존 프레임 표본을 모두 수집할 실행 시간이다.
 die.unref();
 
 function pct(sorted, p) {
@@ -36,12 +46,49 @@ try {
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 
-  await page.goto(URL, { waitUntil: 'load' });
+  await page.goto(PAGE_URL, { waitUntil: 'load' });
   await page.waitForTimeout(900);
   await page.click('#go', { force: true });
   // 개봉 카드를 닫은 실제 경기에서 프레임과 기하 예산을 함께 잰다.
   if (!await clearDraw(page)) throw Error('개봉 판이 닫히지 않아 경기를 측정할 수 없음');
   await page.waitForTimeout(1200);
+
+  // 합성 시간값을 주입하지 않는다. 실제 rAF 작업으로 느리게 만들고 실제 캔버스로 하강과 복원을 읽는다.
+  await page.setViewportSize(HEADROOM);
+  if (await page.evaluate(() => Boolean(window.__resolutionState))) {
+    await page.waitForFunction(() => window.__resolutionState().scale === 1, null, { timeout: RECOVER_WAIT }); // 시작 화면의 부하가 남아 있으면 양성 대조군 전에 실제 여유로 복원한다.
+  }
+  const adaptive = await page.evaluate(async ({ loadMs, span }) => {
+    if (!window.__resolutionState) return { missing: true };
+    const before = window.__resolutionState(), samples = [];
+    const start = performance.now();
+    await new Promise(resolve => {
+      function heavy() {
+        const tick = performance.now();
+        while (performance.now() - tick < loadMs) { /* 해상도 하강을 유발할 실제 작업이다. */ }
+        samples.push(window.__resolutionState());
+        if (performance.now() - start < span) requestAnimationFrame(heavy);
+        else resolve();
+      }
+      requestAnimationFrame(heavy);
+    });
+    return { before, samples, loaded: window.__resolutionState() };
+  }, { loadMs: LOAD_MS, span: LOAD_SPAN });
+  if (!adaptive.missing) {
+    try {
+      await page.waitForFunction(() => window.__resolutionState().scale === 1, null, { timeout: RECOVER_WAIT });
+      adaptive.recovered = await page.evaluate(() => window.__resolutionState());
+    } catch (error) { adaptive.recoveryError = String(error); }
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+  try {
+    await page.waitForFunction(stable => {
+      const state = window.__resolutionState?.();
+      return state && state.mean !== null && performance.now() - state.lastChange >= stable;
+    }, STABLE_MS, { timeout: SETTLE_WAIT });
+    adaptive.settled = await page.evaluate(() => window.__resolutionState());
+  } catch (error) { adaptive.settleError = String(error); }
+  writeFileSync(new URL('adaptive.json', EVIDENCE), JSON.stringify(adaptive, null, 2));
 
   const out = await page.evaluate(() => new Promise((resolve) => {
     const frames = [];
@@ -88,6 +135,18 @@ try {
       : detail,
   ]);
 
+  ok('resolution:heavy-load-lowers-the-actual-buffer', !adaptive.missing
+    && adaptive.loaded.scale < adaptive.before.scale
+    && adaptive.loaded.canvas[0] < adaptive.before.canvas[0], JSON.stringify(adaptive.loaded ?? adaptive));
+  ok('resolution:sustained-load-reaches-and-keeps-the-quality-floor', !adaptive.missing
+    && adaptive.samples.length > 0 && adaptive.loaded.scale === adaptive.loaded.floor
+    && adaptive.samples.every(s => s.scale >= s.floor && s.dpr >= Math.min(1, s.baseDpr)),
+    JSON.stringify({ samples: adaptive.samples?.length, floor: adaptive.loaded?.floor, scale: adaptive.loaded?.scale }));
+  ok('resolution:headroom-restores-the-full-buffer', Boolean(adaptive.recovered)
+    && adaptive.recovered.scale === 1 && adaptive.recovered.dpr === adaptive.before.baseDpr
+    && adaptive.recovered.canvas[0] === adaptive.before.canvas[0], JSON.stringify(adaptive.recovered ?? adaptive.recoveryError));
+  ok('resolution:frame-budget-was-measured-after-settling', Boolean(adaptive.settled), JSON.stringify(adaptive.settled ?? adaptive.settleError));
+
   // 대조군. 계측기가 실제로 시간을 재는지부터 증명한다.
   const stall = await page.evaluate(() => {
     const t0 = performance.now();
@@ -124,6 +183,8 @@ try {
     console.log('  ' + (pass ? 'ok  ' : 'FAIL') + ' ' + name + ' ' + detail);
   }
   console.log('perf ' + (bad ? 'FAIL ' + bad : 'PASS ' + rows.length));
+  writeFileSync(new URL('perf.json', EVIDENCE), JSON.stringify({ invocation: 'node tools/perf-gate.mjs', machineLoad, adaptive,
+    p50, p95, p99, worst, rows, errors, out, pass: bad === 0 }, null, 2));
   process.exitCode = bad ? 1 : 0;
 } finally {
   clearTimeout(die);

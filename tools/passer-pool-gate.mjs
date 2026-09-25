@@ -22,7 +22,7 @@ try{
       window.__crowd(tier,variant);
       return window.__sceneRoot().children.filter(body=>body.userData.walker&&body.visible).map(body=>({
         key:body.userData.roster?.key,country:body.userData.roster?.country,wealth:body.userData.roster?.wealth,
-        kind:body.userData.walker.v.id,shirt:body.userData.walker.chest.children.find(part=>part.isMesh).material.color.getHex()
+        kind:body.userData.walker.v.id,shirt:Array.from(body.userData.walker.chest.children.find(part=>part.isMesh).geometry.getAttribute('color').array.slice(0,3))
       }));
     },{tier,variant});
     check('venue-pool:'+tier+':'+variant,actual.length===expected.length&&actual.every((row,i)=>row.key===expected[i].key&&row.kind===expected[i].id&&row.country===host.country&&row.wealth===host.wealth),{host:host.name,actual,expected});

@@ -1,0 +1,3101 @@
+diff --git a/tools/face-gate.mjs b/tools/face-gate.mjs
+index de1d050..1e57304 100644
+--- a/tools/face-gate.mjs
++++ b/tools/face-gate.mjs
+@@ -119,16 +119,14 @@ try {
+       // 얼굴 형태 표본은 키커의 정체성을 직접 쓰고, 헤어 선반은 구매하지 않은 키퍼의 맨턱을 쓴다.
+       if (rank === undefined) lk.face = r.faceOf(name);
+       return beard === undefined ? lk
+-        : Object.assign({}, lk, { face: Object.assign({}, lk.face, { beard, beardShape: "full" }) });
++        : Object.assign({}, lk, { face: Object.assign({}, lk.face, { beard }) });
+     };
+     const one = async (kind, name, rank) => {
+       const own = rank === undefined ? r.faceOf(name).beard : 0;
+       // 민 얼굴이 기준 틀이다. 수염이 실루엣을 바꾸므로 눈과 입 자리는 수염 없는 쪽에서 읽는다.
+-      // 머리 중심과 기존 AIM을 공유하여 수염 유무가 투영을 바꾸지 못하게 한다.
+-      const projection = { part: "head" };
+-      const hb = m.headBox(kind, body, wear(name, 0, rank), projection);
++      const hb = m.headBox(kind, body, wear(name, 0, rank));
+       const off = await read(hb.url);
+-      const on = await read(m.thumbURL(kind, body, wear(name, own ? undefined : 2, rank), projection));
++      const on = await read(m.thumbURL(kind, body, wear(name, own ? undefined : 2, rank)));
+       const w = off.w;
+       const h = off.h;
+       const R = hb.ry * h;
+diff --git a/tools/hudlink-gate.mjs b/tools/hudlink-gate.mjs
+index 8eec6ec..ceb1807 100644
+--- a/tools/hudlink-gate.mjs
++++ b/tools/hudlink-gate.mjs
+@@ -4,7 +4,7 @@ import { readFileSync, mkdirSync } from 'node:fs';
+ import { fileURLToPath } from 'node:url';
+ import { HUD_LINKS } from '../web/src/ui/links.mjs';
+ 
+-// Reuses keys-gate's Playwright browser, presets and served-parent route control.
++// keys 게이트의 브라우저와 프리셋, 과거 파일 응답 대조군을 재사용한다.
+ const ROOT = new URL('../', import.meta.url);
+ const BASE = 'http://127.0.0.1:10310/web/index.html';
+ const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
+@@ -38,7 +38,7 @@ try {
+     p.setDefaultTimeout(8000);
+     p.on('pageerror', (e) => errors.push(e.message));
+     if (mode) {
+-      const paths = mode === 'baseline' ? ['web/index.html', 'web/src/main.mjs', 'web/src/ui/hud.css'] : ['web/src/main.mjs'];
++      const paths = ['web/index.html', 'web/src/main.mjs', 'web/src/ui/hud.css'];
+       for (const path of paths) {
+         // The 24px target floor owns geometry; the older routing failure remains the behavior control.
+         const body = parent(path, mode === 'baseline' ? 'e373e2f' : '1e46fcd');
+@@ -47,7 +47,14 @@ try {
+         }));
+       }
+     }
++    // 과거 진입점의 의존 모듈 전체를 같은 커밋에서 읽는다.
++    if (mode) await p.route(/\/(?:web\/src|src)\/.*\.mjs(?:\?.*)?$/, route => {
++      const path = new URL(route.request().url()).pathname.slice(1);
++      return route.fulfill({contentType:'text/javascript', body:parent(path, mode === 'baseline' ? 'e373e2f' : '1e46fcd')});
++    });
++    const bootError = new Promise((_, reject) => p.once('pageerror', e => reject(new Error('boot: ' + e.message))));
+     await p.goto(BASE + '?seed=20&preset=rich,famous,veteran');
++    await Promise.race([bootError, p.waitForFunction(() => typeof window.__lockRound === 'function')]);
+     await p.click('#go', { force: true });
+     await p.waitForFunction(() => document.getElementById('title').hidden && getComputedStyle(document.getElementById('hud')).opacity === '1');
+     await p.evaluate(() => { window.__lockRound(); return document.fonts.ready; });
+diff --git a/tools/passer-pool-gate.mjs b/tools/passer-pool-gate.mjs
+index f020201..791e8f8 100644
+--- a/tools/passer-pool-gate.mjs
++++ b/tools/passer-pool-gate.mjs
+@@ -22,7 +22,7 @@ try{
+       window.__crowd(tier,variant);
+       return window.__sceneRoot().children.filter(body=>body.userData.walker&&body.visible).map(body=>({
+         key:body.userData.roster?.key,country:body.userData.roster?.country,wealth:body.userData.roster?.wealth,
+-        kind:body.userData.walker.v.id,shirt:body.userData.walker.chest.children.find(part=>part.isMesh).material.color.getHex()
++        kind:body.userData.walker.v.id,shirt:Array.from(body.userData.walker.chest.children.find(part=>part.isMesh).geometry.getAttribute('color').array.slice(0,3))
+       }));
+     },{tier,variant});
+     check('venue-pool:'+tier+':'+variant,actual.length===expected.length&&actual.every((row,i)=>row.key===expected[i].key&&row.kind===expected[i].id&&row.country===host.country&&row.wealth===host.wealth),{host:host.name,actual,expected});
+diff --git a/tools/passer-roster-gate.mjs b/tools/passer-roster-gate.mjs
+index 3aa699f..1e20af4 100644
+--- a/tools/passer-roster-gate.mjs
++++ b/tools/passer-roster-gate.mjs
+@@ -3,12 +3,32 @@ import {mkdirSync,writeFileSync} from 'node:fs';
+ import {CITY_SKINS,venueAt} from '../web/src/state/gear.mjs';
+ import {passerCountAt,passerPoolAt,passerRosterAt,passerPoolErrors} from '../web/src/state/passer.mjs';
+ import * as THREE from '../web/vendor/three.module.min.js';
+-import {buildPassers,setPasserRoster} from '../web/src/render/objects/pitch.mjs';
++import {chromium} from 'playwright';
+ import {PASSER_VARIANTS} from '../web/src/render/objects/actors.mjs';
+ const rows=[];
+-const scene=new THREE.Group();
+-// 최상위 시설의 인원만 한 번 만들고 같은 루트를 모든 개최지로 갈아입힌다.
+-const bodies=buildPassers(scene,passerCountAt(CITY_SKINS.length-1));
++const browser=await chromium.launch({executablePath:process.env.LOCALAPPDATA+'/ms-playwright/chromium-1228/chrome-win64/chrome.exe'});
++let rendered;
++try {
++  const page=await browser.newPage();
++  await page.goto('http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran');
++  rendered=await page.evaluate(async()=>{
++    const T=await import('/web/vendor/three.module.min.js');
++    const {buildPassers,setPasserRoster}=await import('/web/src/render/objects/pitch.mjs');
++    const {CITY_SKINS}=await import('/web/src/state/gear.mjs');
++    const {passerCountAt}=await import('/web/src/state/passer.mjs');
++    const stage=new T.Group(),bodies=buildPassers(stage,passerCountAt(CITY_SKINS.length-1)),surfaces={};
++    for(const [tier,hosts] of CITY_SKINS.entries())for(const [variant] of hosts.entries()){
++      setPasserRoster(bodies,tier,variant);
++      surfaces[tier+':'+variant]=bodies.slice(0,passerCountAt(tier)).map(body=>{
++        const mesh=body.userData.walker.chest.children.find(part=>part.isMesh);
++        // 승인된 병합 몸의 첫 정점은 상의다. 재질의 흰 곱색 대신 실제 정점색을 읽는다.
++        const shirt=new T.Color().fromBufferAttribute(mesh.geometry.getAttribute('color'),0).getHex();
++        return {key:body.userData.roster.key,id:body.userData.variantId,shirt};
++      });
++    }
++    return surfaces;
++  });
++}finally{await browser.close();}
+ for(const [tier,hosts] of CITY_SKINS.entries())for(const [variant,host] of hosts.entries()){
+   const pool=passerPoolAt(tier,variant),selected=passerRosterAt(tier,variant);
+   assert.deepEqual(passerPoolErrors(pool,host),[]);
+@@ -16,16 +36,14 @@ for(const [tier,hosts] of CITY_SKINS.entries())for(const [variant,host] of hosts
+   assert.ok(selected.every(row=>pool.includes(row)));
+   assert.ok(new Set(selected.map(row=>row.id)).size>1);
+   if(tier)assert.ok(pool.length>passerPoolAt(tier-1,variant).length);
+-  setPasserRoster(bodies,tier,variant);
+-  const actual=bodies.slice(0,selected.length).map((body,i)=>{
++  const actual=rendered[tier+':'+variant].map((body,i)=>{
+     const outfit=selected[i],base=PASSER_VARIANTS.find(row=>row.id===outfit.id);
+     // 제품 계약의 일상복 20%·외출복 55% 색 혼합을 실제 상의 재질에서 독립적으로 확인한다.
+     const wanted=new THREE.Color(base.shirt).lerp(new THREE.Color(outfit.shirt),outfit.clothing==='외출복'?0.55:0.2).getHex();
+-    const material=body.userData.walker.chest.children.find(part=>part.isMesh).material;
+-    assert.equal(material.color.getHex(),wanted);
+-    assert.equal(body.userData.roster.key,outfit.key);
+-    assert.equal(body.userData.variantId,outfit.id);
+-    return {key:body.userData.roster.key,shirt:material.color.getHex(),wanted};
++    assert.equal(body.shirt,wanted);
++    assert.equal(body.key,outfit.key);
++    assert.equal(body.id,outfit.id);
++    return {...body,wanted};
+   });
+   const single=pool.map(row=>({...row,id:pool[0].id}));
+   assert.ok(passerPoolErrors(single,host).includes('단일 주민 종류'));
+diff --git a/tools/perf-gate.mjs b/tools/perf-gate.mjs
+index 0052d56..233e43d 100644
+--- a/tools/perf-gate.mjs
++++ b/tools/perf-gate.mjs
+@@ -4,11 +4,21 @@
+ import { chromium } from 'playwright';
+ import { execFileSync } from 'node:child_process';
+ import { clearDraw } from './draw.mjs';
++import { mkdirSync, writeFileSync } from 'node:fs';
++
++const EVIDENCE = new URL('../.omo/evidence/p29/', import.meta.url);
++mkdirSync(EVIDENCE, { recursive: true });
++const LOAD_MS = 35; // 기존 20ms 예산을 확실히 넘는 실제 작업을 심어 하강 축을 검증한다.
++const LOAD_SPAN = 7000; // 네 단계 하강 뒤에도 부하를 유지해 하한에서 멈추는지 잰다.
++const RECOVER_WAIT = 22000; // 네 단계의 느린 회복 창과 공유 기계 여유를 포함한다.
++const SETTLE_WAIT = 20000; // 기본 화면으로 돌아온 뒤 배율이 안정될 때까지 기다리는 상한이다.
++const STABLE_MS = 3000; // 세 판단 창 동안 같은 배율이어야 기존 프레임 계측을 시작한다.
++const HEADROOM = { width: 320, height: 180 }; // 실제 그리기 면적을 줄여 회복 축에 GPU 여유를 제공한다.
+ 
+ const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
+-const URL = 'http://127.0.0.1:10310/web/index.html?seed=11';
++const PAGE_URL = 'http://127.0.0.1:10310/web/index.html?seed=11';
+ 
+-const die = setTimeout(() => { console.log('WATCHDOG'); process.exit(1); }, 85000);
++const die = setTimeout(() => { console.log('WATCHDOG'); process.exit(1); }, 150000); // 부하·회복·안정화와 기존 프레임 표본을 모두 수집할 실행 시간이다.
+ die.unref();
+ 
+ function pct(sorted, p) {
+@@ -36,13 +46,50 @@ try {
+   page.on('pageerror', (e) => errors.push(String(e)));
+   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+ 
+-  await page.goto(URL, { waitUntil: 'load' });
++  await page.goto(PAGE_URL, { waitUntil: 'load' });
+   await page.waitForTimeout(900);
+   await page.click('#go', { force: true });
+   // 개봉 카드를 닫은 실제 경기에서 프레임과 기하 예산을 함께 잰다.
+   if (!await clearDraw(page)) throw Error('개봉 판이 닫히지 않아 경기를 측정할 수 없음');
+   await page.waitForTimeout(1200);
+ 
++  // 합성 시간값을 주입하지 않는다. 실제 rAF 작업으로 느리게 만들고 실제 캔버스로 하강과 복원을 읽는다.
++  await page.setViewportSize(HEADROOM);
++  if (await page.evaluate(() => Boolean(window.__resolutionState))) {
++    await page.waitForFunction(() => window.__resolutionState().scale === 1, null, { timeout: RECOVER_WAIT }); // 시작 화면의 부하가 남아 있으면 양성 대조군 전에 실제 여유로 복원한다.
++  }
++  const adaptive = await page.evaluate(async ({ loadMs, span }) => {
++    if (!window.__resolutionState) return { missing: true };
++    const before = window.__resolutionState(), samples = [];
++    const start = performance.now();
++    await new Promise(resolve => {
++      function heavy() {
++        const tick = performance.now();
++        while (performance.now() - tick < loadMs) { /* 해상도 하강을 유발할 실제 작업이다. */ }
++        samples.push(window.__resolutionState());
++        if (performance.now() - start < span) requestAnimationFrame(heavy);
++        else resolve();
++      }
++      requestAnimationFrame(heavy);
++    });
++    return { before, samples, loaded: window.__resolutionState() };
++  }, { loadMs: LOAD_MS, span: LOAD_SPAN });
++  if (!adaptive.missing) {
++    try {
++      await page.waitForFunction(() => window.__resolutionState().scale === 1, null, { timeout: RECOVER_WAIT });
++      adaptive.recovered = await page.evaluate(() => window.__resolutionState());
++    } catch (error) { adaptive.recoveryError = String(error); }
++  }
++  await page.setViewportSize({ width: 1280, height: 720 });
++  try {
++    await page.waitForFunction(stable => {
++      const state = window.__resolutionState?.();
++      return state && state.mean !== null && performance.now() - state.lastChange >= stable;
++    }, STABLE_MS, { timeout: SETTLE_WAIT });
++    adaptive.settled = await page.evaluate(() => window.__resolutionState());
++  } catch (error) { adaptive.settleError = String(error); }
++  writeFileSync(new URL('adaptive.json', EVIDENCE), JSON.stringify(adaptive, null, 2));
++
+   const out = await page.evaluate(() => new Promise((resolve) => {
+     const frames = [];
+     // 실제 걷는 행인의 정점 버전은 0회 변해야 한다. 배치 행렬 갱신은 이 버전에 포함되지 않는다.
+@@ -88,6 +135,18 @@ try {
+       : detail,
+   ]);
+ 
++  ok('resolution:heavy-load-lowers-the-actual-buffer', !adaptive.missing
++    && adaptive.loaded.scale < adaptive.before.scale
++    && adaptive.loaded.canvas[0] < adaptive.before.canvas[0], JSON.stringify(adaptive.loaded ?? adaptive));
++  ok('resolution:sustained-load-reaches-and-keeps-the-quality-floor', !adaptive.missing
++    && adaptive.samples.length > 0 && adaptive.loaded.scale === adaptive.loaded.floor
++    && adaptive.samples.every(s => s.scale >= s.floor && s.dpr >= Math.min(1, s.baseDpr)),
++    JSON.stringify({ samples: adaptive.samples?.length, floor: adaptive.loaded?.floor, scale: adaptive.loaded?.scale }));
++  ok('resolution:headroom-restores-the-full-buffer', Boolean(adaptive.recovered)
++    && adaptive.recovered.scale === 1 && adaptive.recovered.dpr === adaptive.before.baseDpr
++    && adaptive.recovered.canvas[0] === adaptive.before.canvas[0], JSON.stringify(adaptive.recovered ?? adaptive.recoveryError));
++  ok('resolution:frame-budget-was-measured-after-settling', Boolean(adaptive.settled), JSON.stringify(adaptive.settled ?? adaptive.settleError));
++
+   // 대조군. 계측기가 실제로 시간을 재는지부터 증명한다.
+   const stall = await page.evaluate(() => {
+     const t0 = performance.now();
+@@ -124,6 +183,8 @@ try {
+     console.log('  ' + (pass ? 'ok  ' : 'FAIL') + ' ' + name + ' ' + detail);
+   }
+   console.log('perf ' + (bad ? 'FAIL ' + bad : 'PASS ' + rows.length));
++  writeFileSync(new URL('perf.json', EVIDENCE), JSON.stringify({ invocation: 'node tools/perf-gate.mjs', machineLoad, adaptive,
++    p50, p95, p99, worst, rows, errors, out, pass: bad === 0 }, null, 2));
+   process.exitCode = bad ? 1 : 0;
+ } finally {
+   clearTimeout(die);
+diff --git a/tools/product-pop-gate.mjs b/tools/product-pop-gate.mjs
+index 7a74f5f..c8635b6 100644
+--- a/tools/product-pop-gate.mjs
++++ b/tools/product-pop-gate.mjs
+@@ -49,7 +49,7 @@ function verdict(name, status, detail) {
+ function measure(policy, level, mode, contrast = null, coupledShots = false) {
+   const gains = (policy === 'fixed-order' ? [] : contrast ? [contrast] : PATH).map(stat => ({ stat, eligible: 0, tested: 0, baseSaved: 0, bumpSaved: 0, n10: 0, n01: 0, samples: [] }));
+   let conceded = 0, tested = 0, gold = 0;
+-  const causes = {};
++  const causes = {}, goldSamples = [];
+   for (let s = 0; s < BALLS / 5; s++) {
+     if (Date.now() - started >= WATCHDOG) { console.error('product-pop FAIL watchdog'); process.exit(1); }
+     const source = makeRng(1000003 + s + level * 7919);
+@@ -63,6 +63,7 @@ function measure(policy, level, mode, contrast = null, coupledShots = false) {
+       return { ...keeper, [g.stat]: contrast ? 10 : Math.min(10, keeper[g.stat] + 1) };
+     });
+     const before = gains.map(g=>({n10:g.n10,n01:g.n01,tested:g.tested}));
++    const goldBefore = gold;
+     for (const shot of shots) {
+       // 한 구마다 정책과 판정의 씨앗을 고정해 스탯 변화가 다음 구를 밀지 않는다.
+       const shotSeed = 1000003 + s * 7919 + level * 31 + shot.index;
+@@ -86,6 +87,8 @@ function measure(policy, level, mode, contrast = null, coupledShots = false) {
+       }
+     }
+     gains.forEach((g,i)=>g.samples.push([g.n01-before[i].n01-g.n10+before[i].n10,g.tested-before[i].tested]));
++    // 분모 1은 같은 다섯 슛 세트 하나다. 구매 간격의 수입 표본을 별도 난수 없이 보존한다.
++    if (policy === "coach" && !contrast) goldSamples.push([gold-goldBefore,1]);
+   }
+   for (const g of gains) {
+     g.eligibility = g.eligible / (BALLS / 5);
+@@ -93,9 +96,10 @@ function measure(policy, level, mode, contrast = null, coupledShots = false) {
+     // McNemar normal approximation: paired 95% half-width =
+     // 1.96 * sqrt(n10 + n01) / tested * 100 (discordant tested balls).
+     g.hw = g.tested ? 1.96 * Math.sqrt(g.n10 + g.n01) / g.tested * 100 : NaN;
+-    if (g.tested) resolution(`product-pop/${mode}/${policy}/L${level}/${g.stat}/${contrast ? "contrast" : "one"}`,g.samples);
++    if (g.tested) resolution(`product-pop/${mode}/${policy}/L${level}/${g.stat}/${contrast ? "contrast" : "one"}${coupledShots ? "/coupled-control" : ""}`,g.samples);
+   }
+-  return { policy, level, mode, conceded, tested, nonconcession: 100 * (BALLS - conceded) / BALLS, testedSave: 100 * (tested - conceded) / tested, gains, causes, goldPerSet: gold / (BALLS / 5) };
++  if (goldSamples.length) resolution(`product-pop/${mode}/${policy}/L${level}/gold${coupledShots ? "/coupled-control" : ""}`,goldSamples,1);
++  return { goldSamples, policy, level, mode, conceded, tested, nonconcession: 100 * (BALLS - conceded) / BALLS, testedSave: 100 * (tested - conceded) / tested, gains, causes, goldPerSet: gold / (BALLS / 5) };
+ }
+ 
+ console.log(`product-pop balls=${BALLS}/cell keepers=${BALLS / 5} shots/keeper=5 seed=1000003 + s + level*7919; s starts at 0`);
+@@ -237,6 +241,10 @@ for (const mode of ['hand-follow', 'bot']) {
+   const anchors = LEVELS.map(level => rows.find(r => r.mode === mode && r.policy === 'coach' && r.level === level));
+   console.log(`gold-per-set: ${mode}/coach ${anchors.map(r => `L${r.level}=${f(r.goldPerSet)}`).join(' ')}; linear between anchors, last slope extended to L30; coinGain(conceded,fame,untested) over 5 shots`);
+   const { bought, gaps, longest, status, exception } = purchaseWalk(anchors, mode);
++  // HOTL 가설: 각 레벨의 같은 시드 블록을 함께 재표집해 수입→구매 간격의 전파 오차를 잰다.
++  // 열 두 개는 수입 합과 세트 수의 짝이고 배율 1은 원 단위인 세트 간격을 유지한다.
++  resolution(`product-pop/${mode}/purchase-gap`,anchors[0].goldSamples.map((_,i)=>anchors.flatMap(a=>a.goldSamples[i])),1,
++    sums=>purchaseWalk(anchors.map((a,i)=>({...a,goldPerSet:sums[i*2]/sums[i*2+1]})),mode).longest.gap);
+   verdict('deadend:the-next-purchase-or-unlock-is-within-N-sets', status, status === 'ACCEPTED'
+     ? `${mode} longest=${longest.gap} <= bound ${exception.bound} at ${exception.where}; accepted asymmetry, ${exception.record}; N=${N_SETS} remains the trigger elsewhere`
+     : `${mode} N=${N_SETS} sets; purchases=${bought}/${purchases.length} within 400 sets; gaps=${gaps.join(',')}; longest=${longest?.gap ?? 'unavailable'} sets${longest ? ` at sets ${longest.from}->${longest.set} ${longest.purchase.name} cost=${longest.purchase.cost}` : ''}; HOTL hypothesis, lap record decides the red`);
+diff --git a/tools/resolution-gate.mjs b/tools/resolution-gate.mjs
+index 1138ebf..41dcfb1 100644
+--- a/tools/resolution-gate.mjs
++++ b/tools/resolution-gate.mjs
+@@ -9,7 +9,7 @@ const browser=await chromium.launch({executablePath:process.env.LOCALAPPDATA+'/m
+ const rows=[],errors=[];
+ try{
+   for(const pixel of [false,true])for(const [width,height] of [[1280,720],[844,390],[740,360]]){ // 과제의 데스크톱과 두 가로 모바일 화면에서 같은 스위치를 잰다.
+-    const dpr=width===844?3:1; // 고밀도 가로 폰에서도 기본 버퍼가 기기 해상도를 그대로 쓰는지 확인한다.
++    const dpr=width===844?3:1; // 고밀도 가로 폰은 DPR 상한과 실제 버퍼를 함께 검증한다.
+     const ctx=await browser.newContext({viewport:{width,height},deviceScaleFactor:dpr});await pinClock(ctx);
+     const page=await ctx.newPage();page.on('pageerror',e=>errors.push(String(e)));
+     await page.goto('http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran'+(pixel?'&pix=1':''));
+@@ -26,10 +26,11 @@ try{
+         const live=read();c.fillStyle='white';c.fillRect(0,0,cv.width,cv.height);const flat=read();c.putImageData(image,0,0); // 균일 원판을 심어 부드러운 가장자리 측정의 양성 대조군으로 쓴다.
+         alpha={live,flat};
+       }
+-      return {...s,contacts:contacts.length,alpha,pcf:s.shadowType===T.PCFShadowMap};
++      return {...s,resolution:window.__resolutionState(),contacts:contacts.length,alpha,pcf:s.shadowType===T.PCFShadowMap};
+     });
+     const soft=a=>Boolean(a&&a.center>a.edge&&a.edge===0);
+-    const checks={nativeDpr:pixel||actual.dpr===dpr,switch:actual.on===pixel&&actual.filtered===pixel,resolution:pixel?actual.rt[1]<actual.canvas[1]||height<actual.rt[1]:actual.rt.every((v,i)=>v===actual.canvas[i]),stencil:actual.stencil,lights:actual.lights.filter(x=>x==='HemisphereLight').length===1&&actual.lights.filter(x=>x==='DirectionalLight').length===1,pcf:actual.pcf,contacts:actual.contacts>0,soft:soft(actual.alpha?.live),flatControl:!soft(actual.alpha?.flat)}; // 동일 스위치, 실제 버퍼, 두 조명과 접촉 음영을 각각 판정한다.
++    // DPR 상한 2는 Canvas 선행 구현의 기본값이며 하한 1은 CSS 화소를 보존하는 품질 계약이다.
++    const checks={boundedDpr:actual.dpr<=Math.min(dpr,2)&&actual.dpr>=Math.min(dpr,1)&&actual.dpr===actual.resolution.baseDpr*actual.resolution.scale,directCanvas:actual.intermediate===pixel,switch:actual.on===pixel&&actual.filtered===pixel,resolution:pixel?actual.rt[1]<actual.canvas[1]||height<actual.rt[1]:actual.rt.every((v,i)=>v===actual.canvas[i]),stencil:actual.stencil,lights:actual.lights.filter(x=>x==='HemisphereLight').length===1&&actual.lights.filter(x=>x==='DirectionalLight').length===1,pcf:actual.pcf,contacts:actual.contacts>0,soft:soft(actual.alpha?.live),flatControl:!soft(actual.alpha?.flat)}; // 동일 스위치, 실제 버퍼, 두 조명과 접촉 음영을 각각 판정한다.
+     rows.push({pixel,width,height,actual,checks});
+     if(pixel&&width===1280)await page.screenshot({path:fileURLToPath(new URL('pixel-opt-in-1280x720.jpg',out)),type:'jpeg',quality:85}); // 선택한 픽셀판도 같은 크기의 JPEG 증거로 남긴다.
+     const errorStart=errors.length;
+diff --git a/tools/seed-resolution.mjs b/tools/seed-resolution.mjs
+index 9f6f757..3ae4d7e 100644
+--- a/tools/seed-resolution.mjs
++++ b/tools/seed-resolution.mjs
+@@ -9,17 +9,19 @@ const BLOCKS = 50;
+ const REPLICATES = 1000;
+ // HOTL 가설: 양측 95% 구간은 작은 가드 변동을 결함으로 오인하지 않기 위한 이번 랩의 해상도다.
+ const TAIL = 0.025;
+-// 고정 재표집 시드는 제품 난수와 별개라 게이트의 결정론 재현을 유지한다.
++// 2803은 P28-U3의 식별자를 재표집 시드로 쓴 값이며 제품 난수와 독립해 결정론 재현을 유지한다.
+ const SEED = 2803;
+ 
+-export function resolution(name, observations, scale = 100) {
++// 기본 배율 100은 비율을 퍼센트로 출력한다. 수입과 세트 간격은 배율 1로 원 단위를 유지한다.
++export function resolution(name, observations, scale = 100, statistic = null) {
+   if (!observations.length) throw new Error('해상도 표본 없음: '+name);
+   const width = observations[0].length;
+   const blocks = Array.from({length:Math.min(BLOCKS,observations.length)},()=>Array(width).fill(0));
+   observations.forEach((row,i)=>row.forEach((value,j)=>{ blocks[Math.floor(i*blocks.length/observations.length)][j]+=value; }));
+   const total=blocks.reduce((sum,row)=>sum.map((v,j)=>v+row[j]),Array(width).fill(0));
+   // 열 둘은 비율 하나, 열 넷은 같은 시드의 두 비율 차다. 0 분모는 정밀 부족이며 통과로 간주하지 않는다.
+-  const estimate = row => row[0]/row[1]-(width===4 ? row[2]/row[3] : 0);
++  // 파생 구매 간격은 동일 블록의 수입 앵커를 기존 구매 순회에 넣는다. 판정 문턱에는 쓰지 않는다.
++  const estimate = statistic || (row => row[0]/row[1]-(width===4 ? row[2]/row[3] : 0));
+   const point=estimate(total)*scale, rng=makeRng(SEED), draws=[];
+   for(let b=0;b<REPLICATES;b++) {
+     const sum=Array(width).fill(0);
+diff --git a/tools/shelf-gate.mjs b/tools/shelf-gate.mjs
+index 24d801b..325041a 100644
+--- a/tools/shelf-gate.mjs
++++ b/tools/shelf-gate.mjs
+@@ -1,5 +1,5 @@
+ import { chromium } from "playwright";
+-import { GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, TATTOOS } from "../web/src/state/gear.mjs";
++import { SHELF_WORDS } from "../web/src/state/shelf.mjs";
+ import { BOTS } from "../web/src/state/bot.mjs";
+ import { BUFFS } from "../web/src/state/buff.mjs";
+ 
+@@ -16,8 +16,7 @@ t.unref();
+ // 데이터가 늘어난 날 문서와 화면이 같이 틀리고 아무도 모른다.
+ const WANT = {
+   pull: 1,
+-  glove: GLOVES.length, boot: BOOTS.length, kit: KITS.length, sock: SOCKS.length,
+-  frame: GOALS.length, city: CITIES.length, hair: HAIRS.length, ink: TATTOOS.length,
++  ...Object.fromEntries(Object.entries(SHELF_WORDS).map(([key, shelf]) => [key, shelf.list.length])),
+   bot: BOTS.length, buff: BUFFS.length
+ };
+ 
+diff --git a/tools/skin-gate.mjs b/tools/skin-gate.mjs
+index 79c34b7..85800bc 100644
+--- a/tools/skin-gate.mjs
++++ b/tools/skin-gate.mjs
+@@ -36,6 +36,23 @@ try {
+   await p.reload({ waitUntil: "load" });
+   await p.waitForSelector("#go", { timeout: 15000 });
+   await p.click("#go", { force: true });
++  // condition-gate의 저장 경로로 외형 비교 전에 구매 조건만 충족한다.
++  await p.evaluate(async () => {
++    window.__persist();
++    const key = window.__saveKey(), data = JSON.parse(localStorage.getItem(key));
++    const gear = await import("/web/src/state/gear.mjs"), keeper = data.squad[data.pick];
++    for (const list of [gear.HAIRS, gear.TATTOOS, gear.GLOVES, gear.BOOTS, gear.KITS, gear.SOCKS]) {
++      for (const item of list) if (item.condition) {
++        const {key:field,min} = item.condition;
++        if (field === "fans") data.fans = Math.max(data.fans, min);
++        else keeper[field] = Math.max(keeper[field], min);
++      }
++    }
++    data.keeper = structuredClone(keeper);
++    localStorage.setItem(key, JSON.stringify(data));
++  });
++  await p.goto(BASE.split("&preset=")[0], {waitUntil:"load"});
++  await p.click("#go", {force:true});
+   const from = await p.evaluate(() => window.__frames());
+   await p.waitForFunction((n) => window.__frames() >= n, from + LEAD, { timeout: 20000 });
+   // 세계를 멈춘다. 이 뒤의 두 장이 다르면 그 차이는 시간이 아니라 스킨이다.
+diff --git a/tools/tabicon-gate.mjs b/tools/tabicon-gate.mjs
+index 6f86d10..7a657d7 100644
+--- a/tools/tabicon-gate.mjs
++++ b/tools/tabicon-gate.mjs
+@@ -1,4 +1,8 @@
+ import { chromium } from "playwright";
++import { SHELF_WORDS } from "../web/src/state/shelf.mjs";
++import { mkdirSync } from "node:fs";
++// 등급 선반 외 이적시장과 봇과 버프도 아이콘을 가진다.
++const EXPECTED = [...Object.keys(SHELF_WORDS), "pull", "bot", "buff"];
+ 
+ // 상점 탭 아이콘의 자. 열한 칸이 글자로만 서 있으면 어느 칸이 무엇을 파는지 매번 읽어야 한다.
+ //
+@@ -32,35 +36,50 @@ try {
+   await p.evaluate(() => window.__shop(true));
+   await p.waitForTimeout(320);
+ 
+-  const scan = await p.evaluate(() => {
++  const scan = await p.evaluate(async () => {
+     const tabs = [...document.querySelectorAll("#shop .tab")];
+-    return tabs.map((e) => {
++    const rows = [];
++    for (const original of tabs) {
++      const key = original.dataset.tab;
++      document.querySelector('#shop .tab[data-tab="' + key + '"]').click();
++      // maxview와 같은 전환 대기로 선택 탭이 띠 안에 도착한 뒤 읽는다.
++      await new Promise(resolve => setTimeout(resolve, 320));
++      const e = document.querySelector('#shop .tab[data-tab="' + key + '"]');
+       const svg = e.querySelector("svg");
+       const label = e.querySelector("span");
+       const r = e.getBoundingClientRect();
+-      return {
++      const strip = e.parentElement.getBoundingClientRect();
++      const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
++      rows.push({
+         tab: e.dataset.tab,
++        bounds: {left:r.left,right:r.right,top:r.top,bottom:r.bottom,stripLeft:strip.left,stripRight:strip.right,hit:at?.className},
+         icons: e.querySelectorAll("svg").length,
+         // 그림 자체를 지문으로 삼는다. 두 칸이 같은 사각형 묶음을 쓰면 같은 문자열이 나온다.
+         ink: svg ? [...svg.querySelectorAll("rect")].map((q) => q.getAttribute("x") + "," + q.getAttribute("y") + "," + q.getAttribute("width") + "," + q.getAttribute("height")).join(" ") : "",
+         named: svg ? (svg.getAttribute("aria-label") || "") : "",
+         words: label ? label.textContent.trim() : "",
+-        onScreen: r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth
+-      };
+-    });
++        // 기울어진 장식 테두리가 아닌 사람이 읽는 그림과 이름의 사각형을 잰다.
++        onScreen: [svg,label].every(node => {
++          if (!node) return false;
++          const q = node.getBoundingClientRect();
++          return q.top >= 0 && q.bottom <= innerHeight && q.left >= Math.max(0, strip.left) && q.right <= Math.min(innerWidth, strip.right);
++        }) && Boolean(at && e.contains(at))
++      });
++    }
++    return rows;
+   });
+ 
+-  check("instrument:the-shop-showed-its-tabs", scan.length === 11, scan.length + " tabs");
++  check("instrument:the-shop-showed-its-tabs", scan.length === EXPECTED.length && EXPECTED.every(key => scan.some(row => row.tab === key)), scan.length + " tabs");
+   check("tabicon:every-tab-carries-exactly-one-icon", scan.every((s) => s.icons === 1),
+-    scan.filter((s) => s.icons !== 1).map((s) => s.tab + ":" + s.icons).join(", ") || "11 of 11");
++    scan.filter((s) => s.icons !== 1).map((s) => s.tab + ":" + s.icons).join(", ") || scan.length + " of " + EXPECTED.length);
+   check("tabicon:every-tab-keeps-its-name-beside-the-icon", scan.every((s) => s.words.length > 0),
+     scan.filter((s) => !s.words).map((s) => s.tab).join(", ") || scan.map((s) => s.words).join(" "));
+   const shapes = new Set(scan.map((s) => s.ink));
+   check("tabicon:no-two-tabs-draw-the-same-shape", shapes.size === scan.length, shapes.size + " distinct of " + scan.length);
+   const names = new Set(scan.map((s) => s.named));
+   check("tabicon:every-icon-names-itself-for-a-reader", names.size === scan.length && !names.has(""), names.size + " labels");
+-  check("tabicon:every-tab-is-inside-the-viewport", scan.every((s) => s.onScreen),
+-    scan.filter((s) => !s.onScreen).map((s) => s.tab).join(", ") || "11 on screen");
++  check("tabicon:each-selected-icon-and-name-is-visible", scan.every((s) => s.onScreen),
++    scan.filter((s) => !s.onScreen).map((s) => s.tab + ":" + JSON.stringify(s.bounds)).join(", ") || scan.length + " selected tabs on screen");
+ 
+   // 대조군 하나. 같은 칸을 두 번 읽으면 같은 지문이 나와야 한다. 안 그러면 위의 다름은 잡음이다.
+   const again = await p.evaluate(() => {
+@@ -134,10 +153,12 @@ try {
+     document.body.appendChild(board);
+   });
+   await p.waitForTimeout(200);
+-  const BOARD = "tabicons.local.png";
+-  await p.screenshot({ path: BOARD });
++  const OUT = process.env.GTG_EVIDENCE_DIR || ".omo/evidence/";
++  mkdirSync(OUT, {recursive:true});
++  const BOARD = OUT + "/tabicons.jpg";
++  await p.screenshot({ path: BOARD, type:"jpeg" });
+   const cells = await p.evaluate(() => document.querySelectorAll("#iconBoard > div").length);
+-  check("instrument:a-board-for-the-eye-was-baked", cells === 11, cells + " icons at 120px in " + BOARD);
++  check("instrument:a-board-for-the-eye-was-baked", cells === EXPECTED.length, cells + " icons at 120px in " + BOARD);
+ 
+   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
+   await ctx.close();
+diff --git a/tools/tailstart-gate.mjs b/tools/tailstart-gate.mjs
+index 649e36c..7c76c10 100644
+--- a/tools/tailstart-gate.mjs
++++ b/tools/tailstart-gate.mjs
+@@ -2,6 +2,11 @@ import { chromium } from "playwright";
+ import { readFileSync } from "node:fs";
+ import { execFileSync } from "node:child_process";
+ import { pinClock } from "./clock.mjs";
++import { makeRng, newKeeper, rollForm, buildSet, botPlan, positionInput } from "./position-pop.mjs";
++import { resolve as judge } from "../src/chain.mjs";
++import { defaultEleven, kickerByName } from "../src/roster.mjs";
++import { applyPreset } from "../web/src/state/inject.mjs";
++import { aimLine } from "../web/src/ui/callout.mjs";
+ 
+ // 사건이 언제 시작하는가의 자. 판정은 공이 날아가기 전에 이미 끝나 있고 화면은 그것을 연기한다.
+ // 그런데 첫 사건이 착탄 0.9초 뒤에 시작해서, 막은 공은 흙에 서 있다가 장갑으로 뛰어오르고
+@@ -142,6 +147,30 @@ try {
+     seen.push(url.split("seed=")[1].split("&")[0] + ":" + got.length);
+     for (const x of got) all.push(x);
+   }
++  // 현재 판정으로 첫 슛이 헛구인 시드만 후보로 고른 뒤, 실제 브라우저 다섯 구로 확인한다.
++  // 무입력 자취는 position-pop의 중앙 고정 정책을 재사용하며 결과를 주입하지 않는다.
++  const predictsWide = seed => {
++    const rng = makeRng(seed), keeper = newKeeper();
++    applyPreset("maxed", {squad:[keeper],pick:0});
++    rollForm(keeper, rng);
++    const shot = buildSet(rng, keeper.level, 0, defaultEleven().map(kickerByName))[0];
++    botPlan(keeper, shot, rng);
++    aimLine(shot.kicker, rng, null);
++    return judge({keeper, shot, rng, input:positionInput(keeper, shot, rng, "hand-centre")})
++      .events[0].t === "wide";
++  };
++  // 원래 축의 최소 두 헛구를 채울 때까지 시드를 탐색한다. 실제 관측만 모집단에 센다.
++  for (let seed = 1; all.filter(x => x.kind === "wide").length <= 1; seed += 1) {
++    if (PAGES.some(url => Number(new URL(url).searchParams.get("seed")) === seed) || !predictsWide(seed)) continue;
++    const url = new URL(PAGES[0]);
++    url.searchParams.set("seed", String(seed));
++    PAGES.push(url.href);
++    const got = starts(await watch(url.href), String(seed));
++    seen.push(seed + ":" + got.length);
++    all.push(...got);
++    console.log("instrument:seed-search seed=" + seed + " balls=" + got.length
++      + " wide=" + got.filter(x => x.kind === "wide").length + " " + elapsed());
++  }
+   const touched = all.filter((x) => TOUCHED.has(x.kind));
+   const passed = all.filter((x) => !TOUCHED.has(x.kind));
+   const resting = (x) => x.rest[0] < REST_STEP;
+@@ -198,13 +227,20 @@ try {
+   } else {
+     if (copies.length !== 2) throw Error("wait extension must occur exactly once");
+     const forceLive = process.argv.includes("--control-live");
+-    const parent = forceLive ? source : copies.join("");
++    // 기다림 연장만 빼도 현재 비행은 이미 정지할 수 있어, 정지 전 대기 자체를 지운 결함을 심는다.
++    const parent = forceLive ? source : copies.join("if (firstSettle) cue.wait = 0;");
+     let routed = 0;
+     await p.route("**/render/scene.mjs*", (route) => {
+       routed += 1;
+       return route.fulfill({ contentType: "text/javascript", body: parent });
+     });
+-    const control = starts(await watch(PAGES.find((url) => new URL(url).searchParams.get("seed") === "27")), "27");
++    // 닿음과 비접촉이 모두 실제로 관측된 시드를 대조군으로 재생한다.
++    const controlPage = PAGES.find(url => {
++      const seed = new URL(url).searchParams.get("seed");
++      return touched.some(row => row.seed === seed) && passed.some(row => row.seed === seed);
++    });
++    if (!controlPage) throw Error("No mixed contact population for wait control");
++    const control = starts(await watch(controlPage), new URL(controlPage).searchParams.get("seed"));
+     await p.unroute("**/render/scene.mjs*");
+     const untouchedControl = control.filter((x) => !TOUCHED.has(x.kind));
+     const touchedControl = control.filter((x) => TOUCHED.has(x.kind));
+@@ -219,7 +255,9 @@ try {
+   }
+ 
+ 
+-  const wide = all.filter((x) => x.kind === "wide");
++  // 현재 판정에서 실제로 헛구가 나온 시드를 같은 런타임의 대조군에 다시 건넨다.
++  const wide = all.filter(x => x.kind === "wide");
++  const widePages = PAGES.filter(url => wide.some(x => x.seed === new URL(url).searchParams.get("seed")));
+   const noHop = (x) => x.dy.every((dy) => Number.isFinite(dy) && dy <= REST_STEP);
+   const wideRow = (x) => "seed=" + x.seed + " open=" + x.open + " |dy|="
+     + x.dy.map((dy) => dy.toFixed(6)).join("/") + "m/frame bar=" + REST_STEP;
+@@ -227,9 +265,13 @@ try {
+   check("tailstart:a-wide-ball-does-not-hop-again-after-the-caption-opens",
+     wide.length > 1 && wide.every(noHop), wide.map(wideRow).join(", "));
+ 
+-  // Reuse the served-module control above; git supplies the exact parent bytes.
+-  // Keep caption timing and horizontal travel intact so only the fresh hop differs.
+-  const wideParent = execFileSync("git", ["show", "dba2d6d:web/src/render/scene.mjs"], { encoding: "utf8" });
++  // 자막 시점과 수평 이동은 현재 것을 유지하고 과거의 수직 튐만 재현한다.
++  // 과거 전체 모듈 대신 dba2d6d의 수직 궤적 한 줄만 현재 런타임에 심는다.
++  const oldScene = execFileSync("git", ["show", "dba2d6d:web/src/render/scene.mjs"], { encoding: "utf8" });
++  const vertical = text => text.match(/case 'wide':[\s\S]*?ball\.position\.set\(\s*[^\n]+\n(?:\s*\/\/[^\n]*\n)*\s*([^\n]+),\s*\n/)[1];
++  const currentY = vertical(source), oldY = vertical(oldScene);
++  if (source.split(currentY).length !== 2 || currentY === oldY) throw Error("wide control anchor drift");
++  const wideParent = source.replace(currentY, oldY);
+   let wideRouted = 0;
+   const wideControl = [];
+   await p.route("**/render/scene.mjs*", (route) => {
+@@ -237,12 +279,7 @@ try {
+     return route.fulfill({ contentType: "text/javascript", body: wideParent });
+   });
+   try {
+-    for (const seed of new Set(wide.map((x) => x.seed))) {
+-      const url = PAGES.find((url) => new URL(url).searchParams.get("seed") === seed);
+-      const got = starts(await watch(url), seed);
+-      if (got.length !== BALLS) throw Error("incomplete wide parent sample seed=" + seed);
+-      wideControl.push(...got.filter((x) => x.kind === "wide"));
+-    }
++    for (const url of widePages) wideControl.push(...starts(await watch(url), new URL(url).searchParams.get("seed")).filter(x => x.kind === "wide"));
+   } finally {
+     await p.unroute("**/render/scene.mjs*");
+   }
+diff --git a/tools/thumb-gate.mjs b/tools/thumb-gate.mjs
+index f9da1b0..bf4017e 100644
+--- a/tools/thumb-gate.mjs
++++ b/tools/thumb-gate.mjs
+@@ -84,7 +84,7 @@ try {
+   await p.route("**/web/src/render/thumb.mjs", async (route) => {
+     const response = await route.fetch();
+     await route.fulfill({ response, body: await response.text() +
+-      '\nexport function spongeSurface(k, look) { frame("pads", k, look); return { rig, scene, cam, cv: R.domElement, render: () => R.render(scene, cam) }; }\nexport function cardSurface(kind, k, look, over) { frame(kind, k, look, undefined, over); return {rig, sceneRig, cam, cv:R.domElement}; }' });
++      '\nexport function spongeSurface(k, look) { frame("pads", k, look); return { rig, scene, cam, cv: R.domElement, render: () => R.render(scene, cam) }; }' });
+   });
+   const errs = [];
+   p.on("pageerror", (e) => errs.push(String(e)));
+@@ -218,7 +218,7 @@ try {
+      -0.5는 깃이 칸 위 변에 닿는 자리다. 실측으로 상의가 칠한 첫 줄이 게이트 몸에서
+      -0.2에 0.259, -0.3에 0.151, -0.4에 0.039, -0.5에 0.000이다. 다섯 벌이 모두 -0.5에서 0.000이고
+      한 칸 앞인 -0.4까지는 다섯 벌 다 초록이라, 이 값은 문턱을 스치는 자리가 아니다. */
+-  const PADS_DROP = { lift: -0.75 }; // 넓어진 카드의 실제 윗변 밖까지 깃을 보내는 결함 대조군이다.
++  const PADS_DROP = { lift: -0.5 };
+   const shapes = await p.evaluate(async ([bodies, wide, drop]) => {
+     const m = await import("/web/src/render/thumb.mjs");
+     const g = await import("/web/src/state/gear.mjs");
+@@ -493,50 +493,6 @@ try {
+   // 심는 대조군. 이 자리로 겨냥을 되돌리면 기본 등급의 머리가 칸 밖으로 나가야 한다.
+   /* 체격도 표본이다. 아래 두 축이 재던 몸은 188/84 하나였는데 게임은 그보다 넓은 몸을 만든다.
+      BODIES가 소스에서 끌어온 봉투의 네 귀퉁이와 그 게이트 몸이고, 판정은 다섯 벌 전부다. */
+-  // 모든 착용 선반이 상품과 착용자를 함께 판다. 등급과 변형과 체격 봉투를 빠짐없이 걷는다.
+-  const wearers = await p.evaluate(async bodies => {
+-    const m = await import("/web/src/render/thumb.mjs");
+-    const g = await import("/web/src/state/gear.mjs");
+-    const shelves = {grip:g.GLOVES, studs:g.BOOTS, pads:g.KITS, socks:g.SOCKS, ink:g.TATTOOS, hair:g.HAIRS, beard:g.BEARDS};
+-    const rows = [];
+-    for (const [kind, grades] of Object.entries(shelves)) {
+-      for (const body of bodies) for (const [rank] of grades.entries()) {
+-        for (const [skin] of g.skinsAt(kind, rank).entries()) {
+-          const look = g.lookOf({[kind]:rank, [kind + "Skin"]:skin});
+-          const box = m.wearerBox(kind, body, look);
+-          rows.push({kind, rank, skin, body, ...box, head:{...box.head, url:undefined}});
+-        }
+-      }
+-    }
+-    // 봇은 세 판매 등급을 같은 체격 봉투로 검사한다. 외형 변형은 봇 카탈로그에 없다.
+-    const bots = await import("/web/src/state/bot.mjs");
+-    const botGrades = bots.BOTS;
+-    for (const body of bodies) for (const entry of botGrades) {
+-      const box = m.wearerBox("bot", body, {rank:entry.tier});
+-      rows.push({kind:"bot", rank:entry.tier, body, ...box, head:{...box.head, url:undefined}});
+-    }
+-    // 옛 장갑 겨냥의 거리 0.94·높이 0.03·시선 0.12를 그대로 심어 상품만 남고 얼굴을 잃는 회귀를 잡는다.
+-    const old = m.wearerBox("grip", bodies[0], g.lookOf({grip:0}), {part:"glove", dist:0.94, lift:0.03, high:0.12});
+-    return {rows, old:{...old, head:{...old.head, url:undefined}}, expected:[...Object.entries(shelves).map(([kind, grades]) => ({kind, n:grades.reduce((n, _, rank) => n + g.skinsAt(kind, rank).length, 0) * bodies.length})), {kind:"bot", n:botGrades.length * bodies.length}]};
+-  }, BODIES);
+-  const pointInside = p => p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1;
+-  // 리그가 반환하는 두 눈과 두 어깨의 실제 메시 정점을 모두 확인해 일부만 측정한 통과를 막는다.
+-  const personInside = r => r.head && r.head.ry > 0
+-    && r.head.x - r.head.rx >= 0 && r.head.x + r.head.rx <= 1
+-    && r.head.y - r.head.ry >= 0 && r.head.y + r.head.ry <= 1
+-    && r.head.eyes.length === 2 && r.head.eyes.every(pointInside)
+-    && r.shoulders.length === 2 && r.shoulders.every(points => points.length > 0 && points.every(pointInside));
+-  for (const {kind, n} of wearers.expected) {
+-    const rows = wearers.rows.filter(r => r.kind === kind);
+-    const lost = rows.filter(r => !personInside(r));
+-    check("thumb:" + kind + ":every-worn-look-keeps-head-eyes-and-shoulders",
+-      n > 0 && rows.length === n && lost.length === 0,
+-      rows.length + "/" + n + " looks; outside: " + JSON.stringify(lost));
+-  }
+-  check("control:the-old-glove-frame-loses-its-wearer", !personInside(wearers.old)
+-    && wearers.old.head.eyes.length === 2 && wearers.old.shoulders.length === 2,
+-    JSON.stringify(wearers.old));
+-
+   const OLD_PADS_AIM = { part: "torso", lift: 0.3 };
+   /* 아래 바닥 자가 심는 겨냥. 부위는 파는 그대로 목이고 lift 한 칸만 흐른 값이다. 위의 자가 옛
+      겨냥을 통째로 되심는 것과 달라야 한다. 실제로 나는 회귀는 부위가 바뀌는 것이 아니라 상수
+@@ -697,7 +653,7 @@ try {
+     if (all.length !== 1) throw new Error(what + " read " + all.length + " times in actors.mjs, want 1");
+     return Number(ACTORS.match(re)[1]);
+   };
+-  const SHELL = 0; // 무광 키트에는 복제 외곽선이 없으므로 접촉 허용 폭도 없다.
++  const SHELL = oneOf(/addOutline\(gv, ([\d.]+)\);/, "the glove outline width");
+   const PIP_Z = oneOf(/pip\.translate\(col \* s \* [\d.]+, row \* s \* [\d.]+, s \* ([\d.]+)\);/, "the pad z");
+   const GLOVE_SIZE = oneOf(/gloveSize: h \* ([\d.]+),/, "the keeper glove size");
+   const pads = await p.evaluate(async ([bodies, shell, gsize]) => {
+@@ -738,15 +694,13 @@ try {
+             }
+             return { hi, lo, zhi };
+           };
+-          const parts = gv.userData.partVertices;
+-          const palm = face(0, parts[0]); // 구와 상자의 정점 수를 같은 수로 가정하지 않는다.
+-          const start = parts.slice(0, 3).reduce((a, n) => a + n, 0); // 손바닥, 엄지, 손목 뒤가 빨판의 시작이다.
++          const palm = face(0, box);
+           let back = Infinity;
+-          for (let q = 0; q < cut.pips; q += 1) back = Math.min(back, face(start + q * box, start + (q + 1) * box).lo);
+-          const sz = ink.length ? ink[0].scale.z : 1; // 외곽선이 없으면 표면 자체 배율이다.
++          for (let q = 0; q < cut.pips; q += 1) back = Math.min(back, face((3 + q) * box, (4 + q) * box).lo);
++          const sz = ink.length ? ink[0].scale.z : 0;
+           out.rows.push({
+             body: k.height + "/" + k.weight, tag: L.rank + ":" + L.skin, hand: at,
+-            verts: pos.count, want: start + cut.pips * box, inks: ink.length, sz,
++            verts: pos.count, want: (3 + cut.pips) * box, inks: ink.length, sz,
+             wantSz: 1 + (shell * 2) / Math.max(0.04, bb.max.z - bb.min.z),
+             s: (k.height / 100) * gsize * cut.bulk, stand: back - palm.hi,
+             reach: (palm.zhi - (bb.max.z + bb.min.z) / 2) * (sz - 1)
+@@ -761,7 +715,7 @@ try {
+   const padEnds = (k) => Math.min.apply(null, pads.rows.map((r) => r[k])).toFixed(5)
+     + ".." + Math.max.apply(null, pads.rows.map((r) => r[k])).toFixed(5);
+   const padClear = pads.rows.filter((r) => !(r.stand <= r.reach));
+-  const padDrift = pads.rows.filter((r) => r.verts !== r.want || r.inks !== 0
++  const padDrift = pads.rows.filter((r) => r.verts !== r.want || r.inks !== 1
+     || Math.abs(r.sz - r.wantSz) > 1e-9);
+   const padPlant = pads.rows.filter((r) => r.stand + (PLANT_PIP_Z - PIP_Z) * r.s > r.reach);
+   const padTight = pads.rows.reduce((a, c) => (a && a.reach - a.stand <= c.reach - c.stand ? a : c), null);
+@@ -789,7 +743,7 @@ try {
+      옷의 꼭대기와 잉크의 꼭대기를 따로 잰다. 옷 위에 선 상자라도 몸통 잉크 아래면
+      어깨 윗선이 없다. 자기 외곽선을 단 스펀지는 그 외곽선 정점이 몸통 외곽선보다 바닥만큼
+      높아야 하고, 카드에서 몸통만 남긴 실루엣보다 위에 실제로 찍힌 행도 있어야 한다.
+-     스펀지는 메시 하나다. 빨판과 달리 병합되지 않아 어깨 관절의 shoulderPad 표식 자식 하나가 그것이고,
++     스펀지는 메시 하나다. 빨판과 달리 병합되지 않아 어깨 관절의 BoxGeometry 자식 하나가 그것이고,
+      하나가 아니면 축이 수 대신 그 어긋남으로 먼저 빨개진다. 폭과 두께와 깊이와 앉은 높이를
+      actors.mjs에서 한 자리씩 읽어 다시 세워 맞춘다. 여기 수를 베껴 두면 그 식이 얇아진 날 이 축만
+      옛 수로 초록이 난다. 자리를 손으로 옮겨 셈한 값이 pad.matrixWorld로 읽은 값과 같은지도 같이
+@@ -818,16 +772,15 @@ try {
+   const [TORSO_K] = manyOf(/torsoR: w \* ([\d.]+), torsoLen: h \* [\d.]+,/, "the keeper torso radius");
+   const [W_BASE, W_AT, W_STEP] = manyOf(/const w = ([\d.]+) \+ \(weight - (\d+)\) \* ([\d.]+);/, "the girth from weight");
+   const [PAD_TH_K] = manyOf(/const th = o\.armR \* ([\d.]+) \* kc\.pad;/, "the sponge thickness");
+-  const [PAD_LIFT_K, PAD_SEAT_K, PAD_SEAT_DOWN] = manyOf(/pad\.position\.set\(side \* \(o\.armR \* [\d.]+ \+ Math\.max\([\d.]+, kc\.pad\) \* [\d.]+\), o\.armR \* ([\d.]+) \+ th \* ([\d.]+) - ([\d.]+), o\.armR \* [\d.]+\);/, "the sponge seat");
++  const [PAD_LIFT_K, PAD_SEAT_K, PAD_SEAT_DOWN] = manyOf(/pad\.position\.set\(side \* \(o\.armR \* [\d.]+ \+ Math\.max\([\d.]+, kc\.pad\) \* [\d.]+\), o\.armR \* ([\d.]+) \+ th \* ([\d.]+) - ([\d.]+), 0\);/, "the sponge seat");
+   const [PAD_WIDE_K, PAD_GIRTH_K] = manyOf(/const wide = o\.armR \* ([\d.]+) \+ o\.torsoR \* kc\.girth \* ([\d.]+);/, "the sponge width");
+-  const [PAD_DEEP_K] = manyOf(/padGeo\.scale\(wide \/ 2, th \/ 2, o\.armR \* ([\d.]+) \/ 2\)/, "the sponge depth");
+-  const [PAD_SPHERE, PAD_RINGS] = manyOf(/const KIT = \{cap:\d+, radial:\d+, sphere:(\d+), rings:(\d+)/, "the rounded sponge tessellation");
+-  const TORSO_PEN = 0; // 키트 몸통은 복제 잉크 없이 실제 표면이 외곽선이다.
++  const [PAD_DEEP_K] = manyOf(/new THREE\.BoxGeometry\(wide, th, o\.armR \* ([\d.]+)\)/, "the sponge depth");
++  const [TORSO_PEN] = manyOf(/addOutline\(torso, ([\d.]+)\);/, "the torso outline width");
+   const crowns = await p.evaluate(async ([bodies, lit, floor, halfAt]) => {
+     const T = await import("/web/vendor/three.module.min.js");
+     const A = await import("/web/src/render/objects/actors.mjs");
+     const g = await import("/web/src/state/gear.mjs");
+-    const box = new T.SphereGeometry(1, lit.sphere, lit.rings).attributes.position.count; // 실제 패드가 쓰는 구 분할을 읽어 상자 대신 둥근 표면의 정점 수를 검증한다.
++    const box = new T.BoxGeometry(1, 1, 1).attributes.position.count;
+     // 스펀지를 든 장만 고른다. 등급 번호를 여기 적으면 스펀지가 다른 등급에 붙는 날 그 등급이 조용히 빠진다.
+     const looks = [];
+     for (let rank = 0; rank < g.KITS.length; rank += 1) {
+@@ -866,10 +819,9 @@ try {
+         const arms = rig.userData.arms || [];
+         for (let at = 0; at < arms.length; at += 1) {
+           const sh = arms[at];
+-          const boxes = sh.children.filter((c) => c.isMesh && c.userData.shoulderPad);
++          const boxes = sh.children.filter((c) => c.isMesh && c.geometry.type === "BoxGeometry");
+           const pad = boxes.length === 1 ? boxes[0] : null;
+-          if (pad) pad.geometry.computeBoundingBox();
+-          const par = pad ? pad.geometry.boundingBox.getSize(new T.Vector3()) : new T.Vector3(); // 실제 정점 봉투로 세 반축을 재므로 둥근 패드의 크기 축도 유지된다.
++          const par = pad ? (pad.geometry.parameters || {}) : {};
+           const home = pad ? pad.position : new T.Vector3();
+           const seatTo = (y) => topOf(pad, sh.matrixWorld, new T.Vector3(home.x, y, home.z));
+           const top = pad ? seatTo(home.y) : 0;
+@@ -883,9 +835,9 @@ try {
+             boxes: boxes.length, verts: pad ? pad.geometry.attributes.position.count : 0,
+             inks: ink.length,
+             padInks: pad ? pad.children.filter((c) => c.userData && c.userData.isOutline).length : -1,
+-            wide: par.x, high: par.y, deep: par.z,
+-            wantWide: Math.fround((armR * lit.wideK + torsoR * cut.girth * lit.girthK) / 2) * 2,
+-            wantHigh: Math.fround(th / 2) * 2, wantDeep: Math.fround(armR * lit.deepK / 2) * 2, // BufferAttribute의 Float32 반축 양끝을 합친 값과 비교하고 기존 오차 문턱은 유지한다.
++            wide: Number(par.width) || 0, high: Number(par.height) || 0, deep: Number(par.depth) || 0,
++            wantWide: armR * lit.wideK + torsoR * cut.girth * lit.girthK,
++            wantHigh: th, wantDeep: armR * lit.deepK,
+             seat: home.y, wantSeat: armR * lit.liftK + th * lit.seatK - lit.seatDown,
+             crown, pen: ink.length === 1 ? topOf(torso, ink[0].matrixWorld, null) - crown : 0,
+             inkTop, torsoInkTop, inkMargin: inkTop - torsoInkTop,
+@@ -898,12 +850,12 @@ try {
+     }
+     return out;
+   }, [BODIES, { armK: ARM_K, torsoK: TORSO_K, wBase: W_BASE, wAt: W_AT, wStep: W_STEP, thK: PAD_TH_K,
+-    liftK: PAD_LIFT_K, seatK: PAD_SEAT_K, seatDown: PAD_SEAT_DOWN, wideK: PAD_WIDE_K, girthK: PAD_GIRTH_K, deepK: PAD_DEEP_K, sphere: PAD_SPHERE, rings: PAD_RINGS },
++    liftK: PAD_LIFT_K, seatK: PAD_SEAT_K, seatDown: PAD_SEAT_DOWN, wideK: PAD_WIDE_K, girthK: PAD_GIRTH_K, deepK: PAD_DEEP_K },
+   CROWN_FLOOR, PLANT_SEAT]);
+   const crownSay = (r) => r.body + " " + r.tag + " hand " + r.hand + " clears by " + r.margin.toFixed(5);
+   const crownEnds = (k) => Math.min.apply(null, crowns.rows.map((r) => r[k])).toFixed(5)
+     + ".." + Math.max.apply(null, crowns.rows.map((r) => r[k])).toFixed(5);
+-  const crownDrift = crowns.rows.filter((r) => r.boxes !== 1 || r.verts !== crowns.box || r.inks !== 0
++  const crownDrift = crowns.rows.filter((r) => r.boxes !== 1 || r.verts !== crowns.box || r.inks !== 1
+     || r.padInks > 1 || !(r.fall > 0 && r.fall <= 1) || Math.abs(r.top - r.live) > 1e-9
+     || Math.abs(r.wide - r.wantWide) > 1e-9 || Math.abs(r.high - r.wantHigh) > 1e-9
+     || Math.abs(r.deep - r.wantDeep) > 1e-9 || Math.abs(r.seat - r.wantSeat) > 1e-9);
+@@ -929,7 +881,7 @@ try {
+           + crownInk.length + " of " + crowns.rows.length + ", the seat dropped by each margin sinks all "
+           + crownSank.length + " to -" + CROWN_FLOOR + " while halving it sinks only " + crownHalf.length);
+ 
+-  const inkLow = crowns.rows.filter((r) => r.padInks !== 0 || r.inkMargin < CROWN_FLOOR);
++  const inkLow = crowns.rows.filter((r) => r.padInks !== 1 || r.inkMargin < CROWN_FLOOR);
+   check("thumb:pads:the-sponge-silhouette-clears-the-ink-shell",
+     crowns.rows.length === BODIES.length * crowns.looks.length * 2 && inkLow.length === 0,
+     "floor " + CROWN_FLOOR + ", margins " + crownEnds("inkMargin") + ", below " + inkLow.length
+@@ -951,7 +903,7 @@ try {
+         const look = g.lookOf({ pads: rank, padsSkin: skin });
+         look.shirt = 0xff00ff;
+         const s = t.spongeSurface(body, look);
+-        const pads = s.rig.userData.arms.map((a) => a.children.filter((c) => c.isMesh && c.userData.shoulderPad));
++        const pads = s.rig.userData.arms.map((a) => a.children.filter((c) => c.isMesh && c.geometry.type === "BoxGeometry"));
+         if (pads.length !== 2 || pads.some((a) => a.length !== 1)) throw Error("sponge pixel population drift");
+         const meshes = [];
+         s.rig.traverse((o) => { if (o.isMesh) meshes.push([o, o.visible]); });
+@@ -1120,7 +1072,7 @@ try {
+     /* 대조군은 띠 위 축이 쓰는 장만 굽는다. 반사실까지 같이 구우면 한 회차가 아홉 장 더
+        늘어나고, 이 판의 굽는 수는 옆 게이트의 page.goto를 30초 밖으로 밀어낸 적이 있다. */
+     const nearSkin = async (dist) => {
+-      const over = { dist, yaw: -0.95 }; // 옛 확대 대조군의 각도도 고정해 새 카드의 정면 각도를 물려받지 않는다.
++      const over = { dist };
+       const skin = await read(m.thumbURL("ink", k, g.lookOf({ ink: 0 }), over));
+       const box = toneOf(skin);
+       const above = [];
+@@ -1129,8 +1081,7 @@ try {
+       }
+       return { above, box };
+     };
+-    // 0.32 거리의 기존 표면 검사창을 고정한다. 카드 전체 면적을 요구하면 완전한 팔을 담을수록 실패한다.
+-    const live = await rig({part:"arm", dist:0.32, lift:-0.1, high:0.06, yaw:-0.95});
++    const live = await rig();
+     const was = await rig(old);
+     const near = await nearSkin(nearDist);
+     const one = m.thumbURL("ink", k, g.lookOf({ ink: 0 }));
+@@ -1144,8 +1095,8 @@ try {
+   check("instrument:the-bare-skin-card-bakes-the-same-bytes", fills.base.same && fills.base.len > 0,
+     fills.base.same ? "grade 0 baked twice is the same " + fills.base.len + " char still"
+       : "grade 0 moved between two bakes");
+-  check("thumb:the-tattoo-keeps-its-surface-contrast", paid.length > 0 && paid.every((x) => x >= INK_FILL),
+-    "grades 1..3 paint " + paid.map(pct).join(" ") + " of the fixed surface probe over the sold bare-skin probe, floor "
++  check("thumb:the-tattoo-fills-its-card", paid.length > 0 && paid.every((x) => x >= INK_FILL),
++    "grades 1..3 paint " + paid.map(pct).join(" ") + " of the card over the sold bare-skin card, floor "
+     + pct(INK_FILL) + " (" + INK_FILL_FROM + "); the forced-grade-0 counterfactual reads "
+     + fills.live.flat.slice(1).map(pct).join(" ") + " on the same bakes");
+   check("control:bare-skin-carries-no-tattoo", fills.live.sold[0] >= 0 && fills.live.sold[0] < 0.005,
+@@ -1158,7 +1109,7 @@ try {
+     + " under the " + pct(INK_FILL) + " floor");
+   const skinUp = fills.live.above.slice(1);
+   const boxOf = (q) => q.map((c) => c[0] + ".." + c[1]).join("/");
+-  check("thumb:surface-tone-stands-above-the-tattoo", skinUp.length > 0 && skinUp.every((n) => n >= INK_SKIN),
++  check("thumb:card-tone-stands-above-the-tattoo", skinUp.length > 0 && skinUp.every((n) => n >= INK_SKIN),
+     "grades 1..3 keep " + skinUp.join(" ") + " opaque pixels above the band's top edge inside the tone box, floor "
+     + INK_SKIN + "; the tone box r/g/b " + boxOf(fills.live.box)
+     + " came from the sold grade-0 card's whole tone, the same still the fill axis measures against,"
+@@ -1169,81 +1120,6 @@ try {
+     + " opaque pixels above the band inside the tone box (tone box " + boxOf(fills.near.box)
+     + "), worst " + nearWorst + " under the " + INK_SKIN + " floor");
+ 
+-  // 실제 판매 그림의 모든 팔 표면 정점과 관절을 같은 카메라로 투영한다. 잘린 좌표를 clamp하지 않는다.
+-  const framing = await p.evaluate(async bodies => {
+-    const m = await import("/web/src/render/thumb.mjs");
+-    const g = await import("/web/src/state/gear.mjs");
+-    const T = await import("/web/vendor/three.module.min.js");
+-    const {BOTS} = await import("/web/src/state/bot.mjs");
+-    const points = (object, camera) => {
+-      const out = [];
+-      object.traverse(o => {
+-        if (!o.isMesh || !o.visible) return;
+-        const pos = o.geometry.attributes.position;
+-        for (let i = 0; i < pos.count; i++) {
+-          const v = new T.Vector3().fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).project(camera);
+-          out.push({x:v.x, y:v.y, z:v.z});
+-        }
+-      });
+-      return out;
+-    };
+-    const inside = p => Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1 && Math.abs(p.z) <= 1; // NDC 정육면체의 여섯 면이 실제 클리핑 경계다.
+-    const bounds = points => ({count:points.length, outside:points.filter(p => !inside(p)).length});
+-    const arm = (body, rank, skin, over) => {
+-      const s = m.cardSurface("ink", body, g.lookOf({ink:rank, inkSkin:skin}), over);
+-      const camera = s.cam.userData.inkDetail?.camera || s.cam;
+-      const j = s.rig.userData.joints;
+-      // 위팔에 붙은 실제 무늬까지 포함한다. 팔꿈치 아래 전체와 손목의 장갑까지 함께 담겨야 한다.
+-      const all = points(j.shL, camera);
+-      const elbow = j.elL.getWorldPosition(new T.Vector3()).project(camera);
+-      const wrist = s.rig.userData.gloves[0].getWorldPosition(new T.Vector3()).project(camera);
+-      return {body, rank, skin, ...bounds(all), elbow:inside(elbow), wrist:inside(wrist)};
+-    };
+-    const arms = [], bots = [];
+-    for (const body of bodies) {
+-      for (const [rank] of g.TATTOOS.entries()) for (const [skin] of g.skinsAt("ink", rank).entries()) arms.push(arm(body,rank,skin));
+-      for (const b of BOTS) {
+-        const s = m.cardSurface("bot",body,{rank:b.tier});
+-        s.sceneRig.updateMatrixWorld(true);
+-        const emblem = s.sceneRig.children.filter(o => o.isMesh).flatMap(o => points(o,s.cam));
+-        bots.push({body,tier:b.tier,...bounds(emblem)});
+-      }
+-    }
+-    // 0.28은 기존의 피부 조각 확대 거리다. 같은 실제 팔 정점으로 팔꿈치와 손목 손실을 검출한다.
+-    const crop = arm(bodies[0],1,0,{part:"arm",dist:0.28,lift:-0.1,high:0.06,yaw:-0.95});
+-    const s = m.cardSurface("bot",bodies[0],{rank:BOTS[0].tier});
+-    const emblem = s.sceneRig.children.filter(o => o.isMesh);
+-    // 카메라 높이를 한 프레임만큼 옮겨 가슴 표식이 사라지는 양성 대조군이다.
+-    s.cam.setViewOffset(s.cv.width,s.cv.height,0,-s.cv.height,s.cv.width,s.cv.height);
+-    const lostBot = bounds(emblem.flatMap(o => points(o,s.cam)));
+-    return {arms,bots,crop,lostBot};
+-  }, BODIES);
+-  const armInside = r => r.count > 0 && r.outside === 0 && r.elbow && r.wrist;
+-  check("thumb:tattoo-keeps-elbow-wrist-and-complete-band",framing.arms.length > 0 && framing.arms.every(armInside),JSON.stringify(framing.arms));
+-  check("control:blurry-skin-crop-loses-arm-landmarks",framing.crop.count > 0 && !armInside(framing.crop),JSON.stringify(framing.crop));
+-  check("thumb:bot-keeps-entire-chest-emblem",framing.bots.length > 0 && framing.bots.every(r => r.count > 0 && r.outside === 0),JSON.stringify(framing.bots));
+-  check("control:head-only-bot-loses-chest-emblem",framing.lostBot.count > 0 && framing.lostBot.outside > 0,JSON.stringify(framing.lostBot));
+-
+-  // 실제 카드 슬롯에서도 원본 전체가 담겨야 카메라의 가슴 표식 검사가 화면에서 참이다.
+-  for (const [width,height] of [[1280,720],[844,390],[740,360]]) for (const kind of ["bot","ink"]) { // 요청된 세 화면 크기를 그대로 재현한다.
+-    await p.setViewportSize({width,height});
+-    await grab(kind);
+-    const fit = async () => p.locator('#shop .card[data-spec="'+kind+'"] .shot').evaluateAll(slots => slots.map(slot => {
+-      const image = slot.querySelector('img');
+-      const box = slot.getBoundingClientRect(), im = image.getBoundingClientRect();
+-      return {w:im.width,h:im.height,overflow:Math.max(box.left-im.left,box.top-im.top,im.right-box.right,im.bottom-box.bottom)};
+-    }));
+-    const live = await fit();
+-    check("thumb:"+kind+"-image-fits-slot:"+width,live.length > 0 && live.every(r => r.w > 0 && r.h > 0 && r.overflow <= 1),JSON.stringify(live)); // 1픽셀은 소수 CSS 경계 반올림만 허용한다.
+-    if (width === 740) { // 가장 짧은 화면에 옛 정적 이미지 배치를 심는다.
+-      await p.locator('#shop .card[data-spec="'+kind+'"] .shot img').evaluateAll(images => images.forEach(image => image.style.position='static'));
+-      const old = await fit();
+-      check("control:static-"+kind+"-image-overflows-short-slot",old.some(r => r.overflow > 1),JSON.stringify(old));
+-      await p.locator('#shop .card[data-spec="'+kind+'"] .shot img').evaluateAll(images => images.forEach(image => image.style.removeProperty('position')));
+-    }
+-  }
+-  await p.setViewportSize({width:1280,height:720}); // 뒤의 기존 호버 검사는 원래 데스크톱 표본에서 계속한다.
+-
+   // 대조군. 같은 등급을 두 번 구우면 같은 그림이어야 한다. 매번 달라지면 위의 다름은
+   // 상품의 차이가 아니라 굽는 잡음이고, 그 축은 아무것도 증명하지 않는다.
+   const twice = await p.evaluate(async (k) => {
+diff --git a/tools/ui-gate.mjs b/tools/ui-gate.mjs
+index 73b2864..a532a23 100644
+--- a/tools/ui-gate.mjs
++++ b/tools/ui-gate.mjs
+@@ -74,9 +74,7 @@ try {
+   const chrome = await p.evaluate(() => {
+     const W = innerWidth, H = innerHeight;
+     let area = 0;
+-    for (const id of ["top", "out", "auto", "caption"]) {
+-      const el = document.getElementById(id);
+-      if (!el) continue;
++    for (const el of document.querySelectorAll("#top,#auto,#caption,.move-arrow")) {
+       const r = el.getBoundingClientRect();
+       area += Math.max(0, r.width) * Math.max(0, r.height);
+     }
+@@ -89,9 +87,7 @@ try {
+     const W = innerWidth, H = innerHeight;
+     const box = { x0: W * 0.3, x1: W * 0.7, y0: H * 0.3, y1: H * 0.7 };
+     let area = 0;
+-    for (const id of ["top", "out", "auto", "caption"]) {
+-      const el = document.getElementById(id);
+-      if (!el) continue;
++    for (const el of document.querySelectorAll("#top,#auto,#caption,.move-arrow")) {
+       const r = el.getBoundingClientRect();
+       const w = Math.max(0, Math.min(r.right, box.x1) - Math.max(r.left, box.x0));
+       const h = Math.max(0, Math.min(r.bottom, box.y1) - Math.max(r.top, box.y0));
+@@ -105,8 +101,8 @@ try {
+   await p.setViewportSize({ width: 740, height: 360 });
+   await p.waitForTimeout(500);
+   const overlaps = await p.evaluate(() => {
+-    const ids = ["top", "out", "auto", "caption"];
+-    const rs = ids.map((id) => [id, document.getElementById(id).getBoundingClientRect()]);
++    // 돌진 단추 대신 현재 좌우 이동 단추 각각의 실제 상자를 잰다.
++    const rs = [...document.querySelectorAll("#top,#auto,#caption,.move-arrow")].map(el => [el.id || el.dataset.move, el.getBoundingClientRect()]);
+     const hit = [];
+     for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) {
+       const [ai, a] = rs[i], [bj, c] = rs[j];
+@@ -117,6 +113,8 @@ try {
+     }
+     return hit;
+   });
++  // 좌우 두 방향이 모두 있어야 이동 조작을 빠뜨린 빈 표본이 아니다.
++  check("instrument:both-movement-buttons-stand", await p.locator(".move-arrow").count() === 2, "left and right");
+   check("layout:no-overlap-at-740x360", overlaps.length === 0, overlaps.join(",") || "none");
+   await p.setViewportSize({ width: 1280, height: 720 });
+   await p.waitForTimeout(400);
+@@ -162,7 +160,8 @@ try {
+   };
+   // 8%. 66px 판때기에 3px 격자로 그린 두툼한 픽셀 아이콘은 15~25%대가 나온다.
+   // 8%는 그 아래 절반이라, 아이콘이 한 조각만 남아도 잡히는 자리다.
+-  for (const id of ["out", "auto"]) {
++  // 이동은 글리프이고 자동은 픽셀 그림이므로 SVG 잉크 축은 자동 단추에 적용한다.
++  for (const id of ["auto"]) {
+     const cover = await ink(id);
+     check("icon:" + id + "-drawn-over-8pct", cover >= 0.08, (cover * 100).toFixed(1) + "%");
+   }
+@@ -181,7 +180,7 @@ try {
+       }
+       return t;
+     };
+-    return ["out", "auto"].map((id) => {
++    return ["auto"].map((id) => {
+       const el = document.getElementById(id);
+       return { id, text: vis(el).trim(), label: el.getAttribute("aria-label") || "" };
+     });
+diff --git a/tools/vq2-visual-gate.mjs b/tools/vq2-visual-gate.mjs
+index a573c67..907cdeb 100644
+--- a/tools/vq2-visual-gate.mjs
++++ b/tools/vq2-visual-gate.mjs
+@@ -88,8 +88,9 @@ try {
+     const scene=new T.Scene();scene.background=new T.Color(0xdce6df); // 얼굴과 소품 색을 가리지 않는 중립 배경이다.
+     scene.add(new T.HemisphereLight(0xe7f4ff,0x9b9384,2.1)); // 키트 반구광이다.
+     const key=new T.DirectionalLight(0xffedce,3.2);key.position.set(-4,8,5);scene.add(key); // 키트의 단일 주광이다.
+-    const variants=a.PASSER_VARIANTS.filter(v=>!['keeper','kicker'].includes(v.id));
+-    variants.forEach((v,i)=>{const rig=a.buildWalker(v);a.poseWalker(rig,0.12,{heading:0,time:1});rig.root.position.x=(i-3)*1.65;scene.add(rig.root);}); // 같은 보폭의 정면에서 일곱 차림을 나란히 세운다.
++    const {buildPassers}=await import('/web/src/render/objects/pitch.mjs');
++    const bodies=buildPassers(scene,7,3); // 최상위 풀의 일곱 차림을 승인된 몸으로 비교한다.
++    bodies.forEach((body,i)=>{a.poseWalker(body.userData.walker,0.12,{heading:0,time:1});body.position.set((i-3)*1.65,0,0);}); // 기존 비교판 간격과 보폭이다.
+     const cam=new T.PerspectiveCamera(34,1280/480,0.1,100);cam.position.set(0,2.6,8.8);cam.lookAt(0,1.2,0); // 머리부터 발끝까지 한 장에 남기는 비교용 카메라다.
+     renderer.render(scene,cam);
+   });
+diff --git a/web/src/render/objects/actors.mjs b/web/src/render/objects/actors.mjs
+index 18c4f6c..1d2f1ef 100644
+--- a/web/src/render/objects/actors.mjs
++++ b/web/src/render/objects/actors.mjs
+@@ -2,26 +2,9 @@
+ // 몸통 하나를 통째로 기울이면 T포즈를 회전시킨 것으로만 읽힌다.
+ // 어깨와 고관절을 끝단 피벗으로 세우고, 각도를 데이터로 둔다. 과장은 여기서 나온다.
+ import * as THREE from '../../../vendor/three.module.min.js';
+-import { mergeGeos, standOnGround } from '../units.mjs';
++import { flat, flatMap, flatVertex, mergeGeos, standOnGround } from '../units.mjs';
+ import { clothTex, inkTex } from '../texture.mjs';
+-// Three.js MIT CapsuleGeometry를 키트와 공유하고 기존 관절 피벗에 맞춰 복제한다.
+-// 출처: https://threejs.org/docs/pages/CapsuleGeometry.html (MIT, three 패키지 LICENSE).
+-const KIT = {cap:6, radial:16, sphere:20, rings:14, roughness:0.9}; // 키트의 둥근 외곽선과 넓은 무광 반사를 그대로 쓴다.
+-const capsuleCache = new Map();
+-function capsuleGeometry(radius, length) {
+-  const key = radius + ':' + length;
+-  if (!capsuleCache.has(key)) capsuleCache.set(key, new THREE.CapsuleGeometry(radius, length, KIT.cap, KIT.radial));
+-  return capsuleCache.get(key).clone();
+-}
+-// Three.js WebGLBindingStates의 기본 속성 경로로 흰 RGB 1을 주어 단색과 정점색이 한 프로그램을 공유한다.
+-function flat(color) {
+-  const m = new THREE.MeshStandardMaterial({color, roughness:KIT.roughness, vertexColors:true});
+-  m.defaultAttributeValues = {color:[1,1,1]};
+-  return m;
+-}
+-function flatMap(color, map) { const m=flat(color); m.map=map; return m; }
+-function flatVertex(color) { const m=flat(color); m.vertexColors=true; return m; }
+-// 키트는 매끈한 기하 자체로 실루엣을 만들므로 임의 정점 잡음과 복제 외곽선을 쓰지 않는다.
++import { jitterMesh, addOutline } from '../handmade.mjs';
+ 
+ // 동공은 연출이 바꿔 끼우므로 재질을 밖에서 소유한다.
+ export const pupilMat = new THREE.MeshBasicMaterial({ color: 0x18140f });
+@@ -240,25 +223,22 @@ export const POSES = {
+   // setPose uses joint-local Euler angles: faceDir only places face and boot geometry.
+   // For the -z-facing kicker, negative leg rx winds back; positive rx swings toward the camera.
+   windup: {
+-    // 양의 앞기울기로 지지발 위에 몸을 싣고 감은 어깨가 임팩트에서 반대로 풀리게 한다.
+-    spine: [0.32, 0.28, 0.2], neck: [-0.06, 0, 0],
++    spine: [-0.18, 0, -0.10], neck: [-0.06, 0, 0],
+     shL: [-0.52, 0, -0.34], elL: [-0.94, 0, 0.22],
+     shR: [0.48, 0, 0.26], elR: [-0.70, 0, -0.18],
+     hipL: [-0.16, 0, -0.10], knL: [0.24, 0, 0],
+-    hipR: [-0.95, 0, 0.48], knR: [-1.10, 0, 0] // 허벅지를 뒤로 0.95, 옆으로 0.48 돌리고 무릎을 1.10 접어 장화 외곽선을 몸 밖에 둔다.
++    hipR: [-0.50, 0, 0.12], knR: [-0.85, 0, 0]
+   },
+   // Plant releases the backswing before the strike so the foot keeps moving toward -z.
+   plant: {
+-    // 양의 앞기울기로 지지발 위에 몸을 싣고 감은 어깨가 임팩트에서 반대로 풀리게 한다.
+-    spine: [0.44, 0.12, 0.22], neck: [-0.02, 0, 0.06],
++    spine: [-0.34, 0, -0.18], neck: [-0.02, 0, 0.06],
+     shL: [-0.92, 0, -0.58], elL: [-1.16, 0, 0.34],
+     shR: [0.86, 0, 0.44], elR: [-0.52, 0, -0.26],
+     hipL: [-0.24, 0, -0.12], knL: [0.36, 0, 0],
+     hipR: [-0.10, 0, 0.14], knR: [-0.20, 0, 0]
+   },
+   strike: {
+-    // 양의 앞기울기로 지지발 위에 몸을 싣고 감은 어깨가 임팩트에서 반대로 풀리게 한다.
+-    spine: [0.5, -0.24, 0.18], neck: [-0.10, 0, 0],
++    spine: [0.22, 0, 0.12], neck: [-0.10, 0, 0],
+     shL: [-1.10, 0, -0.78], elL: [-0.44, 0, 0.30],
+     shR: [0.96, 0, 0.40], elR: [-0.24, 0, -0.16],
+     hipL: [-0.06, 0, -0.12], knL: [0.16, 0, 0],
+@@ -294,39 +274,35 @@ export const POSES = {
+      네 예비 자세의 실루엣 차이는 pose 게이트가 실제 관절의 월드 좌표로 잰다. */
+   // 인사이드. 골반을 열고 차는 다리를 옆으로 돌린다. 감아 차는 발은 몸을 가로질러 들어온다.
+   windInside: {
+-    // 양의 앞기울기로 지지발 위에 몸을 싣고 감은 어깨가 임팩트에서 반대로 풀리게 한다.
+-    spine: [0.22, 0.32, 0.38], neck: [-0.10, 0, 0.22],
++    spine: [-0.10, 0, 0.34], neck: [-0.10, 0, 0.22],
+     shL: [-0.30, 0, -0.90], elL: [-0.60, 0, 0.60],
+     shR: [0.20, 0, 0.86], elR: [-1.10, 0, -0.30],
+     hipL: [-0.10, 0, -0.34], knL: [0.20, 0, 0],
+-    hipR: [-0.70, 0, 0.90], knR: [-1.05, 0, 0] // 인사이드는 옆으로 0.90 열고 뒤로 0.70 감아 다른 슛과 발 방향을 구별한다.
++    hipR: [-0.46, 0, 0.72], knR: [-0.80, 0, 0]
+   },
+   // 인스텝. 발등으로 곧게 민다. 무릎을 뒤로 접고 상체를 조금 눕혀 축을 세운다.
+   windInstep: {
+-    // 양의 앞기울기로 지지발 위에 몸을 싣고 감은 어깨가 임팩트에서 반대로 풀리게 한다.
+-    spine: [0.32, 0.28, 0.18], neck: [-0.02, 0, 0.04],
++    spine: [-0.30, 0, -0.16], neck: [-0.02, 0, 0.04],
+     shL: [-0.80, 0, -0.62], elL: [-1.10, 0, 0.30],
+     shR: [0.72, 0, 0.44], elR: [-0.60, 0, -0.24],
+     hipL: [-0.22, 0, -0.12], knL: [0.30, 0, 0],
+-    hipR: [-0.90, 0, 0.42], knR: [-1.20, 0, 0] // 인스텝은 무릎을 1.20 접되 옆 벌림을 0.42로 좁혀 곧게 차는 방향을 남긴다.
++    hipR: [-0.62, 0, 0.10], knR: [-0.85, 0, 0]
+   },
+   // 칩. 백스윙이 짧고 상체가 선다. 크게 감으면 퍼올리는 공이 아니라 그냥 강슛이 된다.
+   windChip: {
+-    // 양의 앞기울기로 지지발 위에 몸을 싣고 감은 어깨가 임팩트에서 반대로 풀리게 한다.
+-    spine: [0.12, 0.12, 0.1], neck: [0.10, 0, 0],
++    spine: [-0.06, 0, -0.04], neck: [0.10, 0, 0],
+     shL: [-0.20, 0, -0.18], elL: [-0.50, 0, 0.10],
+     shR: [0.14, 0, 0.14], elR: [-0.36, 0, -0.08],
+     hipL: [-0.08, 0, -0.08], knL: [0.14, 0, 0],
+-    hipR: [-0.42, 0, 0.24], knR: [-0.65, 0, 0] // 칩은 다른 슛의 절반 정도 감아 작은 예비 동작 안에서도 장화가 보이게 한다.
++    hipR: [-0.26, 0, 0.08], knR: [-0.44, 0, 0]
+   },
+   // 강슛. 고관절을 더 뒤로 젖히고 두 팔을 크게 벌려 균형을 잡는다.
+   windPower: {
+-    // 양의 앞기울기로 지지발 위에 몸을 싣고 감은 어깨가 임팩트에서 반대로 풀리게 한다.
+-    spine: [0.44, 0.4, 0.26], neck: [-0.24, 0, 0.06],
++    spine: [-0.46, 0, -0.24], neck: [-0.24, 0, 0.06],
+     shL: [-1.30, 0, -1.10], elL: [-0.70, 0, 0.50],
+     shR: [1.20, 0, 0.80], elR: [-0.30, 0, -0.40],
+     hipL: [-0.34, 0, -0.16], knL: [0.52, 0, 0],
+-    hipR: [-0.98, 0, 0.45], knR: [-1.22, 0, 0] // 강슛은 가장 큰 0.98 뒤감기와 1.22 무릎 접기로 발을 골반 뒤에서 끌어낸다.
++    hipR: [-0.80, 0, 0.14], knR: [-0.75, 0, 0]
+   }
+ };
+ 
+@@ -469,7 +445,7 @@ export function setPose(g, pose, time = 0) {
+ // 안 넘기면 기본 갈색에 기본 반구로 선다.
+ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
+   const whiteMat = new THREE.MeshBasicMaterial({ color: 0xfbfbf5 });
+-  const darkMat = pupilMat.clone(); // 경기장의 알파 마스크 셰이더가 썸네일의 눈과 입에 새지 않게 재질을 분리한다.
++  const darkMat = pupilMat;
+   // 흰자 둘은 표정이 바뀌어도 자리가 그대로다. 한 장으로 붙여야 얼굴 하나가 드로우콜을 아홉 부르지 않는다.
+   const whiteGeos = [];
+   const eyes = [];
+@@ -479,14 +455,14 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
+        먼 거리 기준으로만 깎아 흰자 지름이 머리 반지름의 0.68이었고, 두 개가 얼굴을 덮어
+        파운더가 볼에 검은 김이 붙었다고 짚었다. 그 김은 입이고, 흰자에 밀려 자리가 없었다.
+        가까운 쪽에 맞추고 먼 쪽은 facevis가 지킨다. 그 자가 열다섯 사건에서 얼굴 노출을 잰다. */
+-    const w = new THREE.SphereGeometry(r * 0.203, KIT.sphere, KIT.rings);
++    const w = new THREE.SphereGeometry(r * 0.23, 10, 8);
+     w.scale(1, 1.15, 0.42);
+-    w.translate(s * r * 0.36, r * 0.095, dir * r * 0.9); // 키트 눈 간격과 작은 흰자를 구 표면에 맞춘다.
++    w.translate(s * r * 0.36, r * 0.16, dir * r * 0.78);
+     whiteGeos.push(w);
+     // 동공은 감정마다 따로 늘어난다. 붙이면 한쪽 배율이 반대쪽 눈을 밖으로 민다.
+-    const pupil = new THREE.Mesh(new THREE.SphereGeometry(r * 0.086, KIT.sphere, KIT.rings), darkMat);
+-    pupil.position.set(s * r * 0.36, r * 0.081, dir * r * 0.98); // 흰자 앞에 작은 동공을 둔다.
+-    pupil.scale.set(1, 1.5, 0.6); // 키트의 세로 눈동자 비율이다.
++    const pupil = new THREE.Mesh(new THREE.SphereGeometry(r * 0.115, 8, 6), darkMat);
++    pupil.position.set(s * r * 0.36, r * 0.14, dir * r * 0.99);
++    pupil.scale.set(1, 1.1, 0.5);
+     head.add(pupil);
+     eyes.push(pupil);
+   }
+@@ -495,7 +471,7 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
+   const mouth = new THREE.Mesh(new THREE.SphereGeometry(r * 0.155, 8, 6), darkMat);
+   mouth.position.set(0, -r * 0.4, dir * r * 0.9);
+   // 폭이 좁으면 검은 원이 되어 공의 검은 오각 무늬와 구별이 안 된다. 가로로 눕혀야 입이다.
+-  mouth.scale.set(1.25, 0.38, 0.34); // 얇은 키트 입을 사건 표정의 기준 배율로 쓴다.
++  mouth.scale.set(1.35, 0.6, 0.34);
+   head.add(mouth);
+   // 카메라는 골대 뒤에 있다. 키퍼는 키커를 보므로 화면에 잡히는 건 언제나 뒤통수다.
+   // 구 하나에 정수리 반구만 얹으면 그 아래가 굴곡 없는 살색 판이 되어 머리로 안 읽힌다.
+@@ -504,19 +480,15 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
+   // 껍데기 각과 배율을 등급이 정한다. 색만 바꾸면 네 값이 같은 실루엣을 판다.
+   const cut = hairCut || { wide: 1, tall: 1, phi: 0.42, tilt: 0 };
+   // 늘린 머리도 입 높이 아래로 내려오지 않는다. 반지름 1.05배는 위의 기존 껍데기 두께다.
+-  const hair = new THREE.SphereGeometry(r * 1.05, KIT.sphere, KIT.rings, 0, Math.PI * 2, 0, Math.min(Math.PI * cut.phi, Math.PI * 0.43));
++  const hair = new THREE.SphereGeometry(r * 1.05, 10, 8, 0, Math.PI * 2, 0, Math.min(Math.PI * cut.phi, Math.acos(mouth.position.y / (r * 1.05 * cut.tall))));
+   // 좌우로 죄면 볏이 되고 위로 늘리면 기른 머리가 된다. z는 그대로 둬야 뒤통수를 계속 덮는다.
+-  const hp=hair.attributes.position, hu=hair.attributes.uv;
+-  const height=Math.max(1,cut.tall)+(cut.phi>0.5&&cut.wide>0.9?0.22:0); // 넓은 탈색 헤어는 정수리를 더 세워 기본 커트와 실루엣이 갈리게 한다.
+-  for(let i=0;i<hp.count;i++){
+-    const blend=Math.min(1,hu.getY(i)*6); // 마지막 두 위도 띠만 두피에 접어 등급별 볏 높이를 보존한다. // 아랫단은 두피에 붙이고 정수리만 등급 비율로 늘린다.
+-    hp.setXYZ(i,hp.getX(i)*cut.wide,hp.getY(i)*(1+(height-1)*blend),hp.getZ(i));
+-  }
+-  hair.computeVertexNormals(); // 정수리 덮개는 피부 구보다 커야 낮은 헤어도 피부가 뚫고 나오지 않는다.
++  hair.scale(cut.wide, cut.tall, 1);
+   // 집에서 깎은 머리는 한쪽이 눌린다. 라디안이라 0.07이면 4도쯤이다.
+-  if (cut.tilt) for(let i=0;i<hp.count;i++) hp.setX(i,hp.getX(i)+Math.sin(cut.tilt)*r*hu.getY(i)); // 눌린 정수리만 기울이고 두피 접촉선은 고정한다.
+-  // 정수리 껍질은 머리와 원점을 공유해야 헤어 아랫단이 두피에서 떠 있지 않는다.
+-
++  if (cut.tilt) hair.rotateZ(cut.tilt);
++  hair.translate(0, r * 0.08, -dir * r * 0.1);
++  const nape = new THREE.SphereGeometry(r * 0.98, 10, 8);
++  nape.scale(1, 1, 0.62);
++  nape.translate(0, -r * 0.04, -dir * r * 0.42);
+   /* 목은 머리보다 가늘다. 1.12r로 시작하면 머리보다 굵어 어깨 위에 기둥이 서고,
+      그 위에 밝은 칼라까지 얹혀 있어서 파운더가 목깁스를 찼다고 짚었다.
+      0.62r은 두개골 반지름의 3분의 2로, 사람 목이 머리에 대해 갖는 비율에 가깝다. */
+@@ -525,54 +497,37 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
+   /* 칼라를 뺐다. 머리와 어깨 사이 값이 안 끊긴다는 문제에 실물에 없는 원반을 얹어
+      풀었고, 사람은 없는 물건이 몸에 붙어 있으면 그것을 결함이 아니라 병으로 읽는다.
+      값은 목을 가늘게 해서 끊는다. 가는 목은 양옆에 배경을 남기므로 그 자체가 경계다. */
+-  const shellGeos = [hair, neck]; // 정수리만 머리색으로 덮고 턱까지 내려오는 뒷머리 구는 쓰지 않는다.
+-  const shellColors = [hairTone || 0x2b1d14, skin]; // 목은 피부색이며 수염은 별도 데이터만 칠한다.
++  const shellGeos = [hair, nape, neck];
++  const shellColors = [hairTone || 0x2b1d14, 0x5a4030, 0x2a2018];
+   /* 수염과 묶은 머리. 머리색과 피부색만으로는 백 명이 다섯 얼굴로 뭉친다.
+      이 둘은 실루엣을 바꾸므로 카드 크기에서도, 경기장의 작은 머리에서도 갈린다.
+      수염은 턱과 인중에 붙는 껍데기다. 1은 짧고 2는 덥수룩해서 조금 더 서고 넓다. */
+   const beard = face && face.beard ? face.beard : 0;
+   if (beard) {
+-    // 수염은 피부 구의 턱 표면을 따라가며 입과 볼은 비워 둔다. 면도는 이 분기 자체가 없다.
++    /* 앞의 턱선 고리는 위도 0.54파이에서 시작해 입 창만 남기고 머리를 한 바퀴 감았고,
++       그 띠가 정면에서 양볼에 어두운 조각 둘로 맺혀 파운더가 볼에 김이 붙었다고 짚었다.
++       실측으로 조각의 위 끝이 머리 중심에서 반지름의 0.21 아래인데 입 윗선은 0.40 아래라
++       조각이 볼 한가운데 섰다. 귀에서 내려오는 구레나룻도 그 자리에서 시작하지 않는다.
++       짧은 수염은 입 아래 턱과 인중 두 덩이로 읽힌다. 그 둘만 남긴다.
++       턱수염은 입 아랫선 -0.49r 바로 아래인 -0.52r에서 시작하고 뒷머리를 감싸지 않는다.
++       인중은 입 윗선 -0.31r 위 한 줄이고 폭은 입 반폭 0.21r보다 조금 넓다.
++       볼 높이에는 어느 등급도 아무것도 안 선다. */
++    // 키커의 기존 수염 정체성은 유지한다. 묶은 머리의 긴 수염은 턱끝에 모아 형태를 구별한다.
+     const shape = face.beardShape || (beard === 1 ? 'stubble' : face.tail ? 'goatee' : 'full');
+-    const stubble = shape === 'stubble', goatee = shape === 'goatee';
+-    const shell = stubble ? 1.008 : goatee ? 1.025 : 1.018; // 잔수염은 피부 바로 위, 긴 수염만 턱 실루엣 밖으로 나온다.
+-    const span = Math.PI * (goatee ? 0.24 : stubble ? 1 : 1.1); // 염소수염은 턱끝만, 나머지는 아래턱 양옆까지 덮는다.
+-    const top = Math.acos(-0.52 / shell); // 입 아랫선보다 아래에서 시작해 볼과 입을 비운다.
+-    const chin = new THREE.SphereGeometry(r * shell, 32, 12,
+-      Math.PI * (dir > 0 ? 0.5 : 1.5) - span / 2, span, top, Math.PI - top); // 촘촘한 곡면이 각진 턱띠 대신 턱선을 따라간다.
+-    const jawPos = chin.attributes.position, jawUV = chin.attributes.uv;
+-    for (let i = 0; i < jawPos.count; i++) {
+-      const u = jawUV.getX(i), v = jawUV.getY(i);
+-      const lip = goatee ? -0.58 : stubble ? -0.45 - 0.20 * Math.sin(Math.PI * u) ** 2 : -0.45 - 0.13 * Math.sin(Math.PI * u) ** 2; // 양옆은 잔수염의 -0.45 경계까지 내리고 차이 0.13만 휘어 입 아래 -0.58과 턱의 앞쪽 부피를 보존한다.
+-      const begin = Math.acos(lip / shell), theta = begin + (Math.PI - begin) * (1 - v); // 기존 구의 위도를 다시 배치해 일자 턱띠를 없앤다.
+-      const phi = Math.atan2(jawPos.getZ(i), jawPos.getX(i));
+-      const full = !stubble && !goatee;
+-      const depth = full ? (Math.sin((1 - v) * Math.PI) * 0.60 + (1 - v) * 0.35) * r : 0; // 중간은 반경의 60% 부풀리고 끝은 35% 앞에 남겨 턱 아래로 이어지는 둥근 덩어리를 만든다.
+-      const drop = full ? (1 - v) * r * 0.70 : 0; // 턱 아래 반경의 70%까지 내려 잔수염과 풍성한 수염의 외곽선을 나눈다.
+-      jawPos.setXYZ(i, r * shell * Math.sin(theta) * Math.cos(phi), r * shell * Math.cos(theta) - drop, r * shell * Math.sin(theta) * Math.sin(phi) + dir * depth);
+-    }
+-    if (goatee) chin.scale(1, 1.08, 1); // 턱끝에만 짧은 술을 내려 둥근 공처럼 보이지 않게 한다.
+-    chin.computeVertexNormals();
+-    const musSpan = Math.PI * (goatee ? 0.13 : 0.20); // 콧수염은 입 폭 안팎의 얇은 조각이며 뺨으로 번지지 않는다.
+-    const musTop = Math.acos(-0.22 / shell), musBottom = Math.acos(-0.29 / shell); // 입 윗선과 콧수염 사이 피부 여백을 남긴다.
+-    const mus = new THREE.SphereGeometry(r * shell, 24, 4,
+-      Math.PI * (dir > 0 ? 0.5 : 1.5) - musSpan / 2, musSpan, musTop, musBottom - musTop); // 가는 윗입술 그림자를 매끄러운 곡면으로 만든다.
+-    const musPos = mus.attributes.position, musUV = mus.attributes.uv;
+-    for (let i = 0; i < musPos.count; i++) {
+-      const u = musUV.getX(i), v = musUV.getY(i);
+-      const middle = -0.25 + 0.035 * Math.cos(u * Math.PI * 2); // 인중에서 양끝으로 올라가는 짧은 콧수염 곡선이다.
+-      const y = middle + (v - 0.5) * 0.07 * Math.sin(u * Math.PI); // 양끝 두께를 줄여 직사각형 검은 띠가 되지 않게 한다.
+-      const phi = Math.atan2(musPos.getZ(i), musPos.getX(i)), radius = Math.sqrt(shell * shell - y * y) * r;
+-      musPos.setXYZ(i, radius * Math.cos(phi), y * r, radius * Math.sin(phi));
+-    }
+-    mus.computeVertexNormals();
++    const c = beard === 2 ? { rad: 1.06, mus: 0.16 } : { rad: 1.02, mus: 0.14 };
++    // 껍데기는 y를 0.06r 내려 쓰므로 높이를 위도로 바꿀 때 그만큼 되돌린다.
++    const lat = (y) => Math.acos((y + 0.06) / c.rad);
++    // 턱 앞면만 덮는다. 0.24파이는 턱끝, 0.8파이는 짧은 수염, 1.1파이는 앞턱 양옆까지다.
++    const span = Math.PI * (shape === 'goatee' ? 0.24 : shape === 'stubble' ? 0.8 : 1.1);
++    const chin = new THREE.SphereGeometry(r * c.rad, 12, 6,
++      Math.PI * (dir > 0 ? 0.5 : 1.5) - span / 2, span,
++      lat(-0.52), Math.PI - lat(-0.52));
++    const mus = new THREE.SphereGeometry(r * c.rad, 12, 3,
++      Math.PI * (0.5 - c.mus * 0.5 + (dir > 0 ? 0 : 1)), Math.PI * c.mus,
++      lat(-0.20), lat(-0.31) - lat(-0.20));
+     for (const g of [chin, mus]) {
+-      if (stubble) {
+-        const shade = flatVertex(0xffffff); // 흰 재질에 독립된 수염색 정점만 곱한다.
+-        shade.transparent = true; shade.opacity = 0.45; shade.depthWrite = false; // 잔수염은 피부 윤곽을 보존하는 얇은 음영이다.
+-        head.add(new THREE.Mesh(mergeGeos([g], [face.beardTone ?? 0x1c1712]), shade)); // 염색 색은 이 표면에 들어오지 않는다.
+-        continue;
+-      }
++      g.scale(1, 1, c.rad);
++      g.translate(0, -r * 0.06, 0);
+       shellGeos.push(g);
+       // 수염은 독립된 짙은 갈색이다. 기존 기본색을 유지해 염색이 턱으로 새지 않는다.
+       shellColors.push(face.beardTone ?? 0x1c1712);
+@@ -607,7 +562,7 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
+ // 사지에는 외곽선을 안 건다. 팔 여덟 개가 각자 복제본을 달면 드로우콜이 두 배가 되고,
+ // 가늘어서 어차피 선만 남는다. 실루엣을 만드는 건 몸통과 머리다.
+ function seg(radius, len, color, tag, salt, cuff, span, girth, ink) {
+-  const geo = capsuleGeometry(radius, len);
++  const geo = new THREE.CapsuleGeometry(radius, len, 3, 6);
+   geo.translate(0, -len / 2, 0);
+   // 마디 중간에 밝은 띠를 하나 병합한다. 드로우콜은 그대로다.
+   // 피벗 쪽에 두면 어깨 구와 몸통 측면에 묻혀 화면에 안 나온다.
+@@ -632,7 +587,7 @@ function seg(radius, len, color, tag, salt, cuff, span, girth, ink) {
+   }
+   m.name = tag;
+   // 사지는 얇다. 0.035를 그대로 주면 팔이 끊어진 것처럼 잘록해진다.
+-
++  jitterMesh(m, 0.012, salt);
+   return m;
+ }
+ 
+@@ -652,27 +607,14 @@ function buildBody(o) {
+ 
+   // 품과 기장을 등급이 정한다. 뼈대는 안 건드린다. 관절을 같이 늘리면 팔이 몸통에서 떨어진다.
+   const kc = o.kitCut || { girth: 1, len: 1, pad: 0 };
+-  const rigRadius = o.tag === 'keeper' ? o.torsoR * 0.55 / 0.85 : 0.16; // 기존 관절 높이를 보존해 몸통 폭이 사건 포즈의 누움 판정을 바꾸지 않게 한다.
+-  const torsoHeight = o.tag === 'keeper' ? 0.85 : 1; // 비평의 15% 단축을 목에도 적용해 머리를 짧은 장난감 몸통에 붙인다.
+-  const neckY = ((o.torsoLen + rigRadius) * kc.len - rigRadius * 0.18) * torsoHeight; // 사건 포즈의 기존 목 앵커다.
+-  const torsoGeo = capsuleGeometry(o.torsoR, o.torsoLen);
++  const torsoGeo = new THREE.CapsuleGeometry(o.torsoR, o.torsoLen, 3, 8);
+   torsoGeo.translate(0, o.torsoLen / 2, 0);
+   torsoGeo.scale(kc.girth, kc.len, kc.girth);
+-  torsoGeo.scale(1, (neckY - o.headR * 0.1) / ((o.torsoLen + o.torsoR) * kc.len), 1); // 넓힌 몸통의 윗끝을 턱 아래로 내려 얼굴과 수염을 가리지 않는다.
+-  if (o.tag === 'keeper') {
+-    const positions = torsoGeo.attributes.position;
+-    for (let i = 0; i < positions.count; i++) {
+-      const lower = 1 - THREE.MathUtils.clamp(positions.getY(i) / neckY, 0, 1); // 목에서 골반까지 기존 높이를 정규화한다.
+-      const breadth = 1 + 0.15 * lower * kc.girth * kc.girth; // 기본 몸의 골반은 15% 넓히고 품이 큰 면티는 밑단을 더 퍼뜨려 몸에 붙는 체육복과 구별한다.
+-      positions.setXYZ(i, positions.getX(i) * breadth, positions.getY(i), positions.getZ(i) * breadth);
+-    }
+-    torsoGeo.computeVertexNormals();
+-  }
+   // 유니폼 한 장이 단색이면 사람이 아니라 색 견본이다. 구겨진 명암이 옷을 옷으로 만든다.
+-  const torso = new THREE.Mesh(torsoGeo, flat(o.shirt));
++  const torso = new THREE.Mesh(torsoGeo, flatMap(o.shirt, clothTex()));
+   torso.name = tag;
+-
+-
++  jitterMesh(torso, 0.022, 3);
++  addOutline(torso, 0.05);
+   spine.add(torso);
+ 
+   /* 목은 몸통 위에 선다. 상의 등급이 몸통을 세로 kc.len으로 늘리는데 이 자리를 원래
+@@ -685,13 +627,13 @@ function buildBody(o) {
+      머리를 몸통 꼭대기까지 올려 머리가 몸에서 떨어져 보인다. 파운더가 그 둘을 차례로 짚었다.
+      0.18은 눈이 뜨는 선에서 머리를 가장 낮게 놓는 자리다. 실측으로 가장 나쁜 등급이 0.006m다.
+      두 조건이 반대 방향이라 여유를 더 주면 다시 떠오르므로 이 값은 최대가 아니라 경계다. */
+-  const neck = joint(spine, 0, neckY, 0);
+-  const head = new THREE.Mesh(new THREE.SphereGeometry(o.headR, KIT.sphere, KIT.rings), flat(o.skin));
++  const neck = joint(spine, 0, (o.torsoLen + o.torsoR) * kc.len - o.torsoR * 0.18, 0);
++  const head = new THREE.Mesh(new THREE.SphereGeometry(o.headR, 10, 8), flat(o.skin));
+   head.name = tag;
+   head.position.y = o.headR * 0.92;
+   // 머리는 작다. 몸통과 같은 진폭을 주면 두개골이 찌그러진 것으로 읽힌다.
+-
+-
++  jitterMesh(head, 0.008, 11);
++  addOutline(head, 0.045);
+   addFace(head, o.headR, o.faceDir, o.skin, o.hair, o.hairCut, o.face);
+   neck.add(head);
+ 
+@@ -708,13 +650,13 @@ function buildBody(o) {
+     const sh = joint(spine, side * o.shoulderX, o.torsoLen * 0.92, 0);
+     // 어깨에 살이 없으면 팔이 몸통 옆에 떠 있는 별개 물체로 읽힌다.
+     // 팔을 어느 각도로 돌려도 피벗에 있는 이 구가 몸통과 팔 사이를 메운다.
+-    const delt = new THREE.Mesh(new THREE.SphereGeometry(o.armR * 1.45, KIT.sphere, KIT.rings), flat(o.sleeve));
++    const delt = new THREE.Mesh(new THREE.SphereGeometry(o.armR * 1.45, 8, 6), flat(o.sleeve));
+     delt.name = tag;
+-
++    jitterMesh(delt, 0.015, side < 0 ? 25 : 26);
+     sh.add(delt);
+     // 어깨 스펀지. 상의 색이라 무엇이 두꺼워졌는지가 그 옷의 색으로 읽힌다.
+     // 어깨 삼각근 구가 반지름 1.45라, 그 안에 넣으면 스펀지를 사도 화면이 그대로다.
+-    // 구 위로 올려 얹어 어깨선이 둥글고 넓어진 것이 보이게 한다.
++    // 구 위로 올려 얹어야 어깨선이 각지고 넓어진 것이 보인다.
+     if (kc.pad) {
+       /* 폭을 팔 반지름으로만 잡으면 그 폭이 키만 따라간다. 품은 몸무게가 정하므로, 짧고 무거운 몸은
+          상의가 옆으로 가장 넓어지는 자리에서 스펀지가 가장 작다. 실측 165/96에서 1등급과 3등급이 칠한
+@@ -724,17 +666,14 @@ function buildBody(o) {
+          0.112에서 0.047로 줄었다. */
+       const th = o.armR * 1.1 * kc.pad;
+       const wide = o.armR * 1.9 + o.torsoR * kc.girth * 0.9;
+-      const padGeo = new THREE.SphereGeometry(1, KIT.sphere, KIT.rings); // 기존 머리와 같은 구 표면을 재사용해 턱 옆의 상자 모서리를 없앤다.
+-      padGeo.scale(wide / 2, th / 2, o.armR * 2.7 / 2); // 기존 패드의 폭·높이·깊이를 반축으로 바꾸어 어깨 바깥의 부피만 둥글게 남긴다.
+-      const pad = new THREE.Mesh(padGeo, flat(o.shirt));
+-      pad.userData.shoulderPad = true;
++      const pad = new THREE.Mesh(new THREE.BoxGeometry(wide, th, o.armR * 2.7), flat(o.shirt));
+       pad.name = tag;
+-
++      jitterMesh(pad, 0.015, side < 0 ? 27 : 28);
+       /* 몸통 껍질 폭 0.05를 어깨 여유의 단위로 쓴다. 준비 자세의 어깨는 기울어 있어 로컬 y만
+          올리면 스펀지가 목 안으로 들어간다. 작은 스펀지는 덜 올리고 두꺼운 저지는 더 솟는다.
+          외곽선은 handmade.mjs의 addOutline을 장갑과 축구화의 폭 0.028로 그대로 쓴다. */
+-      pad.position.set(side * (o.armR * 1.1 + Math.max(1, kc.pad) * 0.05), o.armR * 1.15 + th * 0.3 - 0.05, o.armR * 1.2); // 넓은 상체 앞쪽에 어깨 패드를 앉혀 양쪽이 가려지지 않게 한다.
+-
++      pad.position.set(side * (o.armR * 0.45 + Math.max(1, kc.pad) * 0.05), o.armR * 1.15 + th * 0.3 - 0.05, 0);
++      addOutline(pad, 0.028);
+       sh.add(pad);
+     }
+     const upper = seg(o.armR, o.upperLen, o.sleeve, tag, side < 0 ? 21 : 22, o.cuffSleeve, o.cuffSpan, o.cuffGirth, o.inkGrade);
+@@ -752,10 +691,8 @@ function buildBody(o) {
+       const s = o.gloveSize * gc.bulk;
+       // 정육면체는 어느 각도에서 봐도 노란 상자다. 벗겨져 날아가는 순간에는 카드 한 장으로 읽혔다.
+       // 손바닥, 엄지, 손목밴드를 하나로 병합한다. 실루엣이 벙어리장갑이 되고 드로우콜은 그대로 하나다.
+-      const palm = new THREE.SphereGeometry(s * 0.5, KIT.sphere, KIT.rings); // 기존 손 폭 안에서 벙어리장갑을 둥글게 만든다.
+-      palm.scale(1, 1.15, 0.5); // 장갑 앵커와 등급별 폭을 보존한다.
+-      const thumb = new THREE.SphereGeometry(s * 0.26, KIT.sphere, KIT.rings); // 엄지는 손바닥보다 작은 둥근 덩어리다.
+-      thumb.scale(0.85, 1, 0.88); // 기존 엄지의 접촉 범위를 보존한다.
++      const palm = new THREE.BoxGeometry(s, s * 1.15, s * 0.5);
++      const thumb = new THREE.BoxGeometry(s * 0.44, s * 0.52, s * 0.46);
+       thumb.translate(side * s * 0.6, s * 0.1, 0);
+       const cuffH = s * 0.32 * gc.cuff;
+       const cuff = new THREE.BoxGeometry(s * 1.12, cuffH, s * 0.58);
+@@ -775,16 +712,14 @@ function buildBody(o) {
+            수로는 못 고친다. col과 row가 n의 홀짝과 n<=2로만 갈려서 다섯을 넘긴 빨판은 같은
+            다섯 자리에 겹쳐 쌓인다. 실측: 돌기를 아예 빼면 이 선반의 최악 쌍이 0.801에서
+            0.853으로 오른다. */
+-        pip.translate(col * s * 0.28, row * s * 0.3, s * 0.26); // 둥근 손바닥 가장자리에도 빨판 뒷면이 닿도록 얕게 붙인다.
++        pip.translate(col * s * 0.28, row * s * 0.3, s * 0.42);
+         hand.push(pip);
+       }
+       const gv = new THREE.Mesh(mergeGeos(hand), flatMap(o.gloveTone || 0xf2d64b, clothTex()));
+       gv.name = tag;
+-      gv.userData.partVertices = hand.map(g => g.attributes.position.count); // 합친 장갑의 조각 경계를 계기가 실제 기하에서 읽는다.
+-      gv.geometry.computeBoundingBox();
+       // 장갑은 화면에서 가장 자주 보는 물건이다. 직육면체 그대로면 여기서 티가 제일 크게 난다.
+-
+-
++      jitterMesh(gv, 0.02, side < 0 ? 31 : 32);
++      addOutline(gv, 0.028);
+       gv.position.set(0, -o.foreLen - s * 0.2, 0);
+       el.add(gv);
+       gloves.push(gv);
+@@ -793,8 +728,8 @@ function buildBody(o) {
+       // 장갑만 날리면 팔가 끝에서 잘린 것으로 보인다.
+       const bh = new THREE.Mesh(new THREE.SphereGeometry(o.gloveSize * 0.42, 8, 6), flat(o.skin));
+       bh.name = tag;
+-
+-
++      jitterMesh(bh, 0.02, side < 0 ? 33 : 34);
++      addOutline(bh, 0.028);
+       bh.position.set(0, -o.foreLen - o.gloveSize * 0.16, 0);
+       bh.visible = false;
+       el.add(bh);
+@@ -812,7 +747,7 @@ function buildBody(o) {
+     if (sc.guard) {
+       const gd = new THREE.Mesh(new THREE.BoxGeometry(o.legR * 1.3, o.shinLen * 0.62, o.legR * 0.5 * sc.guard), flat(o.socks));
+       gd.name = tag;
+-
++      jitterMesh(gd, 0.012, side < 0 ? 45 : 46);
+       gd.position.set(0, -o.shinLen * 0.46, o.faceDir * o.legR * 0.78);
+       kn.add(gd);
+     }
+@@ -820,7 +755,7 @@ function buildBody(o) {
+     if (sc.band) {
+       const bd = new THREE.Mesh(new THREE.CylinderGeometry(o.legR * 1.15 * sc.band, o.legR * 1.15 * sc.band, o.shinLen * 0.22, 8), flat(o.socks));
+       bd.name = tag;
+-
++      jitterMesh(bd, 0.012, side < 0 ? 47 : 48);
+       bd.position.set(0, -o.shinLen * 0.86, 0);
+       kn.add(bd);
+     }
+@@ -833,16 +768,13 @@ function buildBody(o) {
+       const bc = o.bootCut || { sole: 1, long: 1, wide: 1, pips: 0, pip: 0, girth: 1 };
+       const sole = o.legR * 0.9 * bc.sole;
+       const span = o.bootLen * (bc.long || 1);
+-      // Three.js MIT 구를 기존 신발 봉투에 맞춰 눌러 둥근 발끝을 만들고 장비별 치수를 보존한다.
+-      const toe = new THREE.SphereGeometry(1, KIT.sphere, KIT.rings); // 공유 키트의 분할을 사용한다.
+-      toe.scale(o.legR * 1.5 * (bc.wide || 1) / 2, sole / 2, span / 2); // 기존 상자 폭과 높이와 길이의 절반이 구의 반축이다.
+-      const parts = [toe];
++      const parts = [new THREE.BoxGeometry(o.legR * 1.5 * (bc.wide || 1), sole, span)];
+       // 돌기는 두 줄로 깐다. 한 줄이면 발바닥이 아니라 톱니로 읽힌다.
+       const rows = Math.ceil(bc.pips / 2);
+       for (let n = 0; n < bc.pips; n++) {
+         const col = n % 2 === 0 ? -1 : 1;
+         const row = Math.floor(n / 2);
+-        const len = o.legR * 0.32 * bc.pip; // 스파이크 돌기를 늘려 짧은 스터드와 카드 외곽선이 겹치지 않게 한다.
++        const len = o.legR * 0.26 * bc.pip;
+         const th = o.legR * 0.2 * (bc.girth || 1);
+         const pip = new THREE.BoxGeometry(th, len, th);
+         // 앞뒤로 고르게 편다. rows가 1이면 가운데 하나다.
+@@ -853,7 +785,7 @@ function buildBody(o) {
+       const boot = new THREE.Mesh(mergeGeos(parts), flat(o.bootTone || 0x2a241c));
+       boots.push(boot);
+       boot.name = tag;
+-
++      jitterMesh(boot, 0.016, side < 0 ? 51 : 52);
+       // 발끝은 얼굴이 보는 쪽으로 나간다. 뒤꿈치는 발목 밑에 남긴다.
+       boot.position.set(0, -o.shinLen - o.legR * 0.36, o.faceDir * (o.bootLen * 0.28));
+       kn.add(boot);
+@@ -867,7 +799,6 @@ function buildBody(o) {
+   g.userData.arms = arms;
+   g.userData.head = head;
+   g.userData.torso = torso;
+-  g.userData.contactFeet = boots; // 장갑 없는 키커도 발 접촉 음영에 같은 앵커를 제공한다.
+   setPose(g, o.rest, 0);
+   standOnGround(g);
+   if (gloves.length) {
+@@ -887,12 +818,11 @@ export function buildKeeper(height, weight, look) {
+   const g = buildBody({
+     tag: 'keeper',
+     hipY: h * 0.47,
+-    torsoR: w * 0.85, torsoLen: h * 0.27, // 넉넉한 키트 몸통을 기존 척추 길이에 붙인다.
+-    headR: h * 0.14, faceDir: 1, // 머리를 몸통 폭과 비슷하게 키워 장난감 비율로 읽힌다.
+-    shoulderX: w * 0.644, armR: h * 0.048, // 0.56×1.15인 어깨 폭으로 팔이 넓어진 옷 안에 잠기지 않게 한다.
++    torsoR: w * 0.55, torsoLen: h * 0.27,
++    headR: h * 0.082, faceDir: 1,
++    shoulderX: w * 0.56, armR: h * 0.048,
+     upperLen: h * 0.17, foreLen: h * 0.16,
+-    hipX: w * 0.48 * 1.15, legR: w * 0.45 * 1.15, // 비평의 15% 하반신 확장을 다리 간격에도 주어 발 사이 틈을 보존한다.
+-    // 몸통 반폭의 절반에 두툼한 다리를 두어 막대처럼 보이는 후면을 고친다.
++    hipX: w * 0.34, legR: w * 0.24,
+     thighLen: h * 0.21, shinLen: h * 0.20,
+     gloveSize: h * 0.115, bootLen: h * 0.14,
+     // 반바지·양말·축구화가 전부 검정에 가까워 하반신이 기둥 하나로 뭉쳤다.
+@@ -925,11 +855,11 @@ export function buildKicker(face) {
+   const g = buildBody({
+     tag: 'kicker',
+     hipY: 0.88,
+-    torsoR: 0.25, torsoLen: 0.48, // 키커도 키퍼와 같은 둥근 몸통 폭을 쓴다.
+-    headR: 0.26, faceDir: -1, // 키커 얼굴도 같은 키트의 큰 머리 비율이다.
++    torsoR: 0.16, torsoLen: 0.48,
++    headR: 0.145, faceDir: -1,
+     shoulderX: 0.17, armR: 0.05,
+     upperLen: 0.30, foreLen: 0.28,
+-    hipX: 0.15, legR: 0.14, // 키퍼와 같은 짧고 두툼한 장난감 다리 비율이며 양발 사이 틈을 남긴다.
++    hipX: 0.10, legR: 0.085,
+     thighLen: 0.40, shinLen: 0.38,
+     gloveSize: 0, bootLen: 0.24,
+     // 카메라가 골대 뒤에 있어 크로스바가 키커의 다리를 가로로 자른다.
+@@ -944,11 +874,7 @@ export function buildKicker(face) {
+   return g;
+ }
+ 
+-const T = THREE; // 검증한 키트의 Three.js 기하와 관절 배선을 같은 렌더 모듈에서 쓴다.
+-// Three.js MIT CapsuleGeometry와 Quaternion.setFromUnitVectors를 그대로 사용하고 비율만 바꾼다: https://threejs.org/docs/pages/CapsuleGeometry.html
+-// 수치는 세계 미터 대신 머리가 넉넉한 장난감 비율이며 캡슐 끝이 관절을 덮도록 정했다.
+-const C = {cap:6, radial:16, sphere:20, rings:14, roughness:0.9, hip:0.73, chest:1.13, head:1.87, radius:0.37, torso:0.35, length:0.32, shoulder:0.4, arm:0.12, leg:0.14, foot:0.105, stride:0.92, lift:0.19};
+-// 피부와 옷은 참조 화면처럼 무광의 큰 색면으로 나누고 소품마다 실루엣을 다르게 잡았다.
++// 개최지별 의상 팔레트와 이름은 상태 풀의 식별자를 그대로 쓴다. 몸은 승인된 행인 기하가 소유한다.
+ export const PASSER_VARIANTS = [
+   {id:'keeper',name:'골키퍼',shirt:0x168f89,pants:0x233d55,skin:0xdca078,hair:0x322821,width:1.08,height:1,prop:'gloves'}, // 넓은 상체와 청록색은 골키퍼를 먼저 읽게 한다.
+   {id:'kicker',name:'키커',shirt:0xe56b4b,pants:0xf0e8d7,skin:0x995f42,hair:0x292627,width:0.96,height:1.04,prop:'band'}, // 주황과 밝은 반바지는 키퍼와 반대 색면이다.
+@@ -960,201 +886,10 @@ export const PASSER_VARIANTS = [
+   {id:'elder',name:'어르신',shirt:0xa28aad,pants:0x5f6178,skin:0xc9977e,hair:0xdbd7cc,width:0.98,height:0.89,prop:'cane'}, // 낮은 키와 지팡이로 과도한 허리 굽힘 없이 구별한다.
+   {id:'fashion',name:'패셔니스타',shirt:0xb84f56,pants:0x763b49,skin:0xe6b28c,hair:0x413036,width:0.94,height:1.07,prop:'bag'} // 성인 코트, 선글라스와 가방으로만 매력을 표현한다.
+ ];
+-// 원경은 각 분할을 절반으로 줄인다. 근경 비교판에는 원래 분할을 그대로 남긴다.
+-const FAR = {sphere:10, rings:7, cap:3, radial:8};
+-const walkerCapsules = new Map();
+-const walkerGeometries = [new WeakMap(), new WeakMap()]; // 근경과 원경의 불변 기하를 각각 공유한다.
+-function walkerCapsule(r, length) {
+-  const key = r + ':' + length;
+-  if (!walkerCapsules.has(key)) walkerCapsules.set(key, capsuleGeometry(r, length));
+-  return walkerCapsules.get(key);
+-}
+-// Three.js MIT BatchedMesh, LOD와 onBeforeCompile을 재사용하고 기존 캡슐 변형만 셰이더에 옮긴다.
+-// 출처: https://threejs.org/docs/pages/BatchedMesh.html · https://threejs.org/docs/pages/LOD.html · https://threejs.org/docs/pages/Material.html
+-function roundedStretch(material) {
+-  const stretchShader = shader => {
+-    // 0은 강체, 양수는 캡슐 중심 길이다. 2로 나눈 양끝 이동은 기존 CPU 식과 같다.
+-    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute float capsuleHeight;')
+-      .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
+-        if (capsuleHeight > 0.0) objectNormal.y *= length(batchingMatrix[1].xyz) / length(batchingMatrix[0].xyz);`)
+-      .replace('#include <begin_vertex>', `#include <begin_vertex>
+-        if (capsuleHeight > 0.0) {
+-          float stretch = length(batchingMatrix[1].xyz) / length(batchingMatrix[0].xyz);
+-          float end = sign(position.y) * capsuleHeight / 2.0;
+-          transformed.y = end + (position.y - end) / stretch;
+-        }`);
+-  };
+-  // 전경 알파 태그가 나중에 연결되어도 관절 변형을 덮어쓰지 않고 두 패치를 함께 실행한다.
+-  let surfaceShader = () => {};
+-  Object.defineProperty(material,'onBeforeCompile',{
+-    get:()=>shader=>{stretchShader(shader);surfaceShader(shader);},
+-    set:shader=>{surfaceShader=shader;}
+-  });
+-  material.customProgramCacheKey = () => 'walker-rounded-stretch';
+-  return material;
+-}
+-const walkerSurface = () => roundedStretch(new T.MeshStandardMaterial({color:0xffffff, roughness:C.roughness, vertexColors:true})); // 흰 재질은 리그마다 만들어 전경 알파 태그가 썸네일로 새지 않게 한다.
+-const walkerDepth = roundedStretch(new T.MeshDepthMaterial()); // 본체와 그림자가 같은 둥근 끝을 쓴다.
+-function walkerGeometry(source, far, stretch = false) {
+-  const cache = walkerGeometries[Number(far)];
+-  let variants = cache.get(source);
+-  if (!variants) { variants = new Map(); cache.set(source, variants); }
+-  if (variants.has(stretch)) return variants.get(stretch);
+-  const p = source.parameters;
+-  let geo = source.clone();
+-  if (far && source.type === 'SphereGeometry') geo = new T.SphereGeometry(p.radius,FAR.sphere,FAR.rings,p.phiStart,p.phiLength,p.thetaStart,p.thetaLength);
+-  if (far && source.type === 'CapsuleGeometry') geo = new T.CapsuleGeometry(p.radius,p.height,FAR.cap,FAR.radial,p.heightSegments);
+-  // 색을 갖지 않는 공유 구와 캡슐에도 같은 속성을 달아 한 배치에서 재사용한다.
+-  const colored = mergeGeos([geo], [0xffffff]);
+-  geo.dispose();
+-  colored.setAttribute('capsuleHeight',new T.Float32BufferAttribute(new Float32Array(colored.attributes.position.count).fill(stretch ? p.height : 0),1));
+-  variants.set(stretch,colored);
+-  return colored;
+-}
+-function batchWalker(rig) {
+-  const moving = new Set([...rig.arms.flatMap(a=>[a.arm,a.fore,a.hand]),...rig.legs.flatMap(l=>[l.thigh,l.shin]),...rig.feet]);
+-  const rigid = [rig.hips,rig.chest,rig.head,rig.accessory].map(node=>({node,parts:node.children.filter(m=>m.isMesh&&!moving.has(m))})).filter(g=>g.parts.length);
+-  const records = [...rigid,...[...moving].map(node=>({node}))];
+-  const lod = new T.LOD();
+-  const owned = [];
+-  const surface = walkerSurface();
+-  const batches = [false,true].map(far=>{
+-    const geometries = records.map(({node,parts})=>{
+-      if (!parts) return walkerGeometry(node.geometry,far,Boolean(node.userData.limb));
+-      // 같은 관절의 강체 조각만 합친다. 머리와 소품의 서로 다른 흔들림은 합치지 않는다.
+-      const pieces = parts.map(m=>walkerGeometry(m.geometry,far).clone().applyMatrix4(m.matrix));
+-      const geo = mergeGeos(pieces,parts.map(m=>m.material.color.getHex()));
+-      pieces.forEach(g=>g.dispose());
+-      geo.setAttribute('capsuleHeight',new T.Float32BufferAttribute(new Float32Array(geo.attributes.position.count),1));
+-      owned.push(geo);return geo;
+-    });
+-    const unique = [...new Set(geometries)];
+-    const batch = new T.BatchedMesh(records.length,unique.reduce((n,g)=>n+g.attributes.position.count,0),unique.reduce((n,g)=>n+g.index.count,0),surface);
+-    batch.sortObjects = false;batch.perObjectFrustumCulled = false;
+-    batch.castShadow = true;batch.receiveShadow = true;batch.customDepthMaterial = walkerDepth;
+-    const ids = new Map(unique.map(g=>[g,batch.addGeometry(g)]));
+-    const instances = geometries.map((g,i)=>{
+-      const id=batch.addInstance(ids.get(g));
+-      batch.setColorAt(id,records[i].parts ? new T.Color(0xffffff) : records[i].node.material.color);
+-      return id;
+-    });
+-    // 18은 전신 비교판의 11.5 거리에서는 근경을, 펜스 너머 행인에는 원경을 선택하는 렌더 경계다.
+-    lod.addLevel(batch,far ? 18 : 0);
+-    return {batch,instances};
+-  });
+-  rig.root.traverse(m=>{if(m.isMesh)m.visible=false;});
+-  rig.root.add(lod);rig.lod=lod;
+-  const inverse=new T.Matrix4(),matrix=new T.Matrix4();
+-  rig.sync=()=>{
+-    inverse.copy(rig.root.matrixWorld).invert();
+-    for (const {batch,instances} of batches) {
+-      records.forEach(({node},i)=>batch.setMatrixAt(instances[i],matrix.multiplyMatrices(inverse,node.matrixWorld)));
+-      batch.computeBoundingSphere();
+-      batch.boundingSphere.radius += C.radius; // 압축된 관절의 둥근 끝도 머리 반경 여유 안에 들어 절두체가 자르지 않는다.
+-    }
+-  };
+-  rig.dispose=()=>{batches.forEach(({batch})=>batch.dispose());owned.forEach(g=>g.dispose());surface.dispose();};
+-  rig.sync();
+-}
+-const sphere = new T.SphereGeometry(1,C.sphere,C.rings); // 단위 구를 공유해 얼굴과 소품의 생성 비용을 줄인다.
+-const up = new T.Vector3(0,1,0); // 캡슐의 기본 축이다.
+-const mats = new Map();
+-function material(color){if(!mats.has(color))mats.set(color,new T.MeshStandardMaterial({color,roughness:C.roughness}));return mats.get(color);}
+-function ball(parent,color,pos,scale){const m=new T.Mesh(sphere,material(color));m.position.set(...pos);m.scale.set(...scale);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
+-function capsule(parent,color,r,length,pos){const m=new T.Mesh(walkerCapsule(r,length),material(color));m.position.set(...pos);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
+-function group(parent,pos){const g=new T.Group();g.position.set(...pos);parent.add(g);return g;}
+-function limb(parent,color,r){const m=capsule(parent,color,r,0.15,[0,0,0]);m.userData.limb=true;return m;} // 중심 구간을 짧은 0.15 구간으로 만들어 늘려도 둥근 관절 끝이 납작해지지 않게 한다.
+-function between(m,a,b,r){
+-  const av=new T.Vector3(...a),bv=new T.Vector3(...b),distance=av.distanceTo(bv);
+-  m.position.copy(av).add(bv).multiplyScalar(0.5); // 끝점 사이 중앙에 캡슐을 놓는다.
+-  m.quaternion.setFromUnitVectors(up,bv.clone().sub(av).normalize());
+-  // 중심 원통만 늘리고 끝 반구는 배치 셰이더에서 역보정한다. 정점 버퍼는 자세마다 다시 쓰지 않는다.
+-  m.scale.y=(distance-r)/m.geometry.parameters.height;
+-} // 캡슐 중심선이 관절 끝점까지 닿으므로 둥근 끝이 관절을 충분히 덮는다.
+-export function buildWalker(v=PASSER_VARIANTS[0]){
+-  const root=new T.Group(), hips=group(root,[0,C.hip,0]), chest=group(hips,[0,C.chest-C.hip,0]); // 원점은 지면이고 골반과 가슴은 따로 회전한다.
+-  root.scale.set(v.width,v.height,v.width);
+-  capsule(chest,v.shirt,C.torso,C.length,[0,0,0]);
+-  ball(hips,v.pants,[0,0,0],[0.31,0.23,0.25]); // 바지의 둥근 골반은 몸통과 다리의 틈만 채운다.
+-  const head=group(chest,[0,C.head-C.chest,0]);
+-  ball(head,v.skin,[0,0,0],[C.radius,C.radius*1.04,C.radius*0.94]); // 머리는 몸통보다 크고 정면만 살짝 평평하다.
+-  const hair=new T.Mesh(new T.SphereGeometry(C.radius*1.02,C.sphere,C.rings,0,Math.PI*2,0,Math.PI*0.43),material(v.hair)); // 정수리만 덮어 턱을 감싸는 머리카락 회귀를 막는다.
+-  hair.scale.y=1.08;head.add(hair);hair.castShadow=true; // 머리의 세로 배율보다 높여 정수리에 피부가 뚫리지 않게 한다.
+-  for(const side of [-1,1]){ // 양쪽 귀와 눈을 같은 정면에 둔다.
+-    ball(head,v.skin,[side*0.35,-0.015,0],[0.07,0.1,0.065]); // 귀는 실루엣을 깨되 머리보다 작다.
+-    ball(head,0xfaf7e9,[side*0.135,0.035,0.321],[0.075,0.086,0.035]); // 눈 간격은 코가 겹치지 않는 머리 폭의 삼분의 일이다.
+-    ball(head,0x272c31,[side*0.135,0.03,0.352],[0.032,0.048,0.019]); // 검은 눈동자는 축소해도 한 점으로 남는다.
+-  }
+-  ball(head,v.skin,[0,-0.058,0.352],[0.069,0.062,0.065]); // 작은 코가 측면 얼굴의 방향을 보여 준다.
+-  ball(head,0x6b3e38,[0,-0.17,0.305],[0.072,0.022,0.025]); // 얇은 입은 얼굴에 검은 덩어리를 만들지 않는다.
+-  const arms=[],legs=[],feet=[];
+-  for(const side of [-1,1]){
+-    const arm=limb(chest,v.shirt,C.arm),fore=limb(chest,v.skin,C.arm*0.98); // 맨팔 반경을 소매의 98퍼센트로 두어 접합면의 깊이 충돌을 없애고 윤곽은 잇는다.
+-    const hand=ball(chest,v.prop==='gloves'?0xf6df8a:v.skin,[0,0,0],[0.13,0.15,0.12]); // 손의 반축 0.13/0.15/0.12는 팔 반경에 맞춰 손목의 갑작스러운 부풀음을 줄인다.
+-    arms.push({side,arm,fore,hand});
+-    legs.push({side,thigh:limb(root,v.pants,C.leg),shin:limb(root,v.pants,C.leg)}); // 짧고 두툼한 다리를 두 마디로 유지한다.
+-    feet.push(ball(root,0x303b49,[side*0.19,C.foot,0.05],[0.16,C.foot,0.25])); // 넓은 신발은 접지와 전진 방향을 읽게 한다.
+-  }
+-  const accessory=group(chest,[0,0,0]);
+-  const prop=v.prop;
+-  if(prop==='pack'||prop==='helmet')ball(accessory,prop==='pack'?0x5b887a:0xe7773f,[0,0,-0.36],[0.29,0.36,0.18]); // 등짐은 뒤쪽으로만 돌출한다.
+-  if(prop==='helmet')ball(head,0xf0b52d,[0,0.15,-0.025],[0.41,0.31,0.37]); // 헬멧은 눈 위에서 끝나 얼굴을 가리지 않는다.
+-  if(['hat','visor','band'].includes(prop)){
+-    ball(head,prop==='hat'?0xe3c68e:0xf5e8cf,[0,0.19,0.07],[0.43,0.045,0.42]); // 챙은 눈보다 높고 넓게 돌출한다.
+-    if(prop==='hat')ball(head,0xe3c68e,[0,0.32,-0.025],[0.29,0.19,0.28]); // 관광 모자의 낮은 크라운이다.
+-  }
+-  if(prop==='tie'){
+-    capsule(accessory,0xeac3a0,0.045,0.23,[0,0.05,0.32]); // 넥타이는 상의 앞면에만 선다.
+-    ball(accessory,0x513f35,[0.52,-0.43,0],[0.21,0.23,0.1]); // 서류 가방으로 손쪽 실루엣을 구별한다.
+-  }
+-  if(prop==='hat')ball(accessory,0x354a50,[0,-0.13,0.34],[0.16,0.115,0.09]); // 카메라가 관광객을 읽게 한다.
+-  if(prop==='cane'){
+-    capsule(accessory,0x805d40,0.035,0.84,[0.54,-0.57,0.16]); // 지팡이 끝이 지면에 닿는 길이다.
+-    ball(head,v.hair,[0,0.25,-0.13],[0.3,0.17,0.29]); // 흰 머리의 낮은 덩어리다.
+-  }
+-  if(prop==='bag'){
+-    ball(chest,v.shirt,[0,-0.26,0],[0.38,0.28,0.29]); // 코트 밑단을 넓혀 바지 차림과 실루엣이 갈리게 한다.
+-    for(const side of [-1,1])ball(head,0x283740,[side*0.145,0.065,0.342],[0.125,0.075,0.035]); // 선글라스는 눈 높이에만 둔다.
+-    capsule(head,v.hair,0.15,0.3,[0,0.02,-0.3]); // 단발은 뒤통수에서 끝나 턱을 감싸지 않는다.
+-    ball(accessory,0xe6bb74,[0.48,-0.4,0.12],[0.19,0.23,0.11]); // 옆 가방이 코트와 다른 색면을 만든다.
+-    const handle=new T.Mesh(new T.TorusGeometry(0.12,0.026,8,20),material(0xe6bb74)); // 손잡이는 가방 폭에 맞춘 작은 고리다.
+-    handle.position.set(0.48,-0.15,0.12);accessory.add(handle); // 가방 바로 위에 손잡이를 붙인다.
+-  }
+-  const rig={root,hips,chest,head,arms,legs,feet,accessory,v};
+-  poseWalker(rig,0);batchWalker(rig);return rig; // 생성 즉시 땅에 선 자세를 보장한다.
+-}
+-// 감쇠 조화진동 해를 사용해 프레임 간격과 무관하게 겹동작을 재생한다. https://en.wikipedia.org/wiki/Harmonic_oscillator
+-export function poseWalker(rig,distance,{mode='walk',time=0,heading=0}={}){
+-  const {root,hips,chest,head,arms,legs,feet,v}=rig;
+-  const cycle=distance/C.stride,phase=cycle*Math.PI*2; // 한 주기의 이동 거리를 보폭에 묶는다.
+-  const sway=Math.sin(phase)*0.11; // 0.11의 골반 기울기로 작은 화면에서도 디딤 쪽 체중 이동을 읽게 한다.
+-  root.rotation.set(0,heading,0);hips.rotation.set(0,sway,sway);chest.rotation.set(0,-sway*1.4,-sway*2); // 부모 골반 기울기를 상쇄한 뒤 같은 크기로 어깨가 반대 기울기를 갖게 두 배 역회전한다.
+-  head.rotation.z=Math.exp(-time*2.8)*Math.sin(time*10)*0.09+sway*0.3; // 감쇠율은 삼 초 안에 잔동작이 가라앉는 범위다.
+-  rig.accessory.rotation.z=Math.exp(-time*2.4)*Math.sin(time*8)*0.08-sway; // 소품은 머리보다 느리게 뒤따른다.
+-  for(let i=0;i<legs.length;i++){
+-    const {side,thigh,shin}=legs[i];
+-    const q=T.MathUtils.euclideanModulo(cycle+i*0.5,1); // 두 발은 반 주기만큼 어긋난다.
+-    const stance=q<0.5,u=(q-0.5)*2; // 절반은 지면 고정이고 절반은 공중 회수다.
+-    const z=stance?C.stride*(0.25-q):T.MathUtils.lerp(-C.stride*0.25,C.stride*0.25,T.MathUtils.smoothstep(u,0,1)); // 지지 구간의 역이동이 루트 이동을 정확히 상쇄한다.
+-    const y=C.foot+(stance?0:Math.sin(u*Math.PI)*C.lift); // 공중에서만 발끝을 들고 양 끝에서 지면에 붙인다.
+-    const x=side*(v.prop==='bag'?0.155:0.19); // 코트 걸음은 발 간격만 좁히고 신체 부위는 강조하지 않는다.
+-    feet[i].position.set(x,y,z);feet[i].userData.stance=stance;
+-    const knee=[x,0.41,z*0.5+0.12]; // 무릎은 앞쪽으로만 접혀 역관절을 막는다.
+-    const hip=new T.Vector3(x,0,0).applyEuler(hips.rotation).add(hips.position); // 기운 골반에 허벅지 시작점을 붙이고 발의 지면 궤적은 보존한다.
+-    between(thigh,hip.toArray(),knee,C.leg);between(shin,knee,[x,y,z],C.leg); // 신발까지 끊기지 않는 두 마디다.
+-  }
+-  for(const {side,arm,fore,hand} of arms){
+-    const swing=Math.sin(phase+(side>0?Math.PI:0))*0.34; // 팔의 이동폭을 0.34로 키워 반대 다리와 함께 전진하는 외곽선을 드러낸다.
+-    const elbow=[side*0.43,-0.22,swing],end=[side*0.47,-0.5,swing*1.3]; // 팔을 몸에서 조금 벌려 외곽선을 유지한다.
+-    if(mode==='shuffle'){elbow[2]=0.25;end[1]=-0.05;end[2]=0.43;} // 셔플은 장갑을 앞에 들고 공을 향한다.
+-    if(mode==='dive'){elbow[0]=side*0.3;elbow[1]=0.9;end[0]=side*0.24;end[1]=1.45;end[2]=0.12;} // 누운 몸의 머리 위로 양손이 함께 뻗는다.
+-    between(arm,[side*C.shoulder,0.2,0],elbow,C.arm);between(fore,elbow,end,C.arm*0.92);hand.position.set(...end); // 같은 관절 배선을 세 동작이 공유한다.
+-  }
+-  if(mode==='shuffle'){
+-    for(const f of feet){const old=f.position.z;f.position.z=0;f.position.x+=old;} // 셔플만 보폭 축을 옆으로 바꾼다.
+-    for(let i=0;i<legs.length;i++){const l=legs[i],f=feet[i].position,k=[l.side*0.2,0.36,0.14];between(l.thigh,[l.side*0.19,C.hip,0],k,C.leg);between(l.shin,k,f.toArray(),C.leg);} // 옆으로 벌어진 발까지 무릎을 다시 연결한다.
+-  }
+-  if(mode==='dive')root.rotation.z=-Math.PI*0.43; // 수평에 가까운 옆다이빙이며 발이 손을 따라가는 실루엣이다.
+-  root.updateMatrixWorld(true);
+-  rig.sync?.();
++
++// 승인된 행인의 흔들림을 이동 거리에 묶어 멈춘 몸이 제자리에서 걷지 않게 한다.
++export function poseWalker(rig, distance, {heading = 0} = {}) {
++  rig.root.rotation.y = heading;
++  // 승인된 보행 흔들림의 주기 6과 진폭 0.06을 그대로 유지한다.
++  rig.root.rotation.z = Math.sin(distance * 6 + rig.root.userData.phase) * 0.06;
+ }
+diff --git a/web/src/render/objects/pitch.mjs b/web/src/render/objects/pitch.mjs
+index a46d0b0..606583c 100644
+--- a/web/src/render/objects/pitch.mjs
++++ b/web/src/render/objects/pitch.mjs
+@@ -6,7 +6,7 @@ import { loadDecor } from '../decor.mjs';
+ import { placeGeo } from './places.mjs';
+ import { jitterMesh, seeded, addOutline, INK } from '../handmade.mjs';
+ import { MARK_LINES, ARC_R, ARC_HALF, SPOT_Z, FAR_W } from './markspec.mjs';
+-import { buildWalker, PASSER_VARIANTS } from './actors.mjs';
++import { addFace, PASSER_VARIANTS } from './actors.mjs';
+ import { skinAt } from '../../state/gear.mjs';
+ import { PERSONAS, personaKindAt, passerRosterAt } from '../../state/passer.mjs';
+ 
+@@ -137,8 +137,8 @@ export const BOX_Z = 8.2;
+ 
+ export function buildPitch(scene) {
+   // 흙바닥. 잔디가 아니다. 동네 운동장이 이 게임의 무대다.
+-  // 바닥 두 판은 같은 황토색을 공유하고 골문과 스폿의 넓은 마모만 구별한다.
+-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), flatLit(0xb08e58, dirtTex()));
++  // 단색 흙은 카펫으로 읽힌다. 얼룩과 발자국과 잔모래가 있어야 밟은 땅이 된다.
++  const ground = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), flatLit(0x9c7a4a, dirtTex()));
+   ground.rotation.x = -Math.PI / 2;
+   ground.position.z = 24;
+   ground.name = 'ground';
+@@ -231,8 +231,8 @@ export function buildPitch(scene) {
+ 
+   // 골대. 판정식이 쓰는 폭과 높이를 그대로 쓴다. 그림과 숫자가 어긋나면 화면이 거짓말을 한다.
+   const post = new THREE.CylinderGeometry(0.06, 0.06, R_H, 8);
+-  // 골대도 배우와 같은 무광 표면이라 작은 녹 얼룩이 공의 윤곽과 경쟁하지 않는다.
+-  const white = new THREE.MeshLambertMaterial({ color: 0xf4f6f2 });
++  // 새로 칠한 골대는 규격 경기장의 물건이다. 아래에서 녹이 올라와야 동네 골대다.
++  const white = flatMap(0xf4f6f2, chippedTex());
+   for (const [pi, x] of [-R_HALF_W, R_HALF_W].entries()) {
+     const p = new THREE.Mesh(post, white);
+     p.position.set(x, R_H / 2, 0);
+@@ -360,7 +360,7 @@ export function buildPitch(scene) {
+   rails.push(railGeo(BACK_HW * 2, 'x').translate(0, 0.05, -NET_D));
+   // 0x5f6a5c는 흰 골대 옆에서 조명을 못 받은 물건으로 읽혔다. 같은 램버트 재질인데 색만 어두웠다.
+   // 낡은 아연도금 쇠 밝기로 올린다. 흰 골대와는 여전히 갈라지고, 빛을 받은 것으로 읽힌다.
+-  const rear = new THREE.Mesh(mergeGeos(rails), new THREE.MeshLambertMaterial({ color: 0x9aa294 }));
++  const rear = new THREE.Mesh(mergeGeos(rails), flatMap(0x9aa294, chippedTex()));
+   // 앞 골대는 한 번 들이받혀 기울었다. 뒷틀만 정확히 서 있으면 둘이 다른 날 세운 물건으로 보인다.
+   rear.name = 'rear';
+   rear.rotation.z = 0.012;
+@@ -399,8 +399,8 @@ export function buildPitch(scene) {
+         '  float a = texture2D(cloud, uv).a;',
+         // 알파를 두 단으로 끊는다. 몸통은 흰색, 아랫배는 회색. 부드러운 경계는 손그림이 아니다.
+         // 여기 리터럴은 선형값이라 sRGB 인코딩을 한 번 더 받는다. 화면에서 흰 판으로 날지 않게 낮춰 적는다.
+-        '  vec3 body = mix(vec3(0.60, 0.62, 0.66), vec3(0.85), smoothstep(0.0, 1.0, a));',
+-        '  float on = smoothstep(0.0, 0.38, a);', // 기존 경계값까지 연속으로 섞어 오린 종이 같은 경계를 없앤다.
++        '  vec3 body = mix(vec3(0.60, 0.62, 0.66), vec3(0.85), step(0.62, a));',
++        '  float on = step(0.38, a);',
+         // 지평선 바로 위는 구름을 걷는다. 건물 실루엣과 겹치면 스티커로 읽힌다.
+         '  on *= smoothstep(0.005, 0.045, vH);',
+         '  gl_FragColor = vec4(mix(sky, body, on), 1.0);',
+@@ -425,7 +425,7 @@ export function buildPitch(scene) {
+      드로우콜도 하나다. 넷을 각각 메시로 세우고 보이기만 끄면 예산은 같아도 지오메트리 넷이
+      GPU에 올라가고, 등급을 안 산 사람이 안 보는 동네 셋의 정점을 계속 들고 있게 된다.
+      계측이 광선으로 되묻는 면은 밟는 흙이라, 지평선 건물과 같은 이유로 광선은 통과시킨다. */
+-  const props = new THREE.Mesh(placeGeo(0), new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true }));
++  const props = new THREE.Mesh(placeGeo(0), flatVertex(0xffffff));
+   props.name = 'place';
+   props.userData.probeIgnore = true;
+   scene.add(props);
+@@ -486,11 +486,7 @@ export function buildPitch(scene) {
+   let lastRise = 1;
+   const applyRise = () => {
+     for (const o of scene.children) {
+-      if (o.name === 'skyline' || o.name === 'skyline-back') {
+-        o.scale.y = lastRise;
+-        // 경기장 앞쪽은 시설의 교사동과 관람석이 맡고 타이틀 뒤쪽 도시는 그대로 둔다.
+-        o.visible = o.name === 'skyline-back';
+-      }
++      if (o.name === 'skyline' || o.name === 'skyline-back') o.scale.y = lastRise;
+     }
+   };
+   // GLB가 서면 이 사본도 GLB 사본으로 갈린다. loadDecor가 여기를 본다.
+@@ -522,11 +518,17 @@ export function buildPitch(scene) {
+       // 이름이 말하는 장소가 화면에도 서야 한다. 색만 갈던 동안 공터와 번화가가 같은 빈 벌판이었다.
+       // 등급 번호는 선반 데이터가 들고 있다. 여기서 순서를 다시 세면 상점 카드와 경기장이 갈린다.
+       props.geometry = placeGeo(place.city);
+-      // 잔디 구장부터는 관람석이 경계이므로 행인 앞의 공용 철망을 걷는다.
+-      fence.visible = place.city < 2;
+       ground.material.color.setHex(place.ground);
+-      // 마모는 텍스처의 넓은 패치가 소유한다. 판 전체를 밝히면 네모 경계가 생긴다.
+-      box.material.color.copy(ground.material.color);
++      /* 골문 앞 밟힌 자리도 같은 면이다. 이것만 흙으로 두었더니 잔디와 아스팔트 위에
++         흙 사각형이 하나 떠 있었다. 색을 따로 적지 않고 바닥에서 밝기만 올려 만든다.
++         밟혀서 벗겨진 자리라 원래 면보다 밝고 채도가 낮다. 그러면 등급이 늘어도 값이 하나다. */
++      {
++        const c = new THREE.Color(place.ground);
++        const h = {};
++        c.getHSL(h);
++        c.setHSL(h.h, h.s * 0.72, Math.min(1, h.l * 1.28 + 0.06));
++        box.material.color.copy(c);
++      }
+       for (const f of [fence, backFence]) f.material.color.setHex(place.fence);
+       // 건물은 y가 h/2에 서 있어서 그룹을 세로로 늘리면 크기와 자리가 같이 늘어난다.
+       // 밑동은 바닥에 붙은 채로 높이만 자란다. 거울 사본도 같은 배율을 받아야 앞뒤가 안 갈린다.
+@@ -548,53 +550,185 @@ export function buildPitch(scene) {
+ // 소지품마다 메시를 세우면 열한 명이 예산을 통째로 먹는다. 실측: 옛 배치는 한 명이 4에서 7
+ // 드로우콜을 썼고 번화가에서 134콜이었다. 몸통과 팔과 머리와 소지품을 한 지오메트리로 붙이면
+ // 한 명이 셋이고, 얼굴이 붙는 0번만 넷이다.
+-// 소품과 몸 비율은 기존 무광 장난감 리그를 재사용한다. 개최국 색은 옷에만 섞고 피부와 체형에는 쓰지 않는다.
+-function rosterLook(row){
+-  const base=PASSER_VARIANTS.find(variant=>variant.id===row.id);
+-  // 일상복 20%·외출복 55%의 개최지 색은 직업별 원래 색면을 남기면서 두 차림을 가른다.
+-  const mix=row.clothing==='외출복'?0.55:0.2;
+-  // 어르신의 넉넉한 외투 폭을 12% 넓혀 학생과 실루엣을 구별한다. 나라나 소득은 몸 비율에 쓰지 않는다.
+-  return {...base,width:base.width*(row.id==='elder'?1.12:1),shirt:new THREE.Color(base.shirt).lerp(new THREE.Color(row.shirt),mix).getHex(),
+-    pants:new THREE.Color(base.pants).lerp(new THREE.Color(row.pants),mix).getHex()};
+-}
+-
+-// 이동 좌표·라포 번호·향하던 방향을 보존하고 개최지가 바뀔 때 차림만 갈아입힌다.
+-export function setPasserRoster(passers,tier,variant=0){
+-  const rows=passerRosterAt(tier,variant,passers.length);
+-  passers.forEach((body,i)=>{
+-    const row=rows[i];if(body.userData.roster?.key===row.key)return;
+-    const old=[];body.traverse(part=>{if(part.isMesh)old.push(part.geometry);});
+-    body.userData.walker?.dispose?.(); // 교체한 배치의 행렬·색 텍스처도 함께 해제한다.
+-    body.clear();
+-    const rig=buildWalker(rosterLook(row));
+-    body.scale.copy(rig.root.scale).multiplyScalar(body.userData.bodyScale);
+-    body.add(...rig.root.children.slice());rig.root=body;
+-    Object.assign(body.userData,{walker:rig,head:rig.head,variantId:row.id,roster:row});
+-    body.traverse(part=>{if(part.isMesh)part.userData.probeIgnore=true;});
+-    // 공유 구·캡슐은 살아 있는 몸이 쓰므로 남기고 제거된 몸의 고유 기하만 해제한다.
+-    const kept=new Set();body.parent.traverse(part=>{if(part.isMesh)kept.add(part.geometry);});
+-    for(const geo of new Set(old))if(!kept.has(geo))geo.dispose();
+-  });
+-}
+-
+ export function buildPassers(scene, count = 5, tier = 0, variant = 0) {
+-  const passers = [], rnd = seeded(0x9a55e7); // 기존 배치 시드를 유지해 동네별 가시 인원 비교를 보존한다.
+-  // 판정의 번호와 이름은 그대로 두고 렌더 차림만 명시적으로 매핑한다.
+-  const wardrobe = passerRosterAt(tier,variant,count);
++  const wardrobe = passerRosterAt(tier, variant, count);
++  const passers = [];
++  // 0번은 키커와 나란히 서는 유일한 행인이다. 붉은 계열을 주면 키커 셔츠(0xc9483a)와
++  // 같은 빨간 캡슐 둘이 되고, 화면에서 사람이 바뀐 것 자체가 안 읽힌다.
++  const shirt = [0xf2e9ff, 0x4a72c4, 0xe0a23c, 0x7a4fb0, 0x3fa37a];
++  // 코트 색 셋. 직장인 넷이 같은 코트를 입으면 페르소나가 제복이 된다.
++  const coat = [0x3f4450, 0x6b5a44, 0x2f3a3f];
++  const rnd = seeded(0x9a55e7);
+   for (let i = 0; i < count; i += 1) {
+-    const kind = personaKindAt(i), P = PERSONAS[kind];
+-    const v = rosterLook(wardrobe[i]);
+-    const rig = buildWalker(v), g = rig.root;
+-    const s = 0.92 + rnd() * 0.2; // 기존 원경 크기 분산만 유지하고 키트의 몸 비율은 보존한다.
+-    g.scale.multiplyScalar(s);
+-    const z = i === 0 ? 31.6 + rnd() * 1.8 : 26.8 + rnd() * 12.4; // 기존 배치 밴드로 골대 연출과 원근을 보존한다.
+-    const raw = -25 + i * 9.5 + (rnd() - 0.5) * 9.8; // 기존 불규칙 간격을 재사용한다.
+-    g.position.set(((raw + 42) % 84 + 84) % 84 - 42, 0, z); // 화면 밖 순환 구간을 보존한다.
+-    Object.assign(g.userData,{walker:rig,head:rig.head,variantId:v.id,persona:kind,roster:wardrobe[i],bodyScale:s,
+-      speed:1.05+P.stride*0.95,phase:rnd()*Math.PI*2,homeZ:z,walkDistance:0,heading:Math.PI/2}); // 기존 속도는 유지하고 첫 방향은 +x 보행이다.
+-    g.rotation.y=g.userData.heading;
+-    g.traverse(m=>{if(m.isMesh)m.userData.probeIgnore=true;});
+-    scene.add(g);passers.push(g);
++    const row = wardrobe[i], v = PASSER_VARIANTS.find(item => item.id === row.id);
++    // 기존 일상복 20%·외출복 55% 혼합을 승인된 정점색 몸에 입힌다.
++    const tint = new THREE.Color(v.shirt).lerp(new THREE.Color(row.shirt), row.clothing === '외출복' ? 0.55 : 0.2).getHex();
++    const pants = new THREE.Color(v.pants).lerp(new THREE.Color(row.pants), row.clothing === '외출복' ? 0.55 : 0.2).getHex();
++    // 관계 번호를 유지하며 새 직업도 승인된 치마·가방·코트·지팡이 모형으로 표현한다.
++    const kind = ({fashion:'beauty',student:'student',office:'worker',elder:'elder',delivery:'student',jogger:'beauty',tourist:'worker'})[row.id];
++    const P = PERSONAS[kind];
++    const g = new THREE.Group();
++    // 회차마다 흔드는 것은 크기 하나다. 비율까지 흔들면 실루엣 비를 재는 자가 재는 것이
++    // 페르소나가 아니라 그날 굴린 난수가 된다. 0.92에서 1.12는 원경에서 키가 갈려 읽히는 폭이다.
++    const s = 0.92 + rnd() * 0.2;
++    const tall = P.tall * s;
++    const wide = P.wide * s;
++    // 다리가 짧으면 골반과 머리가 그만큼 내려앉는다. 발은 어느 페르소나에서도 땅에 있다.
++    const legLen = 0.46 * tall * P.leg;
++    const drop = 0.46 * tall - legLen;
++    const hipY = 0.86 * tall - drop + P.bob;
++    const torsoR = 0.22 * wide;
++    // 몸에 붙는 것은 전부 골반 기준 좌표다. 노인은 이 덩어리를 골반에서 통째로 굽히므로
++    // 여기에 월드 높이를 그대로 적으면 굽힐 때 소지품만 제자리에 남는다.
++    const at = (y) => (y - 0.86) * tall;
++    const parts = [new THREE.CapsuleGeometry(torsoR, 0.62 * tall, 3, 6)];
++    const colors = [tint];
++    const armLen = 0.62 * tall;
++    for (const side of [-1, 1]) {
++      const a = new THREE.CapsuleGeometry(0.072 * wide, armLen, 3, 5);
++      // 캡슐은 중앙이 원점이다. 그대로 돌리면 어깨가 아니라 팔 한가운데가 축이 된다.
++      a.translate(0, -armLen / 2, 0);
++      // 팔이 몸에서 벌어지는 각은 페르소나가 정한다. 원경에서 사람을 가르는 것이 이 각이다.
++      a.rotateZ(-side * P.arm);
++      // 어깨는 몸통 꼭대기가 아니라 그 한 칸 아래다. 꼭대기에 달면 목에서 팔이 난다.
++      a.translate(side * (torsoR + 0.05), 0.22 * tall, 0);
++      parts.push(a);
++      colors.push(0xe0b48c);
++    }
++    if (kind === 'beauty') {
++      // 긴 머리 한 덩이. 반경 0.17은 머리(0.15)보다 커서 얼굴을 삼켰다. 뒤통수 쪽으로 물린다.
++      const hair = new THREE.CapsuleGeometry(0.115 * wide, 0.34 * tall, 3, 6);
++      hair.translate(0, at(1.44), -0.13);
++      parts.push(hair);
++      colors.push(0x2b1d14);
++      // 머리 하나만으로는 멀리서 남녀가 안 갈린다. 치마가 실루엣 밑변을 벌려 준다.
++      const skirt = new THREE.ConeGeometry(0.27 * wide, 0.42 * tall, 8);
++      skirt.translate(0, at(0.62), 0);
++      parts.push(skirt);
++      colors.push(0xb98ad6);
++    } else if (kind === 'student') {
++      // 등에 가방 하나, 옆으로 멘 가방 하나. 등가방은 앞에서 안 보이므로 옆가방이 폭을 만든다.
++      const bag = new THREE.BoxGeometry(0.34 * wide, 0.42 * tall, 0.2);
++      bag.translate(0, at(0.92), -0.24);
++      parts.push(bag);
++      colors.push(0x2f4f43);
++      const satchel = new THREE.BoxGeometry(0.26 * wide, 0.3 * tall, 0.16);
++      satchel.translate(0.42 * wide, at(0.6), 0.06);
++      parts.push(satchel);
++      colors.push(0x6b4f2f);
++    } else if (kind === 'worker') {
++      // 무릎까지 오는 코트. 몸통과 허벅지를 한 통으로 덮어 실루엣이 위아래로 곧게 선다.
++      const c = new THREE.CylinderGeometry(0.27 * wide, 0.32 * wide, 0.72 * tall, 8);
++      c.translate(0, at(0.6), 0);
++      parts.push(c);
++      colors.push(tint);
++    }
++    if (kind !== 'beauty') {
++      // 얼굴이 붙는 것은 0번뿐이다. 나머지 머리는 몸에 붙여 드로우콜을 안 늘린다.
++      const hd = new THREE.SphereGeometry(0.15, 8, 6);
++      hd.translate(0, at(1.36), 0);
++      parts.push(hd);
++      colors.push(0xe0b48c);
++    }
++    const bodyGeo = mergeGeos(parts, colors);
++    // 노인. 굽은 등이 실루엣의 전부다. 조각을 하나씩 기울이면 어깨와 머리가 따로 논다.
++    // 실측: 0.62라디안은 실루엣 비 1.42를 냈고 학생 1.39와 2.2퍼센트밖에 안 갈렸다.
++    // 0.88은 머리가 골반 앞으로 확실히 나와 비가 1.1대로 내려가면서도 얼굴은 아직 앞을 본다.
++    if (kind === 'elder') bodyGeo.rotateX(0.88);
++    const bodyMat = flatVertex(0xffffff);
++    bodyMat.map = clothTex();
++    const body = new THREE.Mesh(bodyGeo, bodyMat);
++    body.position.y = hipY;
++    // 다리 한 덩어리는 옆에 선 키퍼의 두 다리와 나란히 놓이면 통짜 기둥으로 읽힌다.
++    // 0.082 반경에 0.08 간격은 두 캡슐이 서로 파묻혀 다시 한 기둥이 됐다. 사이로 흙이 보여야 갈린다.
++    const legGeos = [];
++    const legCols = [];
++    const legsY = 0.15 * tall + legLen / 2;
++    for (const side of [-1, 1]) {
++      const l = new THREE.CapsuleGeometry(0.068 * wide, legLen, 3, 5);
++      // 보폭. 한 발이 앞이고 한 발이 뒤다. 나란히 두면 걷는 사람이 아니라 세워 둔 인형이다.
++      l.translate(side * 0.115 * wide, 0, side * P.stride * 0.14);
++      legGeos.push(l);
++      legCols.push(pants);
++    }
++    if (kind === 'elder') {
++      // 짚는 막대. 굽은 등과 짝이라 하나만 있으면 그냥 굽은 사람이다.
++      // 다리 덩어리에 붙인다. 몸에 붙이면 등을 굽힐 때 막대도 같이 굽어 땅에서 떨어진다.
++      // 위는 손에 붙고 아래는 몸 밖으로 벌어진다. 곧게 세우면 다리 옆에 붙은 막대라
++      // 실루엣 폭이 안 늘고, 그러면 노인과 학생의 비가 2.2퍼센트밖에 안 갈린다(실측).
++      const cane = new THREE.CylinderGeometry(0.03 * wide, 0.03 * wide, 0.95 * tall, 5);
++      cane.rotateZ(0.2);
++      cane.translate(0.49 * wide, 0.95 * tall * 0.5 - legsY, 0.12);
++      legGeos.push(cane);
++      legCols.push(0x8a6b4a);
++    }
++    const legs = new THREE.Mesh(mergeGeos(legGeos, legCols), flatVertex(0xffffff));
++    legs.position.y = legsY;
++    const meshes = [body, legs];
++    if (kind === 'beauty') {
++      /* 이 행인은 한눈팔기 연출에서 골대 앞까지 걸어온다. 화면 한복판에 서는데 얼굴이 없으면
++         키퍼만 눈이 있고 옆에는 달걀이 선다. 하트가 떠도 왜 한눈파는지가 화소에 없다.
++         머리 반경 0.15는 치마와 몸통 옆에서 전구만 해졌다. 몸통은 두고 머리만 키운다. */
++      const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), flat(0xe0b48c));
++      head.scale.setScalar(1.3);
++      // 몸통 캡슐 꼭대기가 1.39*tall이다. 머리 중심을 1.4에 두면 목까지 몸에 묻힌다.
++      head.position.y = 1.54 * tall - drop + P.bob;
++      addFace(head, 0.15, 1, 0xe0b48c);
++      // 볼 두 점. 눈만으로는 행인 넷과 안 갈린다. 둘을 한 지오메트리로 붙여 드로우콜은 하나다.
++      const blush = [];
++      for (const side of [-1, 1]) {
++        const bl = new THREE.SphereGeometry(0.045, 6, 5);
++        bl.scale(1.1, 0.7, 0.4);
++        bl.translate(side * 0.088, -0.022, 0.126);
++        blush.push(bl);
++      }
++      head.add(new THREE.Mesh(mergeGeos(blush), new THREE.MeshBasicMaterial({ color: 0xff8fa3 })));
++      // 눈에 띄는 사람은 화면에서도 눈에 띄어야 한다. 머리 위 반짝임 하나가 시선을 잡는다.
++      // 연출이 이것을 돌리고 키우므로 병합하지 않고 메시로 남긴다.
++      const spark = new THREE.Mesh(new THREE.OctahedronGeometry(0.11, 0), new THREE.MeshBasicMaterial({ color: 0xffe98a }));
++      spark.position.y = 1.88 * tall - drop + P.bob;
++      g.userData.spark = spark;
++      meshes.push(head, spark);
++    }
++    for (const [pi, m] of meshes.entries()) { jitterMesh(m, 0.02, 70 + i * 5 + pi); m.userData.probeIgnore = true; }
++    addOutline(body, 0.03);
++    g.add(...meshes);
++    // 9.5씩 끊어 놓으면 다섯이 같은 간격으로 지나간다. 행렬이지 행인이 아니다.
++    // 깊이까지 흩어야 원근이 크기를 갈라 준다. 한 줄에 세우면 키만 다른 같은 인형이다.
++    // 0번은 한눈팔기 연출에서 골대 앞까지 걸어오므로 거리 밴드를 그대로 둔다.
++    const z = i === 0 ? 31.6 + rnd() * 1.8 : 26.8 + rnd() * 12.4;
++    // 9.5씩 밀면 여섯 번째부터 화면 오른쪽 되돌림 지점(42) 밖에서 태어난다. [-42, 42]로 감는다.
++    const raw = -25 + i * 9.5 + (rnd() - 0.5) * 9.8;
++    g.position.set(((raw + 42) % 84 + 84) % 84 - 42, 0, z);
++    // 걷는 속도는 보폭에서 나온다. 노인이 학생을 따라 걸으면 보폭 표가 화면에 없는 것이 된다.
++    // scene.mjs가 이 값으로 걸음과 대기 흔들림 주기를 같이 돌린다.
++    g.userData.speed = 1.05 + P.stride * 0.95;
++    g.userData.phase = rnd() * Math.PI * 2;
++    g.userData.homeZ = g.position.z;
++    // 계기가 어느 몸인지 되물을 수 있어야 한다. 실루엣이 갈렸다는 주장은 임자를 알아야 재진다.
++    g.userData.persona = personaKindAt(i);
++    // 기존 게이트가 읽는 신원·상의·머리 손잡이는 실제 승인 기하를 가리킨다.
++    g.userData.roster = row; g.userData.variantId = row.id;
++    g.userData.walkDistance = 0; g.userData.heading = Math.PI / 2;
++    g.userData.walker = {root:g, v, chest:{children:[body]}, feet:[legs], head:meshes.find(m=>m.geometry.type==='SphereGeometry') || body};
++    g.rotation.y = g.userData.heading;
++    scene.add(g);
++    passers.push(g);
+   }
+   return passers;
+ }
++
++// 좌표와 관계 번호는 보존하고 새 개최지의 옷을 승인된 몸에 입힌다.
++export function setPasserRoster(passers, tier, variant = 0) {
++  const rows = passerRosterAt(tier, variant, passers.length);
++  if (passers.every((body,i)=>body.userData.roster?.key===rows[i].key)) return;
++  const stage = new THREE.Group();
++  const fresh = buildPassers(stage, passers.length, tier, variant);
++  passers.forEach((body,i)=>{
++    const replacement = fresh[i], state = body.userData;
++    body.traverse(part=>{if(part.isMesh)part.geometry.dispose();});
++    body.clear(); body.add(...replacement.children.slice());
++    Object.assign(state, {roster:rows[i],variantId:rows[i].id,walker:replacement.userData.walker,spark:replacement.userData.spark});
++    state.walker.root = body;
++  });
++}
+diff --git a/web/src/render/objects/places.mjs b/web/src/render/objects/places.mjs
+index 00b5f69..f152390 100644
+--- a/web/src/render/objects/places.mjs
++++ b/web/src/render/objects/places.mjs
+@@ -5,8 +5,9 @@
+ // 리마스터 뒤 예산이 118/120이라 남은 자리가 둘이고, 메시 하나로 그중 하나만 쓴다.
+ // 재질은 밖에서 units.mjs의 flatVertex 한 장을 물려 준다. 색은 전부 정점에 실린다.
+ import * as THREE from '../../../vendor/three.module.min.js';
+-import { mergeGeos } from '../units.mjs';
++import { mergeGeos, flatVertex } from '../units.mjs';
+ import { GOAL } from '../../../../src/reality.mjs';
++import { seeded } from '../handmade.mjs';
+ 
+ /* 물건이 설 수 있는 자리. 페널티 박스 판은 밟는 면이라 그 위에는 아무것도 안 세운다.
+    reality의 규칙이 아닌 연출용 흙판은 16.5 x 16.5이고 중심이 z 8.2라 x는 8.25까지, z는 16.45까지가 그 판이다.
+@@ -46,9 +47,8 @@ function pen() {
+     // 가지 한 층. 일곱 각이면 실루엣이 원뿔로 읽히면서 정점이 스물넷이다.
+     // 각을 더 줄이면 원뿔이 아니라 엎은 그릇으로 읽혀 나무가 안 된다.
+     cone: (r, h, x, y0, z, c) => {
+-      // 기존 수관 봉투 안에 매끈한 타원체를 넣어 삼각 고깔 외곽선을 없앤다.
+-      const g = new THREE.SphereGeometry(1, 20, 12); // 원경에서도 둥근 윤곽을 유지할 최소 분할이다.
+-      g.scale(r, h / 2, r);
++      // 승인된 일곱 각 침엽수 수관이다.
++      const g = new THREE.ConeGeometry(r, h, 7);
+       g.translate(x, y0 + h / 2, z);
+       push(g, c);
+     }
+@@ -73,18 +73,30 @@ function mainGoal(p, x, z) {
+ }
+ 
+ // 운동장 뒤편의 학교와 담은 골문보다 뒤에 두어 슈터와 행인을 가리지 않는다.
+-function neighborhood(p){
+-  // 연습 골대 뒤 18~26미터의 관리 보행로는 흙 운동장과 학교 시설의 경계다. 두께 0.12는 겹침을 막는다.
+-  p.box(60,0.12,8,0,22,0x969c92);
++function lot(p) {
++  const r = seeded(0x51a70c);
++  for (let i = 0; i < 22; i += 1) {
++    // 다섯에 하나는 무너져 없다. 이가 빠져야 쌓다 만 담이지 옹벽이 아니다.
++    if (i % 5 === 3) continue;
++    const x = -32 + i * 3.05;
++    const h = 0.95 + r() * 0.4;
++    p.box(2.6, h, 0.34, x, 26.2, 0xb8ac96);
++    p.box(2.76, 0.14, 0.46, x, 26.2, 0x8f8474, h);
++  }
++  for (let i = 0; i < 5; i += 1) tree(p, -24 + i * 12.5, 28.6 + r() * 2.4, 0.9 + r() * 0.3);
++  // 오른쪽 큰 나무 하나. 먼 나무만 있으면 화면 아래 절반이 비어 공터가 아니라 벌판이 된다.
++  // 왼쪽에 안 세우는 이유는 한눈팔기 연출이 왼쪽 x -11.5에 서기 때문이다.
++  tree(p, 10.5, 13.5, 1.25);
++  // 풀 포기. 담 앞 맨흙이 너무 넓어 밟힌 땅이 아니라 칠한 판으로 읽혔다.
++  for (let i = 0; i < 22; i += 1) {
++    // 자리는 담 앞 흙(z 17.4~24.8)이다. 페널티 박스 판은 z 16.45에서 끝나므로 밟는 면 위에는 안 선다.
++    p.box(0.66, 0.42 + r() * 0.24, 0.08, -30 + r() * 60, 17.4 + r() * 7.4, 0x6d8a4a);
++  }
++}
++
+ 
+-  // 46미터 뒤의 낮은 교사동과 세 창 띠는 기존 학교 모형을 축소한 배경이다.
+-  p.box(30,6,5,-5,46,0xc8c5ad);
+-  for(let i=0;i<3;i++)p.box(28,0.7,0.16,-5,43.4,0x75888a,1+i*1.6);
+-  p.box(32,0.35,5.5,-5,46,0x858c7c,6);
+-  // 행인 띠 뒤의 42미터 담과 열린 골문 사이로 몸을 계속 볼 수 있다.
+-  p.box(56,0.7,0.3,0,42,0xb4b19c);
+-  mainGoal(p,0,23);
+-  tree(p,-17,29,0.9);tree(p,18,33,1.1);
++function neighborhood(p){
++  lot(p);
+ }
+ 
+ // 풋살장은 낮은 킥보드와 성긴 펜스로 둘러싸인 인조잔디 시설이다.
+@@ -169,7 +181,7 @@ export function venueCrowd(){
+   const body=new THREE.CapsuleGeometry(0.23,0.35,4,8);body.translate(0,0.4,0);
+   const head=new THREE.SphereGeometry(0.18,8,6);head.translate(0,0.88,0);
+   const geo=mergeGeos([body,head],[0xffffff,0xd7b79a]);
+-  const crowd=new THREE.InstancedMesh(geo,new THREE.MeshLambertMaterial({vertexColors:true}),8*36);
++  const crowd=new THREE.InstancedMesh(geo,flatVertex(0xffffff),8*36);
+   const matrix=new THREE.Matrix4(),color=new THREE.Color();
+   // 차분한 네 색은 팀이나 국가의 실측이 아니라 관중석의 제품 팔레트다.
+   const colors=[0x9eb6b1,0xb8877c,0xbca86b,0x8393ae];
+diff --git a/web/src/render/scene.mjs b/web/src/render/scene.mjs
+index c69c5d2..af8c151 100644
+--- a/web/src/render/scene.mjs
++++ b/web/src/render/scene.mjs
+@@ -13,7 +13,6 @@ import {
+ import { pupilMat, buildKeeper, buildKicker, poseWalker, POSES, JOINTS, lerpPose, pushPose, setPose, poseDist, KICK_WIND, beatOf } from './objects/actors.mjs';
+ import { buildPitch, buildPassers, setPasserRoster, BOX_Z } from './objects/pitch.mjs';
+ import { venueCrowd } from './objects/places.mjs';
+-import { contactTex } from './texture.mjs';
+ import { skinAt, placeAt } from '../state/gear.mjs';
+ import { gazeMood } from '../ui/lines.mjs';
+ import { createImpact } from './objects/impact.mjs';
+@@ -30,19 +29,20 @@ const SCUFF_POSES = new Set([POSES.faceplant, POSES.sprawlR, POSES.sprawlL, POSE
+ 
+ export function createScene(canvas) {
+   const sfx = mountSfx();
+-  const PIX = new URLSearchParams(location.search).get('pix') === '1';
+   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+   // 그림자 지도 한 장. 발밑 원판은 접지를 말하지만 몸이 드리운 그늘은 못 그린다.
+-  // 키트의 PCF 그림자와 발 접촉 음영이 둥근 몸을 지면에 붙인다.
++  // PCFSoft는 가장자리를 흐린다. 딱딱한 경계는 종이를 오려 붙인 것으로 읽힌다.
++  // 1024는 아래 그림자 카메라가 덮는 20미터를 한 텍셀 2센티로 나눈다. 재는 것이 발밑 그늘 하나라
++  // 그보다 잘게 나눌 자리가 없다.
+   renderer.shadowMap.enabled = true;
+-  renderer.shadowMap.type = THREE.PCFShadowMap; // 현재 Three.js의 PCF 필터로 실제 투영 그림자를 부드럽게 한다.
++  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+   // 알파를 전경 마스크로 쓴다. 아무것도 그려지지 않은 화소가 0이면 전경으로 읽힌다.
+   renderer.setClearAlpha(1);
+-  renderer.setPixelRatio(PIX ? Math.min(devicePixelRatio, 2) : devicePixelRatio); // 기본 경로는 기기의 실제 화소 밀도를 보존한다.
++  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+ 
+   const scene = new THREE.Scene();
+   scene.background = new THREE.Color(0x86aecb);
+-  scene.fog = new THREE.Fog(0x9dbdd4, 26, 60); // 배우 앞의 26까지 원색을 두고 60에서 하늘색에 합쳐 먼 건물 창의 대비를 누른다.
++  scene.fog = new THREE.Fog(0x9dbdd4, 34, 96);
+ 
+   // 가로 화면 전제. 골대는 좌우로 긴 물건이라 세로로는 판정이 안 보인다.
+   // 카메라는 골대 뒤 위쪽. 골대 폭 전체와 키커까지 한 화면에 넣는다.
+@@ -53,15 +53,17 @@ export function createScene(canvas) {
+   camera.position.set(0, 3.3, -5.1);
+   camera.lookAt(0, 1.4, 4.5);
+ 
+-  // 기본은 전체 해상도다. 선택한 픽셀 모드에서만 축소와 필터를 함께 적용한다.
++  // 화면을 한 번 작게 그린 다음 늘린다. 플래시 게임의 뭉개짐은 실력 부족이 아니라 그 시대의 해상도다.
++  // 풀해상도로 깨끗하게 그린 로우폴리는 에셋스토어 템플릿으로 읽힌다. 여기서 그 지문을 지운다.
+   // 세로 288은 골키퍼 얼굴이 뭉개져 사라졌고 540은 원본과 구분이 안 갔다. 384가 계단이 보이면서 형태가 남는 높이다.
+   const RT_H = 384;
+-  // ?pix=1 하나가 축소 타깃과 픽셀 후처리를 함께 켠다.
++  // 풀해상 갈래. ?pix=0이면 384 타깃을 건너뛰고 캔버스 해상도 그대로 굽는다.
++  // 기본은 확대 쪽이다. 이 갈래는 픽셀 확대가 무엇을 덮고 있는지 볼 때만 쓴다.
++  const PIX = new URLSearchParams(location.search).get('pix') !== '0';
+   const rt = new THREE.WebGLRenderTarget(683, RT_H, {
+     // 선형 보간으로 늘리면 뿌옇기만 하고 픽셀이 안 보인다. 계단이 보여야 저해상도로 읽힌다.
+     // 스텐실을 켠다. 공이 자기 화소에 표식을 남기고 임팩트 플래시가 그 자리를 비켜 가려면 이 버퍼가 있어야 한다.
+     stencilBuffer: true,
+-    samples: PIX ? 0 : 4, // 기본 전체 해상도에서는 네 표본으로 캡슐 가장자리를 고르게 한다.
+     minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter
+   });
+   const postScene = new THREE.Scene();
+@@ -144,8 +146,7 @@ export function createScene(canvas) {
+     ].join(String.fromCharCode(10)),
+     depthTest: false, depthWrite: false
+   });
+-  const displayMat = PIX ? postMat : new THREE.MeshBasicMaterial({map:rt.texture,depthTest:false,depthWrite:false}); // 픽셀 스위치만 축소·디더·주사선·비네트를 함께 켠다.
+-  postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), displayMat));
++  postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), postMat));
+ 
+   // 세계의 시계. performance.now()를 직접 읽으면 시간을 늦출 자리가 없다.
+ 
+@@ -226,10 +227,29 @@ export function createScene(canvas) {
+      4:2 5:3 6:15 7:22 8:17 9:8 10:10). 이 선에서 74퍼센트가 발등, 26퍼센트가 발 안쪽인데,
+      판정이 레벨로 -2에서 +1.2를 얹으므로 낮은 레벨에서는 그 비가 뒤집힌다. */
+   const KICK_POWER_AT = 7;
+-  // 머리 중심의 하강이 충분히 깊고 느려진 뒤, 누운 몸에만 착지 눌림을 준다.
+-  const LAND_FALL = 0.28; // 첫 충돌의 하강 0.32~0.39보다 낮은 기존 연출 문턱을 유지한다. 전체 낙하 깊이와 첫 충돌 깊이는 다르다.
+-  const LAND_SLOW = 0.10; // 관측 최고 하강 속도의 10%까지 감속한 순간이 보이는 몸의 착지다.
+-  const LAND_LIE = 0.90; // 골반 기준 길이로 정규화한 수평 길이 0.90부터 누운 몸으로 판정한다.
++  /* 착지는 목이 내려오기를 멈춘 프레임이다. 자세가 목표 각도에 도착하는 것과는 다른 순간이다.
++     관절 각도는 실측으로 사건 뒤 8에서 17프레임에 도착하는데, 그 뒤로도 꼬리가 0.8초에 걸쳐 몸통을
++     눕히므로 목은 44에서 50프레임까지 계속 내려간다. 각도로 걸면 아직 떨어지는 중인 몸을 누르게 된다.
++     이만큼은 내려와야 착지라고 부른다. 그 프레임까지 머리가 내려온 깊이를 열다섯 사건에서 재면
++     바닥에 닿는 넷이 lost 0.301, downed 0.315, reboundMiss 0.385, carriedIn 0.454이고,
++     두 발로 끝나는 몸은 빈 골대의 허리 접기가 0.239, 뛰쳐나감이 0.357이다. 0.28은 그 넷 중 가장
++     얕은 0.301과 허리 접기 0.239 사이이고 양쪽으로 0.02와 0.04가 남는다.
++     깊이 문턱은 하나다. 착지를 부르는 깊이와 무게가 실리는 깊이를 두 상수로 두면 큰 쪽만 일하고
++     작은 쪽은 이름만 남아, 그것을 반으로 낮춰도 화면이 안 움직인다(실측: 0.20을 0.05로 내려도
++     눌리는 프레임 넷이 그대로였다). */
++  const LAND_FALL = 0.28;
++  /* 떨어지던 속도가 가장 빨랐던 값의 이 비율 아래로 꺾이면 닿은 것이다. 절대 속도로 걸면 사건마다
++     낙하 속도가 달라 같은 뜻이 안 된다. 실측한 목 속도는 사건에 따라 초속 3에서 11미터로 떨어지고,
++     닿는 프레임에서 한두 프레임 만에 최고값의 10퍼센트대로 꺾인다. 끌려 들어가는 사건만 낙하가 두 번
++     오고, 0.10에서는 두 번째 낙하 끝까지 밀렸다(실측 25프레임, 첫 낙하가 끝나는 자리는 16).
++     0.15는 그 사건까지 첫 접지에서 걸린다. */
++  const LAND_SLOW = 0.15;
++  /* 착지한 몸이 누웠는가. 목과 두 무릎의 수평 거리이고 그늘이 이미 쓰던 수다.
++     깊이와 누움은 각자 다른 몸을 걸러 낸다. 깊이만 물으면 멀리 떨어졌다가 두 발로 버틴 몸이
++     통과하고(제껴짐과 뛰쳐나감이 그렇게 0.28을 넘는다), 누움만 물으면 허리를 접고 선 몸이
++     통과한다(빈 골대의 허리 접기는 누움이 눌리는 넷보다도 높다). 그래서 둘을 함께 묻는다.
++     0.56은 서서 끝나는 몸의 누움 위, 바닥에 누운 몸의 누움 아래에서 고른 자리다. */
++  const LAND_LIE = 0.56;
+   // 0.30은 슬로모션으로 읽혔고 0.02는 프레임이 멈춘 것으로 읽혔다. 0.08이 걸리는 느낌이다.
+   const HIT_SCALE = 0.08;
+ 
+@@ -238,7 +258,7 @@ export function createScene(canvas) {
+   // 지점마다 손으로 다는 대신 add를 감싸는 이유는, 한 서브시스템이 최상위에 여러 개를
+   // 흩뿌려도 누락 없이 전부 귀속되기 때문이다.
+   let subTag = 'stage';
+-  // stage 구간에서 add되는 것은 아래 조명뿐이고 __subs는 조명을 세지 않는다. 그래서
++  // stage 구간에서 add되는 것은 아래 조명 셋뿐이고 __subs는 조명을 세지 않는다. 그래서
+   // __subs에 stage가 0인 것은 하네스 결함이 아니라 설계상 필연이고, stage 컷도 나오지 않는다.
+   const rawAdd = scene.add.bind(scene);
+   scene.add = (...objs) => {
+@@ -246,15 +266,19 @@ export function createScene(canvas) {
+     return rawAdd(...objs);
+   };
+ 
+-  // 키트 app.mjs의 반구광 색과 세기로 무광 얼굴의 아래쪽도 읽게 한다.
+-  scene.add(new THREE.HemisphereLight(0xe7f4ff, 0x9b9384, 2.1));
++  // 조명 셋. 방향 없는 암빛과 반대편 필은 밝기만 한 겹씩 더하고 있었고, 그 몫은 반구광의
++  // 하늘색과 땅색에 접어 넣을 수 있다. 밝기는 그대로 두고 방향이 살아 있는 빛만 남긴다.
++  // 실측: 하늘 0xd8edfe 땅 0xaeac9d 세기 1.7이면 위를 보는 면이 받던 빛이 다섯 개 시절과 같고,
++  // 흙 화소 휘도 p10/p50/p90이 64/93/148 그대로다.
++  scene.add(new THREE.HemisphereLight(0xd8edfe, 0xaeac9d, 1.7));
+   // 키. 카메라 쪽 왼쪽 위에서 얼굴과 장갑을 친다. 그림자를 드리우는 빛도 이 하나다.
+   // 둘이 드리우면 같은 몸이 두 방향으로 눕고, 그 그림은 조명이 둘이라는 정보가 아니라
+   // 그림자가 잘못 그려졌다는 인상으로 읽힌다.
+-  const key = new THREE.DirectionalLight(0xffedce, 3.2);
++  const key = new THREE.DirectionalLight(0xfff4dc, 2.05);
+   key.castShadow = true;
+-  key.shadow.mapSize.set(2048, 2048); // 전체 해상도에서 둥근 발과 몸의 그림자 경계를 보존한다.
+-  // 그림자 카메라의 기존 연출 범위는 유지하고 해상도만 키트에 맞춘다.
++  key.shadow.mapSize.set(1024, 1024);
++  // 그림자 카메라는 페널티 박스를 덮는다. 몸이 서는 땅이 그 판이고, 더 넓히면 같은 1024칸이
++  // 더 넓은 땅에 흩어져 발밑이 뭉갠다. 반폭 10은 박스 반폭 8.25에 누운 몸의 여유를 더한 값이다.
+   const SHADOW_HALF = 10;
+   key.shadow.camera.left = -SHADOW_HALF;
+   key.shadow.camera.right = SHADOW_HALF;
+@@ -266,7 +290,6 @@ export function createScene(canvas) {
+   // 면과 그림자 지도가 같은 깊이를 다투면 자기 그림자가 줄무늬로 앉는다. 법선 쪽으로 밀어 피한다.
+   key.shadow.normalBias = 0.04;
+   key.shadow.bias = -0.0004;
+-  key.shadow.radius = 3; // 키트의 PCF 필터 폭으로 그림자 가장자리를 부드럽게 한다.
+   /* 빛을 박스 중심축으로 옮긴다. 방향 벡터는 (-6, 8, -4)를 2.4배 한 것이라 그대로이고,
+      명암은 한 화소도 안 움직인다. 움직이는 것은 그림자 카메라가 덮는 땅뿐이다.
+      타깃은 씬에 안 붙인다. 붙이면 조명이 아닌 자식이 하나 늘어 __subs의 stage 칸이 열린다. */
+@@ -274,7 +297,10 @@ export function createScene(canvas) {
+   key.target.position.set(0, 0, BOX_Z);
+   key.target.updateMatrixWorld();
+   scene.add(key);
+-  // 키트의 반구광과 주광 하나로 무광 몸통의 넓은 명암을 만든다.
++  // 림. 뒤에서 치면 어깨와 머리 윤곽에 선이 생기고, 인물이 배경에서 떨어진다.
++  const rim = new THREE.DirectionalLight(0xffd9a0, 1.9);
++  rim.position.set(2, 6, 12);
++  scene.add(rim);
+ 
+   subTag = 'pitch';
+   const pitch = buildPitch(scene);
+@@ -301,7 +327,6 @@ export function createScene(canvas) {
+   const FG_A = 0.25;
+   let fgOutline = null;
+   const tagFg = (mat) => {
+-    if (!PIX) return mat; // 전체 해상도는 후처리용 알파 태그 없이 실제 재질 투명도를 쓴다.
+     if (mat.userData.fg) return mat;
+     mat.userData.fg = true;
+     mat.onBeforeCompile = (sh) => {
+@@ -488,14 +513,16 @@ const TOUCHED = new Set(['contact']);
+   // 배우 그림자. 공에만 그림자가 있으면 사람은 떠 보인다. 수치상 접지여도 화면은 그렇게 안 읽힌다.
+   // 그늘 한 장은 균일하다. 실제로는 몸에 가까운 쪽이 더 짙고 가장자리로 갈수록 옅다.
+   // 원판 두 장을 어긋나게 겹치면 그 농도 차이가 생긴다.
++  let blobSeed = 0x1f0b77;
+   const blob = (r) => {
++    blobSeed += 0x9e37;
+     const m = new THREE.Mesh(
+-      new THREE.PlaneGeometry(r * 2, r * 2), // 발 접점의 방사형 음영을 담는 같은 폭의 면이다.
+-      new THREE.MeshBasicMaterial({ color: SHADOW_INK, map:contactTex(), transparent: true, opacity: 0.72, depthWrite:false })
++      blobGeo(r, blobSeed),
++      new THREE.MeshBasicMaterial({ color: SHADOW_INK, transparent: true, opacity: 0.72 })
+     );
+     const core = new THREE.Mesh(
+-      new THREE.PlaneGeometry(r * 1.12, r * 1.12), // 중심 음영은 기존 접점 폭을 보존한다.
+-      new THREE.MeshBasicMaterial({ color: SHADOW_INK, map:contactTex(), transparent: true, opacity: 0.86, depthWrite:false })
++      blobGeo(r * 0.56, blobSeed + 0x31),
++      new THREE.MeshBasicMaterial({ color: SHADOW_INK, transparent: true, opacity: 0.86 })
+     );
+     // 정확히 겹치면 두 장인 줄 모른다. 반지름의 5분의 1만 밀어 발밑을 짙게 만든다.
+     core.position.set(r * 0.18, -r * 0.14, 0.001);
+@@ -522,22 +549,6 @@ const TOUCHED = new Set(['contact']);
+   const footB = new THREE.Vector3();
+   // 행인도 그림자가 있어야 땅을 딘는다. 말걸기 연출은 행인을 앞줄로 데려오므로 더 눈에 띄다.
+   const passerShadows = passers.map(() => blob(0.28));
+-  const footContacts=[], contactPoint=new THREE.Vector3(),contactBox=new THREE.Box3();
+-  function syncFootContacts(actor,feet,index){
+-    if(!footContacts[index])footContacts[index]=feet.map(()=>{
+-      const m=new THREE.Mesh(new THREE.PlaneGeometry(0.65,0.72),new THREE.MeshBasicMaterial({color:SHADOW_INK,map:contactTex(),transparent:true,depthWrite:false})); // 키트 발 접촉 면의 폭과 깊이다.
+-      m.rotation.x=-Math.PI/2;m.userData.probeIgnore=true;m.userData.sub='shadow';m.userData.contact=true;scene.add(m);return m;
+-    });
+-    actor.updateMatrixWorld(true);
+-    feet.forEach((foot,i)=>{
+-      foot.getWorldPosition(contactPoint);
+-      if(!foot.geometry.boundingBox)foot.geometry.computeBoundingBox();
+-      contactBox.copy(foot.geometry.boundingBox).applyMatrix4(foot.matrixWorld);
+-      const m=footContacts[index][i];m.position.set(contactPoint.x,0.035,contactPoint.z); // 기존 바닥 음영보다 조금 위에서 깊이 충돌을 피한다.
+-      m.material.opacity=0.8*Math.max(0,Math.min(1,1-contactBox.min.y*2)); // 발이 반 단위 이상 뜨면 접촉 음영을 없애 공중 접지를 만들지 않는다.
+-      m.visible=actor.visible;
+-    });
+-  }
+ 
+   const kicker = buildKicker();
+   subTag = 'kicker';
+@@ -1171,8 +1182,7 @@ const TOUCHED = new Set(['contact']);
+       loose = gl;
+       keeper.userData.bareHands[gi].visible = true;
+     }
+-    const headStartY = keeper.userData.head.getWorldPosition(new THREE.Vector3()).y; // 사건 첫 프레임의 낙하도 속도와 깊이에 포함하도록 움직이기 전에 기준을 잡는다.
+-    tail = { kind, t0: vnow, from: ball.position.clone(), kx: keeper.position.x, neckTop: headStartY, neckWas: headStartY };
++    tail = { kind, t0: vnow, from: ball.position.clone(), kx: keeper.position.x };
+     // 눈맞음이 어느 갈래인지. 자막을 고른 쪽이 넘겨 주므로 화면과 글자가 같은 갈래를 본다.
+     tail.act = flavour || null;
+     // 화면 전용 편차. 판정 rng가 아니라 여기서 뽑으므로 시드 재현 게이트를 흔들지 않는다.
+@@ -2253,23 +2263,21 @@ const TOUCHED = new Set(['contact']);
+        (실측: 자빠짐이 4프레임에 눌리고 몸은 15프레임에 닿았다).
+        무게가 실렸는지는 몸이 누웠는지로 가른다. 두 발로 서서 끝나는 사건에는 실릴 무게가 없다. */
+     if (tail) {
+-      /* 머리 중심이 얼마나 내려왔고 지금 얼마나 빠르게 내려오는가. 프레임당 변위가 아니라 초속으로 잰다.
++      /* 목이 얼마나 내려왔고 지금 얼마나 빠르게 내려오는가. 프레임당 변위가 아니라 초속으로 잰다.
+          히트스톱이 걸린 프레임은 세계시간이 8퍼센트로 흐르므로 변위만 보면 떨어지는 중인 몸이
+          멈춘 것으로 읽힌다(실측: 그렇게 걸었더니 자빠짐이 16프레임에, 놓친 공이 8프레임에 눌렸다). */
+-      const headFallY = keeper.userData.head.getWorldPosition(new THREE.Vector3()).y; // 목과 달리 회전하는 머리의 실제 높이가 화면의 낙하를 소유한다.
+-      const bodyScale = keeper.userData.joints.spine.getWorldPosition(new THREE.Vector3()).distanceTo(keeper.position);
+-      if (tail.neckTop === undefined) tail.neckTop = headFallY;
+-      const fell = tail.neckWas === undefined ? 0 : tail.neckWas - headFallY;
+-      tail.neckWas = headFallY;
++      if (tail.neckTop === undefined) tail.neckTop = headW.y;
++      const fell = tail.neckWas === undefined ? 0 : tail.neckWas - headW.y;
++      tail.neckWas = headW.y;
+       tail.mps = stepDt > 0 ? fell / stepDt : 0;
+       tail.peak = Math.max(tail.peak ?? 0, tail.mps);
+       tail.conv = tail.aim && tail.d0 > 0 ? 1 - poseDist(poseNow.keeper, tail.aim) / tail.d0 : 1;
+-      if (!tail.landed && tail.neckTop - headFallY >= LAND_FALL && tail.mps <= tail.peak * LAND_SLOW) {
++      if (!tail.landed && tail.neckTop - headW.y >= LAND_FALL && tail.mps <= tail.peak * LAND_SLOW) {
+         tail.landed = true;
+         tail.landLie = span;
+-        tail.landFall = tail.neckTop - headFallY;
++        tail.landFall = tail.neckTop - headW.y;
+         // 깊게 내려왔고 그 끝이 누운 몸일 때만 무게가 실린다. 하나만 보면 접고 선 몸이 통과한다.
+-        if (span / bodyScale >= LAND_LIE) landSq = LAND_FOR;
++        if (span >= LAND_LIE) landSq = LAND_FOR;
+       }
+     }
+     keeperShadow.position.set((headW.x + footX) * 0.5, 0.03, (headW.z + footZ) * 0.5);
+@@ -2324,9 +2332,6 @@ const TOUCHED = new Set(['contact']);
+       // 세계시간이 멈춘 첫 프레임이 그 한 걸음을 따라잡아 정지 프레임 두 장이 갈린다.
+       passerShadows[i].position.set(p.position.x, 0.03, p.position.z);
+     }
+-    syncFootContacts(keeper,keeper.userData.contactFeet,0); // 재착용으로 리그가 바뀌어도 현재 발 앵커를 읽는다.
+-    syncFootContacts(kicker,kicker.userData.contactFeet,1); // 키커도 실제 양발 위치를 따른다.
+-    passers.forEach((p,i)=>syncFootContacts(p,p.userData.walker.feet,i+2)); // 두 선수 뒤의 슬롯은 행인 순서를 보존한다.
+     kickerShadow.position.set(kicker.position.x, 0.03, kicker.position.z);
+     // 잔상은 지나온 자리를 따라간다. 매 프레임 전부 옮기면 공이 여덟 개인 것으로 읽힌다.
+     // 세계시간이 멈추면 잔상도 그 프레임의 모습 그대로 서 있어야 한다.
+@@ -2530,8 +2535,7 @@ const TOUCHED = new Set(['contact']);
+ 
+   // 어느 해상도로 구웠는지. 캔버스 크기만 보면 두 갈래가 같은 수를 내므로 밖에서 못 가른다.
+   window.__pixState = () => ({
+-    on: PIX, filtered:displayMat===postMat, stencil:rt.stencilBuffer, samples:rt.samples, shadowType:renderer.shadowMap.type,
+-    lights:scene.children.filter(o=>o.isLight).map(o=>o.type),
++    on: PIX,
+     rt: [rt.width, rt.height],
+     canvas: [renderer.domElement.width, renderer.domElement.height],
+     dpr: renderer.getPixelRatio()
+diff --git a/web/src/render/texture.mjs b/web/src/render/texture.mjs
+index b510500..4d9041f 100644
+--- a/web/src/render/texture.mjs
++++ b/web/src/render/texture.mjs
+@@ -12,19 +12,14 @@ function canvas(size) {
+   return cv;
+ }
+ 
+-function sampled(t){
+-  const pixel=typeof location!=='undefined'&&new URLSearchParams(location.search).get('pix')==='1';
+-  t.magFilter=pixel?THREE.NearestFilter:THREE.LinearFilter;
+-  t.minFilter=pixel?THREE.NearestFilter:THREE.LinearMipmapLinearFilter;
+-  t.generateMipmaps=!pixel; // 세 표면 경로 모두 같은 스위치에서만 먼 표면의 픽셀 잡음을 남긴다.
+-}
+-
+ function finish(cv, repeat) {
+   const t = new THREE.CanvasTexture(cv);
+   // 캔버스 바이트는 sRGB다. 선언하지 않으면 선형으로 오독돼 중간톤이 눌린다.
+   t.colorSpace = THREE.SRGBColorSpace;
+-  // 표면 보간도 픽셀 모드의 같은 스위치를 따른다.
+-  sampled(t);
++  // 보간하면 잡티가 뿌옇게 번져 저해상도 화면에서 아예 안 읽힌다.
++  t.magFilter = THREE.NearestFilter;
++  t.minFilter = THREE.NearestFilter;
++  t.generateMipmaps = false;
+   t.wrapS = THREE.RepeatWrapping;
+   t.wrapT = THREE.RepeatWrapping;
+   if (repeat) t.repeat.set(repeat[0], repeat[1]);
+@@ -60,33 +55,180 @@ function memo(key, make) {
+   return cache.get(key);
+ }
+ 
+-// Gang Beasts rooftop 참조처럼 바닥은 넓은 무광 색면이고 마모만 낮은 대비로 남긴다.
++// 흙바닥. 얼룩과 발자국이다. 균일한 그라데이션 한 장은 카펫으로 읽힌다.
+ export function dirtTex() {
+   return memo('dirt', () => {
+-    const cv = canvas(256); // 기존 타일 해상도를 유지해 맵 소비자의 크기 계약을 보존한다.
++    // 128에 22번 반복이면 6.8m마다 같은 얼룩이 돌아온다. 화면 안에 한 주기가 여러 번 들어가 격자로 읽힌다.
++    // 텍셀 밀도는 그대로 둘 채 판을 두 배로 키워 주기를 13.6m로 밀어낸다.
++    const S = 256;
++    const cv = canvas(S);
+     const c = cv.getContext('2d');
+-    c.fillStyle = '#eee7dc'; // 황토 재질에 곱할 따뜻한 밝은 바탕으로 공의 흰색과 구별한다.
+-    c.fillRect(0, 0, cv.width, cv.height);
+-    return finish(cv);
++    c.fillStyle = '#ffffff';
++    c.fillRect(0, 0, S, S);
++    const r = rng(0x51d3a1);
++    // 큰 얼룩 먼저, 그 위에 작은 얼룩. 한 크기로만 찍으면 물방울무늬가 된다.
++    // 주기가 길수록 눈에 띄다. 큰 얼룩은 대비를 낮추고 작은 얼룩만 진하게 찍는다.
++    for (let i = 0; i < 104; i += 1) {
++      const rad = 6 + r() * 22;
++      const t = (rad - 6) / 22;
++      const g = 0.78 + r() * (0.16 - t * 0.10);
++      const bx = r() * S;
++      const by = r() * S;
++      const ry = rad * (0.5 + r() * 0.7);
++      const rot = r() * 3.14;
++      const a = 0.85 - t * 0.55;
++      c.fillStyle = 'rgba(' + Math.round(255 * g) + ',' + Math.round(246 * g) + ',' + Math.round(232 * g) + ',' + a.toFixed(3) + ')';
++      tiled(c, S, () => {
++        c.beginPath();
++        c.ellipse(bx, by, rad, ry, rot, 0, 6.283);
++        c.fill();
++      });
++    }
++    // 발자국. 짝을 지어 한 방향으로 간다. 흩뿌리면 자국이 아니라 먼지다.
++    for (let k = 0; k < 20; k += 1) {
++      const x0 = r() * S;
++      const y0 = r() * S;
++      const dx = (r() - 0.5) * 8;
++      c.fillStyle = 'rgba(150,138,118,0.55)';
++      tiled(c, S, () => {
++        for (let i = 0; i < 4; i += 1) {
++          c.fillRect(x0 + dx * i + (i % 2) * 5, y0 + i * 9, 4, 6);
++        }
++      });
++    }
++    // 잔모래. 이게 없으면 얼룩이 오려붙인 스티커로 보인다.
++    for (let i = 0; i < 3600; i += 1) {
++      c.fillStyle = r() > 0.5 ? 'rgba(120,110,92,0.30)' : 'rgba(255,252,240,0.30)';
++      c.fillRect(Math.floor(r() * S), Math.floor(r() * S), 1, 1);
++    }
++    return finish(cv, [11, 11]);
+   });
+ }
+ 
+-const SCUFF_S = 2048; // 누적 접촉 자국이 쓰는 기존 캔버스 해상도다.
++// 페널티 박스 안쪽. 밟히는 자리라 흙보다 닳았다.
++// 여기는 경기 중에 덧칠되는 면이라 반복 타일이 아니라 박스 전체를 한 장으로 굽는다.
++// 타일을 물리면 한 번 찍은 자국이 바닥 전체에 열한 번 복사된다.
++// 흙 한 장이 6.6m를 덮으면 가까운 땅에서 한 텍셀이 렌더 버퍼 두 픽셀을 넘어간다.
++// 그러면 이웃한 화면 픽셀이 같은 텍셀에 갇혀 바닥이 행마다 평평해졌다 거칠어졌다 한다.
++// 판을 두 배로 키우고 타일 크기는 그대로 둬서 같은 넓이에 흙을 두 배로 깐다.
++const SCUFF_S = 2048;
++const SCUFF_TILE = 1024 / 2.5;
++
++// 박스 한 장에 흙 그림을 깐다. 쌓인 자국을 옅게 덮어 지울 때도 같은 붓을 쓴다.
+ export function paintScuffBase(c) {
+-  c.drawImage(dirtTex().image, 0, 0, SCUFF_S, SCUFF_S);
+-  // 골문 앞은 넓게, 페널티 스폿 부근은 좁게 닳게 하되 표시는 별도 규정선 메시가 소유한다.
+-  const patches = [[0.5, 0.07, 0.48, 0.09], [0.5, 0.66, 0.14, 0.1]]; // 판 UV에서 두 접촉 영역만 강조한다.
+-  for (const [x, y, rx, ry] of patches) {
++  const src = dirtTex().image;
++  const ox = 0.37 * SCUFF_S;
++  const oy = 0.11 * SCUFF_S;
++  for (let i = -2; i <= 6; i += 1) {
++    for (let j = -2; j <= 6; j += 1) {
++      c.drawImage(src, i * SCUFF_TILE - ox, j * SCUFF_TILE - oy, SCUFF_TILE, SCUFF_TILE);
++    }
++  }
++  // 화면은 384줄로 한 번 줄었다가 일곱 단으로 끊긴다.
++  // 잔모래는 가까이서 한 픽셀보다 잘아 평균으로 지워지고, 밝기 차도 한 단 안에 갇혀 사라진다.
++  // 그래서 바닥이 죽은 갈색 한 장이 된다. 발밑에서도 남으려면 자국이 굵고, 단을 넘을 만큼 진해야 한다.
++  paintScuffCoarse(c);
++}
++
++// 고정 씨앗이라 몇 번을 덧칠해도 같은 자리에 같은 자국이 겹친다.
++const COARSE = (() => {
++  const r = rng(0x7b1f42);
++  const worn = [];
++  for (let i = 0; i < 44; i += 1) {
++    // 진흙 웅덩이는 좁게 패이고 마른 자리는 넓게 번진다.
++    const dark = r() > 0.42;
++    const rad = dark ? 30 + r() * 46 : 58 + r() * 66;
++    // 깔끔한 타원 하나는 물방울무늬로 읽힌다. 겹친 조각들의 합집합이라야 밟고 지나간 자리가 된다.
++    const lobes = [];
++    const n = 3 + Math.floor(r() * 3);
++    for (let k = 0; k < n; k += 1) {
++      lobes.push({
++        dx: (r() - 0.5) * rad * 1.2,
++        dy: (r() - 0.5) * rad * 0.7,
++        rad: rad * (0.45 + r() * 0.45),
++        ry: 0.4 + r() * 0.5,
++        rot: r() * 3.14
++      });
++    }
++    worn.push({ x: r() * SCUFF_S, y: r() * SCUFF_S, lobes, dark, amp: r() });
++  }
++  const drag = [];
++  for (let i = 0; i < 34; i += 1) {
++    drag.push({
++      x: r() * SCUFF_S,
++      y: r() * SCUFF_S,
++      len: 120 + r() * 200,
++      wid: 8 + r() * 7,
++      rot: r() * 3.14,
++      dark: r() > 0.5
++    });
++  }
++  return { worn, drag };
++})();
++
++// 골문 바로 앞은 매 경기 밟혀 파인다. 페널티 스폿 쪽으로 갈수록 땅이 성하다.
++// 텍스처 위쪽이 골문 앞이고, 그 줄이 화면 아래쪽 발밑으로 온다.
++const CHURN_H = Math.round(SCUFF_S * 0.44);
++function churnLayer() {
++  return memo('churn', () => {
++    const cv = document.createElement('canvas');
++    cv.width = SCUFF_S;
++    cv.height = CHURN_H;
++    const c = cv.getContext('2d');
++    const r = rng(0x51c3a7);
++    // 자국이 화면 픽셀만 해지면 공과 팔다리가 같은 주파수의 얼룩에 섞여 사라진다.
++    // 파인 자리는 뭉쳐서 크게, 밝기 차는 흙 한 톤 안쪽으로 눌러 저주파 얼룩으로 남긴다.
++    for (let y = 0; y < CHURN_H; y += 13) {
++      const near = 1 - y / CHURN_H;
++      for (let x = 0; x < SCUFF_S; x += 13) {
++        // 골문에서 멀어질수록 파인 자리가 뜸해진다.
++        if (r() > 0.28 + near * 0.66) continue;
++        // 파인 자리와 마른 흙덩이. 한 값만 뿌리면 먼지 한 겹이지 파인 땅이 아니다.
++        const deep = r() > 0.5;
++        const v = deep ? 58 + Math.round(r() * 20) : 142 + Math.round(r() * 20);
++        const a = (0.32 + near * 0.5).toFixed(2);
++        c.fillStyle = 'rgba(' + v + ',' + Math.round(v * 0.96) + ',' + Math.round(v * 0.86) + ',' + a + ')';
++        c.fillRect(x + r() * 6 - 3, y + r() * 6 - 3, 9 + r() * 11, 9 + r() * 11);
++      }
++    }
++    return cv;
++  });
++}
++
++function paintScuffCoarse(c) {
++  // 밟혀 벗겨진 자리와 마른 자리. 한 쪽만 찍으면 얼룩이 아니라 그늘로 읽힌다.
++  for (const p of COARSE.worn) {
++    const v = p.dark ? 46 + Math.round(p.amp * 22) : 158 + Math.round(p.amp * 15);
++    const rgb = v + ',' + Math.round(v * 0.96) + ',' + Math.round(v * 0.86);
++    const a = p.dark ? 0.86 : 0.94;
++    for (const l of p.lobes) {
++      // 가장자리가 칼같으면 스티커다. 흙은 밟힌 중심에서 바깥으로 옅어진다.
++      const g = c.createRadialGradient(p.x + l.dx, p.y + l.dy, 0, p.x + l.dx, p.y + l.dy, l.rad);
++      g.addColorStop(0, 'rgba(' + rgb + ',' + a + ')');
++      g.addColorStop(0.55, 'rgba(' + rgb + ',' + (a * 0.7).toFixed(3) + ')');
++      g.addColorStop(1, 'rgba(' + rgb + ',0)');
++      c.fillStyle = g;
++      c.save();
++      c.translate(p.x + l.dx, p.y + l.dy);
++      c.rotate(l.rot);
++      c.scale(1, l.ry);
++      c.translate(-(p.x + l.dx), -(p.y + l.dy));
++      c.beginPath();
++      c.ellipse(p.x + l.dx, p.y + l.dy, l.rad, l.rad, 0, 0, 6.283);
++      c.fill();
++      c.restore();
++    }
++  }
++  // 끌린 자국. 둥근 얼룩만 있으면 물방울무늬로 돌아간다. 방향이 있어야 밟고 지나간 땅이 된다.
++  for (const d of COARSE.drag) {
+     c.save();
+-    c.translate(x * SCUFF_S, y * SCUFF_S);
+-    c.scale(rx * SCUFF_S, ry * SCUFF_S);
+-    const g = c.createRadialGradient(0, 0, 0, 0, 0, 1); // 정규화한 타원 안에서 중심부터 가장자리까지 번진다.
+-    g.addColorStop(0, 'rgba(96,78,52,0.78)'); // 넓은 골문 마모가 세 휘도 구간을 지나도록 중심만 어둡게 하고 가장자리까지 천천히 푼다.
+-    g.addColorStop(1, 'rgba(96,78,52,0)'); // 끝은 투명해서 마모판의 경계가 보이지 않는다.
+-    c.fillStyle = g;
+-    c.fillRect(-1, -1, 2, 2); // 정규화 타원의 외접 사각형을 채운다.
++    c.translate(d.x, d.y);
++    c.rotate(d.rot);
++    c.fillStyle = d.dark ? 'rgba(62,52,38,0.72)' : 'rgba(168,158,132,0.7)';
++    c.fillRect(-d.len / 2, -d.wid / 2, d.len, d.wid);
+     c.restore();
+   }
++  c.drawImage(churnLayer(), 0, 0);
+ }
+ 
+ export function scuffTex() {
+@@ -96,7 +238,9 @@ export function scuffTex() {
+     paintScuffBase(c);
+     const t = new THREE.CanvasTexture(cv);
+     t.colorSpace = THREE.SRGBColorSpace;
+-    sampled(t);
++    t.magFilter = THREE.NearestFilter;
++    t.minFilter = THREE.NearestFilter;
++    t.generateMipmaps = false;
+     t.wrapS = THREE.ClampToEdgeWrapping;
+     t.wrapT = THREE.ClampToEdgeWrapping;
+     return t;
+@@ -158,11 +302,6 @@ export function cloudTex() {
+         const t = k / (puffs - 1) - 0.5;
+         const rad = base * (0.5 + Math.pow(1 - Math.abs(t) * 1.6, 2) * 0.9);
+         c.beginPath();
+-        // 기존 덩어리 위치를 유지하고 중심부터 반경 끝까지 부드럽게 옅어진다.
+-        const puff = c.createRadialGradient(cx + t * base * 2.4, cy, 0, cx + t * base * 2.4, cy, rad);
+-        puff.addColorStop(0, 'rgba(255,255,255,1)'); // 중심은 불투명해서 흰 덩어리로 읽힌다.
+-        puff.addColorStop(1, 'rgba(255,255,255,0)'); // 가장자리는 하늘에 부드럽게 섞인다.
+-        c.fillStyle = puff;
+         c.ellipse(cx + t * base * 2.4, cy - rad * squash * 0.4 + (r() - 0.5) * base * 0.3,
+                   rad, rad * squash * 1.35, 0, 0, Math.PI * 2);
+         c.fill();
+@@ -175,7 +314,9 @@ export function cloudTex() {
+       c.restore();
+     }
+     const t = new THREE.CanvasTexture(cv);
+-    sampled(t);
++    t.magFilter = THREE.NearestFilter;
++    t.minFilter = THREE.NearestFilter;
++    t.generateMipmaps = false;
+     t.wrapS = THREE.RepeatWrapping;
+     t.wrapT = THREE.ClampToEdgeWrapping;
+     return t;
+@@ -391,13 +532,12 @@ export function inkTex(base, tone, grade, span, girth) {
+        그림 몇 개가 뜬 것으로 읽힌다. 이 등급만 칸을 넷으로 늘려 무늬가 서로 닿게 한다. */
+     const cols = gd >= 3 ? 4 : INK_COLS;
+     // 무늬 한 개의 크기. 띠가 좁으면 띠 높이가, 넓으면 둘레 간격이 크기를 정한다.
+-    const rad = Math.max(4, Math.min(band * 0.42, INK_W / (cols * 2.2))) * gr * 1.1; // 전체 팔 프레임에서도 읽히도록 획 반경을 10% 키우고 무늬 종류와 띠 폭은 유지한다.
++    const rad = Math.max(4, Math.min(band * 0.42, INK_W / (cols * 2.2))) * gr;
+     /* 줄 간격. 3등급만 2.6이 아니라 1.5다. 채운 소매는 줄과 줄이 겹쳐야 한 벌로 읽힌다.
+        실측: 번개 한 종류를 2.6 간격 네 줄로 놓았을 때 팔 화소 분산이 1421.9로, 고리 방식의
+        1472.9 아래였다. */
+     const rows = Math.max(1, Math.round(band / (rad * (gd >= 3 ? 1.5 : 2.6))));
+-    // rgb 문자열을 비트 연산에 넣으면 검정이 된다. 기존 62% 밝기 혼합을 숫자 색으로 유지한다.
+-    const face = gd >= 3 ? new THREE.Color(tone).lerp(new THREE.Color(0xffffff),0.62).getHex() : tone;
++    const face = gd >= 3 ? mix(tone, 0xffffff, 0.62) : tone;
+     // 무늬는 팔 둘레에서 감긴다. 한 번만 그리면 텍스처 이음선에서 반 토막이 난다.
+     const wrap = (fn) => { fn(0); fn(-INK_W); fn(INK_W); };
+     for (let ry = 0; ry < rows; ry += 1) {
+@@ -413,15 +553,14 @@ export function inkTex(base, tone, grade, span, girth) {
+            소매(0x073239)는 41이라 차이가 37뿐이었다. 필름은 휘도 170대로 올라가 차이가 130이다. */
+         if (gd === 1) {
+           wrap((dx) => {
+-            c.fillStyle = rgb(0xffffff); // 스티커 필름은 흰색이어야 작은 확대 창에서도 별과 구별된다.
++            c.fillStyle = mix(base, 0xffffff, 0.72);
+             c.fillRect(x + dx - rad * 1.15, y - rad * 1.15, rad * 2.3, rad * 2.3);
+             c.fillStyle = mix(base, 0xffffff, 0.3);
+             c.fillRect(x + dx - rad * 1.15, y + rad * 0.72, rad * 2.3, rad * 0.43);
+           });
+         }
+         // 2등급은 새긴 글씨다. 밝은 획을 반 칸 밀어 깔고 그 위에 진한 획을 얹으면 파인 것으로 읽힌다.
+-        // 밑획 밝기 95%와 폭 1.5배는 잉크 원색을 남기면서 새긴 글씨를 음영과 가른다.
+-        if (gd === 2) wrap((dx) => { c.fillStyle = mix(base, 0xffffff, 0.95); MARK[gd](c, x + dx + rad * 0.18, y + rad * 0.18, rad * 1.5); });
++        if (gd === 2) wrap((dx) => { c.fillStyle = mix(base, 0xffffff, 0.52); MARK[gd](c, x + dx + rad * 0.18, y + rad * 0.18, rad); });
+         wrap((dx) => {
+           // 테두리 먼저. 문신은 선을 긋고 안을 채우므로 바깥 한 겹이 더 진하다.
+           c.fillStyle = mix(face, 0x000000, 0.45);
+@@ -441,16 +580,3 @@ export function inkTex(base, tone, grade, span, girth) {
+     return finish(cv);
+   });
+ }
+-
+-// 키트 app.mjs의 Canvas 방사형 접촉 음영을 공유한다. 화면 전체 AO 대신 발밑만 부드럽게 잇는다.
+-let contact;
+-export function contactTex(){
+-  if(contact)return contact;
+-  const cv=canvas(64),ctx=cv.getContext('2d'); // 작은 방사형 맵을 모든 발 그림자가 공유한다.
+-  const g=ctx.createRadialGradient(32,32,0,32,32,32); // 중앙에서 면 끝까지 투명도를 연속으로 줄인다.
+-  g.addColorStop(0,'rgba(255,255,255,0.24)'); // 발에 가까운 부분만 진하게 두어 검은 원판이 되지 않게 한다.
+-  g.addColorStop(1,'rgba(255,255,255,0)'); // 가장자리는 완전히 사라져 바닥과 경계선이 생기지 않는다.
+-  ctx.fillStyle=g;ctx.fillRect(0,0,64,64); // 맵의 전체 면을 같은 방사형 음영으로 채운다.
+-  contact=new THREE.CanvasTexture(cv);contact.colorSpace=THREE.SRGBColorSpace;
+-  return contact;
+-}
+diff --git a/web/src/render/thumb.mjs b/web/src/render/thumb.mjs
+index 7c32fb8..7415108 100644
+--- a/web/src/render/thumb.mjs
++++ b/web/src/render/thumb.mjs
+@@ -8,7 +8,7 @@ import * as THREE from "../../vendor/three.module.min.js";
+ import { buildKeeper, buildKicker, setPose, POSES } from "./objects/actors.mjs";
+ import { faceOf } from "../../../src/roster.mjs";
+ import { meshPanel, buildPassers } from "./objects/pitch.mjs";
+-import { placeCardGeo, venueCrowd } from "./objects/places.mjs";
++import { placeCardGeo } from "./objects/places.mjs";
+ import { flatVertex, mergeGeos } from "./units.mjs";
+ import { skinAt, placeAt } from "../state/gear.mjs";
+ 
+@@ -36,7 +36,7 @@ const CARD_H = 269;
+ const sizeOf = (kind) => ((kind === "body" || kind === "kicker") ? [BODY_W, BODY_H]
+   : kind === "bot" || kind === "buff" ? [CARD_W, CARD_H] : [BAKE_W, BAKE_H]);
+ 
+-// 착용 카드는 아래 wornCamera가 관절 봉투를 맞춘다. 이 표는 다른 카드와 옛 겨냥 대조군도 지원한다.
++// 상품마다 봐야 할 곳이 다르다. 장갑을 온몸 썸네일로 보여 주면 손은 여덟 화소가 된다.
+ // part는 무엇을 겨냥하는지, dist는 그 부위가 칸을 채우는 거리, lift는 시선 높이 보정,
+ // high는 눈높이 배율이다. 파는 면이 위에 있으면 내려다보고 밑에 있으면 올려다본다.
+ const AIM = {
+@@ -56,7 +56,7 @@ const AIM = {
+      어깨는 같이 들어온다. 고정 보정이 지키려던 것이 어깨인데 실측으로 그 보정이 어깨를 이미
+      잘랐다. 스펀지를 넣은 저지가 키 188에서 위팔 상자 위끝 -0.131이고 키 205에서는 네 등급이
+      전부 칸 밖이었다. 목을 잡으면 그 위끝이 가장 높은 칸에서도 0.145라 어깨가 칸에 남는다. */
+-  pads: { part: "neck", dist: 2.1, lift: 0.1, high: 0.1, yaw: -0.35 }, // 각도 -0.35로 양쪽 어깨 패드가 서로 가려지지 않게 한다.
++  pads: { part: "neck", dist: 1.7, lift: 0, high: 0.1 },
+   socks: { part: "shin", dist: 1.05, lift: 0.02 },
+   // 겨냥점은 머리 한가운데인데 파는 것은 그 위에 얹힌 껍데기다. 보정 없이 잡으면
+   // 모히칸의 무게중심이 칸 위에서 13퍼센트 지점에 걸려 볏이 잘린다.
+@@ -69,8 +69,8 @@ const AIM = {
+      942까지 떨어져 thumb의 하한 1000을 깼고 무게중심이 위쪽 0.12까지 올라갔다.
+      정사각으로 되돌리는 갈래는 버렸다. contain이 96x96으로 줄여 넣어 옛 결함이 돌아온다. */
+   // 머리와 같은 거리에서 얼굴 중심을 잡아 턱수염과 면도를 함께 비교한다.
+-  beard: { part: "head", dist: 1.35, lift: 0, high: 0, yaw: 0.24 }, // 머리 반경 확대에 맞춰 턱 전체를 담는다.
+-  hair: { part: "head", dist: 1.35, lift: 0.17, high: 0 }, // 키트 머리 배율만큼 정수리 여백을 함께 늘린다.
++  beard: { part: "head", dist: 0.8, lift: 0, high: 0 },
++  hair: { part: "head", dist: 0.8, lift: 0.1, high: 0 },
+   /* 파는 것은 팔이 아니라 팔에 새긴 그림이다. 겨냥점이 어깨 관절이라 lift가 그 아래
+      위팔 한가운데를 잡고, 0.58에서는 칸의 대부분을 소매와 유니폼이 먹어 무늬가 위쪽
+      귀퉁이에 손톱만 하게 걸린다. 실측: 세 유료 등급의 무늬가 칸의 16.6과 18.4와
+@@ -81,7 +81,7 @@ const AIM = {
+      0등급은 무늬가 없어 그 몫이 0이고, 그것이 맨살을 맨살로 읽히게 하는 대조군이다.
+      키는 178에서 198까지 갈리는데 그 폭 전부에서 74.9퍼센트 아래로 안 내려간다.
+      각을 여기 다는 이유는 도는 그림이 이 각에서 출발하기 때문이다. yawOf가 여기서 읽는다. */
+-  ink: { part: "arm", dist: 0.32, lift: -0.1, high: 0.06, yaw: 0 }, // 정면 각도 0으로 팔의 길이를 원근 축약 없이 보여 준다.
++  ink: { part: "arm", dist: 0.32, lift: -0.1, high: 0.06, yaw: -0.95 },
+   /* 탈의실의 온몸. 부위가 아니라 사람을 보여 준다. 무엇을 걸쳤는지가 아니라
+      걸친 뒤의 내가 어떻게 보이는지가 이 칸이 답하는 질문이다.
+      겨냥은 머리다. 몸통을 잡으면 카메라가 허리를 보고 정수리는 프레임 위로 밀린다
+@@ -92,7 +92,7 @@ const AIM = {
+      -0.675는 프레임 가운데를 머리 아래 몸통 중간에 놓아 발까지 담는 보정이다.
+      내려다보지 않는다. 기본 눈높이 0.22로 잡으면 정수리를 위에서 보게 되어
+      온몸 그림이 머리 뚜껑부터 시작한다. */
+-  body: { part: "head", dist: 5.4, lift: -0.74, high: 0 } // 큰 머리를 포함한 전신과 발끝 여백을 확보한다.
++  body: { part: "head", dist: 4.73, lift: -0.675, high: 0 }
+   ,
+   /* 개봉 카드의 한 사람. 탈의실 칸은 정사각인데 카드는 세로로 길어서, 같은 그림을 잘라 키우면
+      위아래가 남고 좌우가 깎인다. 그러면 머리가 프레임 밖으로 나간다.
+@@ -104,14 +104,13 @@ const AIM = {
+      한 겨냥으로 셋을 다 먹인다. 키퍼의 얼굴은 +z를 보므로 카메라도 +z에 서야 한다.
+      yaw 0이 그 자리이고, 0.24만큼 틀어야 코와 귀가 실루엣을 만든다.
+      겨냥점은 머리다. 몸통을 잡고 올려 맞추면 키가 다른 선수마다 얼굴이 다른 높이에 걸린다. */
+-  face: { part: "head", dist: 1.06, lift: 0.034, high: 0.06, yaw: 0.24 } // 키트의 머리 확대 비율로 초상 거리와 중심을 맞춘다.
++  face: { part: "head", dist: 0.62, lift: 0.02, high: 0.06, yaw: 0.24 }
+ };
+ 
+-// 키커 전신도 시착실과 같은 프레임을 쓰되 선수 얼굴과 키커 몸을 그린다.
+-AIM.kicker = AIM.body;
+-
+ /* 골대와 동네는 몸에 안 걸친다. 사람을 겨냥하는 AIM으로는 못 찍으므로 장면 조각을 따로 세운다.
+    두 칸 다 등급이 화면을 바꾸는 물건이라, 파는 것이 곧 그 장면의 모습이다. */
++// 전설 선수도 승인된 전신 구도로 자기 얼굴과 키커 옷을 보여 준다.
++AIM.kicker = AIM.body;
+ let sceneRig = null;
+ 
+ function clearScene() {
+@@ -172,19 +171,23 @@ function cityRig(pick) {
+     new THREE.MeshLambertMaterial({ color: place.ground }));
+   ground.rotation.x = -Math.PI / 2;
+   grp.add(ground);
+-  // 시설 자체가 지평선을 만든다. 별도 도심 건물을 얹으면 잔디 구장과 스타디움이 같은 도시로 읽힌다.
++  /* 지평선 한 조각. 인원과 하늘만으로는 네 칸이 같은 장소의 다른 시간대로 읽혔다.
++     경기장과 같은 규칙으로 등급이 높을수록 건물이 솟는다. 다섯 동이면 칸 폭을 채우고,
++     행인 뒤에 서므로 사람을 안 가린다. 다섯을 한 지오메트리로 붙여 칸 하나가 메시 하나다. */
++  const far = [];
++  for (let i = 0; i < 5; i += 1) {
++    const h = (1.6 + (i % 3) * 0.7) * place.rise;
++    const b = new THREE.BoxGeometry(1.5, h, 1.2);
++    b.translate(-3.2 + i * 1.6, h / 2, -10.4);
++    far.push(b);
++  }
++  grp.add(new THREE.Mesh(mergeGeos(far), new THREE.MeshLambertMaterial({ color: place.fence })));
+   /* 그 동네의 물건. 밟는 면과 지평선 높이만 갈리던 동안 네 칸이 색만 다른 같은 벌판이었다.
+      경기장 배치를 그대로 담으면 60m짜리 담이 이 칸에서 실 한 오라기가 되므로, 칸의 배치는
+      places.mjs가 따로 쥔다. 어느 동네인지는 한 곳이 정하고 어떻게 담을지만 칸마다 다르다.
+      굽고 나면 clearScene이 이 리그의 지오메트리를 버린다. 사본을 주지 않으면 같은 칸을
+      두 번째로 구울 때 이미 버려진 지오메트리를 그리게 된다. */
+   grp.add(new THREE.Mesh(placeCardGeo(rank).clone(), flatVertex(0xffffff)));
+-  // 프로 관중은 시설 카드와 같은 배율로 옮겨 관람석 위에 앉힌다.
+-  if(rank===3){
+-    const crowd=venueCrowd();
+-    crowd.scale.set(0.45,0.7,0.3);crowd.rotation.y=Math.PI;crowd.position.z=3;
+-    grp.add(crowd);
+-  }
+   // 행인 수는 경기장과 같은 식으로 센다. 다섯에서 시작해 등급마다 둘씩 는다.
+   const n = PASSER_BASE + PASSER_STEP * rank;
+   const who = buildPassers(grp, n, rank, pick && pick.skin);
+@@ -250,7 +253,7 @@ function botRig(pick, keeper) {
+   grp.add(spine);
+   /* 온몸이 아니라 머리부터 허리까지 잡는다. 서 있는 사람을 가로 칸에 통째로 담으면
+      사람이 칸 폭의 16퍼센트만 쓰고, 그 크기에서 회로는 점 몇 개가 된다. */
+-  return { grp, body, at: new THREE.Vector3(0, h * 0.7, 0), dist: h, high: 0.04 };
++  return { grp, at: new THREE.Vector3(0, h * 0.7, 0), dist: h, high: 0.04 };
+ }
+ 
+ /* 버프 한 통. 마시고 뿌리고 던지는 물건이라 손에 쥐는 그 하나가 곧 상품이다.
+@@ -317,79 +320,14 @@ function boot() {
+     R.setSize(BAKE_W, BAKE_H, false);
+   scene = new THREE.Scene();
+   // 경기장과 같은 빛을 쓴다. 상점에서 본 색과 화면에서 신은 색이 다르면 산 것이 다른 물건이 된다.
+-  scene.add(new THREE.HemisphereLight(0xe7f4ff, 0x9b9384, 2.1));
+-  const key = new THREE.DirectionalLight(0xffedce, 3.2);
++  scene.add(new THREE.HemisphereLight(0xdfe8ef, 0x2b2a24, 1.15));
++  const key = new THREE.DirectionalLight(0xffffff, 1.25);
+   key.position.set(-1.4, 2.2, 1.8);
+   scene.add(key);
+     // 세로 화각이 프레임을 정한다. 가로로 넓히면 담기는 폭만 늘고 물건 높이는 그대로다.
+     cam = new THREE.PerspectiveCamera(32, BAKE_W / BAKE_H, 0.01, 40);
+ }
+ 
+-// 착용 상품은 실제 관절과 메시의 봉투를 함께 담는다. Three.js MIT Box3의 경계를 원근 화각에 맞춘다.
+-const WORN = new Set(["grip", "studs", "pads", "socks", "ink", "hair", "beard"]);
+-function previewPose(kind, body) {
+-  // 어깨를 옆으로 1.4라디안 벌리고 팔꿈치를 0.1만큼 꺾어 팔과 무늬를 가로로 크게 보여 준다.
+-  if (kind === "ink") setPose(body, {...POSES.ready, shL:[0, 0, -1.4], elL:[0, 0, 0.1]});
+-  if (kind === "hair") setPose(body, {...POSES.ready, neck:[0.4, 0, 0]}); // 목을 0.4만큼 숙여 정수리 형태와 눈을 함께 보여 준다.
+-  if (kind === "grip") setPose(body, POSES.clutch); // 잡은 손을 얼굴 가까이 올리는 기존 자세를 재사용한다.
+-  if (kind === "studs" || kind === "socks") {
+-    // 허벅지 -2.6은 발을 가슴까지 올리고 벌림 -0.35와 무릎 0.3은 신발이 얼굴을 가리지 않게 한다.
+-    setPose(body, {...POSES.ready, hipL: [kind === "socks" ? -2.85 : -2.6, 0, -0.35], knL: [kind === "socks" ? 0.1 : 0.3, 0, 0]}); // 양말은 허벅지 -2.85와 무릎 0.1로 더 들어 정강이를 카드 가운데에 둔다.
+-  }
+-
+-}
+-function surfacePoints(object) {
+-  const points = [];
+-  object.traverse(o => {
+-    if (!o.isMesh || !o.visible) return;
+-    const pos = o.geometry.attributes.position;
+-    for (let i = 0; i < pos.count; i++) points.push(new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld));
+-  });
+-  return points;
+-}
+-function shoulderPoints(body) {
+-  return body.userData.arms.map(sh => sh.children.filter(ch => ch.isMesh && ["SphereGeometry", "BoxGeometry"].includes(ch.geometry.type)).flatMap(surfacePoints));
+-}
+-function wornCamera(kind, body, yaw, detailOnly = false, extra = []) {
+-  const points = detailOnly ? [] : surfacePoints(body.userData.head).concat(...shoulderPoints(body));
+-  points.push(...extra);
+-  const add = object => points.push(...surfacePoints(object));
+-  const j = body.userData.joints;
+-  if (kind === "grip") for (const glove of body.userData.gloves) add(glove);
+-  if (kind === "studs") add(body.userData.boots[0]);
+-  if (kind === "socks") for (const ch of j.knL.children) if (ch.isMesh) add(ch);
+-  // 실제 팔 전체를 담아 위팔의 무늬와 팔꿈치, 아래팔, 손목이 한 방향으로 이어지게 한다.
+-  if (kind === "ink") add(j.shL);
+-  const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+-  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+-  const viewPoints = points.map(p => new THREE.Vector3(p.dot(right), p.y, p.dot(forward)));
+-  if (kind === "pads") {
+-    // 짧은 몸에서도 얼굴 밑에 저지가 남도록 골반의 척추 원점까지 담는다.
+-    const chest = j.spine.getWorldPosition(new THREE.Vector3()).lerp(j.neck.getWorldPosition(new THREE.Vector3()), 0.15); // 아래 15% 지점까지 담아 턱 여백과 헐렁한 면티의 밑단을 함께 보존한다.
+-    viewPoints.push(new THREE.Vector3(chest.dot(right), chest.y, chest.dot(forward)));
+-  }
+-  if (kind === "hair") {
+-    // 머리 반경의 0.75만큼 정수리 여백을 확보해 짧은 헤어도 카드 위쪽 변에 붙지 않게 한다.
+-    const top = viewPoints.reduce((a, p) => p.y > a.y ? p : a).clone();
+-    top.y += body.userData.head.geometry.parameters.radius * 0.75;
+-    viewPoints.push(top);
+-  }
+-  const center = new THREE.Box3().setFromPoints(viewPoints).getCenter(new THREE.Vector3());
+-  const at = right.clone().multiplyScalar(center.x).addScaledVector(forward, center.z);
+-  at.y = center.y;
+-  const tanY = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)); // 반각으로 실제 표면의 원근 경계를 푼다.
+-  const tanX = tanY * cam.aspect;
+-  let distance = 0;
+-  for (const p of viewPoints) {
+-    const q = p.clone().sub(center);
+-    distance = Math.max(distance, q.z + Math.max(Math.abs(q.x) / tanX, Math.abs(q.y) / tanY));
+-  }
+-  distance *= kind === "pads" ? 1.12 : 1.04; // 상의는 큰 키의 턱과 회전한 어깨 상자를 12% 여백으로 담고 나머지는 기존 4%를 유지한다.
+-  cam.position.copy(at).addScaledVector(forward, distance);
+-  cam.lookAt(at);
+-  cam.userData.distance = distance;
+-}
+-
+ function partPoint(k, part) {
+   const v = new THREE.Vector3();
+   const j = k.userData.joints;
+@@ -422,9 +360,6 @@ export function yawOf(kind, aim) {
+ // over는 겨냥 한 칸만 덮어쓰는 자리다. 계기가 반사실을 구울 때만 쓰고, 화면은 안 쓴다.
+ function frame(kind, keeper, look, yaw, over) {
+   boot();
+-  delete cam.userData.portrait;
+-  delete cam.userData.inkDetail;
+-  cam.clearViewOffset();
+   /* 프레임 비율은 칸마다 다르다. 세로로 긴 피사체를 가로 칸에 구우면 담기는 것은 사람이 아니라 여백이다.
+      크기가 그대로면 아무것도 안 한다. 매번 다시 잡으면 굽는 한 장마다 그리기 버퍼를 새로 만든다. */
+   const [fw, fh] = sizeOf(kind);
+@@ -433,8 +368,6 @@ function frame(kind, keeper, look, yaw, over) {
+     cam.aspect = fw / fh;
+     cam.updateProjectionMatrix();
+   }
+-  cam.aspect = fw / fh;
+-  cam.updateProjectionMatrix();
+   // 장면 칸은 AIM 겨냥을 안 쓴다. 무엇을 겨냥할 몸이 없거나, 몸 자체가 상품이기 때문이다.
+   if (SCENE[kind]) {
+     if (rig) { scene.remove(rig); rig = null; }
+@@ -450,12 +383,6 @@ function frame(kind, keeper, look, yaw, over) {
+     // 눈높이는 칸이 정한다. 골대와 행인은 크기가 여섯 배 차이라 같은 각으로 보면 한쪽이 늘 잘린다.
+     cam.position.set(made.at.x + Math.sin(a) * made.dist, made.at.y + made.dist * made.high, made.at.z + Math.cos(a) * made.dist);
+     cam.lookAt(made.at);
+-    if (kind === "bot") {
+-      rig = made.body;
+-      sceneRig.updateMatrixWorld(true);
+-      // 가슴 표식은 몸통의 형제가 아니라 장면 그룹에 붙으므로 그 실제 정점도 봉투에 넣는다.
+-      wornCamera("pads", rig, a, false, sceneRig.children.filter(o => o.isMesh).flatMap(surfacePoints));
+-    }
+     R.render(scene, cam);
+     return;
+   }
+@@ -464,11 +391,11 @@ function frame(kind, keeper, look, yaw, over) {
+   if (rig) scene.remove(rig);
+   rig = kind === "kicker" ? buildKicker(faceOf(keeper.name)) : buildKeeper(keeper.height, keeper.weight, look);
+   if (kind === "kicker") {
+-    setPose(rig, POSES.ready); // 시착 카드처럼 두 발을 딛고 선수 얼굴과 차림을 보여 준다.
+-    rig.rotation.y = Math.PI; // 키커 얼굴은 로컬 -z이므로 초상 카메라를 향해 반 바퀴 돌린다.
+-    rig.scale.set(keeper.weight / 84, keeper.height / 188, keeper.weight / 84); // 시착실 기준 체격에 대한 명단의 상대 비율로 세 선수의 체격을 구별한다.
++    setPose(rig, POSES.ready);
++    rig.rotation.y = Math.PI; // 키커의 로컬 얼굴 방향을 미리보기 카메라에 맞춘다.
++    // 시착실 기본 체격 84와 188에 대한 기존 명단 비율이다.
++    rig.scale.set(keeper.weight / 84, keeper.height / 188, keeper.weight / 84);
+   }
+-  if (WORN.has(kind) && !(over && (over.part || over.dist || over.lift !== undefined || over.high !== undefined))) previewPose(kind, rig);
+   rig.updateMatrixWorld(true);
+   scene.add(rig);
+   const aim = Object.assign({}, AIM[kind] || { part: "torso", dist: 1.3, lift: 0 }, over || {});
+@@ -478,47 +405,7 @@ function frame(kind, keeper, look, yaw, over) {
+   const high = aim.high === undefined ? 0.22 : aim.high;
+   cam.position.set(at.x + Math.sin(a) * aim.dist, at.y + aim.dist * high, at.z + Math.cos(a) * aim.dist);
+   cam.lookAt(at);
+-  cam.userData.distance = aim.dist;
+-  if (WORN.has(kind) && !(over && (over.part || over.dist || over.lift !== undefined || over.high !== undefined))) wornCamera(kind, rig, a);
+-  if (kind === "ink" && !(over && (over.part || over.dist || over.lift !== undefined || over.high !== undefined))) {
+-    tattooFrame(a, fw, fh);
+-  } else R.render(scene, cam);
+-}
+-
+-// 문신은 확대 면과 착용자를 한 카드에 함께 둔다. 관절을 따라가므로 체격이 바뀌어도 잘리지 않는다.
+-const INK_DETAIL_SHARE = 0.78; // 가로로 편 팔에 78%를 주면 같은 높이에서 무늬를 키우고 나머지 22%에 인물 축을 남긴다.
+-function tattooFrame(yaw, width, height) {
+-  const split = Math.round(width * INK_DETAIL_SHARE);
+-  const portraitWidth = width - split;
+-  cam.aspect = portraitWidth / height;
+-  cam.updateProjectionMatrix();
+-  wornCamera("ink", rig, yaw);
+-  const portrait = cam.clone();
+-  cam.aspect = split / height;
+-  cam.updateProjectionMatrix();
+-  // 기존 표면 경계 맞춤을 실제 팔 전체에 적용한다. 관절 길이만으로 거리를 잡지 않는다.
+-  wornCamera("ink", rig, yaw, true);
+-  const detail = cam.clone(); detail.updateMatrixWorld(true); // 팔 상자도 실제 확대 창의 카메라로 투영한다.
+-  R.setScissorTest(true);
+-  R.setViewport(portraitWidth, 0, split, height); R.setScissor(portraitWidth, 0, split, height);
+-  // 상세 창에는 실제 팔과 손을 남긴다. 몸통과 반대 팔이 무늬나 손목을 가리지 않게 한다.
+-  const armParts = new Set();
+-  rig.userData.joints.shL.traverse(part => { if (part.isMesh) armParts.add(part); });
+-  const hidden = [];
+-  rig.traverse(part => {
+-    if (part.isMesh && part.visible && !armParts.has(part)) {
+-      hidden.push(part);
+-      part.visible = false;
+-    }
+-  });
+-  R.render(scene, cam);
+-  for (const part of hidden) part.visible = true;
+-  cam.copy(portrait);
+-  R.setViewport(0, 0, portraitWidth, height); R.setScissor(0, 0, portraitWidth, height);
+   R.render(scene, cam);
+-  R.setScissorTest(false); R.setViewport(0, 0, width, height);
+-  cam.userData.portrait = {x:0, width:portraitWidth / width};
+-  cam.userData.inkDetail = {camera:detail, x:portraitWidth / width, width:split / width};
+ }
+ 
+ // over는 굽는 각을 덮어쓰는 자리다. 계기가 반사실을 구울 때만 쓰고, 화면은 안 쓴다.
+@@ -604,26 +491,24 @@ export function armBox(kind, keeper, look) {
+     n += 1;
+   }
+   if (!n) return null;
+-  const viewport = kind === 'ink' ? cam.userData.inkDetail : null;
+-  const projection = viewport ? viewport.camera : cam;
+   const v = new THREE.Vector3();
+   let x0 = 1;
+   let x1 = -1;
+   let y0 = 1;
+   let y1 = -1;
+   for (let i = 0; i < 8; i += 1) {
+-    v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).project(projection);
++    v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).project(cam);
+     x0 = Math.min(x0, v.x);
+     x1 = Math.max(x1, v.x);
+     y0 = Math.min(y0, v.y);
+     y1 = Math.max(y1, v.y);
+   }
+-  return { parts: n, x0: (viewport?.x || 0) + (x0 + 1) / 2 * (viewport?.width || 1), x1: (viewport?.x || 0) + (x1 + 1) / 2 * (viewport?.width || 1), y0: (1 - y1) / 2, y1: (1 - y0) / 2,
++  return { parts: n, x0: (x0 + 1) / 2, x1: (x1 + 1) / 2, y0: (1 - y1) / 2, y1: (1 - y0) / 2,
+     url: R.domElement.toDataURL("image/png") };
+ }
+ 
+ export function headBox(kind, keeper, look, over) {
+-  if (!AIM[kind] && kind !== "bot") return null;
++  if (!AIM[kind]) return null;
+   frame(kind, keeper, look, undefined, over);
+   const head = rig && rig.userData.head;
+   if (!head) return null;
+@@ -632,8 +517,7 @@ export function headBox(kind, keeper, look, over) {
+   const r = head.geometry.parameters.radius;
+   const crown = at.clone();
+   crown.y += r;
+-  const port = cam.userData.portrait;
+-  const to = (v) => ({ x: (port?.x || 0) + (v.x + 1) / 2 * (port?.width || 1), y: (1 - v.y) / 2 });
++  const to = (v) => ({ x: (v.x + 1) / 2, y: (1 - v.y) / 2 });
+   const mid = to(at.clone().project(cam));
+   const top = to(crown.clone().project(cam));
+   const ry = Math.abs(mid.y - top.y);
+@@ -656,15 +540,5 @@ export function headBox(kind, keeper, look, over) {
+   }
+   // 쓴 거리를 같이 돌려준다. 계기가 반사실을 구울 때 겨냥 상수를 옮겨 적지 않아도 된다.
+   return { x: mid.x, y: mid.y, ry, rx: ry * (R.domElement.height / R.domElement.width), eyes, mouth,
+-    dist: cam.userData.distance, url: R.domElement.toDataURL("image/png") };
+-}
+-
+-// 착용 카드의 두 어깨를 실제 구 메시 봉투로 읽는다. 상품 축과 별개인 착용자 축의 계기다.
+-export function wearerBox(kind, keeper, look, over) {
+-  const head = headBox(kind, keeper, look, over);
+-  const shoulders = shoulderPoints(rig).map(points => points.map(p => {
+-    const q = p.clone().project(cam);
+-    return {x:(cam.userData.portrait?.x || 0) + (q.x + 1) / 2 * (cam.userData.portrait?.width || 1), y:(1 - q.y) / 2}; // 장치 좌표를 카드 좌상단 기준으로 바꾼다.
+-  }));
+-  return {head, shoulders};
++    dist: Object.assign({}, AIM[kind], over || {}).dist, url: R.domElement.toDataURL("image/png") };
+ }
+diff --git a/web/src/state/gear.mjs b/web/src/state/gear.mjs
+index 61443f8..976168e 100644
+--- a/web/src/state/gear.mjs
++++ b/web/src/state/gear.mjs
+@@ -193,7 +193,7 @@ export const MAX_FRAME = GOALS.length - 1;
+ // 무광 흙·인조잔디·잔디·프로 잔디의 채도를 낮춘 제품 팔레트이며 실제 구장의 색 실측은 아니다.
+ export const CITIES = [
+   { city: 0, name: '동네 운동장', cost: 0, note: '아무것도 안 샀을 때 서 있는 곳. 지나가는 사람이 거의 없다',
+-    ground: 0xa68b60, fence: 0x3f6b4a, rise: 0.55 },
++    ground: 0x9c7a4a, fence: 0x3f6b4a, rise: 0.55 },
+   { city: 1, name: '풋살장', cost: 145, note: '하교 시간에 사람이 지나간다. 가끔 고개가 돌아간다',
+     ground: 0x527d60, fence: 0x6b6f5a, rise: 0.8 },
+   { city: 2, name: '잔디 축구장', cost: 385, note: '유동인구가 많다. 막으면 소문이 빨리 난다',
+diff --git a/web/src/ui/hud.css b/web/src/ui/hud.css
+index 7a9a7b2..4a56d9c 100644
+--- a/web/src/ui/hud.css
++++ b/web/src/ui/hud.css
+@@ -1444,6 +1444,22 @@ h1,h2,h3,h4,h5,h6,#shop .card > b,#shop .venue-subtitle{ text-wrap:balance; }
+ #shop .pack-offer .buy.pull{width:100%;min-width:0;flex:1;margin:0;padding:var(--gap-2) var(--gap-1)}
+ #shop .pack-card .buy.pull>i{max-width:100%}
+ #shop .pack-card .buy.pull .price{flex-wrap:wrap;justify-content:center}
++/* 포장과 구매를 두 열로 놓아 승인된 첫 화면 안에서 바로 살 수 있게 한다. 34%는 포장 그림의 기존 가로 비율을 남기는 열이다. */
++#shop .card.pack-card{display:grid;grid-template-columns:34% minmax(0,1fr);column-gap:var(--gap-3)}
++#shop .pack-card .lede{grid-column:1 / -1}
++#shop .pack-card .pack-stage{grid-column:1;grid-row:2}
++#shop .pack-card .pack-art{width:100%;height:auto;aspect-ratio:176 / 232}
++#shop .pack-card .buys{grid-column:2;grid-row:2;align-self:center}
++#shop .pack-card .odds{grid-column:1 / -1;grid-row:3}
++/* 가로 폰 360 높이에서도 탭과 가격을 함께 읽도록 포장은 112, 무대는 124 높이로 제한한다. */
++@media (orientation:landscape) and (max-height:480px){
++  #shop:has(.pack-card) .fitting{display:none}
++  #shop .pack-card .pack-stage{height:124px}
++  #shop .pack-card .pack-art{height:112px;width:auto}
++  #shop .pack-card .promise-lines{min-height:0;gap:0}
++  #shop .pack-card .pack-offer{gap:var(--gap-1)}
++  #shop .pack-card .buys{margin-top:0}
++}
+ /* 무대의 65% 광원 범위는 중앙 선수를 강조하고 3장의 동일 폭 카드는 한정 상품 오인을 피한다. */
+ #shop .legend-showcase{background:radial-gradient(ellipse at 50% 0,#ffd83d30,transparent 65%),var(--panel);padding:var(--gap-3) 0;text-align:center}#shop .legend-showcase h2{font:var(--fs-title) var(--disp);color:#ffd83d}#shop .legend-showcase>p{color:var(--dim);margin:var(--gap-2)}#shop .legend-showcase .players{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--gap-3);padding:var(--gap-3)}
+ /* 3px 금테 바깥으로 빛이 새지 않게 격리하고 4초 주기는 전설 프레임의 신호다. */
