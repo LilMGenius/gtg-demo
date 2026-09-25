@@ -95,11 +95,13 @@ try {
       /* 회차와 값이 각자 자기 자리에 있는가. 회차는 큰 글자 자리가, 값은 그 아래 자리가 든다.
          값은 데이터에서도 읽고 그려진 숫자로도 읽는다. 데이터만 읽으면 사람이 못 보는 값도 통과한다. */
       shaped: buys.map((e) => {
-        const times = e.querySelector("b");
+        const times = e.closest(".pack-offer")?.querySelector(".promise-lines span");
         const slot = e.querySelector("i");
         const px = e.querySelector("i .px[data-coin]");
         return {
-          times: times ? times.textContent.trim() : "",
+          // 회차는 가격 버튼 밖의 약속 문구에 있고 결제 요청값과 같아야 한다.
+          times: times ? times.textContent.replace(/[^0-9]/g, "") : "",
+          want: Number(e.dataset.want),
           timesLit: lit(times),
           coin: px ? Number(px.dataset.coin) : null,
           // 값 자리에 그려진 숫자. 값을 치르는 회차면 골드 수이고, 이용권으로 다 내면 이용권 수다.
@@ -121,7 +123,7 @@ try {
      얼마인지는 값 자리에 아이콘과 숫자가 같이 서 있고 그 숫자가 데이터와 같은지로 판정한다. */
   check("market:each-button-says-how-many-and-what-it-costs",
     shelf.shaped.length === DRAWS.length && shelf.shaped.every((s, i) =>
-      /^[0-9]+$/.test(s.times) && Number(s.times) === DRAWS[i] && s.timesLit
+      /^[0-9]+$/.test(s.times) && Number(s.times) === DRAWS[i] && Number(s.times) === s.want && s.timesLit
       && s.priceLit && s.icon && /^[0-9]+$/.test(s.shown)
       && (s.coin === null || s.shown === String(s.coin))),
     shelf.shaped.map((s) => s.times + " " + (s.coin === null ? "ticket " + s.shown : s.shown)).join(", "));
