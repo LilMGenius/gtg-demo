@@ -1042,6 +1042,9 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
    칸의 화소가 0.0퍼센트 움직였다. visibility가 아니라 display인 이유는 숨긴 그림도 격자
    한 줄을 계속 잡아서, 캔버스가 여전히 반 칸에 머물기 때문이다. */
 #shop .shot.spinning img{display:none}
+/* 봇과 문신은 실제 원본 전체가 필요하다. 낮은 칸에서도 이미지의 내재 높이가 가슴과 손목을 밀어내지 않게 한다. */
+#shop .card:is([data-spec="bot"],[data-spec="ink"]) .shot{position:relative}
+#shop .card:is([data-spec="bot"],[data-spec="ink"]) .shot img,#shop .card:is([data-spec="bot"],[data-spec="ink"]) .shot canvas{position:absolute;inset:0}
 /* 이름은 제목 토큰을 쓴다. 카드에서 가장 큰 글자가 값이면 진열이 아니라 가격표가 된다. */
 #shop .card.gear b{font-size:var(--fs-title);line-height:1.25}
 /* 이름 칸은 두 줄을 미리 잡아 둔다. 한 줄 이름과 두 줄 이름이 같은 격자 줄에 서면 두 줄짜리 밑의

@@ -81,7 +81,7 @@ const AIM = {
      0등급은 무늬가 없어 그 몫이 0이고, 그것이 맨살을 맨살로 읽히게 하는 대조군이다.
      키는 178에서 198까지 갈리는데 그 폭 전부에서 74.9퍼센트 아래로 안 내려간다.
      각을 여기 다는 이유는 도는 그림이 이 각에서 출발하기 때문이다. yawOf가 여기서 읽는다. */
-  ink: { part: "arm", dist: 0.32, lift: -0.1, high: 0.06, yaw: -0.95 },
+  ink: { part: "arm", dist: 0.32, lift: -0.1, high: 0.06, yaw: 0 }, // 정면 각도 0으로 팔의 길이를 원근 축약 없이 보여 준다.
   /* 탈의실의 온몸. 부위가 아니라 사람을 보여 준다. 무엇을 걸쳤는지가 아니라
      걸친 뒤의 내가 어떻게 보이는지가 이 칸이 답하는 질문이다.
      겨냥은 머리다. 몸통을 잡으면 카메라가 허리를 보고 정수리는 프레임 위로 밀린다
@@ -328,6 +328,8 @@ function boot() {
 // 착용 상품은 실제 관절과 메시의 봉투를 함께 담는다. Three.js MIT Box3의 경계를 원근 화각에 맞춘다.
 const WORN = new Set(["grip", "studs", "pads", "socks", "ink", "hair", "beard"]);
 function previewPose(kind, body) {
+  // 어깨를 옆으로 1.4라디안 벌리고 팔꿈치를 0.1만큼 꺾어 팔과 무늬를 가로로 크게 보여 준다.
+  if (kind === "ink") setPose(body, {...POSES.ready, shL:[0, 0, -1.4], elL:[0, 0, 0.1]});
   if (kind === "hair") setPose(body, {...POSES.ready, neck:[0.4, 0, 0]}); // 목을 0.4만큼 숙여 정수리 형태와 눈을 함께 보여 준다.
   if (kind === "grip") setPose(body, POSES.clutch); // 잡은 손을 얼굴 가까이 올리는 기존 자세를 재사용한다.
   if (kind === "studs" || kind === "socks") {
@@ -348,14 +350,16 @@ function surfacePoints(object) {
 function shoulderPoints(body) {
   return body.userData.arms.map(sh => sh.children.filter(ch => ch.isMesh && ["SphereGeometry", "BoxGeometry"].includes(ch.geometry.type)).flatMap(surfacePoints));
 }
-function wornCamera(kind, body, yaw) {
-  const points = surfacePoints(body.userData.head).concat(...shoulderPoints(body));
+function wornCamera(kind, body, yaw, detailOnly = false, extra = []) {
+  const points = detailOnly ? [] : surfacePoints(body.userData.head).concat(...shoulderPoints(body));
+  points.push(...extra);
   const add = object => points.push(...surfacePoints(object));
   const j = body.userData.joints;
   if (kind === "grip") for (const glove of body.userData.gloves) add(glove);
   if (kind === "studs") add(body.userData.boots[0]);
   if (kind === "socks") for (const ch of j.knL.children) if (ch.isMesh) add(ch);
-  if (kind === "ink") for (const ch of j.shL.children) if (ch.isMesh) add(ch);
+  // 실제 팔 전체를 담아 위팔의 무늬와 팔꿈치, 아래팔, 손목이 한 방향으로 이어지게 한다.
+  if (kind === "ink") add(j.shL);
   const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
   const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
   const viewPoints = points.map(p => new THREE.Vector3(p.dot(right), p.y, p.dot(forward)));
@@ -419,6 +423,8 @@ export function yawOf(kind, aim) {
 function frame(kind, keeper, look, yaw, over) {
   boot();
   delete cam.userData.portrait;
+  delete cam.userData.inkDetail;
+  cam.clearViewOffset();
   /* 프레임 비율은 칸마다 다르다. 세로로 긴 피사체를 가로 칸에 구우면 담기는 것은 사람이 아니라 여백이다.
      크기가 그대로면 아무것도 안 한다. 매번 다시 잡으면 굽는 한 장마다 그리기 버퍼를 새로 만든다. */
   const [fw, fh] = sizeOf(kind);
@@ -446,7 +452,9 @@ function frame(kind, keeper, look, yaw, over) {
     cam.lookAt(made.at);
     if (kind === "bot") {
       rig = made.body;
-      wornCamera("pads", rig, a);
+      sceneRig.updateMatrixWorld(true);
+      // 가슴 표식은 몸통의 형제가 아니라 장면 그룹에 붙으므로 그 실제 정점도 봉투에 넣는다.
+      wornCamera("pads", rig, a, false, sceneRig.children.filter(o => o.isMesh).flatMap(surfacePoints));
     }
     R.render(scene, cam);
     return;
@@ -478,7 +486,7 @@ function frame(kind, keeper, look, yaw, over) {
 }
 
 // 문신은 확대 면과 착용자를 한 카드에 함께 둔다. 관절을 따라가므로 체격이 바뀌어도 잘리지 않는다.
-const INK_DETAIL_SHARE = 0.68; // 오른쪽 68퍼센트는 작은 무늬를 읽고 왼쪽은 얼굴과 양 어깨를 담는다.
+const INK_DETAIL_SHARE = 0.78; // 가로로 편 팔에 78%를 주면 같은 높이에서 무늬를 키우고 나머지 22%에 인물 축을 남긴다.
 function tattooFrame(yaw, width, height) {
   const split = Math.round(width * INK_DETAIL_SHARE);
   const portraitWidth = width - split;
@@ -486,26 +494,31 @@ function tattooFrame(yaw, width, height) {
   cam.updateProjectionMatrix();
   wornCamera("ink", rig, yaw);
   const portrait = cam.clone();
-  const j = rig.userData.joints;
-  const sh = j.shL.getWorldPosition(new THREE.Vector3());
-  const el = j.elL.getWorldPosition(new THREE.Vector3());
-  const length = sh.distanceTo(el);
-  // 어깨의 바깥면에서 두 관절의 중간 높이를 본다. 팔 중심을 향하면 무늬 대신 앞쪽 맨살을 확대한다.
-  const at = sh.clone();
-  at.y = (sh.y + el.y) / 2; // 두 관절 높이의 평균이라 체격과 자세를 그대로 따른다.
   cam.aspect = split / height;
   cam.updateProjectionMatrix();
-  // 위팔 길이만큼 물러나면 무늬가 확대 면을 채우고 관절 크기를 그대로 따른다.
-  cam.position.copy(at).add(new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)).multiplyScalar(length));
-  cam.lookAt(at);
+  // 기존 표면 경계 맞춤을 실제 팔 전체에 적용한다. 관절 길이만으로 거리를 잡지 않는다.
+  wornCamera("ink", rig, yaw, true);
+  const detail = cam.clone(); detail.updateMatrixWorld(true); // 팔 상자도 실제 확대 창의 카메라로 투영한다.
   R.setScissorTest(true);
   R.setViewport(portraitWidth, 0, split, height); R.setScissor(portraitWidth, 0, split, height);
+  // 상세 창에는 실제 팔과 손을 남긴다. 몸통과 반대 팔이 무늬나 손목을 가리지 않게 한다.
+  const armParts = new Set();
+  rig.userData.joints.shL.traverse(part => { if (part.isMesh) armParts.add(part); });
+  const hidden = [];
+  rig.traverse(part => {
+    if (part.isMesh && part.visible && !armParts.has(part)) {
+      hidden.push(part);
+      part.visible = false;
+    }
+  });
   R.render(scene, cam);
+  for (const part of hidden) part.visible = true;
   cam.copy(portrait);
   R.setViewport(0, 0, portraitWidth, height); R.setScissor(0, 0, portraitWidth, height);
   R.render(scene, cam);
   R.setScissorTest(false); R.setViewport(0, 0, width, height);
   cam.userData.portrait = {x:0, width:portraitWidth / width};
+  cam.userData.inkDetail = {camera:detail, x:portraitWidth / width, width:split / width};
 }
 
 // over는 굽는 각을 덮어쓰는 자리다. 계기가 반사실을 구울 때만 쓰고, 화면은 안 쓴다.
@@ -591,19 +604,21 @@ export function armBox(kind, keeper, look) {
     n += 1;
   }
   if (!n) return null;
+  const viewport = kind === 'ink' ? cam.userData.inkDetail : null;
+  const projection = viewport ? viewport.camera : cam;
   const v = new THREE.Vector3();
   let x0 = 1;
   let x1 = -1;
   let y0 = 1;
   let y1 = -1;
   for (let i = 0; i < 8; i += 1) {
-    v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).project(cam);
+    v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).project(projection);
     x0 = Math.min(x0, v.x);
     x1 = Math.max(x1, v.x);
     y0 = Math.min(y0, v.y);
     y1 = Math.max(y1, v.y);
   }
-  return { parts: n, x0: (x0 + 1) / 2, x1: (x1 + 1) / 2, y0: (1 - y1) / 2, y1: (1 - y0) / 2,
+  return { parts: n, x0: (viewport?.x || 0) + (x0 + 1) / 2 * (viewport?.width || 1), x1: (viewport?.x || 0) + (x1 + 1) / 2 * (viewport?.width || 1), y0: (1 - y1) / 2, y1: (1 - y0) / 2,
     url: R.domElement.toDataURL("image/png") };
 }
 
