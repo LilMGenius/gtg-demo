@@ -84,7 +84,7 @@ try {
   await p.route("**/web/src/render/thumb.mjs", async (route) => {
     const response = await route.fetch();
     await route.fulfill({ response, body: await response.text() +
-      '\nexport function spongeSurface(k, look) { frame("pads", k, look); return { rig, scene, cam, cv: R.domElement, render: () => R.render(scene, cam) }; }' });
+      '\nexport function spongeSurface(k, look) { frame("pads", k, look); return { rig, scene, cam, cv: R.domElement, render: () => R.render(scene, cam) }; }\nexport function cardSurface(kind, k, look, over) { frame(kind, k, look, undefined, over); return {rig, sceneRig, cam, cv:R.domElement}; }' });
   });
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -1120,7 +1120,7 @@ try {
     /* 대조군은 띠 위 축이 쓰는 장만 굽는다. 반사실까지 같이 구우면 한 회차가 아홉 장 더
        늘어나고, 이 판의 굽는 수는 옆 게이트의 page.goto를 30초 밖으로 밀어낸 적이 있다. */
     const nearSkin = async (dist) => {
-      const over = { dist };
+      const over = { dist, yaw: -0.95 }; // 옛 확대 대조군의 각도도 고정해 새 카드의 정면 각도를 물려받지 않는다.
       const skin = await read(m.thumbURL("ink", k, g.lookOf({ ink: 0 }), over));
       const box = toneOf(skin);
       const above = [];
@@ -1129,7 +1129,8 @@ try {
       }
       return { above, box };
     };
-    const live = await rig();
+    // 0.32 거리의 기존 표면 검사창을 고정한다. 카드 전체 면적을 요구하면 완전한 팔을 담을수록 실패한다.
+    const live = await rig({part:"arm", dist:0.32, lift:-0.1, high:0.06, yaw:-0.95});
     const was = await rig(old);
     const near = await nearSkin(nearDist);
     const one = m.thumbURL("ink", k, g.lookOf({ ink: 0 }));
@@ -1143,8 +1144,8 @@ try {
   check("instrument:the-bare-skin-card-bakes-the-same-bytes", fills.base.same && fills.base.len > 0,
     fills.base.same ? "grade 0 baked twice is the same " + fills.base.len + " char still"
       : "grade 0 moved between two bakes");
-  check("thumb:the-tattoo-fills-its-card", paid.length > 0 && paid.every((x) => x >= INK_FILL),
-    "grades 1..3 paint " + paid.map(pct).join(" ") + " of the card over the sold bare-skin card, floor "
+  check("thumb:the-tattoo-keeps-its-surface-contrast", paid.length > 0 && paid.every((x) => x >= INK_FILL),
+    "grades 1..3 paint " + paid.map(pct).join(" ") + " of the fixed surface probe over the sold bare-skin probe, floor "
     + pct(INK_FILL) + " (" + INK_FILL_FROM + "); the forced-grade-0 counterfactual reads "
     + fills.live.flat.slice(1).map(pct).join(" ") + " on the same bakes");
   check("control:bare-skin-carries-no-tattoo", fills.live.sold[0] >= 0 && fills.live.sold[0] < 0.005,
@@ -1157,7 +1158,7 @@ try {
     + " under the " + pct(INK_FILL) + " floor");
   const skinUp = fills.live.above.slice(1);
   const boxOf = (q) => q.map((c) => c[0] + ".." + c[1]).join("/");
-  check("thumb:card-tone-stands-above-the-tattoo", skinUp.length > 0 && skinUp.every((n) => n >= INK_SKIN),
+  check("thumb:surface-tone-stands-above-the-tattoo", skinUp.length > 0 && skinUp.every((n) => n >= INK_SKIN),
     "grades 1..3 keep " + skinUp.join(" ") + " opaque pixels above the band's top edge inside the tone box, floor "
     + INK_SKIN + "; the tone box r/g/b " + boxOf(fills.live.box)
     + " came from the sold grade-0 card's whole tone, the same still the fill axis measures against,"
@@ -1167,6 +1168,81 @@ try {
     "the planted rig dist " + NEAR_INK_DIST + " keeps " + fills.near.above.slice(1).join(" ")
     + " opaque pixels above the band inside the tone box (tone box " + boxOf(fills.near.box)
     + "), worst " + nearWorst + " under the " + INK_SKIN + " floor");
+
+  // 실제 판매 그림의 모든 팔 표면 정점과 관절을 같은 카메라로 투영한다. 잘린 좌표를 clamp하지 않는다.
+  const framing = await p.evaluate(async bodies => {
+    const m = await import("/web/src/render/thumb.mjs");
+    const g = await import("/web/src/state/gear.mjs");
+    const T = await import("/web/vendor/three.module.min.js");
+    const {BOTS} = await import("/web/src/state/bot.mjs");
+    const points = (object, camera) => {
+      const out = [];
+      object.traverse(o => {
+        if (!o.isMesh || !o.visible) return;
+        const pos = o.geometry.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const v = new T.Vector3().fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).project(camera);
+          out.push({x:v.x, y:v.y, z:v.z});
+        }
+      });
+      return out;
+    };
+    const inside = p => Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1 && Math.abs(p.z) <= 1; // NDC 정육면체의 여섯 면이 실제 클리핑 경계다.
+    const bounds = points => ({count:points.length, outside:points.filter(p => !inside(p)).length});
+    const arm = (body, rank, skin, over) => {
+      const s = m.cardSurface("ink", body, g.lookOf({ink:rank, inkSkin:skin}), over);
+      const camera = s.cam.userData.inkDetail?.camera || s.cam;
+      const j = s.rig.userData.joints;
+      // 위팔에 붙은 실제 무늬까지 포함한다. 팔꿈치 아래 전체와 손목의 장갑까지 함께 담겨야 한다.
+      const all = points(j.shL, camera);
+      const elbow = j.elL.getWorldPosition(new T.Vector3()).project(camera);
+      const wrist = s.rig.userData.gloves[0].getWorldPosition(new T.Vector3()).project(camera);
+      return {body, rank, skin, ...bounds(all), elbow:inside(elbow), wrist:inside(wrist)};
+    };
+    const arms = [], bots = [];
+    for (const body of bodies) {
+      for (const [rank] of g.TATTOOS.entries()) for (const [skin] of g.skinsAt("ink", rank).entries()) arms.push(arm(body,rank,skin));
+      for (const b of BOTS) {
+        const s = m.cardSurface("bot",body,{rank:b.tier});
+        s.sceneRig.updateMatrixWorld(true);
+        const emblem = s.sceneRig.children.filter(o => o.isMesh).flatMap(o => points(o,s.cam));
+        bots.push({body,tier:b.tier,...bounds(emblem)});
+      }
+    }
+    // 0.28은 기존의 피부 조각 확대 거리다. 같은 실제 팔 정점으로 팔꿈치와 손목 손실을 검출한다.
+    const crop = arm(bodies[0],1,0,{part:"arm",dist:0.28,lift:-0.1,high:0.06,yaw:-0.95});
+    const s = m.cardSurface("bot",bodies[0],{rank:BOTS[0].tier});
+    const emblem = s.sceneRig.children.filter(o => o.isMesh);
+    // 카메라 높이를 한 프레임만큼 옮겨 가슴 표식이 사라지는 양성 대조군이다.
+    s.cam.setViewOffset(s.cv.width,s.cv.height,0,-s.cv.height,s.cv.width,s.cv.height);
+    const lostBot = bounds(emblem.flatMap(o => points(o,s.cam)));
+    return {arms,bots,crop,lostBot};
+  }, BODIES);
+  const armInside = r => r.count > 0 && r.outside === 0 && r.elbow && r.wrist;
+  check("thumb:tattoo-keeps-elbow-wrist-and-complete-band",framing.arms.length > 0 && framing.arms.every(armInside),JSON.stringify(framing.arms));
+  check("control:blurry-skin-crop-loses-arm-landmarks",framing.crop.count > 0 && !armInside(framing.crop),JSON.stringify(framing.crop));
+  check("thumb:bot-keeps-entire-chest-emblem",framing.bots.length > 0 && framing.bots.every(r => r.count > 0 && r.outside === 0),JSON.stringify(framing.bots));
+  check("control:head-only-bot-loses-chest-emblem",framing.lostBot.count > 0 && framing.lostBot.outside > 0,JSON.stringify(framing.lostBot));
+
+  // 실제 카드 슬롯에서도 원본 전체가 담겨야 카메라의 가슴 표식 검사가 화면에서 참이다.
+  for (const [width,height] of [[1280,720],[844,390],[740,360]]) for (const kind of ["bot","ink"]) { // 요청된 세 화면 크기를 그대로 재현한다.
+    await p.setViewportSize({width,height});
+    await grab(kind);
+    const fit = async () => p.locator('#shop .card[data-spec="'+kind+'"] .shot').evaluateAll(slots => slots.map(slot => {
+      const image = slot.querySelector('img');
+      const box = slot.getBoundingClientRect(), im = image.getBoundingClientRect();
+      return {w:im.width,h:im.height,overflow:Math.max(box.left-im.left,box.top-im.top,im.right-box.right,im.bottom-box.bottom)};
+    }));
+    const live = await fit();
+    check("thumb:"+kind+"-image-fits-slot:"+width,live.length > 0 && live.every(r => r.w > 0 && r.h > 0 && r.overflow <= 1),JSON.stringify(live)); // 1픽셀은 소수 CSS 경계 반올림만 허용한다.
+    if (width === 740) { // 가장 짧은 화면에 옛 정적 이미지 배치를 심는다.
+      await p.locator('#shop .card[data-spec="'+kind+'"] .shot img').evaluateAll(images => images.forEach(image => image.style.position='static'));
+      const old = await fit();
+      check("control:static-"+kind+"-image-overflows-short-slot",old.some(r => r.overflow > 1),JSON.stringify(old));
+      await p.locator('#shop .card[data-spec="'+kind+'"] .shot img').evaluateAll(images => images.forEach(image => image.style.removeProperty('position')));
+    }
+  }
+  await p.setViewportSize({width:1280,height:720}); // 뒤의 기존 호버 검사는 원래 데스크톱 표본에서 계속한다.
 
   // 대조군. 같은 등급을 두 번 구우면 같은 그림이어야 한다. 매번 달라지면 위의 다름은
   // 상품의 차이가 아니라 굽는 잡음이고, 그 축은 아무것도 증명하지 않는다.

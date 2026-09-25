@@ -391,12 +391,13 @@ export function inkTex(base, tone, grade, span, girth) {
        그림 몇 개가 뜬 것으로 읽힌다. 이 등급만 칸을 넷으로 늘려 무늬가 서로 닿게 한다. */
     const cols = gd >= 3 ? 4 : INK_COLS;
     // 무늬 한 개의 크기. 띠가 좁으면 띠 높이가, 넓으면 둘레 간격이 크기를 정한다.
-    const rad = Math.max(4, Math.min(band * 0.42, INK_W / (cols * 2.2))) * gr;
+    const rad = Math.max(4, Math.min(band * 0.42, INK_W / (cols * 2.2))) * gr * 1.1; // 전체 팔 프레임에서도 읽히도록 획 반경을 10% 키우고 무늬 종류와 띠 폭은 유지한다.
     /* 줄 간격. 3등급만 2.6이 아니라 1.5다. 채운 소매는 줄과 줄이 겹쳐야 한 벌로 읽힌다.
        실측: 번개 한 종류를 2.6 간격 네 줄로 놓았을 때 팔 화소 분산이 1421.9로, 고리 방식의
        1472.9 아래였다. */
     const rows = Math.max(1, Math.round(band / (rad * (gd >= 3 ? 1.5 : 2.6))));
-    const face = gd >= 3 ? mix(tone, 0xffffff, 0.62) : tone;
+    // rgb 문자열을 비트 연산에 넣으면 검정이 된다. 기존 62% 밝기 혼합을 숫자 색으로 유지한다.
+    const face = gd >= 3 ? new THREE.Color(tone).lerp(new THREE.Color(0xffffff),0.62).getHex() : tone;
     // 무늬는 팔 둘레에서 감긴다. 한 번만 그리면 텍스처 이음선에서 반 토막이 난다.
     const wrap = (fn) => { fn(0); fn(-INK_W); fn(INK_W); };
     for (let ry = 0; ry < rows; ry += 1) {
@@ -412,14 +413,15 @@ export function inkTex(base, tone, grade, span, girth) {
            소매(0x073239)는 41이라 차이가 37뿐이었다. 필름은 휘도 170대로 올라가 차이가 130이다. */
         if (gd === 1) {
           wrap((dx) => {
-            c.fillStyle = mix(base, 0xffffff, 0.72);
+            c.fillStyle = rgb(0xffffff); // 스티커 필름은 흰색이어야 작은 확대 창에서도 별과 구별된다.
             c.fillRect(x + dx - rad * 1.15, y - rad * 1.15, rad * 2.3, rad * 2.3);
             c.fillStyle = mix(base, 0xffffff, 0.3);
             c.fillRect(x + dx - rad * 1.15, y + rad * 0.72, rad * 2.3, rad * 0.43);
           });
         }
         // 2등급은 새긴 글씨다. 밝은 획을 반 칸 밀어 깔고 그 위에 진한 획을 얹으면 파인 것으로 읽힌다.
-        if (gd === 2) wrap((dx) => { c.fillStyle = mix(base, 0xffffff, 0.52); MARK[gd](c, x + dx + rad * 0.18, y + rad * 0.18, rad); });
+        // 밑획 밝기 95%와 폭 1.5배는 잉크 원색을 남기면서 새긴 글씨를 음영과 가른다.
+        if (gd === 2) wrap((dx) => { c.fillStyle = mix(base, 0xffffff, 0.95); MARK[gd](c, x + dx + rad * 0.18, y + rad * 0.18, rad * 1.5); });
         wrap((dx) => {
           // 테두리 먼저. 문신은 선을 긋고 안을 채우므로 바깥 한 겹이 더 진하다.
           c.fillStyle = mix(face, 0x000000, 0.45);
