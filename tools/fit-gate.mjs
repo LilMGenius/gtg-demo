@@ -78,6 +78,26 @@ try {
   check("fit:the-bill-is-the-sum-of-the-shelf-prices", two.coin === want, two.coin + " want " + want);
   check("fit:both-tried-items-are-listed", two.rows === 2, two.rows + " rows");
 
+  // 돈만 가진 표본은 조건 미충족으로 묶음 결제가 막혀야 한다.
+  check("control:unmet-progression-disables-the-bundle", two.off, two.label);
+  // condition-gate의 저장 복원 경로로 입은 두 상품의 조건만 충족한다.
+  await p.evaluate(async () => {
+    window.__persist();
+    const key = window.__saveKey(), data = JSON.parse(localStorage.getItem(key));
+    const g = await import("/web/src/state/gear.mjs");
+    const keeper = data.squad[data.pick];
+    // 앞에서 시착한 최상급 3등급 둘의 요구값을 그대로 읽는다.
+    for (const item of [g.gloveAt(3), g.kitAt(3)]) keeper[item.condition.key] = item.condition.min;
+    data.keeper = structuredClone(keeper);
+    localStorage.setItem(key, JSON.stringify(data));
+  });
+  await p.goto(BASE.split("&preset=")[0], { waitUntil: "load" });
+  await p.click("#go", { force: true });
+  await p.evaluate(() => window.__shop(true));
+  await tab("glove"); await tap(3);
+  await tab("kit"); await tap(3);
+  check("fit:eligible-progression-enables-the-bundle", !(await bill()).off, (await bill()).label);
+
   // 창이 열려 있어도 판은 계속 굴러가고 완봉 보상이 지갑에 들어온다.
   // 사기 전후를 그냥 맞대면 그 사이 벌어들인 몫이 결제액으로 읽힌다.
   // 실측으로 1670을 결제한 회차가 1666으로 잡혔다. 판을 세워 놓고 재야 이 축이 결제만 본다.
