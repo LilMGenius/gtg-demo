@@ -538,7 +538,7 @@ export function addFace(head, r, dir, skin, hairTone, hairCut, face) {
     const jawPos = chin.attributes.position, jawUV = chin.attributes.uv;
     for (let i = 0; i < jawPos.count; i++) {
       const u = jawUV.getX(i), v = jawUV.getY(i);
-      const lip = goatee ? -0.58 : stubble ? -0.45 - 0.20 * Math.sin(Math.PI * u) ** 2 : -0.30 - 0.28 * Math.sin(Math.PI * u) ** 2; // 풍성한 수염의 볼 가장자리는 -0.30에서 시작해 입 아래 -0.58까지 둥글게 내려간다. // 가운데는 입 아래로 파고 양옆은 아래턱을 따라 완만히 오른다.
+      const lip = goatee ? -0.58 : stubble ? -0.45 - 0.20 * Math.sin(Math.PI * u) ** 2 : -0.45 - 0.13 * Math.sin(Math.PI * u) ** 2; // 양옆은 잔수염의 -0.45 경계까지 내리고 차이 0.13만 휘어 입 아래 -0.58과 턱의 앞쪽 부피를 보존한다.
       const begin = Math.acos(lip / shell), theta = begin + (Math.PI - begin) * (1 - v); // 기존 구의 위도를 다시 배치해 일자 턱띠를 없앤다.
       const phi = Math.atan2(jawPos.getZ(i), jawPos.getX(i));
       const full = !stubble && !goatee;
