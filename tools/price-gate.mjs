@@ -1,8 +1,11 @@
 import { auditConditions, CONDITION_ITEMS } from './condition-probe.mjs';
 import { conditionLabel } from '../web/src/state/condition.mjs';
+import { CITIES, CITY_SKINS } from '../web/src/state/gear.mjs';
 // 구매 조건의 구분점은 요청된 카드 문법이다. 실제 조건 표와 정확히 같은 문구만 허용한다.
 const CONDITION_TEXTS = new Set(CONDITION_ITEMS.flatMap(({ item }) => ['🔒', '🔓'].map(icon => icon + ' 구매 조건 · ' + conditionLabel(item.condition))));
-const hasUnapprovedBullet = text => !CONDITION_TEXTS.has(text.trim()) && BULLETS.some(dot => text.includes(dot));
+// 시설·도시 제목과 출시 설명은 경기장 계약이 지정한 정확한 표 값만 허용한다.
+const VENUE_TEXTS=new Set([...CITY_SKINS.flat().map(host=>host.name),...CITIES.map(row=>row.shipped+(row.subtitle?' · '+row.subtitle:'')),...CITIES.flatMap(row=>(row.conditions||[]).flatMap(condition=>['🔒','🔓'].map(icon=>icon+' 구매 조건 · '+conditionLabel(condition))))]);
+const hasUnapprovedBullet = text => !CONDITION_TEXTS.has(text.trim()) && !VENUE_TEXTS.has(text.trim()) && BULLETS.some(dot => text.includes(dot));
 import { chromium } from "playwright";
 
 // 값 표기의 자. 상단 잔고는 아이콘인데 상점 버튼은 '140 골드'처럼 글자였다.
@@ -68,7 +71,8 @@ const SENTENCE = "(?:다|요)$|[.!?]$";
 const STOP = "(?:다)$|[.!?]$";
 // 두 글자를 넘지만 계획 todo 4가 이름으로 지정한 상태 라벨. 지금은 하나뿐이고,
 // 이 목록이 길어지는 만큼 계약이 헐거워지므로 늘릴 때는 계획 문서가 근거여야 한다.
-const LONG_STATES = ["상위 보유"];
+// 미출시 모드 이름과 상태는 창업자 경기장 계약의 명시된 버튼 이름이다.
+const LONG_STATES = ["상위 보유", "업데이트 예정", ...CITIES.flatMap(row=>row.coming)];
 // 재는 자리는 버튼과 배지다. 죽은 이름은 안 넣는다. .got은 화면에서 사라졌고
 // .price-badge는 이 파일 밖 어디에도 없어, 둘 다 아무것도 안 재면서 목록만 길게 했다.
 const LABEL_NODES = "button, .px, .held, .tried i";
@@ -398,7 +402,8 @@ try {
     await p.click('#shop .tab[data-tab="' + tab + '"]', { force: true });
     await p.waitForTimeout(180);
     await sweepLabels("poor:" + tab, "#shop .goods");
-    const list = p.locator("#shop .bad-price .px:not(.cash) b");
+    // 경기장 선반에서는 시착실을 숨긴다. 아래 pxHere와 같이 실제로 보이는 가격만 화소로 잰다.
+    const list = p.locator("#shop .bad-price .px:not(.cash) b:visible");
     const many = await list.count();
     for (let i = 0; i < many; i += 1) {
       const g = await paintAt(list.nth(i), tab + "#" + i, warmOf[tab] || null);
