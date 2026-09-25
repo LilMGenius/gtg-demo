@@ -18,6 +18,7 @@ check(thin.length === 0, "pool:three-lines-per-event", thin.length ? thin.join("
 // 도달성. 판정이 실제로 뱉는 키를 모아, 그 전부가 풀을 갖는지 본다.
 // 폴백이 실전에서 쓰이면 그 사건은 여전히 한 문장짜리다.
 const seen = new Map();
+const witnesses = new Map();
 let repeat = 0;
 const distinct = new Set();
 // 자막 추첨이 판정과 같은 난수열을 쓰면 게이트가 재려는 대상을 게이트가 흔든다.
@@ -53,6 +54,7 @@ for (const mode of ["normal", "agility", "only-agility", "composure", "reflex", 
         if (e.t === "distracted" || e.t === "talked") e.act = gazeAct(lineRng);
         const key = lineKey(e, ctx);
         seen.set(key, (seen.get(key) || 0) + 1);
+        if (!witnesses.has(key)) witnesses.set(key, { event: { ...e }, context: { ...ctx } });
         const line = eventLine(e, lineRng, last, ctx);
         if (last !== null && line === last) repeat++;
         if (POOLS[key]) distinct.add(key + "|" + line);
@@ -72,9 +74,24 @@ check(dead.length === 0, "reach:no-pool-is-unreachable", dead.length ? dead.join
 
 check(repeat === 0, "line:never-repeats-back-to-back", repeat);
 // 못 나온 줄을 세기만 하면 어느 줄이 죽었는지 다시 찾아야 한다. 이름을 같이 뱉는다.
+// 희귀 사건의 문장 추첨을 운에 맡기지 않는다. 실제 발생 사건만 재생해 모든 추첨 구간을 검사한다.
+function reachableLines(draw) {
+  const reached = new Set();
+  for (const [key, { event, context }] of witnesses) {
+    const pool = POOLS[key];
+    if (!pool) continue;
+    for (let index = 0; index < pool.length; index++) reached.add(key + "|" + eventLine(event, () => draw(index, pool.length), null, context));
+  }
+  return reached;
+}
+// 0.5는 각 균등 추첨 구간의 중앙이며 경계 반올림을 피한다. 0 고정 대조는 첫 문장만 고른다.
+const exhaustive = reachableLines((index, length) => (index + 0.5) / length);
+const fixedDraw = reachableLines(() => 0);
+console.log("diagnostic:random-word-coverage " + distinct.size + "/" + LINE_POOL);
+check(fixedDraw.size > 0 && fixedDraw.size < LINE_POOL, "control:fixed-draw-cannot-reach-whole-pool", fixedDraw.size + "/" + LINE_POOL);
 const unseen = [];
-for (const k of Object.keys(POOLS)) for (const l of POOLS[k]) if (!distinct.has(k + "|" + l)) unseen.push(k + ":" + l.slice(0, 14));
-check(unseen.length === 0, "line:whole-pool-is-reachable", unseen.length ? distinct.size + "/" + LINE_POOL + " " + unseen.join(" | ") : distinct.size + "/" + LINE_POOL);
+for (const k of Object.keys(POOLS)) for (const l of POOLS[k]) if (!exhaustive.has(k + "|" + l)) unseen.push(k + ":" + l.slice(0, 14));
+check(unseen.length === 0, "line:whole-pool-is-reachable", unseen.length ? exhaustive.size + "/" + LINE_POOL + " " + unseen.join(" | ") : exhaustive.size + "/" + LINE_POOL);
 
 // 대조군. 직전 문장을 금지하지 않으면 반복이 실제로 나오는지 확인한다.
 // 안 나오면 위 검사가 통과한 이유가 금지 때문이 아니라 표본 탓이다.
