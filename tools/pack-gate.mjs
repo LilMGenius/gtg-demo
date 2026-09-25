@@ -1,143 +1,133 @@
 import { chromium } from 'playwright';
-import { createRequire } from 'node:module';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { PULL_KINDS, PULL_BULK, PULL_BONUS, KEEPERS, KICKERS, poolFor } from '../src/roster.mjs';
+import { PULL_KINDS, PULL_BULK, KEEPERS, KICKERS, poolFor } from '../src/roster.mjs';
 import { clearDraw } from './draw.mjs';
 
-// 요청한 데스크톱·세로 폰 크기이며 배율 1과 JPEG 85는 원본 글자를 유지하면서 증거 용량을 줄인다.
-const SIZES = [[1280, 720], [390, 844]], QUALITY = 85;
-// CSS 응답 160ms 뒤의 안정 프레임을 읽는 여유다. 8도는 PORT의 기울임 상한이다.
-const SETTLE = 220, MAX_TILT = 8;
-// 부족분과 정가가 서로 다른 양수 표본이며 충분 잔고는 기존 rich 프리셋과 같은 규모다.
+// 뽑기 선반의 자. 팩 갈래마다 배너 하나가 나란히 서고, 배너마다 포장과 그 팩에서 나올 수 있는 선수 셋과
+// 약속과 확률과 두 회차 버튼이 한 판에 선다(docs/gamedev economy.md 뽑기 진열).
+// 가로 두 크기는 경기가 도는 폭이라 버튼이 굴리지 않고 보여야 한다. 세로 폰은 상점을 연 뒤 돌린 경로라 굴림을 허용한다.
+const SIZES = [[1280, 720, true], [844, 390, true], [390, 844, false]];
+// 8도는 포장 글자가 읽히는 기울임 상한이다. 220ms는 160ms 응답 전이 뒤의 안정 프레임이다.
+const MAX_TILT = 8, SETTLE = 220;
+// 부족 잔고 표본과 넉넉한 잔고. 둘 다 기존 rich 프리셋 규모에서 고른 서로 다른 양수다.
 const SHORT = 24, RICH = 1000000;
-// 전체 계측은 여러 브라우저를 순차 사용하므로 180초에 강제 종료한다.
-const timer = setTimeout(() => process.exit(1), 180000); timer.unref();
-const root = fileURLToPath(new URL('../.omo/evidence/s2/', import.meta.url));
-mkdirSync(root, { recursive: true });
-const require = createRequire(import.meta.url);
-const exe = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
-const base = 'http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran';
-const report = { invocation: 'node tools/pack-gate.mjs', capturedAt: new Date().toISOString(), node: process.version, nodePath: process.execPath, playwright: require('playwright/package.json').version, playwrightPath: require.resolve('playwright'), exe, checks: [], shots: [] };
-const check = (scenario, pass, observed) => { report.checks.push({ scenario, pass, observed }); console.log(pass ? 'PASS' : 'FAIL', scenario, JSON.stringify(observed)); };
-const response = await fetch(base); check('서버 HTTP 200', response.status === 200, response.status);
-const browser = await chromium.launch({ executablePath: exe, headless: true });
-report.chrome = await browser.version();
+const RED = 'rgb(224, 86, 63)';
+const t = setTimeout(() => { console.log('WATCHDOG'); process.exit(1); }, 240000); t.unref();
+const shots = fileURLToPath(new URL('../.omo/evidence/s2/', import.meta.url));
+mkdirSync(shots, { recursive: true });
+const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
+const BASE = 'http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran';
+const fails = [], notes = [];
+const check = (n, ok, d) => (ok ? notes : fails).push(n + ' ' + (typeof d === 'string' ? d : JSON.stringify(d)));
+const top = Math.max(...PULL_KINDS.map((k) => k.floor));
+const fameOf = (name) => ([...KEEPERS, ...KICKERS].find((k) => k.name === name) || {}).fame || 0;
+
+const b = await chromium.launch({ executablePath: EXE });
 try {
-  for (const [width, height] of SIZES) {
-    // 경기는 가로 시작 계약을 따르고 상점을 연 뒤 세로로 돌리는 실제 경로를 잰다.
-    const page = await browser.newPage({ viewport: { width: Math.max(width, height), height: Math.min(width, height) }, deviceScaleFactor: 1 });
-    const errors = []; page.on('pageerror', e => errors.push(e.message));
-    await page.goto(base); await page.locator('#go').click({ force: true }); await clearDraw(page);
-    await page.evaluate(() => window.__shop(true));
-    await page.setViewportSize({ width, height });
-    await page.evaluate(() => document.fonts.ready);
-    // 0은 다음 이벤트 회차에 고장을 발생시켜 실제 브라우저 오류 수집 배선을 확인한다.
-    const errorControl = page.waitForEvent('pageerror');
-    await page.evaluate(() => setTimeout(() => { throw new Error('팩 계기 양성 대조'); }, 0));
-    const caught = await errorControl;
-    check(width + ':콘솔 계기 양성 대조', caught.message === '팩 계기 양성 대조' && errors.includes(caught.message), caught.message);
-    errors.splice(errors.indexOf(caught.message), 1);
-    const shot = async name => { const path = root + `${width}x${height}-${name}.jpg`; await page.screenshot({ path, type: 'jpeg', quality: QUALITY }); report.shots.push({ name, width, height, path }); };
-    const inspect = () => page.locator('.pack-card').evaluate(e => {
-      const art = e.querySelector('.pack-art'), svg = art.querySelector('svg'), odds = e.querySelector('.odds-link');
-      const a = art.getBoundingClientRect(), o = odds.getBoundingClientRect();
-      const visible = n => { const r = n.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(n).visibility !== 'hidden'; };
-      return { art: visible(svg), svg: svg.outerHTML, below: o.top >= a.bottom, odds: visible(odds), a: a.toJSON(), o: o.toJSON(),
-        offers: [...e.querySelectorAll('.pack-offer')].map(offer => ({
-          lines: [...offer.querySelector('.promise-lines').children].map(n => ({ text: n.innerText, y: n.getBoundingClientRect().y, height: n.getBoundingClientRect().height, visible: visible(n) })),
-          want: +offer.querySelector('button').dataset.want, bonus: offer.querySelector('.bonus')?.innerText,
-          floor: offer.querySelector('.guarantee')?.innerText, disabled: offer.querySelector('button').disabled,
-          prices: [...offer.querySelectorAll('.px')].map(n => ({ shown: n.innerText, coin: n.dataset.coin, cash: n.dataset.cash, color: getComputedStyle(n.querySelector('b')).color })) })) };
+  for (const [W, H, fixed] of SIZES) {
+    const p = await b.newPage({ viewport: { width: Math.max(W, H), height: Math.min(W, H) } });
+    const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+    await p.goto(BASE); await p.locator('#go').click({ force: true }); await clearDraw(p);
+    await p.evaluate(() => window.__shop(true));
+    await p.setViewportSize({ width: W, height: H });
+    await p.evaluate(() => document.fonts.ready); await p.waitForTimeout(500);
+    const tag = W + 'x' + H;
+    const read = () => p.evaluate(() => [...document.querySelectorAll('#shop .banner.kind')].map((e) => {
+      const vis = (n) => { if (!n) return false; const r = n.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(n).visibility !== 'hidden'; };
+      return { id: e.dataset.kind, art: vis(e.querySelector('.pack-art svg')), guarantee: (e.querySelector('.guarantee') || {}).innerText || '',
+        odds: vis(e.querySelector('.odds summary')), fan: [...e.querySelectorAll('.fan figure')].map((f) => ({ name: f.querySelector('figcaption').innerText.trim(), img: f.querySelector('img').naturalWidth, seen: vis(f) })),
+        buys: [...e.querySelectorAll('.buy.pull')].map((x) => { const r = x.getBoundingClientRect(); return { want: +x.dataset.want, kind: x.dataset.kind, bottom: Math.round(r.bottom), top: Math.round(r.top), off: x.disabled,
+          prices: [...x.querySelectorAll('.px')].map((n) => ({ coin: n.dataset.coin, cash: n.dataset.cash, color: getComputedStyle(n.querySelector('b') || n).color })) }; }),
+        times: [...e.querySelectorAll('.promise-lines > span:first-child')].map((n) => n.innerText) };
+    }));
+    const rich = await read();
+    check(tag + ':instrument:every-kind-stands-as-a-banner', rich.map((r) => r.id).join() === PULL_KINDS.map((k) => k.id).join(), rich.map((r) => r.id));
+    check(tag + ':banner:art-guarantee-odds-and-two-draws-on-each', rich.every((r) => r.art && r.odds && r.guarantee && r.buys.length === 2 && r.times.join() === '1회,' + PULL_BULK + '회'), rich.map((r) => [r.id, r.art, r.odds, r.guarantee, r.times]));
+    const inView = (list) => list.every((r) => r.buys.every((x) => x.top >= 0 && x.bottom <= H));
+    const scrolled = await p.evaluate(() => document.getElementById('shop').scrollTop);
+    if (fixed) check(tag + ':banner:every-draw-button-shows-without-scrolling', inView(rich) && scrolled === 0, rich.map((r) => r.buys.map((x) => x.top + '-' + x.bottom)).join(' ') + ' of ' + H);
+    // 부채꼴은 그 팩에서 나올 수 있는 선수다. 바닥 없는 팩이 전설 얼굴을 걸면 전설이 나온다고 약속하는 그림이 된다.
+    const honest = (list) => list.every((r) => r.fan.length === 3 && r.fan.every((f) => f.img > 0 && f.name) && (r.id === 'legend' ? r.fan.every((f) => fameOf(f.name) >= top) : r.fan.every((f) => fameOf(f.name) < top)));
+    check(tag + ':banner:the-fan-shows-only-what-that-pack-can-give', honest(rich), rich.map((r) => r.id + ' ' + r.fan.map((f) => f.name + '(' + fameOf(f.name) + ')').join(' ')));
+    check(tag + ':banner:enough-money-enables-both-draws', rich.every((r) => r.buys.every((x) => !x.off)), rich.map((r) => r.buys.map((x) => x.off)));
+    await p.screenshot({ path: shots + tag + '-banners.jpg', type: 'jpeg', quality: 80 });
+
+    // 포인터를 따라 기우는 포장. 모서리에 두면 두 축이 다 서고 합성 각이 상한 안이어야 한다.
+    const motion = (id) => p.locator('.banner[data-kind="' + id + '"] .pack-art').evaluate((e) => {
+      const m = new DOMMatrix(getComputedStyle(e).transform);
+      // 회전행렬 대각합에서 총 각도를 읽는다. 180/π는 라디안을 도로 바꾼다.
+      const angle = Math.acos(Math.max(-1, Math.min(1, (m.m11 + m.m22 + m.m33 - 1) / 2))) * 180 / Math.PI;
+      const s = getComputedStyle(e);
+      return { angle, outline: s.outlineStyle, sweep: getComputedStyle(e.querySelector('.foil'), '::before').animationName,
+        running: e.closest('.banner').getAnimations({ subtree: true }).filter((a) => a.playState === 'running').length };
     });
-    const motion = () => page.locator('.pack-art').evaluate(e => {
-      const s = getComputedStyle(e), matrix = new DOMMatrix(s.transform);
-      // 회전행렬 대각합에서 총 각도를 읽는다. 180/π는 라디안을 도로 환산한다.
-      const angle = Math.acos(Math.max(-1, Math.min(1, (matrix.m11 + matrix.m22 + matrix.m33 - 1) / 2))) * 180 / Math.PI;
-      return { transform: s.transform, angle, outline: s.outlineStyle, outlineWidth: parseFloat(s.outlineWidth), animation: getComputedStyle(e.querySelector('.foil'), '::before').animationName, active: e.getAnimations({ subtree: true }).filter(a => a.playState === 'running').length };
-    });
-    const artKeys = [];
-    for (const kind of PULL_KINDS) {
-      await page.locator(`.kind[data-kind="${kind.id}"]`).click();
-      await page.locator('.pack-card').scrollIntoViewIfNeeded();
-      await page.mouse.move(0, 0);
-      const prefix = `${width}:${kind.id}`;
-      const rich = await inspect(); artKeys.push(rich.svg);
-      check(prefix + ':포장·확률 좌표', rich.art && rich.odds && rich.below && rich.o.bottom <= height && rich.a.top >= 0, rich);
-      // 기울어진 부모에서는 같은 줄의 y도 다르므로 글자 높이만큼 떨어져야 다른 줄이다.
-      check(prefix + ':약속의 분리', rich.offers.every(o => o.lines.every((l, i) => l.visible && (!i || Math.abs(l.y - o.lines[i - 1].y) >= Math.min(l.height, o.lines[i - 1].height))) && o.bonus === (o.want === PULL_BULK ? `${PULL_BONUS}장 더` : undefined) && o.floor === (kind.floor ? `명성 ${kind.floor} 이상 확정` : undefined)), rich.offers);
-      check(prefix + ':충분 잔고 양성 대조', rich.offers.every(o => !o.disabled), rich.offers.map(o => o.disabled));
-      await shot(kind.id + '-idle');
-      const idle = await motion(); check(prefix + ':대기 반사 양성 대조', idle.active > 0 && idle.animation === 'shop-foil', idle);
-      await page.locator('.pack-art svg').evaluate(e => e.style.visibility = 'hidden');
-      check(prefix + ':SVG 숨김 검출', !(await inspect()).art, await inspect());
-      await page.locator('.pack-art svg').evaluate(e => e.style.visibility = '');
-      await page.locator('.odds').evaluate(e => e.parentElement.prepend(e));
-      check(prefix + ':확률 위치 고장 검출', !(await inspect()).below, await inspect());
-      await page.locator('.odds').evaluate(e => e.parentElement.querySelector('.pack-stage').after(e));
-      await page.locator('.promise-lines').last().evaluate(e => e.style.flexDirection = 'row');
-      const merged = (await inspect()).offers.at(-1).lines;
-      check(prefix + ':약속 합침 검출', merged.some((l, i) => i && Math.abs(l.y - merged[i - 1].y) < Math.min(l.height, merged[i - 1].height)), merged);
-      await page.locator('.promise-lines').last().evaluate(e => e.style.flexDirection = '');
-      await page.locator('.odds-link').click();
-      const odds = await page.locator('.odds em').innerText();
-      check(prefix + ':클릭 확률표', await page.locator('.odds').evaluate(e => e.open) && odds.includes('%'), odds);
-      const held = await page.evaluate(() => window.__squad().squad);
-      const expectedPool = poolFor(KEEPERS.filter(k => !held.includes(k.name)), kind.id);
-      const stock = await page.locator('.odds em span:not(.head) u').evaluateAll(es => es.reduce((sum, e) => sum + Number(e.innerText), 0));
-      check(prefix + ':확률표 실제 미보유 풀', stock === expectedPool.length && stock > 0, { stock, expected: expectedPool.length });
-      await page.locator('.odds-link').press('Enter');
-      await page.locator('.odds-link').press('Enter');
-      check(prefix + ':키보드 확률표', await page.locator('.odds').evaluate(e => e.open), odds);
-      await page.locator('.odds-link').press('Enter');
-      await page.locator('.pack-art').hover(); await page.waitForTimeout(SETTLE);
-      const hover = await motion(); check(prefix + ':기울임·조작 빛', hover.angle > 0 && hover.angle <= MAX_TILT && hover.active > 0 && hover.animation === 'shop-sweep', hover);
-      await shot(kind.id + '-hover');
-      // 20도는 허용 상한 밖의 양성 고장 표본이다.
-      await page.locator('.pack-art').evaluate(e => { e.style.transition = 'none'; e.style.transform = 'rotate3d(1,0,0,20deg)'; });
-      check(prefix + ':기울임 상한 고장 검출', (await motion()).angle > MAX_TILT, await motion());
-      await page.locator('.pack-art').evaluate(e => { e.style.transition = ''; e.style.transform = ''; });
-      await page.mouse.move(0, 0); await page.locator('.odds-link').focus(); await page.keyboard.press('Shift+F6'); await page.waitForTimeout(SETTLE);
-      const focused = await motion(); check(prefix + ':키보드 초점', focused.outline !== 'none' && focused.outlineWidth > 0, focused); await shot(kind.id + '-focus');
-      await page.emulateMedia({ reducedMotion: 'reduce' }); await page.waitForTimeout(SETTLE); await page.locator('.pack-art').hover();
-      const reduced = await motion(); check(prefix + ':감소 동작 정지', reduced.active === 0 && reduced.transform === 'none' && reduced.animation === 'none', reduced); await shot(kind.id + '-reduced');
-      await page.emulateMedia({ reducedMotion: 'no-preference' });
-      await page.evaluate(n => { window.__wallet().coin = n; window.__wallet().cash = n; window.__shop(true); }, SHORT);
-      await page.locator('.pack-card').scrollIntoViewIfNeeded(); const poor = await inspect();
-      const values = rows => rows.map(o => o.prices.map(({ shown, coin, cash }) => ({ shown, coin, cash })));
-      check(prefix + ':부족 잔고 정가·빨강·비활성', JSON.stringify(values(rich.offers)) === JSON.stringify(values(poor.offers)) && poor.offers.every(o => o.disabled && o.prices.every(p => p.color === 'rgb(224, 86, 63)')), poor.offers); await shot(kind.id + '-short');
-      await page.locator('.pack-offer .px b').first().evaluate((e, short) => e.textContent = String(Number(e.textContent.replaceAll(',', '')) - short), SHORT);
-      check(prefix + ':부족분 표시 고장 검출', JSON.stringify(values(rich.offers)) !== JSON.stringify(values((await inspect()).offers)), (await inspect()).offers);
-      await page.evaluate(n => { window.__wallet().coin = n; window.__wallet().cash = n; window.__shop(true); }, RICH);
-      for (const funded of ['coin', 'cash']) {
-        await page.evaluate(({ funded, rich, short }) => { const w = window.__wallet(); w.coin = short; w.cash = short; w[funded] = rich; window.__shop(true); }, { funded, rich: RICH, short: SHORT });
-        const mixed = await inspect();
-        check(prefix + ':' + funded + '만 충분해도 활성', mixed.offers.every(o => !o.disabled && o.prices.some(p => p.color === 'rgb(224, 86, 63)') && o.prices.some(p => p.color !== 'rgb(224, 86, 63)')), mixed.offers);
-      }
-      await page.evaluate(n => { window.__wallet().coin = n; window.__wallet().cash = n; window.__shop(true); }, RICH);
+    for (const k of PULL_KINDS) {
+      const box = await p.locator('.banner[data-kind="' + k.id + '"] .pack-art').boundingBox();
+      await p.mouse.move(box.x + box.width * 0.95, box.y + box.height * 0.05); await p.waitForTimeout(SETTLE);
+      const hov = await motion(k.id);
+      check(tag + ':' + k.id + ':the-pack-leans-toward-the-pointer-within-the-cap', hov.angle > 1 && hov.angle <= MAX_TILT && hov.sweep === 'shop-sweep' && hov.running > 0, hov);
+      await p.mouse.move(1, 1); await p.waitForTimeout(SETTLE);
+      // 키보드로 옮겨 온 초점만 초점 표시를 켠다. Tab은 이 게임에서 상점 선반을 넘기는 키라 Shift로 키보드 조작 상태를 만든다.
+      await p.keyboard.press('Shift'); await p.locator('.banner[data-kind="' + k.id + '"] .pack-art').focus(); await p.waitForTimeout(SETTLE);
+      const foc = await motion(k.id);
+      check(tag + ':' + k.id + ':keyboard-focus-shows-and-leans', foc.outline !== 'none' && foc.angle > 1 && foc.angle <= MAX_TILT, foc);
     }
-    check(width + ':갈래별 다른 문장·색', new Set(artKeys).size === PULL_KINDS.length, artKeys.length);
-    await page.locator('.show-legends').click(); await page.locator('.legend-showcase').scrollIntoViewIfNeeded();
-    const players = await page.locator('.legend-showcase .player').evaluateAll(es => es.map(e => ({ name: e.querySelector('h3').innerText, stats: e.querySelector('.stats').innerText, image: e.querySelector('img').naturalWidth, bounds: e.getBoundingClientRect().toJSON() })));
-    check(width + ':실제 전설 명단·능력치·그림', players.length > 0 && players.every(p => { const k = poolFor(KICKERS, 'legend').find(k => k.name === p.name); return k && p.stats.includes(String(k.finishing)) && p.stats.includes(String(k.power)) && p.image > 0 && p.bounds.width > 0 && p.bounds.height > 0; }), players);
-    await page.locator('.legend-showcase h4').scrollIntoViewIfNeeded(); await shot('showcase-idle'); await page.locator('.legend-showcase .market').hover(); await shot('showcase-hover');
-    await page.locator('.legend-showcase .market').focus(); await page.keyboard.press('F6'); await page.keyboard.press('Shift+F6'); await shot('showcase-focus');
-    const rim = () => page.locator('.legend-showcase').evaluate(e => e.getAnimations({ subtree: true }).filter(a => a.playState === 'running').length);
-    check(width + ':금테 움직임 양성 대조', await rim() > 0, await rim());
-    await page.emulateMedia({ reducedMotion: 'reduce' }); await page.waitForTimeout(SETTLE); const stoppedRim = await rim(); check(width + ':금테 감소 동작', stoppedRim === 0, stoppedRim); await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await page.evaluate(n => { window.__wallet().coin = n; window.__wallet().cash = n; window.__shop(true); }, SHORT); await page.locator('.legend-showcase h4').scrollIntoViewIfNeeded(); await shot('showcase-short');
-    await page.evaluate(n => { window.__wallet().coin = n; window.__wallet().cash = n; }, RICH);
-    const before = await page.evaluate(() => ({ keepers: window.__squad().squad, kickers: window.__kickers() }));
-    await page.locator('.market').click();
-    check(width + ':이적시장 복귀는 전설 키커', await page.locator('[data-role="kicker"]').getAttribute('aria-pressed') === 'true' && await page.locator('.kind[data-kind="legend"]').getAttribute('aria-current') === 'true', await page.locator('.pack-card').innerText());
-    await page.locator('.buy.pull').first().click();
-    const after = await page.evaluate(() => ({ keepers: window.__squad().squad, kickers: window.__kickers(), reveal: window.__reveal() }));
-    check(width + ':키커 결제·개봉 계약', after.kickers.length === before.kickers.length + 1 && JSON.stringify(after.keepers) === JSON.stringify(before.keepers) && after.reveal.drawn === 1, { before, after });
-    check(width + ':콘솔 오류 없음', errors.length === 0, errors);
-    await page.close();
+    if (W === 1280) await p.screenshot({ path: shots + tag + '-focus.jpg', type: 'jpeg', quality: 80 });
+
+    // 확률은 배너 안의 링크 하나 아래에 접혀 있고 표의 남은 수는 그 팩의 실제 미보유 풀이다.
+    await p.click('.banner[data-kind="legend"] .odds summary', { force: true }); await p.waitForTimeout(SETTLE);
+    const odds = await p.locator('.banner[data-kind="legend"] .odds').evaluate((e) => ({ open: e.open, text: e.innerText, stock: [...e.querySelectorAll('em span:not(.head) u')].reduce((n, u) => n + Number(u.innerText), 0) }));
+    const owned = await p.evaluate(() => window.__squad().squad.slice());
+    const want = poolFor(KEEPERS.filter((k) => !owned.includes(k.name)), 'legend').length;
+    check(tag + ':banner:odds-open-as-a-table-of-the-remaining-pool', odds.open && odds.text.includes('%') && odds.stock === want, { stock: odds.stock, want });
+    await p.click('.banner[data-kind="legend"] .odds summary', { force: true });
+
+    // 감소 동작 설정에서는 대기 빛, 금빛 회전, 기울임이 다 멈춘다.
+    await p.emulateMedia({ reducedMotion: 'reduce' });
+    const box = await p.locator('.banner[data-kind="legend"] .pack-art').boundingBox();
+    await p.mouse.move(box.x + box.width * 0.95, box.y + 2); await p.waitForTimeout(SETTLE);
+    const still = await p.evaluate(() => ({ running: document.querySelector('#shop .banners').getAnimations({ subtree: true }).filter((a) => a.playState === 'running').length,
+      transform: getComputedStyle(document.querySelector('.banner.legend .pack-art')).transform }));
+    check(tag + ':banner:reduced-motion-stops-everything', still.running === 0 && still.transform === 'none', still);
+    await p.emulateMedia({ reducedMotion: 'no-preference' }); await p.mouse.move(1, 1);
+
+    // 모자란 잔고는 값을 바꾸지 않고 붉게 칠하고 버튼을 끈다. 같은 물건이 지갑마다 다른 수로 읽히면 안 된다.
+    await p.evaluate((n) => { window.__wallet().coin = n; window.__wallet().cash = n; window.__shop(true); }, SHORT); await p.waitForTimeout(SETTLE);
+    const poor = await read();
+    const values = (l) => l.map((r) => r.buys.map((x) => x.prices.map((q) => q.coin + '/' + q.cash).join()).join('|')).join(' ');
+    check(tag + ':banner:short-money-keeps-the-price-reddens-and-disables', values(rich) === values(poor) && poor.every((r) => r.buys.every((x) => x.off && x.prices.every((q) => q.color === RED))), values(poor));
+    if (W === 1280) await p.screenshot({ path: shots + tag + '-short.jpg', type: 'jpeg', quality: 80 });
+    await p.evaluate((n) => { window.__wallet().coin = n; window.__wallet().cash = n; window.__shop(true); }, RICH); await p.waitForTimeout(SETTLE);
+
+    // 대조군 둘. 버튼을 화면 밖으로 밀어낸 판과 전설 얼굴을 동네 배너에 건 판이 각 축을 붉혀야 계기가 산다.
+    if (fixed) {
+      const planted = await p.addStyleTag({ content: '#shop .banner{--pack-h:600px}' }); await p.waitForTimeout(SETTLE);
+      const pushed = await read();
+      check(tag + ':control:a-pushed-down-button-reddens-the-view-axis', !inView(pushed), pushed.map((r) => r.buys.map((x) => x.bottom)).join(' '));
+      // 심은 규칙을 걷는다. 남겨 두면 뒤의 클릭이 부풀린 배치 위에서 다른 버튼을 누른다.
+      await planted.evaluate((n) => n.remove());
+      await p.evaluate(() => window.__shop(true));
+    }
+    await p.evaluate((name) => { document.querySelector('.banner[data-kind="town"] .fan figcaption').innerText = name; }, poolFor(KEEPERS, 'legend')[0].name);
+    check(tag + ':control:a-legend-face-on-the-open-pack-reddens-the-honesty-axis', !honest(await read()), 'planted');
+    await p.evaluate(() => window.__shop(true)); await p.waitForTimeout(SETTLE);
+
+    // 키커 자리에서 전설 한 장. 값이 나가고 키커가 하나 늘고 개봉이 열린다.
+    if (W === 1280) {
+      await p.click('[data-role="kicker"]', { force: true }); await p.waitForTimeout(SETTLE);
+      const before = await p.evaluate(() => ({ ...window.__squad(), kickers: window.__kickers() }));
+      await p.click('.banner[data-kind="legend"] .buy[data-want="1"]', { force: true });
+      await p.waitForTimeout(400);
+      const after = await p.evaluate(() => ({ ...window.__squad(), kickers: window.__kickers(), shown: !document.getElementById('pull').hidden }));
+      check(tag + ':banner:a-kicker-legend-draw-pays-and-opens', after.kickers.length === before.kickers.length + 1 && after.squad.length === before.squad.length && after.shown, { before: before.kickers.length, after: after.kickers.length, shown: after.shown });
+    }
+    check(tag + ':console:no-errors', errs.length === 0, errs.slice(0, 2).join(' | ') || 'clean');
+    await p.close();
   }
-} catch (error) { check('실행 완료', false, String(error)); }
-finally { await browser.close(); clearTimeout(timer); writeFileSync(root + 'pack.json', JSON.stringify(report, null, 2)); }
-const failed = report.checks.filter(c => !c.pass);
-console.log(failed.length ? `pack FAIL ${failed.length}` : `pack PASS ${report.checks.length}`);
-process.exitCode = failed.length ? 1 : 0;
+} catch (e) { check('instrument:run-completed', false, String(e).slice(0, 300)); }
+await b.close();
+if (notes.length) console.log(notes.map((x) => '  ok   ' + x).join('\n'));
+if (fails.length) console.log(fails.map((x) => '  FAIL ' + x).join('\n'));
+console.log(fails.length ? 'pack FAIL ' + fails.length : 'pack PASS ' + notes.length);
+process.exit(fails.length ? 1 : 0);

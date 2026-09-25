@@ -70,30 +70,29 @@ try {
   }
   await p.waitForTimeout(1300);
   await p.evaluate(() => window.__shop(true));
-  await p.waitForSelector("#shop .kind", { timeout: 8000 });
-  const shown = await p.evaluate(() => [...document.querySelectorAll("#shop .kind")].map((e) => e.dataset.kind));
+  await p.waitForSelector("#shop .banner.kind", { timeout: 8000 });
+  // 갈래는 탭이 아니라 나란히 선 배너다. 가려진 탭의 팩은 값도 약속도 안 보여 고를 수가 없었다.
+  const shown = await p.evaluate(() => [...document.querySelectorAll("#shop .banner.kind")].map((e) => e.dataset.kind));
   check("pullkind:the-shelf-offers-every-kind", shown.length === PULL_KINDS.length, shown.join(", "));
 
-  // 갈래를 바꾸면 화면이 통째로 갈린다. 안 갈리면 버튼만 있고 갈래는 없는 것이다.
-  const read = () => p.evaluate(() => {
-    const card = document.querySelector("#shop .card");
+  // 배너마다 제 값을 든다. 두 배너가 같은 값을 들면 버튼만 둘이고 갈래는 없는 것이다.
+  const read = (id) => p.evaluate((id) => {
+    const card = document.querySelector('#shop .banner.kind[data-kind="' + id + '"]');
     return {
-      cur: (document.querySelector("#shop .kind[aria-current]") || {}).dataset?.kind || "",
+      cur: card ? card.dataset.kind : "",
       coin: Number((card.querySelector(".px[data-coin]") || {}).dataset?.coin || 0),
       /* 이용권이 값을 다 덮는 회차는 골드 칩 대신 이용권 칩을 세운다. 그때 값은 0이 맞고,
          선반이 값을 안 적은 것이 아니다. 열 장 버튼은 이용권으로 다 못 덮으므로 골드를 든다.
          값 축은 그 버튼에서 읽어야 이용권 보유량이 판정을 흔들지 않는다. */
       bulkCoin: Number(([...card.querySelectorAll(".buy.pull .px[data-coin]")].pop() || {}).dataset?.coin || 0),
-      // 이 갈래가 이용권을 받는지는 이제 문장이 아니라 칩의 유무가 말한다.
-      ticketChip: Boolean(card.querySelector(".held")),
+      // 이 갈래가 이용권을 받는지는 문장이 아니라 버튼 값 자리의 이용권 칩이 말한다. 보유 수는 역할 줄 옆 한 곳에만 선다.
+      ticketChip: Boolean(card.querySelector('.buy.pull svg[aria-label="이용권"]')),
       text: card.innerText.replace(/\n/g, " ")
     };
-  });
-  const a = await read();
-  await p.click('#shop .kind[data-kind="legend"]', { force: true });
-  await p.waitForTimeout(300);
-  const c = await read();
-  check("pullkind:choosing-a-kind-changes-the-shelf", a.cur === "town" && c.cur === "legend" && c.coin !== a.coin,
+  }, id);
+  const a = await read("town");
+  const c = await read("legend");
+  check("pullkind:each-banner-carries-its-own-price", a.cur === "town" && c.cur === "legend" && c.bulkCoin !== a.bulkCoin,
     a.cur + " at " + a.coin + " then " + c.cur + " at " + c.coin);
   /* 화면에 선 값이 판정이 계산한 청구서와 같은가. 이용권이 값을 다 덮는 회차는 골드가 0인 것이
      맞는 답이라, 원가와 비교하면 계기가 이용권 보유량을 결함으로 읽는다.
@@ -110,7 +109,7 @@ try {
 
   // 전설 갈래에서 열 장. 나온 이름이 전부 하한 위여야 한다.
   const before = await p.evaluate(() => window.__squad().squad.slice());
-  await p.click('#shop .buy[data-want="10"]', { force: true });
+  await p.click('#shop .banner[data-kind="legend"] .buy[data-want="10"]', { force: true });
   await p.waitForTimeout(500);
   const after = await p.evaluate(() => window.__squad().squad.slice());
   const drawn = after.slice(before.length);

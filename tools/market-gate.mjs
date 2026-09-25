@@ -10,9 +10,10 @@ const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win6
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
 const OLD = "카드깡";
 const NEW = "이적시장";
-// 서는 두 회차. roster.mjs의 낱장 1과 PULL_BULK 10이고, 화면에도 이 순서로 선다.
-// 회차 뒤 단위 낱말이 사라져 버튼에는 수만 남았으므로, 그 수가 무엇인지는 이 값이 잡는다.
+// 배너 하나에 서는 두 회차. roster.mjs의 낱장 1과 PULL_BULK 10이고, 배너마다 이 순서로 선다.
+// 배너는 팩 갈래 수만큼 나란히 서므로 버튼 수는 갈래 수의 두 배다(roster.mjs PULL_KINDS 둘).
 const DRAWS = [1, 10];
+const BANNERS = 2;
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);
 t.unref();
@@ -95,11 +96,12 @@ try {
       /* 회차와 값이 각자 자기 자리에 있는가. 회차는 큰 글자 자리가, 값은 그 아래 자리가 든다.
          값은 데이터에서도 읽고 그려진 숫자로도 읽는다. 데이터만 읽으면 사람이 못 보는 값도 통과한다. */
       shaped: buys.map((e) => {
-        const times = e.querySelector("b");
+        // 회차는 버튼 바로 위 약속 줄의 첫 칸이 든다. 버튼은 치르는 값만 든다.
+        const times = e.closest(".pack-offer")?.querySelector(".promise-lines > span");
         const slot = e.querySelector("i");
         const px = e.querySelector("i .px[data-coin]");
         return {
-          times: times ? times.textContent.trim() : "",
+          times: times ? times.textContent.replace(/[^0-9]/g, "") : "",
           timesLit: lit(times),
           coin: px ? Number(px.dataset.coin) : null,
           // 값 자리에 그려진 숫자. 값을 치르는 회차면 골드 수이고, 이용권으로 다 내면 이용권 수다.
@@ -116,12 +118,12 @@ try {
     };
   });
 
-  check("instrument:both-draw-buttons-stand", shelf.n === 2, shelf.n + " buttons");
+  check("instrument:both-draw-buttons-stand-on-every-banner", shelf.n === DRAWS.length * BANNERS, shelf.n + " buttons");
   /* 회차 뒤 단위 낱말이 없어졌으니 낱말 대신 수를 읽는다. 몇 회인지는 그 수가 실제 회차와 같은지로,
      얼마인지는 값 자리에 아이콘과 숫자가 같이 서 있고 그 숫자가 데이터와 같은지로 판정한다. */
   check("market:each-button-says-how-many-and-what-it-costs",
-    shelf.shaped.length === DRAWS.length && shelf.shaped.every((s, i) =>
-      /^[0-9]+$/.test(s.times) && Number(s.times) === DRAWS[i] && s.timesLit
+    shelf.shaped.length === DRAWS.length * BANNERS && shelf.shaped.every((s, i) =>
+      /^[0-9]+$/.test(s.times) && Number(s.times) === DRAWS[i % DRAWS.length] && s.timesLit
       && s.priceLit && s.icon && /^[0-9]+$/.test(s.shown)
       && (s.coin === null || s.shown === String(s.coin))),
     shelf.shaped.map((s) => s.times + " " + (s.coin === null ? "ticket " + s.shown : s.shown)).join(", "));
