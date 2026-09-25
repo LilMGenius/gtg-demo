@@ -16,14 +16,20 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 async function cashLane(ctx, parent = false) {
   const page = await ctx.newPage();
   if (parent) {
-    // Existing wiki-gate served-parent control; date and wiki import the new wallet API too.
-    for (const file of ['main.mjs', 'state/wallet.mjs', 'state/date.mjs', 'ui/wiki.mjs']) {
-      const body = execFileSync('git', ['show', '258b2a4:web/src/' + file], { encoding: 'utf8' });
-      await page.route('**/src/' + file, route => route.fulfill({ contentType: 'text/javascript', body }));
-    }
+    const html = execFileSync('git', ['show', '258b2a4:web/index.html'], {encoding:'utf8'});
+    await page.route('**/web/index.html*', route => route.fulfill({contentType:'text/html',body:html}));
+    // 과거 지갑 진입점이 읽는 모듈을 모두 같은 커밋에서 응답한다.
+    await page.route(/\/(?:web\/src|src)\/.*\.mjs(?:\?.*)?$/, route => {
+      const path = new globalThis.URL(route.request().url()).pathname.slice(1);
+      const body = execFileSync('git', ['show', '258b2a4:' + path], {encoding:'utf8'});
+      return route.fulfill({contentType:'text/javascript',body});
+    });
   }
+  const bootErrors = [];
+  page.on('pageerror', error => bootErrors.push(error.message));
   try {
-    await page.goto(URL + '&preset=rich,veteran');
+    await page.goto(URL + '&preset=rich,veteran,maxed');
+    if (bootErrors.length) throw Error('boot: ' + bootErrors.join(';'));
     if (parent) {
       const booted = await page.evaluate(() => typeof window.__wallet === 'function');
       check('instrument:the-parent-fixture-boots', booted, String(booted));
@@ -57,7 +63,7 @@ async function cashLane(ctx, parent = false) {
       const gold=+c.dataset.coin, coin=w.coin, cash=w.cash; b.click();
       return w.coin===coin-gold && w.cash===cash;
     });
-    // Same drain path as price-gate: mutate the exposed wallet, then re-render.
+    // price 게이트처럼 노출된 지갑을 비우고 선반을 다시 그린다.
     result['cash:cash-pays-when-gold-is-short'] = await page.evaluate(() => {
       const w=window.__wallet(); w.coin=0; window.__shop(true);
       const b=document.querySelector('#shop .buy[data-rank="3"]'), c=b.querySelector('.price'); if(!c || b.disabled) return false;
