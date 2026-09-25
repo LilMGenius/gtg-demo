@@ -27,10 +27,10 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 
 // 화면 위 조작 전부. 상태 칩 #top은 조작이 아니라 표시라 여기 안 들어간다.
 // 갈래가 둘이다. 켜고 끄는 토글과 창을 여는 버튼은 다른 일을 하므로 다른 판때기를 쓴다.
-// 토글 안에서도 자리가 갈린다. 판을 굴리는 둘은 왼쪽 기둥에 서고, 소리는 판이 아니라
+// 토글 안에서도 자리가 갈린다. 판을 굴리는 토글은 왼쪽 기둥에 서고, 소리는 판이 아니라
 // 기기를 만지는 설정이라 오른쪽 기둥 맨 위 제 칸을 쓴다. 판때기는 자리가 아니라 하는 일을
 // 따라가므로, 소리는 오른쪽으로 가서도 토글 판때기 그대로다.
-const PLAY = ["auto", "out"];
+const PLAY = ["auto"];
 // Help shares the compact settings plate; it is not a gameplay-column opener.
 const SETTINGS = ["mute", "wikiBtn", "fullscreen"];
 const COMPACT = SETTINGS.concat(PLAY);
@@ -77,6 +77,16 @@ try {
     check("control:the-same-handle-opens-once-the-reveal-is-done", after === false, "shop hidden " + after);
     await fresh.close();
   }
+
+  // 필수 조작이 사라지면 기하 측정 전에 계기 실패로 끝낸다.
+  const missingControls = () => p.evaluate((ids) => ids.filter((id) => !document.getElementById(id)), IDS.concat("top"));
+  const missing = await missingControls();
+  if (missing.length) throw new Error("instrument:every-control-was-found missing " + missing.join(", "));
+  // 양성 대조군은 같은 조회에서 필수 조작 하나를 숨긴 뒤 복원한다.
+  await p.evaluate(() => { document.getElementById("auto").id = "missingControlProbe"; });
+  const plantedMissing = await missingControls();
+  await p.evaluate(() => { document.getElementById("missingControlProbe").id = "auto"; });
+  check("control:a-missing-required-control-is-reported", plantedMissing.includes("auto"), plantedMissing.join(", "));
 
   const scan = await p.evaluate((arg) => {
     const ids = arg.ids;
@@ -157,7 +167,7 @@ try {
   const rhythmOf = (page) => page.evaluate(() => {
     const box = (id) => { const e = document.getElementById(id); return { top: e.offsetTop, bottom: e.offsetTop + e.offsetHeight }; };
     const gaps = (ids) => ids.slice(1).map((id, i) => ({ pair: ids[i] + " to " + id, gap: box(id).top - box(ids[i]).bottom }));
-    return { left: gaps(["top", "auto", "out"]), right: gaps(["mute", "gymBtn", "rosterBtn", "gramBtn", "shopBtn"]) };
+    return { left: gaps(["top", "auto"]), right: gaps(["mute", "gymBtn", "rosterBtn", "gramBtn", "shopBtn"]) };
   });
   /* 대역은 오른쪽 기둥이 그 판에서 실제로 쓴 값으로 매 판 다시 낸다. 숫자를 박아 두면 기둥이 움직인
      날 자가 먼저 늙는다. 여유 2px은 offsetTop과 offsetHeight가 정수로 끊기며 생기는 오차고,
@@ -244,10 +254,10 @@ try {
     const t = document.getElementById("top");
     const want = t.offsetTop + t.offsetHeight + 46;
     const d = want - document.getElementById("auto").offsetTop;
-    for (const id of ["auto", "out"]) { const e = document.getElementById(id); e.dataset.was = e.style.top; e.style.top = (e.offsetTop + d) + "px"; }
+    for (const id of ["auto"]) { const e = document.getElementById(id); e.dataset.was = e.style.top; e.style.top = (e.offsetTop + d) + "px"; }
   });
   const planted = await rhythmOf(p);
-  await p.evaluate(() => { for (const id of ["auto", "out"]) { const e = document.getElementById(id); e.style.top = e.dataset.was; delete e.dataset.was; } });
+  await p.evaluate(() => { for (const id of ["auto"]) { const e = document.getElementById(id); e.style.top = e.dataset.was; delete e.dataset.was; } });
   const plant = judge(planted);
   check("control:planting-the-old-sound-plate-reddens-the-rhythm-axis",
     plant.off.length > 0 || plant.over.length > 0,
@@ -378,6 +388,10 @@ try {
   if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));
   console.log(fails.length ? "chrome FAIL " + fails.length : "chrome PASS " + notes.length);
   if (fails.length) process.exitCode = 1;
+} catch (error) {
+  console.log("  FAIL instrument:chrome " + error.message);
+  console.log("chrome FAIL instrument");
+  process.exitCode = 1;
 } finally {
   clearTimeout(t);
   if (b) await b.close();
