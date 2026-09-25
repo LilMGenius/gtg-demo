@@ -109,11 +109,11 @@ try {
   await p.waitForTimeout(420);
   await standDown(true);
   await p.waitForTimeout(200);
-  // Like inkProbe below, plant geometry rather than require incidental HUD overlap.
-  // Keep the live caption's opacity untouched: the product must hide its ink.
+  // 실제 자막의 부모를 옮겨 우연한 겹침 없이 가림을 심는다.
+  // 자막의 불투명도는 제품이 소유하므로 심는 쪽이 바꾸지 않는다.
   const capPosition = await p.evaluate(() => {
-    const e = document.getElementById("caption");
-    const cap = e.getBoundingClientRect();
+    const e = document.getElementById("resultHud");
+    const cap = document.getElementById("caption").getBoundingClientRect();
     const h4 = document.querySelector("#me h4").getBoundingClientRect();
     const originalTop = e.style.top;
     const into = +(Math.min(cap.bottom, h4.bottom) - Math.max(cap.top, h4.top)).toFixed(1);
@@ -148,7 +148,7 @@ try {
   await p.waitForTimeout(90);
   const capPlanted = await inkShot(capClip);
   await p.evaluate(() => { const q = document.getElementById("inkProbe"); if (q) q.remove(); });
-  await p.evaluate((top) => { document.getElementById("caption").style.top = top; }, capPosition.originalTop);
+  await p.evaluate((top) => { document.getElementById("resultHud").style.top = top; }, capPosition.originalTop);
   await standDown(false);
   await p.evaluate(() => window.__me(false));
   await p.waitForTimeout(160);
@@ -173,7 +173,8 @@ try {
   await p.evaluate(() => window.__lockRound());
   await p.evaluate((names) => {
     const r = window.__record();
-    r[names[0]] = { saved: 7, conceded: 3 };
+    // 빗나감은 빈 칸과 구별되는 양수로 심어 다섯째 열의 배선을 잰다.
+    r[names[0]] = { saved: 7, conceded: 3, missed: 2 };
     r[names[1]] = { saved: 2, conceded: 4 };
   }, [KICKERS[0].name, KICKERS[1].name]);
   /* 최근 줄은 피드에서 나온다. 열 판보다 많이 심어야 자르는 자리가 재진다. 남이 찍은 사진과
@@ -209,9 +210,10 @@ try {
       const rows = [...tb.querySelectorAll("tbody tr")];
       return {
         cols: tb.querySelectorAll("thead th").length,
+        headers: [...tb.querySelectorAll("thead th")].map((h) => h.textContent.trim()),
         rows: rows.length,
         faces: rows.filter((r) => { const im = r.querySelector("img"); return im && im.naturalWidth > 0; }).length,
-        square: rows.every((r) => r.querySelectorAll("td").length === 4),
+        square: rows.every((r) => r.querySelectorAll("td").length === tb.querySelectorAll("thead th").length),
         cells: rows.map((r) => [...r.querySelectorAll("td")].map((c) => c.textContent.trim()))
       };
     })();
@@ -366,8 +368,11 @@ try {
 
   // 상대 전적. 표가 아니면 이름과 수가 줄마다 다른 자리에 서고, 누구한테 약한지가 눈으로 안 읽힌다.
   const tb = seen.log.table;
+  check("mepane:the-missed-cell-holds-the-planted-value",
+    Boolean(tb) && tb.cells.some((row) => row.includes(KICKERS[0].name) && row.at(-1) === "2"),
+    tb ? JSON.stringify(tb.cells) : "no table");
   check("mepane:the-head-to-head-is-a-real-table",
-    Boolean(tb) && tb.cols === 4 && tb.rows > 0 && tb.square && tb.faces === tb.rows,
+    Boolean(tb) && tb.headers.join("|") === "|이름|막은|먹힌|빗나감" && tb.rows > 0 && tb.square && tb.faces === tb.rows,
     tb ? tb.cols + " columns, " + tb.rows + " rows, " + tb.faces + " faces, square " + tb.square
       : "no table in the record pane");
   check("instrument:the-table-holds-the-planted-rows", Boolean(tb) && tb.rows >= ledger.n,
