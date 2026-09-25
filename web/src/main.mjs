@@ -1651,6 +1651,8 @@ function closeDate() {
 // 결과 한 줄은 state에 넣지 않는다. 저장에 남을 값이 아니라 이 패널이 열려 있는 동안만 쓰는 글자다.
 // 방금 뽑은 카드. 한 장씩 뒤집히는 동안 이름이 여기 쌓이고, 상점을 닫으면 비워진다.
 let lastPull = [];
+// 방금 연 팩의 갈래. 봉인 단의 뒷면이 그 팩의 포장이라, 산 팩과 여는 팩이 같은 물건으로 읽힌다.
+let pullKindNow = 'town';
 // 몇 장까지 뒤집혔는가. 뽑기와 별개로 도는 값이라, 이 수가 늘어도 지갑은 이미 치러져 있다.
 let shown = 0;
 // 뒤집기를 예약한 타이머. 상점을 닫거나 다시 뽑으면 끊는다. 안 끊으면 닫은 창에 카드가 계속 뜬다.
@@ -2132,6 +2134,7 @@ function revealAll() {
 function stopReveal() {
   if (revealTimer) { clearTimeout(revealTimer); revealTimer = 0; }
   lastPull = [];
+  pullKindNow = 'town';
   shown = 0;
   pullStage = 0;
   el('pull').hidden = true;
@@ -2161,10 +2164,11 @@ function paintPull() {
   const at = Math.max(0, shown - 1);
   const k = lastPull[at];
   const rare = k.fame >= 9;
-  // 이미 나온 줄. 마지막 칸만 방금 확정된 장이라 제자리로 축소되는 동작을 한 번 받는다.
+  /* 이미 나온 줄. 이름만 적힌 칩은 열한 장을 연 뒤에 누가 왔는지를 다시 읽게 하므로 얼굴을 같이 세운다.
+     열어 둔 줄이 곧 회차의 요약판이다. 마지막 칸만 방금 확정된 장이라 제자리로 축소되는 동작을 한 번 받는다. */
   const done = lastPull.slice(0, at)
     .map((c, i) => '<i class="' + (c.fame >= 9 ? 'rare' : '') + (i === at - 1 ? ' just' : '')
-      + '">' + c.name + '</i>').join('');
+      + '"><img alt="" src="' + thumbURL('face', c, lookOf({}, c.name)) + '"><b>' + c.name + '</b></i>').join('');
   // 마지막 장이 마지막 단까지 서면 넘길 것이 없다. 그때부터 이 화면은 닫는 화면이다.
   const over = shown >= lastPull.length && pullStage === STAGE_LAST;
   box.innerHTML = '<div class="count">' + shown + ' / ' + lastPull.length + '</div>'
@@ -2172,7 +2176,8 @@ function paintPull() {
        그대로 굽는다. 걸친 것은 내 장비가 아니라 기본 차림이다. 아직 내 선수가 아니기 때문이다.
        층은 봉인부터 능력치까지 한 번에 세우고, 어느 층이 보이는지는 data-stage가 정한다. */
     + '<div class="now' + (rare ? ' rare' : '') + '" data-stage="' + pullStage + '">'
-    + '<span class="seal"></span>'
+    // 봉인은 산 팩의 포장이다. 줄무늬 뒷면은 어느 팩을 열고 있는지를 말하지 않았다.
+    + '<span class="seal">' + packArt(pullKindOf(pullKindNow)) + '</span>'
     // 등급 신호는 테두리 안쪽을 도는 빛이고, 서 있는 길이를 카드가 직접 들고 온다.
     + '<span class="beam" style="--beam-ms:'
     + (STAGE_MS[BEAM_STAGE] + (rare ? RARE_HOLD_MS : 0)) + 'ms"></span>'
@@ -2192,13 +2197,18 @@ function paintPull() {
        글자는 둘이다. 누름 하나가 하는 일이 앞에 서고, 붙들면 남은 것이 전부 열린다는 것이 뒤에 선다.
        봉인 단이 까만 판이라 손이 먼저 두드리는데 두드림은 한 단씩이라, 뒤 마디가 없으면 급한 사람이
        다섯 번을 눌러 놓고도 붙드는 길을 못 배운다. 뒤 마디는 굵기와 짙기가 한 단 아래다. */
-    + '<button class="tap">' + (over ? '닫기' : '다음<i>· 길게 누르면 전부</i>') + '</button>';
+    + '<button class="tap">' + (over ? '닫기' : '다음<i>· 길게 누르면 전부</i>') + '</button>'
+    /* 전부 열기. 길게 누름은 배워야 아는 손이라, 두 장 이상인 회차에는 같은 일을 하는 버튼이 눈에 보이게 선다.
+       판 가운데를 누르는 손과 안 겹치게 왼쪽 위 귀에 둔다. */
+    + (lastPull.length > 1 && !over ? '<button class="skip">전부 열기</button>' : '');
   box.hidden = false;
   // 놓이는 동작은 클래스를 다시 붙여야 다시 돈다. 같은 노드를 재사용하면 두 번째 장이 안 움직인다.
   const now = box.querySelector('.now');
   void now.offsetWidth;
   now.classList.add('turn');
   const btn = box.querySelector('.tap');
+  const skip = box.querySelector('.skip');
+  if (skip) skip.onclick = (e) => { e.stopPropagation(); revealAll(); };
   /* 짧은 누름은 한 단만 올린다. 올릴 단이 없으면 다음 장으로 가고, 그것도 없을 때에야 닫는다.
      누름 하나가 회차를 통째로 털어 가면 다섯 단을 세운 이유가 없어진다. 급한 사람의 손은 아래 긴 누름이다.
      예약을 먼저 걷는 것은, revealNext가 제 손잡이를 안 걷고 0으로 덮어써서 남은 예약이 뒤에 한 단을
@@ -2596,6 +2606,7 @@ function renderShop() {
     // 값은 여기서 이미 치러졌다. 뒤집기는 결과를 보여 주는 일이지 판정을 미루는 일이 아니다.
     stopReveal();
     lastPull = drawn.slice();
+    pullKindNow = kind.id;
     persist();
     pips();
     renderShop();

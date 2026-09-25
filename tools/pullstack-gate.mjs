@@ -3,7 +3,8 @@ import { PULL_COST, PULL_BULK, pullYield, TICKET_CAP, TICKET_PER_CLEAN, pullBill
 import { TICKETS_HELD } from "../web/src/state/inject.mjs";
 import { clearDraw } from "./draw.mjs";
 
-// 이적시장 이용권과 두 자리의 자. 한 장만 뽑을 수 있으면 모아서 지르는 자리가 없고,
+// 이적시장 이용권과 두 자리의 자. 이용권을 받는 팩은 동네 배너라 버튼은 그 배너 안에서 읽고, 보유 수는 역할 줄 옆 한 곳에서 읽는다.
+// 한 장만 뽑을 수 있으면 모아서 지르는 자리가 없고,
 // 뽑기가 값을 고르는 일이 아니라 값이 될 때까지 기다리는 일이 된다.
 //
 // 재는 것은 넷이다. 두 자리가 서 있는가, 이용권이 값보다 먼저 나가는가,
@@ -56,14 +57,14 @@ try {
   check("preset:ticketed-was-applied", Array.isArray(applied) && applied.includes("ticketed"), JSON.stringify(applied));
 
   await p.evaluate(() => window.__shop(true));
-  await p.waitForSelector("#shop .buy[data-want]", { timeout: 8000 });
+  await p.waitForSelector("#shop .banner[data-kind='town'] .buy[data-want]", { timeout: 8000 });
   /* 판이 뒤에서 계속 돈다. 구가 끝날 때마다 골드가 들어오므로, 두 시점의 잔고를 비교하는 축은
      그 사이에 굴러간 구를 뽑기가 쓴 값으로 읽는다. 재는 동안 판을 멈춘다. */
   await p.evaluate(() => window.__lockRound());
-  const wants = await p.evaluate(() => [...document.querySelectorAll("#shop .buy[data-want]")].map((e) => Number(e.dataset.want)));
+  const wants = await p.evaluate(() => [...document.querySelectorAll("#shop .banner[data-kind='town'] .buy[data-want]")].map((e) => Number(e.dataset.want)));
   check("pullstack:both-sizes-stand", wants.length === 2 && wants[0] === 1 && wants[1] === PULL_BULK, wants.join(" and "));
   const shown = await p.evaluate(() => {
-    const e = document.querySelector("#shop .card .held");
+    const e = document.querySelector("#shop .pull-bar .held");
     return e ? e.textContent.trim() : "";
   });
   check("pullstack:the-shelf-says-how-many-tickets-are-left", shown.indexOf(String(TICKETS_HELD)) >= 0, JSON.stringify(shown));
@@ -71,7 +72,7 @@ try {
     String(await p.evaluate(() => window.__tickets())));
 
   const before = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin, squad: window.__squad().squad.length }));
-  await p.click('#shop .buy[data-want="' + PULL_BULK + '"]', { force: true });
+  await p.click('#shop .banner[data-kind="town"] .buy[data-want="' + PULL_BULK + '"]', { force: true });
   await clearDraw(p);
   await p.waitForTimeout(500);
   const after = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin, squad: window.__squad().squad.slice() }));
@@ -89,7 +90,7 @@ try {
 
   // 낱장은 남은 이용권으로 돌아간다. 값이 안 나가야 이용권이 먼저 쓰인 것이다.
   const mid = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin }));
-  await p.click('#shop .buy[data-want="1"]', { force: true });
+  await p.click('#shop .banner[data-kind="town"] .buy[data-want="1"]', { force: true });
   await clearDraw(p);
   await p.waitForTimeout(400);
   const one = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin }));
@@ -97,11 +98,11 @@ try {
     "tickets " + mid.t + " to " + one.t + ", coin unchanged " + (one.coin === mid.coin));
 
   // 대조군. 이용권이 바닥나면 같은 자리가 값을 치른다. 안 그러면 위의 0원은 공짜 뽑기다.
-  await p.evaluate(() => { while (window.__tickets() > 0) document.querySelector('#shop .buy[data-want="1"]').click(); });
+  await p.evaluate(() => { while (window.__tickets() > 0) document.querySelector('#shop .banner[data-kind="town"] .buy[data-want="1"]').click(); });
   await clearDraw(p);
   await p.waitForTimeout(600);
   const dry = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin }));
-  await p.click('#shop .buy[data-want="1"]', { force: true });
+  await p.click('#shop .banner[data-kind="town"] .buy[data-want="1"]', { force: true });
   await clearDraw(p);
   await p.waitForTimeout(400);
   const paid = await p.evaluate(() => ({ t: window.__tickets(), coin: window.__wallet().coin }));
