@@ -609,42 +609,68 @@ const TOUCHED = new Set(['contact']);
   const REAR_BAND = 0.05 + BALL_R + 0.06;
   const clearRear = (p) => {
     // 뒷틀이 카메라와 공 사이에 있을 때만 가린다. 공이 그보다 앞이면 t가 구간을 벗어난다.
-    const t = (REAR_Z - CAM_BASE.z) / (p.z - CAM_BASE.z);
+    const t = (REAR_Z - camera.position.z) / (p.z - camera.position.z);
     if (!(t > 0 && t < 1)) return;
-    const ry = CAM_BASE.y + (p.y - CAM_BASE.y) * t;
-    const rx = p.x * t;
+    const ry = camera.position.y + (p.y - camera.position.y) * t;
+    const rx = camera.position.x + (p.x - camera.position.x) * t;
     // 상단 가로대. 띠 안이면 가까운 쪽 가장자리로 내보내고 그 값을 공 높이로 되푼다.
     if (Math.abs(rx) < REAR_HW + REAR_BAND && Math.abs(ry - REAR_TOP) < REAR_BAND) {
       const want = ry > REAR_TOP ? REAR_TOP + REAR_BAND : REAR_TOP - REAR_BAND;
-      // 땅 아래로는 못 내린다. 공 반경이 하한이다.
-      p.y = Math.max(BALL_R, CAM_BASE.y + (want - CAM_BASE.y) / t);
+      const height = camera.position.y + (want - camera.position.y) / t;
+      // 지면에 붙은 공은 높이 하한에서 멈추면 여전히 쇠 뒤다. 같은 투영 경계까지 깊이를 당긴다.
+      if (height < BALL_R) {
+        p.z = camera.position.z + (REAR_Z - camera.position.z) * (p.y - camera.position.y) / (want - camera.position.y);
+      } else p.y = height;
     }
     // 좌우 기둥과 빗댐. 둘 다 x가 같은 자리라 한 검사로 걷힌다. 골문 안쪽으로 비킨다.
     if (ry > -REAR_BAND && ry < REAR_TOP + REAR_BAND && Math.abs(Math.abs(rx) - REAR_HW) < REAR_BAND) {
       const sgn = rx >= 0 ? 1 : -1;
       const want = Math.abs(rx) < REAR_HW ? REAR_HW - REAR_BAND : REAR_HW + REAR_BAND;
-      p.x = (sgn * want) / t;
+      p.x = camera.position.x + (sgn * want - camera.position.x) / t;
     }
   };
   /* 시선을 막는 것은 쇠만이 아니다. 키퍼도 같은 자리에 설 수 있고, 다른 점은 그 자리가
      매 프레임 바뀐다는 것뿐이다. 그래서 같은 질문을 몸 상자에 대고 한 번 더 한다.
      공이 몸보다 카메라 쪽이면 몸은 앞을 못 가리므로 깊이부터 거른다. */
   const sightBox = new THREE.Box3();
+  // ball-probe와 같은 Three.js 광선으로 실제 불투명 면이 가릴 때만 상자 밖으로 보정한다.
+  const sightRay = new THREE.Raycaster();
+  const sightDirection = new THREE.Vector3();
   const clearKeeper = (p) => {
     sightBox.setFromObject(keeper);
-    const kz = (sightBox.min.z + sightBox.max.z) / 2;
+    // 몸 안쪽 중심면 대신 실제 앞면부터 시선을 검사한다.
+    const kz = sightBox.min.z;
     if (p.z <= kz) return;
-    const t = (kz - CAM_BASE.z) / (p.z - CAM_BASE.z);
+    sightDirection.copy(p).sub(camera.position);
+    sightRay.far = sightDirection.length() - BALL_R;
+    sightRay.near = camera.near;
+    sightRay.set(camera.position, sightDirection.normalize());
+    if (!sightRay.intersectObject(keeper, true).some((hit) => opaqueBlocker(hit.object))) return;
+    const t = (kz - camera.position.z) / (p.z - camera.position.z);
     if (!(t > 0 && t < 1)) return;
-    const sy = CAM_BASE.y + (p.y - CAM_BASE.y) * t;
-    const sx = p.x * t;
+    const sy = camera.position.y + (p.y - camera.position.y) * t;
+    const sx = camera.position.x + (p.x - camera.position.x) * t;
     if (sy < sightBox.min.y - BALL_R || sy > sightBox.max.y + BALL_R) return;
     if (sx < sightBox.min.x - BALL_R || sx > sightBox.max.x + BALL_R) return;
     // 가까운 쪽 어깨 밖으로 비킨다. 위아래로 밀면 뜬 공이 되고 옆으로 밀면 자리만 옮긴 공이 된다.
     const left = sightBox.min.x - BALL_R;
     const right = sightBox.max.x + BALL_R;
     const want = Math.abs(sx - left) < Math.abs(sx - right) ? left : right;
-    p.x = want / t;
+    p.x = camera.position.x + (want - camera.position.x) / t;
+  };
+  // 한 보정이 다른 장애물 뒤로 보내면 둘 다 다시 검사한다.
+  // 같은 자리로 되돌아오는 경우에는 양쪽 앞면으로 깊이를 옮겨 순환을 끊는다.
+  const clearTailBall = (p) => {
+    const visited = new Set();
+    for (;;) {
+      const before = p.toArray().join(',');
+      clearKeeper(p);
+      clearRear(p);
+      const after = p.toArray().join(',');
+      if (after === before) return;
+      if (visited.has(after)) p.z = Math.min(p.z, REAR_Z - BALL_R, sightBox.min.z - BALL_R);
+      visited.add(after);
+    }
   };
   let shakeAmp = 0;
   let shakeLeft = 0;
@@ -2049,9 +2075,6 @@ const TOUCHED = new Set(['contact']);
         default:
           break;
       }
-      // 갈래가 자기 자리를 다 쓴 뒤 한 번만 묻는다. 갈래 안에서 부르면 갈래마다 빠뜨릴 수 있다.
-      clearRear(ball.position);
-      clearKeeper(ball.position);
       // 손으로 잡는 갈래와 달리는 갈래는 최종 자세가 준비 자세와 가까워서, 그 선 위를 움직여도
       // 회차가 채취 잡음만큼도 안 갈린다. 그런 갈래에서는 몸이 다이빙 각도 그대로 굳는다.
       // 회차별 각도를 한 번만 얹는다. 매 프레임 더하면 감쇠와 싸우다 각도가 계속 자라므로
@@ -2433,6 +2456,8 @@ const TOUCHED = new Set(['contact']);
       netAmp = 0;
       pitch.net.userData.punch(0, 0, 0);
     }
+    // 자세 보간과 접지, 사건 카메라까지 확정된 뒤 보정해야 뒤의 연산이 공을 다시 가리지 않는다.
+    if (tail) clearTailBall(ball.position);
     impact.update(dt, camera);
     // 비행이 아닌 프레임도 같은 배율을 쓴다. 놓인 공과 구르는 공과 잡힌 공이 전부 여기를 지난다.
     if (!ballScaled) {
