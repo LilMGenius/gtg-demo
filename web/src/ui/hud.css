@@ -194,10 +194,12 @@ body.playing #hud{opacity:1}
 
 /* 실점 도장. 흰 장은 0.42초에 끝나 스크린샷에도 눈에도 안 남았다.
    골이 들어간 것은 한 박자 뒤까지 화면에 찍혀 있어야 읽힌다. */
-#stamp{position:fixed;left:50%;top:30%;translate:-50% -50%;pointer-events:none;opacity:0;
+/* 도장은 줄어들지 않는 폭을 예약해 자막이 남은 폭 안에서만 줄바꿈한다. */
+#stamp{pointer-events:none;opacity:0;flex-shrink:0;
   font-family:var(--disp);font-weight:400;font-size:var(--fs-title);color:#ff4d3d;
   -webkit-text-stroke:clamp(4px,.6vw,8px) var(--edge);paint-order:stroke fill;
   text-shadow:5px 6px 0 var(--edge);letter-spacing:.04em;white-space:nowrap}
+#stamp:not(.hit){display:none}
 #stamp.hit{animation:stampHit 1.15s ease-out}
 /* 창이 열려 있으면 사건 단어와 섬광과 자막을 감춘다. 앞의 둘은 #hud 밖에 있어 창 덮개가 안 닿는데,
    글자가 화면 너비의 절반을 쓰므로 어두워져도 창 제목과 한 줄에서 겹쳐 읽힌다.
@@ -209,17 +211,20 @@ body.playing #hud{opacity:1}
    내 정보 첫 단 상자 안으로 13.6px 들어와 그 상자 27390px 중 2488px이 자막 글자였다.
    '골킥 차주는 중'이 '동네형 Lv 2 174cm 88kg' 아래에서 같이 읽힌다. */
 body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is(#stamp,#flash,#caption){animation:none;opacity:0}
+/* 크기와 회전이 예약한 칸을 벗어나면 이웃 문장과 겹친다. 불투명도만 움직여 글자 하한도 지킨다. */
 @keyframes stampHit{
-  0%{opacity:0;rotate:-13deg;scale:2.4}
-  9%{opacity:1;rotate:-7deg;scale:.92}
-  16%{rotate:-9deg;scale:1.04}
-  74%{opacity:1;rotate:-9deg;scale:1.04}
-  100%{opacity:0;rotate:-9deg;scale:1.1}}
+  0%{opacity:0}
+  9%{opacity:1}
+  74%{opacity:1}
+  100%{opacity:0}}
 
 /* 자막은 크로스바 위 하늘에 산다. 공과 같은 높이에 두면 판정을 글자가 덮는다. */
-#caption{position:absolute;left:50%;transform:translateX(-50%);
+#resultHud{position:absolute;left:50%;transform:translateX(-50%);
   top:calc(var(--strip-b) + var(--lift) + var(--gap-1) + env(safe-area-inset-top));
-  width:min(660px,calc(100vw - 2*(var(--pad-r) + 84px)));text-align:center;pointer-events:none;
+  width:min(660px,calc(100vw - 2*(var(--pad-r) + 84px)));
+  display:flex;align-items:center;gap:var(--gap-3);pointer-events:none}
+/* 남은 폭 한 몫을 자막에 주고 최소 내용 폭은 풀어 긴 문장도 줄바꿈한다. */
+#caption{flex:1;min-width:0;text-align:center;pointer-events:none;
   font-family:var(--disp);
   font-size:var(--fs-title);line-height:1.34;font-weight:400;
   -webkit-text-stroke:clamp(3px,.5vw,6px) var(--edge);paint-order:stroke fill;
@@ -233,13 +238,12 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 /* 카운트다운 숫자는 실점 원인이 아니다. 원인 배지와 같은 빨강을 쓰면
    공을 세우는 몇 초가 매번 사고로 읽힌다. 패널색으로 내려 중립으로 둔다. */
 #caption .tick{background:var(--panel);margin-left:2px;transform:rotate(-1.2deg)}
-/* 한 줄이 들어올 때마다 튀어나온다. 페이드만 주면 자막이 조용히 갈리고 반전이 반전으로 안 읽힌다.
-   회전은 -4도. 0도는 UI 알림이고 -12도는 스티커가 된다. */
+/* 문장을 칸 안에서 드러내야 긴 줄과 원인 배지도 등장 중에 서로 겹치지 않는다. */
 #caption>span{display:block;animation:capPop .26s cubic-bezier(.2,1.7,.5,1)}
 @keyframes capPop{
-  0%{opacity:0;transform:scale(.72) rotate(-4deg)}
-  62%{opacity:1;transform:scale(1.15) rotate(-4deg)}
-  100%{opacity:1;transform:scale(1) rotate(-2deg)}}
+  0%{opacity:0}
+  62%{opacity:1}
+  100%{opacity:1}}
 
 /* 지금 걸린 효과는 키퍼 발치와 엄지 조작 사이의 빈 칸을 쓴다.
    더 올리면 키퍼가 좌우로 뻗는 통로를 덮고, 더 내리면 띠와 그림자가 겹친다. */

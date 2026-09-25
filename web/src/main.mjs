@@ -47,6 +47,11 @@ document.addEventListener('visibilitychange', () => {
 window.__telemetry = async () => (await telemetry).snapshot();
 let firstPlayable = false, firstContact = false, completedSet = false, secondSetStarted = false;
 const el = (id) => document.getElementById(id);
+// 도장과 자막을 같은 flex 흐름에 넣어 화면 높이와 문장 길이가 달라도 서로 자리를 예약한다.
+const resultHud = document.createElement('div');
+resultHud.id = 'resultHud';
+el('caption').before(resultHud);
+resultHud.append(el('stamp'), el('caption'));
 const stage = createScene(el('stage'));
 // 계측 훅. 플레이테스트가 이 값을 읽고, 값이 없으면 게이트를 죽인다.
 window.__ballProbe = stage.ballProbe;
@@ -271,6 +276,8 @@ let lastAim = null;
 // 세트 요약은 몇 분에 한 번 나온다. 그 사이 자막이 다 지나가도 사람은 이 줄끼리만 비교한다.
 let lastSetEnd = null;
 
+// 드문 결과도 실제 자막 조립 경로로 재현하여 모든 문장의 사각형을 잰다.
+window.__caption = (line, cause) => say(line, cause);
 function say(line, cause) {
   // 매 줄이 새 요소여야 등장 애니메이션이 다시 돈다. 같은 노드에 글자만 갈면 조용히 바뀐다.
   el('caption').innerHTML = (cause ? '<b>' + (CAUSE_LABEL[cause] || cause) + '</b>' : '')
