@@ -97,6 +97,19 @@ try {
     await tile.locator('progress').evaluate(node => node.remove());
     await restore(CITIES[1], 'saves');
     await page.evaluate(() => { document.querySelector('#shop').scrollTop = 0; document.querySelector('#shop .rack').scrollLeft = 0; });
+    const prices=await page.evaluate(()=>{
+      const read=button=>{const r=button.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,visible:r.width>0&&r.height>0&&r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth};};
+      const buttons=[...document.querySelectorAll('#shop .card[data-spec="city"] .buy')];
+      // 480픽셀 이하는 CSS의 가로 카드 갈래다. 첫 카드는 바로 보이고 뒤 카드는 좌우 스크롤로 읽는다.
+      const shown=innerHeight<innerWidth&&innerHeight<=480?buttons.slice(0,1):buttons;
+      const actual=shown.map(read),first=shown[0],before=first.style.cssText;
+      // 비활성 버튼의 변형 규칙과 전환에도 대조군이 반드시 화면 밖에 서도록 위치를 직접 고정한다.
+      first.style.cssText+=';position:fixed!important;top:100vh!important;left:0!important;transform:none!important;transition:none!important';
+      const rejected=!read(first).visible;first.style.cssText=before;
+      return {actual,rejected};
+    });
+    check('price:initial-viewport:'+width,prices.actual.length>0&&prices.actual.every(row=>row.visible),prices.actual);
+    check('control:price-below-viewport:'+width,prices.rejected,'심은 화면 밖 가격');
     await page.screenshot({ path: new URL('venue-shelf-' + width + 'x' + height + '.jpg', out).pathname.replace(/^\/(\w:)/, '$1'), type: 'jpeg', quality: 85 });
     check('console:' + width, errors.length === 0, errors);
     await context.close();
