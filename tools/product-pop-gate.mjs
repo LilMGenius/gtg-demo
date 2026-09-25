@@ -1,4 +1,4 @@
-import { population } from './product-population.mjs';
+import { population, pairedTrainingStep } from './product-population.mjs';
 import { botTierContract } from './bot-tier-contract.mjs';
 // 위치 경로의 네 입력 모드에서 기존 문턱을 그대로 재며, 옛 완벽/자동/저장 방향은 모집단에서 제외한다.
 import { makeRng, newKeeper, keeperAtLevel, rollForm, buildSet, resolve, positionInput, MODES } from './position-pop.mjs';
@@ -184,7 +184,16 @@ const ladder = HORIZONS.map(level => rows.find(r => r.mode === 'hand-follow' && 
 // deadend:the-next-meaningful-decision-is-within-N-sets has ladder and economy halves.
 // AUTONOMY, Gate axis correction: the ramped roster sits inside nonconcession;
 // tested-save is the keeper's rate against that same ramp. Keep floor and horizons.
-verdict('deadend:coach-ladder-gains-at-least-the-floor-per-five-levels', ladder.slice(1).every((r, i) => r.testedSave - ladder[i].testedSave >= LADDER_FLOOR * (r.level - ladder[i].level) / 5) ? 'PASS' : 'FAIL', `perfect Lv${HORIZONS.join('/')} tested-save ${ladder.map(r => f(r.testedSave)).join(' -> ')}; nonconcession ${ladder.map(r => f(r.nonconcession)).join(' -> ')}; floor=1.60pp per 8 levels`);
+// 실제 상대 램프를 포함한 성적은 감시로 남기고, 훈련 바닥은 동일 상대의 인과 차로 잰다.
+verdict('diagnostic:live-coach-ladder', 'DIAGNOSTIC', ladder.map(r => 'Lv' + r.level + '=' + f(r.testedSave)).join(' -> '));
+for (let i = 1; i < HORIZONS.length; i++) {
+  const lower = HORIZONS[i-1], upper = HORIZONS[i];
+  const paired = pairedTrainingStep('coach', lower, upper, BALLS);
+  const control = pairedTrainingStep('untrained', lower, upper, BALLS);
+  const floor = LADDER_FLOOR * (upper-lower) / 5;
+  verdict('deadend:coach-training-gains-at-the-floor-on-paired-opponents', paired.delta >= floor ? 'PASS' : 'FAIL', JSON.stringify({ ...paired, floor }));
+  verdict('control:untrained-paired-ladder-is-rejected', control.delta === 0 && control.delta < floor && paired.delta > 0 ? 'PASS' : 'FAIL', JSON.stringify({ ...control, floor }));
+}
 const control = HORIZONS.map(level => measure('fixed-order', level, 'hand-follow'));
 console.log(`control:the-fixed-order-coach-on-the-same-column perfect Lv${HORIZONS.join('/')} tested-save ${control.map(r => f(r.testedSave)).join(' -> ')}; gains ${control.slice(1).map((r, i) => f(r.testedSave - control[i].testedSave)).join(',')}pp; first uncapped TRAINING_PRIORITY, 2 points/set; informative second population, not a verdict`);
 

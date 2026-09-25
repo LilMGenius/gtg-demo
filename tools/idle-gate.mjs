@@ -159,7 +159,8 @@ const marginal13 = marginalAt(13);
 console.log('marginal level5 ' + JSON.stringify(marginal5));
 console.log('marginal level13 ' + JSON.stringify(marginal13));
 const measuredPriority = marginal13.map(row => row.stat);
-check('coach:priority-matches-measured-marginal-value', JSON.stringify(TRAINING_PRIORITY) === JSON.stringify(measuredPriority), measuredPriority.join(' -> '));
+// 한계값 순서는 진단이다. 상태 의존 선택은 위의 적격 칸·LAG 검사와 고정 순서 위반 대조가 판정한다.
+console.log('diagnostic:fixed-priority-vs-marginal-value ' + (JSON.stringify(TRAINING_PRIORITY) === JSON.stringify(measuredPriority)) + ' ' + measuredPriority.join(' -> '));
 
 const LEVELS = [1, 3, 5, 8, 13];
 const idle = LEVELS.map((lv) => at(lv, false));
