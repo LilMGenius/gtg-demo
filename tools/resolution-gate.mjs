@@ -9,7 +9,7 @@ const browser=await chromium.launch({executablePath:process.env.LOCALAPPDATA+'/m
 const rows=[],errors=[];
 try{
   for(const pixel of [false,true])for(const [width,height] of [[1280,720],[844,390],[740,360]]){ // 과제의 데스크톱과 두 가로 모바일 화면에서 같은 스위치를 잰다.
-    const dpr=width===844?3:1; // 고밀도 가로 폰에서도 기본 버퍼가 기기 해상도를 그대로 쓰는지 확인한다.
+    const dpr=width===844?3:1; // 고밀도 가로 폰은 DPR 상한과 실제 버퍼를 함께 검증한다.
     const ctx=await browser.newContext({viewport:{width,height},deviceScaleFactor:dpr});await pinClock(ctx);
     const page=await ctx.newPage();page.on('pageerror',e=>errors.push(String(e)));
     await page.goto('http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran'+(pixel?'&pix=1':''));
@@ -26,10 +26,11 @@ try{
         const live=read();c.fillStyle='white';c.fillRect(0,0,cv.width,cv.height);const flat=read();c.putImageData(image,0,0); // 균일 원판을 심어 부드러운 가장자리 측정의 양성 대조군으로 쓴다.
         alpha={live,flat};
       }
-      return {...s,contacts:contacts.length,alpha,pcf:s.shadowType===T.PCFShadowMap};
+      return {...s,resolution:window.__resolutionState(),contacts:contacts.length,alpha,pcf:s.shadowType===T.PCFShadowMap};
     });
     const soft=a=>Boolean(a&&a.center>a.edge&&a.edge===0);
-    const checks={nativeDpr:pixel||actual.dpr===dpr,switch:actual.on===pixel&&actual.filtered===pixel,resolution:pixel?actual.rt[1]<actual.canvas[1]||height<actual.rt[1]:actual.rt.every((v,i)=>v===actual.canvas[i]),stencil:actual.stencil,lights:actual.lights.filter(x=>x==='HemisphereLight').length===1&&actual.lights.filter(x=>x==='DirectionalLight').length===1,pcf:actual.pcf,contacts:actual.contacts>0,soft:soft(actual.alpha?.live),flatControl:!soft(actual.alpha?.flat)}; // 동일 스위치, 실제 버퍼, 두 조명과 접촉 음영을 각각 판정한다.
+    // DPR 상한 2는 Canvas 선행 구현의 기본값이며 하한 1은 CSS 화소를 보존하는 품질 계약이다.
+    const checks={boundedDpr:actual.dpr<=Math.min(dpr,2)&&actual.dpr>=Math.min(dpr,1)&&actual.dpr===actual.resolution.baseDpr*actual.resolution.scale,directCanvas:actual.intermediate===pixel,switch:actual.on===pixel&&actual.filtered===pixel,resolution:pixel?actual.rt[1]<actual.canvas[1]||height<actual.rt[1]:actual.rt.every((v,i)=>v===actual.canvas[i]),stencil:actual.stencil,lights:actual.lights.filter(x=>x==='HemisphereLight').length===1&&actual.lights.filter(x=>x==='DirectionalLight').length===1,pcf:actual.pcf,contacts:actual.contacts>0,soft:soft(actual.alpha?.live),flatControl:!soft(actual.alpha?.flat)}; // 동일 스위치, 실제 버퍼, 두 조명과 접촉 음영을 각각 판정한다.
     rows.push({pixel,width,height,actual,checks});
     if(pixel&&width===1280)await page.screenshot({path:fileURLToPath(new URL('pixel-opt-in-1280x720.jpg',out)),type:'jpeg',quality:85}); // 선택한 픽셀판도 같은 크기의 JPEG 증거로 남긴다.
     const errorStart=errors.length;

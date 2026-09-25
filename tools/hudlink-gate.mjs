@@ -4,7 +4,7 @@ import { readFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { HUD_LINKS } from '../web/src/ui/links.mjs';
 
-// Reuses keys-gate's Playwright browser, presets and served-parent route control.
+// keys 게이트의 브라우저와 프리셋, 과거 파일 응답 대조군을 재사용한다.
 const ROOT = new URL('../', import.meta.url);
 const BASE = 'http://127.0.0.1:10310/web/index.html';
 const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
@@ -38,7 +38,7 @@ try {
     p.setDefaultTimeout(8000);
     p.on('pageerror', (e) => errors.push(e.message));
     if (mode) {
-      const paths = mode === 'baseline' ? ['web/index.html', 'web/src/main.mjs', 'web/src/ui/hud.css'] : ['web/src/main.mjs'];
+      const paths = ['web/index.html', 'web/src/main.mjs', 'web/src/ui/hud.css'];
       for (const path of paths) {
         // The 24px target floor owns geometry; the older routing failure remains the behavior control.
         const body = parent(path, mode === 'baseline' ? 'e373e2f' : '1e46fcd');
@@ -47,7 +47,14 @@ try {
         }));
       }
     }
+    // 과거 진입점의 의존 모듈 전체를 같은 커밋에서 읽는다.
+    if (mode) await p.route(/\/(?:web\/src|src)\/.*\.mjs(?:\?.*)?$/, route => {
+      const path = new URL(route.request().url()).pathname.slice(1);
+      return route.fulfill({contentType:'text/javascript', body:parent(path, mode === 'baseline' ? 'e373e2f' : '1e46fcd')});
+    });
+    const bootError = new Promise((_, reject) => p.once('pageerror', e => reject(new Error('boot: ' + e.message))));
     await p.goto(BASE + '?seed=20&preset=rich,famous,veteran');
+    await Promise.race([bootError, p.waitForFunction(() => typeof window.__lockRound === 'function')]);
     await p.click('#go', { force: true });
     await p.waitForFunction(() => document.getElementById('title').hidden && getComputedStyle(document.getElementById('hud')).opacity === '1');
     await p.evaluate(() => { window.__lockRound(); return document.fonts.ready; });

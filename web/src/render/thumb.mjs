@@ -8,7 +8,7 @@ import * as THREE from "../../vendor/three.module.min.js";
 import { buildKeeper, buildKicker, setPose, POSES } from "./objects/actors.mjs";
 import { faceOf } from "../../../src/roster.mjs";
 import { meshPanel, buildPassers } from "./objects/pitch.mjs";
-import { placeCardGeo, venueCrowd } from "./objects/places.mjs";
+import { placeCardGeo } from "./objects/places.mjs";
 import { flatVertex, mergeGeos } from "./units.mjs";
 import { skinAt, placeAt } from "../state/gear.mjs";
 
@@ -36,7 +36,7 @@ const CARD_H = 269;
 const sizeOf = (kind) => ((kind === "body" || kind === "kicker") ? [BODY_W, BODY_H]
   : kind === "bot" || kind === "buff" ? [CARD_W, CARD_H] : [BAKE_W, BAKE_H]);
 
-// 착용 카드는 아래 wornCamera가 관절 봉투를 맞춘다. 이 표는 다른 카드와 옛 겨냥 대조군도 지원한다.
+// 상품마다 봐야 할 곳이 다르다. 장갑을 온몸 썸네일로 보여 주면 손은 여덟 화소가 된다.
 // part는 무엇을 겨냥하는지, dist는 그 부위가 칸을 채우는 거리, lift는 시선 높이 보정,
 // high는 눈높이 배율이다. 파는 면이 위에 있으면 내려다보고 밑에 있으면 올려다본다.
 const AIM = {
@@ -56,7 +56,7 @@ const AIM = {
      어깨는 같이 들어온다. 고정 보정이 지키려던 것이 어깨인데 실측으로 그 보정이 어깨를 이미
      잘랐다. 스펀지를 넣은 저지가 키 188에서 위팔 상자 위끝 -0.131이고 키 205에서는 네 등급이
      전부 칸 밖이었다. 목을 잡으면 그 위끝이 가장 높은 칸에서도 0.145라 어깨가 칸에 남는다. */
-  pads: { part: "neck", dist: 2.1, lift: 0.1, high: 0.1, yaw: -0.35 }, // 각도 -0.35로 양쪽 어깨 패드가 서로 가려지지 않게 한다.
+  pads: { part: "neck", dist: 1.7, lift: 0, high: 0.1 },
   socks: { part: "shin", dist: 1.05, lift: 0.02 },
   // 겨냥점은 머리 한가운데인데 파는 것은 그 위에 얹힌 껍데기다. 보정 없이 잡으면
   // 모히칸의 무게중심이 칸 위에서 13퍼센트 지점에 걸려 볏이 잘린다.
@@ -69,8 +69,8 @@ const AIM = {
      942까지 떨어져 thumb의 하한 1000을 깼고 무게중심이 위쪽 0.12까지 올라갔다.
      정사각으로 되돌리는 갈래는 버렸다. contain이 96x96으로 줄여 넣어 옛 결함이 돌아온다. */
   // 머리와 같은 거리에서 얼굴 중심을 잡아 턱수염과 면도를 함께 비교한다.
-  beard: { part: "head", dist: 1.35, lift: 0, high: 0, yaw: 0.24 }, // 머리 반경 확대에 맞춰 턱 전체를 담는다.
-  hair: { part: "head", dist: 1.35, lift: 0.17, high: 0 }, // 키트 머리 배율만큼 정수리 여백을 함께 늘린다.
+  beard: { part: "head", dist: 0.8, lift: 0, high: 0 },
+  hair: { part: "head", dist: 0.8, lift: 0.1, high: 0 },
   /* 파는 것은 팔이 아니라 팔에 새긴 그림이다. 겨냥점이 어깨 관절이라 lift가 그 아래
      위팔 한가운데를 잡고, 0.58에서는 칸의 대부분을 소매와 유니폼이 먹어 무늬가 위쪽
      귀퉁이에 손톱만 하게 걸린다. 실측: 세 유료 등급의 무늬가 칸의 16.6과 18.4와
@@ -81,7 +81,7 @@ const AIM = {
      0등급은 무늬가 없어 그 몫이 0이고, 그것이 맨살을 맨살로 읽히게 하는 대조군이다.
      키는 178에서 198까지 갈리는데 그 폭 전부에서 74.9퍼센트 아래로 안 내려간다.
      각을 여기 다는 이유는 도는 그림이 이 각에서 출발하기 때문이다. yawOf가 여기서 읽는다. */
-  ink: { part: "arm", dist: 0.32, lift: -0.1, high: 0.06, yaw: 0 }, // 정면 각도 0으로 팔의 길이를 원근 축약 없이 보여 준다.
+  ink: { part: "arm", dist: 0.32, lift: -0.1, high: 0.06, yaw: -0.95 },
   /* 탈의실의 온몸. 부위가 아니라 사람을 보여 준다. 무엇을 걸쳤는지가 아니라
      걸친 뒤의 내가 어떻게 보이는지가 이 칸이 답하는 질문이다.
      겨냥은 머리다. 몸통을 잡으면 카메라가 허리를 보고 정수리는 프레임 위로 밀린다
@@ -92,7 +92,7 @@ const AIM = {
      -0.675는 프레임 가운데를 머리 아래 몸통 중간에 놓아 발까지 담는 보정이다.
      내려다보지 않는다. 기본 눈높이 0.22로 잡으면 정수리를 위에서 보게 되어
      온몸 그림이 머리 뚜껑부터 시작한다. */
-  body: { part: "head", dist: 5.4, lift: -0.74, high: 0 } // 큰 머리를 포함한 전신과 발끝 여백을 확보한다.
+  body: { part: "head", dist: 4.73, lift: -0.675, high: 0 }
   ,
   /* 개봉 카드의 한 사람. 탈의실 칸은 정사각인데 카드는 세로로 길어서, 같은 그림을 잘라 키우면
      위아래가 남고 좌우가 깎인다. 그러면 머리가 프레임 밖으로 나간다.
@@ -104,14 +104,13 @@ const AIM = {
      한 겨냥으로 셋을 다 먹인다. 키퍼의 얼굴은 +z를 보므로 카메라도 +z에 서야 한다.
      yaw 0이 그 자리이고, 0.24만큼 틀어야 코와 귀가 실루엣을 만든다.
      겨냥점은 머리다. 몸통을 잡고 올려 맞추면 키가 다른 선수마다 얼굴이 다른 높이에 걸린다. */
-  face: { part: "head", dist: 1.06, lift: 0.034, high: 0.06, yaw: 0.24 } // 키트의 머리 확대 비율로 초상 거리와 중심을 맞춘다.
+  face: { part: "head", dist: 0.62, lift: 0.02, high: 0.06, yaw: 0.24 }
 };
-
-// 키커 전신도 시착실과 같은 프레임을 쓰되 선수 얼굴과 키커 몸을 그린다.
-AIM.kicker = AIM.body;
 
 /* 골대와 동네는 몸에 안 걸친다. 사람을 겨냥하는 AIM으로는 못 찍으므로 장면 조각을 따로 세운다.
    두 칸 다 등급이 화면을 바꾸는 물건이라, 파는 것이 곧 그 장면의 모습이다. */
+// 전설 선수도 승인된 전신 구도로 자기 얼굴과 키커 옷을 보여 준다.
+AIM.kicker = AIM.body;
 let sceneRig = null;
 
 function clearScene() {
@@ -172,19 +171,23 @@ function cityRig(pick) {
     new THREE.MeshLambertMaterial({ color: place.ground }));
   ground.rotation.x = -Math.PI / 2;
   grp.add(ground);
-  // 시설 자체가 지평선을 만든다. 별도 도심 건물을 얹으면 잔디 구장과 스타디움이 같은 도시로 읽힌다.
+  /* 지평선 한 조각. 인원과 하늘만으로는 네 칸이 같은 장소의 다른 시간대로 읽혔다.
+     경기장과 같은 규칙으로 등급이 높을수록 건물이 솟는다. 다섯 동이면 칸 폭을 채우고,
+     행인 뒤에 서므로 사람을 안 가린다. 다섯을 한 지오메트리로 붙여 칸 하나가 메시 하나다. */
+  const far = [];
+  for (let i = 0; i < 5; i += 1) {
+    const h = (1.6 + (i % 3) * 0.7) * place.rise;
+    const b = new THREE.BoxGeometry(1.5, h, 1.2);
+    b.translate(-3.2 + i * 1.6, h / 2, -10.4);
+    far.push(b);
+  }
+  grp.add(new THREE.Mesh(mergeGeos(far), new THREE.MeshLambertMaterial({ color: place.fence })));
   /* 그 동네의 물건. 밟는 면과 지평선 높이만 갈리던 동안 네 칸이 색만 다른 같은 벌판이었다.
      경기장 배치를 그대로 담으면 60m짜리 담이 이 칸에서 실 한 오라기가 되므로, 칸의 배치는
      places.mjs가 따로 쥔다. 어느 동네인지는 한 곳이 정하고 어떻게 담을지만 칸마다 다르다.
      굽고 나면 clearScene이 이 리그의 지오메트리를 버린다. 사본을 주지 않으면 같은 칸을
      두 번째로 구울 때 이미 버려진 지오메트리를 그리게 된다. */
   grp.add(new THREE.Mesh(placeCardGeo(rank).clone(), flatVertex(0xffffff)));
-  // 프로 관중은 시설 카드와 같은 배율로 옮겨 관람석 위에 앉힌다.
-  if(rank===3){
-    const crowd=venueCrowd();
-    crowd.scale.set(0.45,0.7,0.3);crowd.rotation.y=Math.PI;crowd.position.z=3;
-    grp.add(crowd);
-  }
   // 행인 수는 경기장과 같은 식으로 센다. 다섯에서 시작해 등급마다 둘씩 는다.
   const n = PASSER_BASE + PASSER_STEP * rank;
   const who = buildPassers(grp, n, rank, pick && pick.skin);
@@ -250,7 +253,7 @@ function botRig(pick, keeper) {
   grp.add(spine);
   /* 온몸이 아니라 머리부터 허리까지 잡는다. 서 있는 사람을 가로 칸에 통째로 담으면
      사람이 칸 폭의 16퍼센트만 쓰고, 그 크기에서 회로는 점 몇 개가 된다. */
-  return { grp, body, at: new THREE.Vector3(0, h * 0.7, 0), dist: h, high: 0.04 };
+  return { grp, at: new THREE.Vector3(0, h * 0.7, 0), dist: h, high: 0.04 };
 }
 
 /* 버프 한 통. 마시고 뿌리고 던지는 물건이라 손에 쥐는 그 하나가 곧 상품이다.
@@ -317,77 +320,12 @@ function boot() {
     R.setSize(BAKE_W, BAKE_H, false);
   scene = new THREE.Scene();
   // 경기장과 같은 빛을 쓴다. 상점에서 본 색과 화면에서 신은 색이 다르면 산 것이 다른 물건이 된다.
-  scene.add(new THREE.HemisphereLight(0xe7f4ff, 0x9b9384, 2.1));
-  const key = new THREE.DirectionalLight(0xffedce, 3.2);
+  scene.add(new THREE.HemisphereLight(0xdfe8ef, 0x2b2a24, 1.15));
+  const key = new THREE.DirectionalLight(0xffffff, 1.25);
   key.position.set(-1.4, 2.2, 1.8);
   scene.add(key);
     // 세로 화각이 프레임을 정한다. 가로로 넓히면 담기는 폭만 늘고 물건 높이는 그대로다.
     cam = new THREE.PerspectiveCamera(32, BAKE_W / BAKE_H, 0.01, 40);
-}
-
-// 착용 상품은 실제 관절과 메시의 봉투를 함께 담는다. Three.js MIT Box3의 경계를 원근 화각에 맞춘다.
-const WORN = new Set(["grip", "studs", "pads", "socks", "ink", "hair", "beard"]);
-function previewPose(kind, body) {
-  // 어깨를 옆으로 1.4라디안 벌리고 팔꿈치를 0.1만큼 꺾어 팔과 무늬를 가로로 크게 보여 준다.
-  if (kind === "ink") setPose(body, {...POSES.ready, shL:[0, 0, -1.4], elL:[0, 0, 0.1]});
-  if (kind === "hair") setPose(body, {...POSES.ready, neck:[0.4, 0, 0]}); // 목을 0.4만큼 숙여 정수리 형태와 눈을 함께 보여 준다.
-  if (kind === "grip") setPose(body, POSES.clutch); // 잡은 손을 얼굴 가까이 올리는 기존 자세를 재사용한다.
-  if (kind === "studs" || kind === "socks") {
-    // 허벅지 -2.6은 발을 가슴까지 올리고 벌림 -0.35와 무릎 0.3은 신발이 얼굴을 가리지 않게 한다.
-    setPose(body, {...POSES.ready, hipL: [kind === "socks" ? -2.85 : -2.6, 0, -0.35], knL: [kind === "socks" ? 0.1 : 0.3, 0, 0]}); // 양말은 허벅지 -2.85와 무릎 0.1로 더 들어 정강이를 카드 가운데에 둔다.
-  }
-
-}
-function surfacePoints(object) {
-  const points = [];
-  object.traverse(o => {
-    if (!o.isMesh || !o.visible) return;
-    const pos = o.geometry.attributes.position;
-    for (let i = 0; i < pos.count; i++) points.push(new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld));
-  });
-  return points;
-}
-function shoulderPoints(body) {
-  return body.userData.arms.map(sh => sh.children.filter(ch => ch.isMesh && ["SphereGeometry", "BoxGeometry"].includes(ch.geometry.type)).flatMap(surfacePoints));
-}
-function wornCamera(kind, body, yaw, detailOnly = false, extra = []) {
-  const points = detailOnly ? [] : surfacePoints(body.userData.head).concat(...shoulderPoints(body));
-  points.push(...extra);
-  const add = object => points.push(...surfacePoints(object));
-  const j = body.userData.joints;
-  if (kind === "grip") for (const glove of body.userData.gloves) add(glove);
-  if (kind === "studs") add(body.userData.boots[0]);
-  if (kind === "socks") for (const ch of j.knL.children) if (ch.isMesh) add(ch);
-  // 실제 팔 전체를 담아 위팔의 무늬와 팔꿈치, 아래팔, 손목이 한 방향으로 이어지게 한다.
-  if (kind === "ink") add(j.shL);
-  const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-  const viewPoints = points.map(p => new THREE.Vector3(p.dot(right), p.y, p.dot(forward)));
-  if (kind === "pads") {
-    // 짧은 몸에서도 얼굴 밑에 저지가 남도록 골반의 척추 원점까지 담는다.
-    const chest = j.spine.getWorldPosition(new THREE.Vector3()).lerp(j.neck.getWorldPosition(new THREE.Vector3()), 0.15); // 아래 15% 지점까지 담아 턱 여백과 헐렁한 면티의 밑단을 함께 보존한다.
-    viewPoints.push(new THREE.Vector3(chest.dot(right), chest.y, chest.dot(forward)));
-  }
-  if (kind === "hair") {
-    // 머리 반경의 0.75만큼 정수리 여백을 확보해 짧은 헤어도 카드 위쪽 변에 붙지 않게 한다.
-    const top = viewPoints.reduce((a, p) => p.y > a.y ? p : a).clone();
-    top.y += body.userData.head.geometry.parameters.radius * 0.75;
-    viewPoints.push(top);
-  }
-  const center = new THREE.Box3().setFromPoints(viewPoints).getCenter(new THREE.Vector3());
-  const at = right.clone().multiplyScalar(center.x).addScaledVector(forward, center.z);
-  at.y = center.y;
-  const tanY = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)); // 반각으로 실제 표면의 원근 경계를 푼다.
-  const tanX = tanY * cam.aspect;
-  let distance = 0;
-  for (const p of viewPoints) {
-    const q = p.clone().sub(center);
-    distance = Math.max(distance, q.z + Math.max(Math.abs(q.x) / tanX, Math.abs(q.y) / tanY));
-  }
-  distance *= kind === "pads" ? 1.12 : 1.04; // 상의는 큰 키의 턱과 회전한 어깨 상자를 12% 여백으로 담고 나머지는 기존 4%를 유지한다.
-  cam.position.copy(at).addScaledVector(forward, distance);
-  cam.lookAt(at);
-  cam.userData.distance = distance;
 }
 
 function partPoint(k, part) {
@@ -422,9 +360,6 @@ export function yawOf(kind, aim) {
 // over는 겨냥 한 칸만 덮어쓰는 자리다. 계기가 반사실을 구울 때만 쓰고, 화면은 안 쓴다.
 function frame(kind, keeper, look, yaw, over) {
   boot();
-  delete cam.userData.portrait;
-  delete cam.userData.inkDetail;
-  cam.clearViewOffset();
   /* 프레임 비율은 칸마다 다르다. 세로로 긴 피사체를 가로 칸에 구우면 담기는 것은 사람이 아니라 여백이다.
      크기가 그대로면 아무것도 안 한다. 매번 다시 잡으면 굽는 한 장마다 그리기 버퍼를 새로 만든다. */
   const [fw, fh] = sizeOf(kind);
@@ -433,8 +368,6 @@ function frame(kind, keeper, look, yaw, over) {
     cam.aspect = fw / fh;
     cam.updateProjectionMatrix();
   }
-  cam.aspect = fw / fh;
-  cam.updateProjectionMatrix();
   // 장면 칸은 AIM 겨냥을 안 쓴다. 무엇을 겨냥할 몸이 없거나, 몸 자체가 상품이기 때문이다.
   if (SCENE[kind]) {
     if (rig) { scene.remove(rig); rig = null; }
@@ -450,12 +383,6 @@ function frame(kind, keeper, look, yaw, over) {
     // 눈높이는 칸이 정한다. 골대와 행인은 크기가 여섯 배 차이라 같은 각으로 보면 한쪽이 늘 잘린다.
     cam.position.set(made.at.x + Math.sin(a) * made.dist, made.at.y + made.dist * made.high, made.at.z + Math.cos(a) * made.dist);
     cam.lookAt(made.at);
-    if (kind === "bot") {
-      rig = made.body;
-      sceneRig.updateMatrixWorld(true);
-      // 가슴 표식은 몸통의 형제가 아니라 장면 그룹에 붙으므로 그 실제 정점도 봉투에 넣는다.
-      wornCamera("pads", rig, a, false, sceneRig.children.filter(o => o.isMesh).flatMap(surfacePoints));
-    }
     R.render(scene, cam);
     return;
   }
@@ -464,11 +391,11 @@ function frame(kind, keeper, look, yaw, over) {
   if (rig) scene.remove(rig);
   rig = kind === "kicker" ? buildKicker(faceOf(keeper.name)) : buildKeeper(keeper.height, keeper.weight, look);
   if (kind === "kicker") {
-    setPose(rig, POSES.ready); // 시착 카드처럼 두 발을 딛고 선수 얼굴과 차림을 보여 준다.
-    rig.rotation.y = Math.PI; // 키커 얼굴은 로컬 -z이므로 초상 카메라를 향해 반 바퀴 돌린다.
-    rig.scale.set(keeper.weight / 84, keeper.height / 188, keeper.weight / 84); // 시착실 기준 체격에 대한 명단의 상대 비율로 세 선수의 체격을 구별한다.
+    setPose(rig, POSES.ready);
+    rig.rotation.y = Math.PI; // 키커의 로컬 얼굴 방향을 미리보기 카메라에 맞춘다.
+    // 시착실 기본 체격 84와 188에 대한 기존 명단 비율이다.
+    rig.scale.set(keeper.weight / 84, keeper.height / 188, keeper.weight / 84);
   }
-  if (WORN.has(kind) && !(over && (over.part || over.dist || over.lift !== undefined || over.high !== undefined))) previewPose(kind, rig);
   rig.updateMatrixWorld(true);
   scene.add(rig);
   const aim = Object.assign({}, AIM[kind] || { part: "torso", dist: 1.3, lift: 0 }, over || {});
@@ -478,47 +405,7 @@ function frame(kind, keeper, look, yaw, over) {
   const high = aim.high === undefined ? 0.22 : aim.high;
   cam.position.set(at.x + Math.sin(a) * aim.dist, at.y + aim.dist * high, at.z + Math.cos(a) * aim.dist);
   cam.lookAt(at);
-  cam.userData.distance = aim.dist;
-  if (WORN.has(kind) && !(over && (over.part || over.dist || over.lift !== undefined || over.high !== undefined))) wornCamera(kind, rig, a);
-  if (kind === "ink" && !(over && (over.part || over.dist || over.lift !== undefined || over.high !== undefined))) {
-    tattooFrame(a, fw, fh);
-  } else R.render(scene, cam);
-}
-
-// 문신은 확대 면과 착용자를 한 카드에 함께 둔다. 관절을 따라가므로 체격이 바뀌어도 잘리지 않는다.
-const INK_DETAIL_SHARE = 0.78; // 가로로 편 팔에 78%를 주면 같은 높이에서 무늬를 키우고 나머지 22%에 인물 축을 남긴다.
-function tattooFrame(yaw, width, height) {
-  const split = Math.round(width * INK_DETAIL_SHARE);
-  const portraitWidth = width - split;
-  cam.aspect = portraitWidth / height;
-  cam.updateProjectionMatrix();
-  wornCamera("ink", rig, yaw);
-  const portrait = cam.clone();
-  cam.aspect = split / height;
-  cam.updateProjectionMatrix();
-  // 기존 표면 경계 맞춤을 실제 팔 전체에 적용한다. 관절 길이만으로 거리를 잡지 않는다.
-  wornCamera("ink", rig, yaw, true);
-  const detail = cam.clone(); detail.updateMatrixWorld(true); // 팔 상자도 실제 확대 창의 카메라로 투영한다.
-  R.setScissorTest(true);
-  R.setViewport(portraitWidth, 0, split, height); R.setScissor(portraitWidth, 0, split, height);
-  // 상세 창에는 실제 팔과 손을 남긴다. 몸통과 반대 팔이 무늬나 손목을 가리지 않게 한다.
-  const armParts = new Set();
-  rig.userData.joints.shL.traverse(part => { if (part.isMesh) armParts.add(part); });
-  const hidden = [];
-  rig.traverse(part => {
-    if (part.isMesh && part.visible && !armParts.has(part)) {
-      hidden.push(part);
-      part.visible = false;
-    }
-  });
   R.render(scene, cam);
-  for (const part of hidden) part.visible = true;
-  cam.copy(portrait);
-  R.setViewport(0, 0, portraitWidth, height); R.setScissor(0, 0, portraitWidth, height);
-  R.render(scene, cam);
-  R.setScissorTest(false); R.setViewport(0, 0, width, height);
-  cam.userData.portrait = {x:0, width:portraitWidth / width};
-  cam.userData.inkDetail = {camera:detail, x:portraitWidth / width, width:split / width};
 }
 
 // over는 굽는 각을 덮어쓰는 자리다. 계기가 반사실을 구울 때만 쓰고, 화면은 안 쓴다.
@@ -604,26 +491,24 @@ export function armBox(kind, keeper, look) {
     n += 1;
   }
   if (!n) return null;
-  const viewport = kind === 'ink' ? cam.userData.inkDetail : null;
-  const projection = viewport ? viewport.camera : cam;
   const v = new THREE.Vector3();
   let x0 = 1;
   let x1 = -1;
   let y0 = 1;
   let y1 = -1;
   for (let i = 0; i < 8; i += 1) {
-    v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).project(projection);
+    v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).project(cam);
     x0 = Math.min(x0, v.x);
     x1 = Math.max(x1, v.x);
     y0 = Math.min(y0, v.y);
     y1 = Math.max(y1, v.y);
   }
-  return { parts: n, x0: (viewport?.x || 0) + (x0 + 1) / 2 * (viewport?.width || 1), x1: (viewport?.x || 0) + (x1 + 1) / 2 * (viewport?.width || 1), y0: (1 - y1) / 2, y1: (1 - y0) / 2,
+  return { parts: n, x0: (x0 + 1) / 2, x1: (x1 + 1) / 2, y0: (1 - y1) / 2, y1: (1 - y0) / 2,
     url: R.domElement.toDataURL("image/png") };
 }
 
 export function headBox(kind, keeper, look, over) {
-  if (!AIM[kind] && kind !== "bot") return null;
+  if (!AIM[kind]) return null;
   frame(kind, keeper, look, undefined, over);
   const head = rig && rig.userData.head;
   if (!head) return null;
@@ -632,8 +517,7 @@ export function headBox(kind, keeper, look, over) {
   const r = head.geometry.parameters.radius;
   const crown = at.clone();
   crown.y += r;
-  const port = cam.userData.portrait;
-  const to = (v) => ({ x: (port?.x || 0) + (v.x + 1) / 2 * (port?.width || 1), y: (1 - v.y) / 2 });
+  const to = (v) => ({ x: (v.x + 1) / 2, y: (1 - v.y) / 2 });
   const mid = to(at.clone().project(cam));
   const top = to(crown.clone().project(cam));
   const ry = Math.abs(mid.y - top.y);
@@ -656,15 +540,5 @@ export function headBox(kind, keeper, look, over) {
   }
   // 쓴 거리를 같이 돌려준다. 계기가 반사실을 구울 때 겨냥 상수를 옮겨 적지 않아도 된다.
   return { x: mid.x, y: mid.y, ry, rx: ry * (R.domElement.height / R.domElement.width), eyes, mouth,
-    dist: cam.userData.distance, url: R.domElement.toDataURL("image/png") };
-}
-
-// 착용 카드의 두 어깨를 실제 구 메시 봉투로 읽는다. 상품 축과 별개인 착용자 축의 계기다.
-export function wearerBox(kind, keeper, look, over) {
-  const head = headBox(kind, keeper, look, over);
-  const shoulders = shoulderPoints(rig).map(points => points.map(p => {
-    const q = p.clone().project(cam);
-    return {x:(cam.userData.portrait?.x || 0) + (q.x + 1) / 2 * (cam.userData.portrait?.width || 1), y:(1 - q.y) / 2}; // 장치 좌표를 카드 좌상단 기준으로 바꾼다.
-  }));
-  return {head, shoulders};
+    dist: Object.assign({}, AIM[kind], over || {}).dist, url: R.domElement.toDataURL("image/png") };
 }

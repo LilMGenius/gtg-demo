@@ -88,8 +88,9 @@ try {
     const scene=new T.Scene();scene.background=new T.Color(0xdce6df); // 얼굴과 소품 색을 가리지 않는 중립 배경이다.
     scene.add(new T.HemisphereLight(0xe7f4ff,0x9b9384,2.1)); // 키트 반구광이다.
     const key=new T.DirectionalLight(0xffedce,3.2);key.position.set(-4,8,5);scene.add(key); // 키트의 단일 주광이다.
-    const variants=a.PASSER_VARIANTS.filter(v=>!['keeper','kicker'].includes(v.id));
-    variants.forEach((v,i)=>{const rig=a.buildWalker(v);a.poseWalker(rig,0.12,{heading:0,time:1});rig.root.position.x=(i-3)*1.65;scene.add(rig.root);}); // 같은 보폭의 정면에서 일곱 차림을 나란히 세운다.
+    const {buildPassers}=await import('/web/src/render/objects/pitch.mjs');
+    const bodies=buildPassers(scene,7,3); // 최상위 풀의 일곱 차림을 승인된 몸으로 비교한다.
+    bodies.forEach((body,i)=>{a.poseWalker(body.userData.walker,0.12,{heading:0,time:1});body.position.set((i-3)*1.65,0,0);}); // 기존 비교판 간격과 보폭이다.
     const cam=new T.PerspectiveCamera(34,1280/480,0.1,100);cam.position.set(0,2.6,8.8);cam.lookAt(0,1.2,0); // 머리부터 발끝까지 한 장에 남기는 비교용 카메라다.
     renderer.render(scene,cam);
   });

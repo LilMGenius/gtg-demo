@@ -193,7 +193,7 @@ export const MAX_FRAME = GOALS.length - 1;
 // 무광 흙·인조잔디·잔디·프로 잔디의 채도를 낮춘 제품 팔레트이며 실제 구장의 색 실측은 아니다.
 export const CITIES = [
   { city: 0, name: '동네 운동장', cost: 0, note: '아무것도 안 샀을 때 서 있는 곳. 지나가는 사람이 거의 없다',
-    ground: 0xa68b60, fence: 0x3f6b4a, rise: 0.55 },
+    ground: 0x9c7a4a, fence: 0x3f6b4a, rise: 0.55 },
   { city: 1, name: '풋살장', cost: 145, note: '하교 시간에 사람이 지나간다. 가끔 고개가 돌아간다',
     ground: 0x527d60, fence: 0x6b6f5a, rise: 0.8 },
   { city: 2, name: '잔디 축구장', cost: 385, note: '유동인구가 많다. 막으면 소문이 빨리 난다',

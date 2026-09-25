@@ -74,9 +74,7 @@ try {
   const chrome = await p.evaluate(() => {
     const W = innerWidth, H = innerHeight;
     let area = 0;
-    for (const id of ["top", "out", "auto", "caption"]) {
-      const el = document.getElementById(id);
-      if (!el) continue;
+    for (const el of document.querySelectorAll("#top,#auto,#caption,.move-arrow")) {
       const r = el.getBoundingClientRect();
       area += Math.max(0, r.width) * Math.max(0, r.height);
     }
@@ -89,9 +87,7 @@ try {
     const W = innerWidth, H = innerHeight;
     const box = { x0: W * 0.3, x1: W * 0.7, y0: H * 0.3, y1: H * 0.7 };
     let area = 0;
-    for (const id of ["top", "out", "auto", "caption"]) {
-      const el = document.getElementById(id);
-      if (!el) continue;
+    for (const el of document.querySelectorAll("#top,#auto,#caption,.move-arrow")) {
       const r = el.getBoundingClientRect();
       const w = Math.max(0, Math.min(r.right, box.x1) - Math.max(r.left, box.x0));
       const h = Math.max(0, Math.min(r.bottom, box.y1) - Math.max(r.top, box.y0));
@@ -105,8 +101,8 @@ try {
   await p.setViewportSize({ width: 740, height: 360 });
   await p.waitForTimeout(500);
   const overlaps = await p.evaluate(() => {
-    const ids = ["top", "out", "auto", "caption"];
-    const rs = ids.map((id) => [id, document.getElementById(id).getBoundingClientRect()]);
+    // 돌진 단추 대신 현재 좌우 이동 단추 각각의 실제 상자를 잰다.
+    const rs = [...document.querySelectorAll("#top,#auto,#caption,.move-arrow")].map(el => [el.id || el.dataset.move, el.getBoundingClientRect()]);
     const hit = [];
     for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) {
       const [ai, a] = rs[i], [bj, c] = rs[j];
@@ -117,6 +113,8 @@ try {
     }
     return hit;
   });
+  // 좌우 두 방향이 모두 있어야 이동 조작을 빠뜨린 빈 표본이 아니다.
+  check("instrument:both-movement-buttons-stand", await p.locator(".move-arrow").count() === 2, "left and right");
   check("layout:no-overlap-at-740x360", overlaps.length === 0, overlaps.join(",") || "none");
   await p.setViewportSize({ width: 1280, height: 720 });
   await p.waitForTimeout(400);
@@ -162,7 +160,8 @@ try {
   };
   // 8%. 66px 판때기에 3px 격자로 그린 두툼한 픽셀 아이콘은 15~25%대가 나온다.
   // 8%는 그 아래 절반이라, 아이콘이 한 조각만 남아도 잡히는 자리다.
-  for (const id of ["out", "auto"]) {
+  // 이동은 글리프이고 자동은 픽셀 그림이므로 SVG 잉크 축은 자동 단추에 적용한다.
+  for (const id of ["auto"]) {
     const cover = await ink(id);
     check("icon:" + id + "-drawn-over-8pct", cover >= 0.08, (cover * 100).toFixed(1) + "%");
   }
@@ -181,7 +180,7 @@ try {
       }
       return t;
     };
-    return ["out", "auto"].map((id) => {
+    return ["auto"].map((id) => {
       const el = document.getElementById(id);
       return { id, text: vis(el).trim(), label: el.getAttribute("aria-label") || "" };
     });

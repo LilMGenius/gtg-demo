@@ -2,6 +2,11 @@ import { chromium } from "playwright";
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { pinClock } from "./clock.mjs";
+import { makeRng, newKeeper, rollForm, buildSet, botPlan, positionInput } from "./position-pop.mjs";
+import { resolve as judge } from "../src/chain.mjs";
+import { defaultEleven, kickerByName } from "../src/roster.mjs";
+import { applyPreset } from "../web/src/state/inject.mjs";
+import { aimLine } from "../web/src/ui/callout.mjs";
 
 // 사건이 언제 시작하는가의 자. 판정은 공이 날아가기 전에 이미 끝나 있고 화면은 그것을 연기한다.
 // 그런데 첫 사건이 착탄 0.9초 뒤에 시작해서, 막은 공은 흙에 서 있다가 장갑으로 뛰어오르고
@@ -142,6 +147,30 @@ try {
     seen.push(url.split("seed=")[1].split("&")[0] + ":" + got.length);
     for (const x of got) all.push(x);
   }
+  // 현재 판정으로 첫 슛이 헛구인 시드만 후보로 고른 뒤, 실제 브라우저 다섯 구로 확인한다.
+  // 무입력 자취는 position-pop의 중앙 고정 정책을 재사용하며 결과를 주입하지 않는다.
+  const predictsWide = seed => {
+    const rng = makeRng(seed), keeper = newKeeper();
+    applyPreset("maxed", {squad:[keeper],pick:0});
+    rollForm(keeper, rng);
+    const shot = buildSet(rng, keeper.level, 0, defaultEleven().map(kickerByName))[0];
+    botPlan(keeper, shot, rng);
+    aimLine(shot.kicker, rng, null);
+    return judge({keeper, shot, rng, input:positionInput(keeper, shot, rng, "hand-centre")})
+      .events[0].t === "wide";
+  };
+  // 원래 축의 최소 두 헛구를 채울 때까지 시드를 탐색한다. 실제 관측만 모집단에 센다.
+  for (let seed = 1; all.filter(x => x.kind === "wide").length <= 1; seed += 1) {
+    if (PAGES.some(url => Number(new URL(url).searchParams.get("seed")) === seed) || !predictsWide(seed)) continue;
+    const url = new URL(PAGES[0]);
+    url.searchParams.set("seed", String(seed));
+    PAGES.push(url.href);
+    const got = starts(await watch(url.href), String(seed));
+    seen.push(seed + ":" + got.length);
+    all.push(...got);
+    console.log("instrument:seed-search seed=" + seed + " balls=" + got.length
+      + " wide=" + got.filter(x => x.kind === "wide").length + " " + elapsed());
+  }
   const touched = all.filter((x) => TOUCHED.has(x.kind));
   const passed = all.filter((x) => !TOUCHED.has(x.kind));
   const resting = (x) => x.rest[0] < REST_STEP;
@@ -198,13 +227,20 @@ try {
   } else {
     if (copies.length !== 2) throw Error("wait extension must occur exactly once");
     const forceLive = process.argv.includes("--control-live");
-    const parent = forceLive ? source : copies.join("");
+    // 기다림 연장만 빼도 현재 비행은 이미 정지할 수 있어, 정지 전 대기 자체를 지운 결함을 심는다.
+    const parent = forceLive ? source : copies.join("if (firstSettle) cue.wait = 0;");
     let routed = 0;
     await p.route("**/render/scene.mjs*", (route) => {
       routed += 1;
       return route.fulfill({ contentType: "text/javascript", body: parent });
     });
-    const control = starts(await watch(PAGES.find((url) => new URL(url).searchParams.get("seed") === "27")), "27");
+    // 닿음과 비접촉이 모두 실제로 관측된 시드를 대조군으로 재생한다.
+    const controlPage = PAGES.find(url => {
+      const seed = new URL(url).searchParams.get("seed");
+      return touched.some(row => row.seed === seed) && passed.some(row => row.seed === seed);
+    });
+    if (!controlPage) throw Error("No mixed contact population for wait control");
+    const control = starts(await watch(controlPage), new URL(controlPage).searchParams.get("seed"));
     await p.unroute("**/render/scene.mjs*");
     const untouchedControl = control.filter((x) => !TOUCHED.has(x.kind));
     const touchedControl = control.filter((x) => TOUCHED.has(x.kind));
@@ -219,7 +255,9 @@ try {
   }
 
 
-  const wide = all.filter((x) => x.kind === "wide");
+  // 현재 판정에서 실제로 헛구가 나온 시드를 같은 런타임의 대조군에 다시 건넨다.
+  const wide = all.filter(x => x.kind === "wide");
+  const widePages = PAGES.filter(url => wide.some(x => x.seed === new URL(url).searchParams.get("seed")));
   const noHop = (x) => x.dy.every((dy) => Number.isFinite(dy) && dy <= REST_STEP);
   const wideRow = (x) => "seed=" + x.seed + " open=" + x.open + " |dy|="
     + x.dy.map((dy) => dy.toFixed(6)).join("/") + "m/frame bar=" + REST_STEP;
@@ -227,9 +265,13 @@ try {
   check("tailstart:a-wide-ball-does-not-hop-again-after-the-caption-opens",
     wide.length > 1 && wide.every(noHop), wide.map(wideRow).join(", "));
 
-  // Reuse the served-module control above; git supplies the exact parent bytes.
-  // Keep caption timing and horizontal travel intact so only the fresh hop differs.
-  const wideParent = execFileSync("git", ["show", "dba2d6d:web/src/render/scene.mjs"], { encoding: "utf8" });
+  // 자막 시점과 수평 이동은 현재 것을 유지하고 과거의 수직 튐만 재현한다.
+  // 과거 전체 모듈 대신 dba2d6d의 수직 궤적 한 줄만 현재 런타임에 심는다.
+  const oldScene = execFileSync("git", ["show", "dba2d6d:web/src/render/scene.mjs"], { encoding: "utf8" });
+  const vertical = text => text.match(/case 'wide':[\s\S]*?ball\.position\.set\(\s*[^\n]+\n(?:\s*\/\/[^\n]*\n)*\s*([^\n]+),\s*\n/)[1];
+  const currentY = vertical(source), oldY = vertical(oldScene);
+  if (source.split(currentY).length !== 2 || currentY === oldY) throw Error("wide control anchor drift");
+  const wideParent = source.replace(currentY, oldY);
   let wideRouted = 0;
   const wideControl = [];
   await p.route("**/render/scene.mjs*", (route) => {
@@ -237,12 +279,7 @@ try {
     return route.fulfill({ contentType: "text/javascript", body: wideParent });
   });
   try {
-    for (const seed of new Set(wide.map((x) => x.seed))) {
-      const url = PAGES.find((url) => new URL(url).searchParams.get("seed") === seed);
-      const got = starts(await watch(url), seed);
-      if (got.length !== BALLS) throw Error("incomplete wide parent sample seed=" + seed);
-      wideControl.push(...got.filter((x) => x.kind === "wide"));
-    }
+    for (const url of widePages) wideControl.push(...starts(await watch(url), new URL(url).searchParams.get("seed")).filter(x => x.kind === "wide"));
   } finally {
     await p.unroute("**/render/scene.mjs*");
   }

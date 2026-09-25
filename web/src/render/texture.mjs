@@ -12,19 +12,14 @@ function canvas(size) {
   return cv;
 }
 
-function sampled(t){
-  const pixel=typeof location!=='undefined'&&new URLSearchParams(location.search).get('pix')==='1';
-  t.magFilter=pixel?THREE.NearestFilter:THREE.LinearFilter;
-  t.minFilter=pixel?THREE.NearestFilter:THREE.LinearMipmapLinearFilter;
-  t.generateMipmaps=!pixel; // 세 표면 경로 모두 같은 스위치에서만 먼 표면의 픽셀 잡음을 남긴다.
-}
-
 function finish(cv, repeat) {
   const t = new THREE.CanvasTexture(cv);
   // 캔버스 바이트는 sRGB다. 선언하지 않으면 선형으로 오독돼 중간톤이 눌린다.
   t.colorSpace = THREE.SRGBColorSpace;
-  // 표면 보간도 픽셀 모드의 같은 스위치를 따른다.
-  sampled(t);
+  // 보간하면 잡티가 뿌옇게 번져 저해상도 화면에서 아예 안 읽힌다.
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  t.generateMipmaps = false;
   t.wrapS = THREE.RepeatWrapping;
   t.wrapT = THREE.RepeatWrapping;
   if (repeat) t.repeat.set(repeat[0], repeat[1]);
@@ -60,33 +55,180 @@ function memo(key, make) {
   return cache.get(key);
 }
 
-// Gang Beasts rooftop 참조처럼 바닥은 넓은 무광 색면이고 마모만 낮은 대비로 남긴다.
+// 흙바닥. 얼룩과 발자국이다. 균일한 그라데이션 한 장은 카펫으로 읽힌다.
 export function dirtTex() {
   return memo('dirt', () => {
-    const cv = canvas(256); // 기존 타일 해상도를 유지해 맵 소비자의 크기 계약을 보존한다.
+    // 128에 22번 반복이면 6.8m마다 같은 얼룩이 돌아온다. 화면 안에 한 주기가 여러 번 들어가 격자로 읽힌다.
+    // 텍셀 밀도는 그대로 둘 채 판을 두 배로 키워 주기를 13.6m로 밀어낸다.
+    const S = 256;
+    const cv = canvas(S);
     const c = cv.getContext('2d');
-    c.fillStyle = '#eee7dc'; // 황토 재질에 곱할 따뜻한 밝은 바탕으로 공의 흰색과 구별한다.
-    c.fillRect(0, 0, cv.width, cv.height);
-    return finish(cv);
+    c.fillStyle = '#ffffff';
+    c.fillRect(0, 0, S, S);
+    const r = rng(0x51d3a1);
+    // 큰 얼룩 먼저, 그 위에 작은 얼룩. 한 크기로만 찍으면 물방울무늬가 된다.
+    // 주기가 길수록 눈에 띄다. 큰 얼룩은 대비를 낮추고 작은 얼룩만 진하게 찍는다.
+    for (let i = 0; i < 104; i += 1) {
+      const rad = 6 + r() * 22;
+      const t = (rad - 6) / 22;
+      const g = 0.78 + r() * (0.16 - t * 0.10);
+      const bx = r() * S;
+      const by = r() * S;
+      const ry = rad * (0.5 + r() * 0.7);
+      const rot = r() * 3.14;
+      const a = 0.85 - t * 0.55;
+      c.fillStyle = 'rgba(' + Math.round(255 * g) + ',' + Math.round(246 * g) + ',' + Math.round(232 * g) + ',' + a.toFixed(3) + ')';
+      tiled(c, S, () => {
+        c.beginPath();
+        c.ellipse(bx, by, rad, ry, rot, 0, 6.283);
+        c.fill();
+      });
+    }
+    // 발자국. 짝을 지어 한 방향으로 간다. 흩뿌리면 자국이 아니라 먼지다.
+    for (let k = 0; k < 20; k += 1) {
+      const x0 = r() * S;
+      const y0 = r() * S;
+      const dx = (r() - 0.5) * 8;
+      c.fillStyle = 'rgba(150,138,118,0.55)';
+      tiled(c, S, () => {
+        for (let i = 0; i < 4; i += 1) {
+          c.fillRect(x0 + dx * i + (i % 2) * 5, y0 + i * 9, 4, 6);
+        }
+      });
+    }
+    // 잔모래. 이게 없으면 얼룩이 오려붙인 스티커로 보인다.
+    for (let i = 0; i < 3600; i += 1) {
+      c.fillStyle = r() > 0.5 ? 'rgba(120,110,92,0.30)' : 'rgba(255,252,240,0.30)';
+      c.fillRect(Math.floor(r() * S), Math.floor(r() * S), 1, 1);
+    }
+    return finish(cv, [11, 11]);
   });
 }
 
-const SCUFF_S = 2048; // 누적 접촉 자국이 쓰는 기존 캔버스 해상도다.
+// 페널티 박스 안쪽. 밟히는 자리라 흙보다 닳았다.
+// 여기는 경기 중에 덧칠되는 면이라 반복 타일이 아니라 박스 전체를 한 장으로 굽는다.
+// 타일을 물리면 한 번 찍은 자국이 바닥 전체에 열한 번 복사된다.
+// 흙 한 장이 6.6m를 덮으면 가까운 땅에서 한 텍셀이 렌더 버퍼 두 픽셀을 넘어간다.
+// 그러면 이웃한 화면 픽셀이 같은 텍셀에 갇혀 바닥이 행마다 평평해졌다 거칠어졌다 한다.
+// 판을 두 배로 키우고 타일 크기는 그대로 둬서 같은 넓이에 흙을 두 배로 깐다.
+const SCUFF_S = 2048;
+const SCUFF_TILE = 1024 / 2.5;
+
+// 박스 한 장에 흙 그림을 깐다. 쌓인 자국을 옅게 덮어 지울 때도 같은 붓을 쓴다.
 export function paintScuffBase(c) {
-  c.drawImage(dirtTex().image, 0, 0, SCUFF_S, SCUFF_S);
-  // 골문 앞은 넓게, 페널티 스폿 부근은 좁게 닳게 하되 표시는 별도 규정선 메시가 소유한다.
-  const patches = [[0.5, 0.07, 0.48, 0.09], [0.5, 0.66, 0.14, 0.1]]; // 판 UV에서 두 접촉 영역만 강조한다.
-  for (const [x, y, rx, ry] of patches) {
+  const src = dirtTex().image;
+  const ox = 0.37 * SCUFF_S;
+  const oy = 0.11 * SCUFF_S;
+  for (let i = -2; i <= 6; i += 1) {
+    for (let j = -2; j <= 6; j += 1) {
+      c.drawImage(src, i * SCUFF_TILE - ox, j * SCUFF_TILE - oy, SCUFF_TILE, SCUFF_TILE);
+    }
+  }
+  // 화면은 384줄로 한 번 줄었다가 일곱 단으로 끊긴다.
+  // 잔모래는 가까이서 한 픽셀보다 잘아 평균으로 지워지고, 밝기 차도 한 단 안에 갇혀 사라진다.
+  // 그래서 바닥이 죽은 갈색 한 장이 된다. 발밑에서도 남으려면 자국이 굵고, 단을 넘을 만큼 진해야 한다.
+  paintScuffCoarse(c);
+}
+
+// 고정 씨앗이라 몇 번을 덧칠해도 같은 자리에 같은 자국이 겹친다.
+const COARSE = (() => {
+  const r = rng(0x7b1f42);
+  const worn = [];
+  for (let i = 0; i < 44; i += 1) {
+    // 진흙 웅덩이는 좁게 패이고 마른 자리는 넓게 번진다.
+    const dark = r() > 0.42;
+    const rad = dark ? 30 + r() * 46 : 58 + r() * 66;
+    // 깔끔한 타원 하나는 물방울무늬로 읽힌다. 겹친 조각들의 합집합이라야 밟고 지나간 자리가 된다.
+    const lobes = [];
+    const n = 3 + Math.floor(r() * 3);
+    for (let k = 0; k < n; k += 1) {
+      lobes.push({
+        dx: (r() - 0.5) * rad * 1.2,
+        dy: (r() - 0.5) * rad * 0.7,
+        rad: rad * (0.45 + r() * 0.45),
+        ry: 0.4 + r() * 0.5,
+        rot: r() * 3.14
+      });
+    }
+    worn.push({ x: r() * SCUFF_S, y: r() * SCUFF_S, lobes, dark, amp: r() });
+  }
+  const drag = [];
+  for (let i = 0; i < 34; i += 1) {
+    drag.push({
+      x: r() * SCUFF_S,
+      y: r() * SCUFF_S,
+      len: 120 + r() * 200,
+      wid: 8 + r() * 7,
+      rot: r() * 3.14,
+      dark: r() > 0.5
+    });
+  }
+  return { worn, drag };
+})();
+
+// 골문 바로 앞은 매 경기 밟혀 파인다. 페널티 스폿 쪽으로 갈수록 땅이 성하다.
+// 텍스처 위쪽이 골문 앞이고, 그 줄이 화면 아래쪽 발밑으로 온다.
+const CHURN_H = Math.round(SCUFF_S * 0.44);
+function churnLayer() {
+  return memo('churn', () => {
+    const cv = document.createElement('canvas');
+    cv.width = SCUFF_S;
+    cv.height = CHURN_H;
+    const c = cv.getContext('2d');
+    const r = rng(0x51c3a7);
+    // 자국이 화면 픽셀만 해지면 공과 팔다리가 같은 주파수의 얼룩에 섞여 사라진다.
+    // 파인 자리는 뭉쳐서 크게, 밝기 차는 흙 한 톤 안쪽으로 눌러 저주파 얼룩으로 남긴다.
+    for (let y = 0; y < CHURN_H; y += 13) {
+      const near = 1 - y / CHURN_H;
+      for (let x = 0; x < SCUFF_S; x += 13) {
+        // 골문에서 멀어질수록 파인 자리가 뜸해진다.
+        if (r() > 0.28 + near * 0.66) continue;
+        // 파인 자리와 마른 흙덩이. 한 값만 뿌리면 먼지 한 겹이지 파인 땅이 아니다.
+        const deep = r() > 0.5;
+        const v = deep ? 58 + Math.round(r() * 20) : 142 + Math.round(r() * 20);
+        const a = (0.32 + near * 0.5).toFixed(2);
+        c.fillStyle = 'rgba(' + v + ',' + Math.round(v * 0.96) + ',' + Math.round(v * 0.86) + ',' + a + ')';
+        c.fillRect(x + r() * 6 - 3, y + r() * 6 - 3, 9 + r() * 11, 9 + r() * 11);
+      }
+    }
+    return cv;
+  });
+}
+
+function paintScuffCoarse(c) {
+  // 밟혀 벗겨진 자리와 마른 자리. 한 쪽만 찍으면 얼룩이 아니라 그늘로 읽힌다.
+  for (const p of COARSE.worn) {
+    const v = p.dark ? 46 + Math.round(p.amp * 22) : 158 + Math.round(p.amp * 15);
+    const rgb = v + ',' + Math.round(v * 0.96) + ',' + Math.round(v * 0.86);
+    const a = p.dark ? 0.86 : 0.94;
+    for (const l of p.lobes) {
+      // 가장자리가 칼같으면 스티커다. 흙은 밟힌 중심에서 바깥으로 옅어진다.
+      const g = c.createRadialGradient(p.x + l.dx, p.y + l.dy, 0, p.x + l.dx, p.y + l.dy, l.rad);
+      g.addColorStop(0, 'rgba(' + rgb + ',' + a + ')');
+      g.addColorStop(0.55, 'rgba(' + rgb + ',' + (a * 0.7).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(' + rgb + ',0)');
+      c.fillStyle = g;
+      c.save();
+      c.translate(p.x + l.dx, p.y + l.dy);
+      c.rotate(l.rot);
+      c.scale(1, l.ry);
+      c.translate(-(p.x + l.dx), -(p.y + l.dy));
+      c.beginPath();
+      c.ellipse(p.x + l.dx, p.y + l.dy, l.rad, l.rad, 0, 0, 6.283);
+      c.fill();
+      c.restore();
+    }
+  }
+  // 끌린 자국. 둥근 얼룩만 있으면 물방울무늬로 돌아간다. 방향이 있어야 밟고 지나간 땅이 된다.
+  for (const d of COARSE.drag) {
     c.save();
-    c.translate(x * SCUFF_S, y * SCUFF_S);
-    c.scale(rx * SCUFF_S, ry * SCUFF_S);
-    const g = c.createRadialGradient(0, 0, 0, 0, 0, 1); // 정규화한 타원 안에서 중심부터 가장자리까지 번진다.
-    g.addColorStop(0, 'rgba(96,78,52,0.78)'); // 넓은 골문 마모가 세 휘도 구간을 지나도록 중심만 어둡게 하고 가장자리까지 천천히 푼다.
-    g.addColorStop(1, 'rgba(96,78,52,0)'); // 끝은 투명해서 마모판의 경계가 보이지 않는다.
-    c.fillStyle = g;
-    c.fillRect(-1, -1, 2, 2); // 정규화 타원의 외접 사각형을 채운다.
+    c.translate(d.x, d.y);
+    c.rotate(d.rot);
+    c.fillStyle = d.dark ? 'rgba(62,52,38,0.72)' : 'rgba(168,158,132,0.7)';
+    c.fillRect(-d.len / 2, -d.wid / 2, d.len, d.wid);
     c.restore();
   }
+  c.drawImage(churnLayer(), 0, 0);
 }
 
 export function scuffTex() {
@@ -96,7 +238,9 @@ export function scuffTex() {
     paintScuffBase(c);
     const t = new THREE.CanvasTexture(cv);
     t.colorSpace = THREE.SRGBColorSpace;
-    sampled(t);
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    t.generateMipmaps = false;
     t.wrapS = THREE.ClampToEdgeWrapping;
     t.wrapT = THREE.ClampToEdgeWrapping;
     return t;
@@ -158,11 +302,6 @@ export function cloudTex() {
         const t = k / (puffs - 1) - 0.5;
         const rad = base * (0.5 + Math.pow(1 - Math.abs(t) * 1.6, 2) * 0.9);
         c.beginPath();
-        // 기존 덩어리 위치를 유지하고 중심부터 반경 끝까지 부드럽게 옅어진다.
-        const puff = c.createRadialGradient(cx + t * base * 2.4, cy, 0, cx + t * base * 2.4, cy, rad);
-        puff.addColorStop(0, 'rgba(255,255,255,1)'); // 중심은 불투명해서 흰 덩어리로 읽힌다.
-        puff.addColorStop(1, 'rgba(255,255,255,0)'); // 가장자리는 하늘에 부드럽게 섞인다.
-        c.fillStyle = puff;
         c.ellipse(cx + t * base * 2.4, cy - rad * squash * 0.4 + (r() - 0.5) * base * 0.3,
                   rad, rad * squash * 1.35, 0, 0, Math.PI * 2);
         c.fill();
@@ -175,7 +314,9 @@ export function cloudTex() {
       c.restore();
     }
     const t = new THREE.CanvasTexture(cv);
-    sampled(t);
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    t.generateMipmaps = false;
     t.wrapS = THREE.RepeatWrapping;
     t.wrapT = THREE.ClampToEdgeWrapping;
     return t;
@@ -391,13 +532,12 @@ export function inkTex(base, tone, grade, span, girth) {
        그림 몇 개가 뜬 것으로 읽힌다. 이 등급만 칸을 넷으로 늘려 무늬가 서로 닿게 한다. */
     const cols = gd >= 3 ? 4 : INK_COLS;
     // 무늬 한 개의 크기. 띠가 좁으면 띠 높이가, 넓으면 둘레 간격이 크기를 정한다.
-    const rad = Math.max(4, Math.min(band * 0.42, INK_W / (cols * 2.2))) * gr * 1.1; // 전체 팔 프레임에서도 읽히도록 획 반경을 10% 키우고 무늬 종류와 띠 폭은 유지한다.
+    const rad = Math.max(4, Math.min(band * 0.42, INK_W / (cols * 2.2))) * gr;
     /* 줄 간격. 3등급만 2.6이 아니라 1.5다. 채운 소매는 줄과 줄이 겹쳐야 한 벌로 읽힌다.
        실측: 번개 한 종류를 2.6 간격 네 줄로 놓았을 때 팔 화소 분산이 1421.9로, 고리 방식의
        1472.9 아래였다. */
     const rows = Math.max(1, Math.round(band / (rad * (gd >= 3 ? 1.5 : 2.6))));
-    // rgb 문자열을 비트 연산에 넣으면 검정이 된다. 기존 62% 밝기 혼합을 숫자 색으로 유지한다.
-    const face = gd >= 3 ? new THREE.Color(tone).lerp(new THREE.Color(0xffffff),0.62).getHex() : tone;
+    const face = gd >= 3 ? mix(tone, 0xffffff, 0.62) : tone;
     // 무늬는 팔 둘레에서 감긴다. 한 번만 그리면 텍스처 이음선에서 반 토막이 난다.
     const wrap = (fn) => { fn(0); fn(-INK_W); fn(INK_W); };
     for (let ry = 0; ry < rows; ry += 1) {
@@ -413,15 +553,14 @@ export function inkTex(base, tone, grade, span, girth) {
            소매(0x073239)는 41이라 차이가 37뿐이었다. 필름은 휘도 170대로 올라가 차이가 130이다. */
         if (gd === 1) {
           wrap((dx) => {
-            c.fillStyle = rgb(0xffffff); // 스티커 필름은 흰색이어야 작은 확대 창에서도 별과 구별된다.
+            c.fillStyle = mix(base, 0xffffff, 0.72);
             c.fillRect(x + dx - rad * 1.15, y - rad * 1.15, rad * 2.3, rad * 2.3);
             c.fillStyle = mix(base, 0xffffff, 0.3);
             c.fillRect(x + dx - rad * 1.15, y + rad * 0.72, rad * 2.3, rad * 0.43);
           });
         }
         // 2등급은 새긴 글씨다. 밝은 획을 반 칸 밀어 깔고 그 위에 진한 획을 얹으면 파인 것으로 읽힌다.
-        // 밑획 밝기 95%와 폭 1.5배는 잉크 원색을 남기면서 새긴 글씨를 음영과 가른다.
-        if (gd === 2) wrap((dx) => { c.fillStyle = mix(base, 0xffffff, 0.95); MARK[gd](c, x + dx + rad * 0.18, y + rad * 0.18, rad * 1.5); });
+        if (gd === 2) wrap((dx) => { c.fillStyle = mix(base, 0xffffff, 0.52); MARK[gd](c, x + dx + rad * 0.18, y + rad * 0.18, rad); });
         wrap((dx) => {
           // 테두리 먼저. 문신은 선을 긋고 안을 채우므로 바깥 한 겹이 더 진하다.
           c.fillStyle = mix(face, 0x000000, 0.45);
@@ -440,17 +579,4 @@ export function inkTex(base, tone, grade, span, girth) {
     }
     return finish(cv);
   });
-}
-
-// 키트 app.mjs의 Canvas 방사형 접촉 음영을 공유한다. 화면 전체 AO 대신 발밑만 부드럽게 잇는다.
-let contact;
-export function contactTex(){
-  if(contact)return contact;
-  const cv=canvas(64),ctx=cv.getContext('2d'); // 작은 방사형 맵을 모든 발 그림자가 공유한다.
-  const g=ctx.createRadialGradient(32,32,0,32,32,32); // 중앙에서 면 끝까지 투명도를 연속으로 줄인다.
-  g.addColorStop(0,'rgba(255,255,255,0.24)'); // 발에 가까운 부분만 진하게 두어 검은 원판이 되지 않게 한다.
-  g.addColorStop(1,'rgba(255,255,255,0)'); // 가장자리는 완전히 사라져 바닥과 경계선이 생기지 않는다.
-  ctx.fillStyle=g;ctx.fillRect(0,0,64,64); // 맵의 전체 면을 같은 방사형 음영으로 채운다.
-  contact=new THREE.CanvasTexture(cv);contact.colorSpace=THREE.SRGBColorSpace;
-  return contact;
 }

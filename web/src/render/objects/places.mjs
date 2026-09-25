@@ -5,8 +5,9 @@
 // 리마스터 뒤 예산이 118/120이라 남은 자리가 둘이고, 메시 하나로 그중 하나만 쓴다.
 // 재질은 밖에서 units.mjs의 flatVertex 한 장을 물려 준다. 색은 전부 정점에 실린다.
 import * as THREE from '../../../vendor/three.module.min.js';
-import { mergeGeos } from '../units.mjs';
+import { mergeGeos, flatVertex } from '../units.mjs';
 import { GOAL } from '../../../../src/reality.mjs';
+import { seeded } from '../handmade.mjs';
 
 /* 물건이 설 수 있는 자리. 페널티 박스 판은 밟는 면이라 그 위에는 아무것도 안 세운다.
    reality의 규칙이 아닌 연출용 흙판은 16.5 x 16.5이고 중심이 z 8.2라 x는 8.25까지, z는 16.45까지가 그 판이다.
@@ -46,9 +47,8 @@ function pen() {
     // 가지 한 층. 일곱 각이면 실루엣이 원뿔로 읽히면서 정점이 스물넷이다.
     // 각을 더 줄이면 원뿔이 아니라 엎은 그릇으로 읽혀 나무가 안 된다.
     cone: (r, h, x, y0, z, c) => {
-      // 기존 수관 봉투 안에 매끈한 타원체를 넣어 삼각 고깔 외곽선을 없앤다.
-      const g = new THREE.SphereGeometry(1, 20, 12); // 원경에서도 둥근 윤곽을 유지할 최소 분할이다.
-      g.scale(r, h / 2, r);
+      // 승인된 일곱 각 침엽수 수관이다.
+      const g = new THREE.ConeGeometry(r, h, 7);
       g.translate(x, y0 + h / 2, z);
       push(g, c);
     }
@@ -73,18 +73,30 @@ function mainGoal(p, x, z) {
 }
 
 // 운동장 뒤편의 학교와 담은 골문보다 뒤에 두어 슈터와 행인을 가리지 않는다.
-function neighborhood(p){
-  // 연습 골대 뒤 18~26미터의 관리 보행로는 흙 운동장과 학교 시설의 경계다. 두께 0.12는 겹침을 막는다.
-  p.box(60,0.12,8,0,22,0x969c92);
+function lot(p) {
+  const r = seeded(0x51a70c);
+  for (let i = 0; i < 22; i += 1) {
+    // 다섯에 하나는 무너져 없다. 이가 빠져야 쌓다 만 담이지 옹벽이 아니다.
+    if (i % 5 === 3) continue;
+    const x = -32 + i * 3.05;
+    const h = 0.95 + r() * 0.4;
+    p.box(2.6, h, 0.34, x, 26.2, 0xb8ac96);
+    p.box(2.76, 0.14, 0.46, x, 26.2, 0x8f8474, h);
+  }
+  for (let i = 0; i < 5; i += 1) tree(p, -24 + i * 12.5, 28.6 + r() * 2.4, 0.9 + r() * 0.3);
+  // 오른쪽 큰 나무 하나. 먼 나무만 있으면 화면 아래 절반이 비어 공터가 아니라 벌판이 된다.
+  // 왼쪽에 안 세우는 이유는 한눈팔기 연출이 왼쪽 x -11.5에 서기 때문이다.
+  tree(p, 10.5, 13.5, 1.25);
+  // 풀 포기. 담 앞 맨흙이 너무 넓어 밟힌 땅이 아니라 칠한 판으로 읽혔다.
+  for (let i = 0; i < 22; i += 1) {
+    // 자리는 담 앞 흙(z 17.4~24.8)이다. 페널티 박스 판은 z 16.45에서 끝나므로 밟는 면 위에는 안 선다.
+    p.box(0.66, 0.42 + r() * 0.24, 0.08, -30 + r() * 60, 17.4 + r() * 7.4, 0x6d8a4a);
+  }
+}
 
-  // 46미터 뒤의 낮은 교사동과 세 창 띠는 기존 학교 모형을 축소한 배경이다.
-  p.box(30,6,5,-5,46,0xc8c5ad);
-  for(let i=0;i<3;i++)p.box(28,0.7,0.16,-5,43.4,0x75888a,1+i*1.6);
-  p.box(32,0.35,5.5,-5,46,0x858c7c,6);
-  // 행인 띠 뒤의 42미터 담과 열린 골문 사이로 몸을 계속 볼 수 있다.
-  p.box(56,0.7,0.3,0,42,0xb4b19c);
-  mainGoal(p,0,23);
-  tree(p,-17,29,0.9);tree(p,18,33,1.1);
+
+function neighborhood(p){
+  lot(p);
 }
 
 // 풋살장은 낮은 킥보드와 성긴 펜스로 둘러싸인 인조잔디 시설이다.
@@ -169,7 +181,7 @@ export function venueCrowd(){
   const body=new THREE.CapsuleGeometry(0.23,0.35,4,8);body.translate(0,0.4,0);
   const head=new THREE.SphereGeometry(0.18,8,6);head.translate(0,0.88,0);
   const geo=mergeGeos([body,head],[0xffffff,0xd7b79a]);
-  const crowd=new THREE.InstancedMesh(geo,new THREE.MeshLambertMaterial({vertexColors:true}),8*36);
+  const crowd=new THREE.InstancedMesh(geo,flatVertex(0xffffff),8*36);
   const matrix=new THREE.Matrix4(),color=new THREE.Color();
   // 차분한 네 색은 팀이나 국가의 실측이 아니라 관중석의 제품 팔레트다.
   const colors=[0x9eb6b1,0xb8877c,0xbca86b,0x8393ae];

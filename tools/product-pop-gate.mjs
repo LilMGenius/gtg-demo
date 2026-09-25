@@ -49,7 +49,7 @@ function verdict(name, status, detail) {
 function measure(policy, level, mode, contrast = null, coupledShots = false) {
   const gains = (policy === 'fixed-order' ? [] : contrast ? [contrast] : PATH).map(stat => ({ stat, eligible: 0, tested: 0, baseSaved: 0, bumpSaved: 0, n10: 0, n01: 0, samples: [] }));
   let conceded = 0, tested = 0, gold = 0;
-  const causes = {};
+  const causes = {}, goldSamples = [];
   for (let s = 0; s < BALLS / 5; s++) {
     if (Date.now() - started >= WATCHDOG) { console.error('product-pop FAIL watchdog'); process.exit(1); }
     const source = makeRng(1000003 + s + level * 7919);
@@ -63,6 +63,7 @@ function measure(policy, level, mode, contrast = null, coupledShots = false) {
       return { ...keeper, [g.stat]: contrast ? 10 : Math.min(10, keeper[g.stat] + 1) };
     });
     const before = gains.map(g=>({n10:g.n10,n01:g.n01,tested:g.tested}));
+    const goldBefore = gold;
     for (const shot of shots) {
       // 한 구마다 정책과 판정의 씨앗을 고정해 스탯 변화가 다음 구를 밀지 않는다.
       const shotSeed = 1000003 + s * 7919 + level * 31 + shot.index;
@@ -86,6 +87,8 @@ function measure(policy, level, mode, contrast = null, coupledShots = false) {
       }
     }
     gains.forEach((g,i)=>g.samples.push([g.n01-before[i].n01-g.n10+before[i].n10,g.tested-before[i].tested]));
+    // 분모 1은 같은 다섯 슛 세트 하나다. 구매 간격의 수입 표본을 별도 난수 없이 보존한다.
+    if (policy === "coach" && !contrast) goldSamples.push([gold-goldBefore,1]);
   }
   for (const g of gains) {
     g.eligibility = g.eligible / (BALLS / 5);
@@ -93,9 +96,10 @@ function measure(policy, level, mode, contrast = null, coupledShots = false) {
     // McNemar normal approximation: paired 95% half-width =
     // 1.96 * sqrt(n10 + n01) / tested * 100 (discordant tested balls).
     g.hw = g.tested ? 1.96 * Math.sqrt(g.n10 + g.n01) / g.tested * 100 : NaN;
-    if (g.tested) resolution(`product-pop/${mode}/${policy}/L${level}/${g.stat}/${contrast ? "contrast" : "one"}`,g.samples);
+    if (g.tested) resolution(`product-pop/${mode}/${policy}/L${level}/${g.stat}/${contrast ? "contrast" : "one"}${coupledShots ? "/coupled-control" : ""}`,g.samples);
   }
-  return { policy, level, mode, conceded, tested, nonconcession: 100 * (BALLS - conceded) / BALLS, testedSave: 100 * (tested - conceded) / tested, gains, causes, goldPerSet: gold / (BALLS / 5) };
+  if (goldSamples.length) resolution(`product-pop/${mode}/${policy}/L${level}/gold${coupledShots ? "/coupled-control" : ""}`,goldSamples,1);
+  return { goldSamples, policy, level, mode, conceded, tested, nonconcession: 100 * (BALLS - conceded) / BALLS, testedSave: 100 * (tested - conceded) / tested, gains, causes, goldPerSet: gold / (BALLS / 5) };
 }
 
 console.log(`product-pop balls=${BALLS}/cell keepers=${BALLS / 5} shots/keeper=5 seed=1000003 + s + level*7919; s starts at 0`);
@@ -237,6 +241,10 @@ for (const mode of ['hand-follow', 'bot']) {
   const anchors = LEVELS.map(level => rows.find(r => r.mode === mode && r.policy === 'coach' && r.level === level));
   console.log(`gold-per-set: ${mode}/coach ${anchors.map(r => `L${r.level}=${f(r.goldPerSet)}`).join(' ')}; linear between anchors, last slope extended to L30; coinGain(conceded,fame,untested) over 5 shots`);
   const { bought, gaps, longest, status, exception } = purchaseWalk(anchors, mode);
+  // HOTL 가설: 각 레벨의 같은 시드 블록을 함께 재표집해 수입→구매 간격의 전파 오차를 잰다.
+  // 열 두 개는 수입 합과 세트 수의 짝이고 배율 1은 원 단위인 세트 간격을 유지한다.
+  resolution(`product-pop/${mode}/purchase-gap`,anchors[0].goldSamples.map((_,i)=>anchors.flatMap(a=>a.goldSamples[i])),1,
+    sums=>purchaseWalk(anchors.map((a,i)=>({...a,goldPerSet:sums[i*2]/sums[i*2+1]})),mode).longest.gap);
   verdict('deadend:the-next-purchase-or-unlock-is-within-N-sets', status, status === 'ACCEPTED'
     ? `${mode} longest=${longest.gap} <= bound ${exception.bound} at ${exception.where}; accepted asymmetry, ${exception.record}; N=${N_SETS} remains the trigger elsewhere`
     : `${mode} N=${N_SETS} sets; purchases=${bought}/${purchases.length} within 400 sets; gaps=${gaps.join(',')}; longest=${longest?.gap ?? 'unavailable'} sets${longest ? ` at sets ${longest.from}->${longest.set} ${longest.purchase.name} cost=${longest.purchase.cost}` : ''}; HOTL hypothesis, lap record decides the red`);

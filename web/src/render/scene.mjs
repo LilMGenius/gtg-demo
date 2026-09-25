@@ -13,7 +13,6 @@ import {
 import { pupilMat, buildKeeper, buildKicker, poseWalker, POSES, JOINTS, lerpPose, pushPose, setPose, poseDist, KICK_WIND, beatOf } from './objects/actors.mjs';
 import { buildPitch, buildPassers, setPasserRoster, BOX_Z } from './objects/pitch.mjs';
 import { venueCrowd } from './objects/places.mjs';
-import { contactTex } from './texture.mjs';
 import { skinAt, placeAt } from '../state/gear.mjs';
 import { gazeMood } from '../ui/lines.mjs';
 import { createImpact } from './objects/impact.mjs';
@@ -30,19 +29,20 @@ const SCUFF_POSES = new Set([POSES.faceplant, POSES.sprawlR, POSES.sprawlL, POSE
 
 export function createScene(canvas) {
   const sfx = mountSfx();
-  const PIX = new URLSearchParams(location.search).get('pix') === '1';
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   // 그림자 지도 한 장. 발밑 원판은 접지를 말하지만 몸이 드리운 그늘은 못 그린다.
-  // 키트의 PCF 그림자와 발 접촉 음영이 둥근 몸을 지면에 붙인다.
+  // PCFSoft는 가장자리를 흐린다. 딱딱한 경계는 종이를 오려 붙인 것으로 읽힌다.
+  // 1024는 아래 그림자 카메라가 덮는 20미터를 한 텍셀 2센티로 나눈다. 재는 것이 발밑 그늘 하나라
+  // 그보다 잘게 나눌 자리가 없다.
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap; // 현재 Three.js의 PCF 필터로 실제 투영 그림자를 부드럽게 한다.
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   // 알파를 전경 마스크로 쓴다. 아무것도 그려지지 않은 화소가 0이면 전경으로 읽힌다.
   renderer.setClearAlpha(1);
-  renderer.setPixelRatio(PIX ? Math.min(devicePixelRatio, 2) : devicePixelRatio); // 기본 경로는 기기의 실제 화소 밀도를 보존한다.
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x86aecb);
-  scene.fog = new THREE.Fog(0x9dbdd4, 26, 60); // 배우 앞의 26까지 원색을 두고 60에서 하늘색에 합쳐 먼 건물 창의 대비를 누른다.
+  scene.fog = new THREE.Fog(0x9dbdd4, 34, 96);
 
   // 가로 화면 전제. 골대는 좌우로 긴 물건이라 세로로는 판정이 안 보인다.
   // 카메라는 골대 뒤 위쪽. 골대 폭 전체와 키커까지 한 화면에 넣는다.
@@ -53,15 +53,17 @@ export function createScene(canvas) {
   camera.position.set(0, 3.3, -5.1);
   camera.lookAt(0, 1.4, 4.5);
 
-  // 기본은 전체 해상도다. 선택한 픽셀 모드에서만 축소와 필터를 함께 적용한다.
+  // 화면을 한 번 작게 그린 다음 늘린다. 플래시 게임의 뭉개짐은 실력 부족이 아니라 그 시대의 해상도다.
+  // 풀해상도로 깨끗하게 그린 로우폴리는 에셋스토어 템플릿으로 읽힌다. 여기서 그 지문을 지운다.
   // 세로 288은 골키퍼 얼굴이 뭉개져 사라졌고 540은 원본과 구분이 안 갔다. 384가 계단이 보이면서 형태가 남는 높이다.
   const RT_H = 384;
-  // ?pix=1 하나가 축소 타깃과 픽셀 후처리를 함께 켠다.
+  // 풀해상 갈래. ?pix=0이면 384 타깃을 건너뛰고 캔버스 해상도 그대로 굽는다.
+  // 기본은 확대 쪽이다. 이 갈래는 픽셀 확대가 무엇을 덮고 있는지 볼 때만 쓴다.
+  const PIX = new URLSearchParams(location.search).get('pix') !== '0';
   const rt = new THREE.WebGLRenderTarget(683, RT_H, {
     // 선형 보간으로 늘리면 뿌옇기만 하고 픽셀이 안 보인다. 계단이 보여야 저해상도로 읽힌다.
     // 스텐실을 켠다. 공이 자기 화소에 표식을 남기고 임팩트 플래시가 그 자리를 비켜 가려면 이 버퍼가 있어야 한다.
     stencilBuffer: true,
-    samples: PIX ? 0 : 4, // 기본 전체 해상도에서는 네 표본으로 캡슐 가장자리를 고르게 한다.
     minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter
   });
   const postScene = new THREE.Scene();
@@ -144,8 +146,7 @@ export function createScene(canvas) {
     ].join(String.fromCharCode(10)),
     depthTest: false, depthWrite: false
   });
-  const displayMat = PIX ? postMat : new THREE.MeshBasicMaterial({map:rt.texture,depthTest:false,depthWrite:false}); // 픽셀 스위치만 축소·디더·주사선·비네트를 함께 켠다.
-  postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), displayMat));
+  postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), postMat));
 
   // 세계의 시계. performance.now()를 직접 읽으면 시간을 늦출 자리가 없다.
 
@@ -226,10 +227,29 @@ export function createScene(canvas) {
      4:2 5:3 6:15 7:22 8:17 9:8 10:10). 이 선에서 74퍼센트가 발등, 26퍼센트가 발 안쪽인데,
      판정이 레벨로 -2에서 +1.2를 얹으므로 낮은 레벨에서는 그 비가 뒤집힌다. */
   const KICK_POWER_AT = 7;
-  // 머리 중심의 하강이 충분히 깊고 느려진 뒤, 누운 몸에만 착지 눌림을 준다.
-  const LAND_FALL = 0.28; // 첫 충돌의 하강 0.32~0.39보다 낮은 기존 연출 문턱을 유지한다. 전체 낙하 깊이와 첫 충돌 깊이는 다르다.
-  const LAND_SLOW = 0.10; // 관측 최고 하강 속도의 10%까지 감속한 순간이 보이는 몸의 착지다.
-  const LAND_LIE = 0.90; // 골반 기준 길이로 정규화한 수평 길이 0.90부터 누운 몸으로 판정한다.
+  /* 착지는 목이 내려오기를 멈춘 프레임이다. 자세가 목표 각도에 도착하는 것과는 다른 순간이다.
+     관절 각도는 실측으로 사건 뒤 8에서 17프레임에 도착하는데, 그 뒤로도 꼬리가 0.8초에 걸쳐 몸통을
+     눕히므로 목은 44에서 50프레임까지 계속 내려간다. 각도로 걸면 아직 떨어지는 중인 몸을 누르게 된다.
+     이만큼은 내려와야 착지라고 부른다. 그 프레임까지 머리가 내려온 깊이를 열다섯 사건에서 재면
+     바닥에 닿는 넷이 lost 0.301, downed 0.315, reboundMiss 0.385, carriedIn 0.454이고,
+     두 발로 끝나는 몸은 빈 골대의 허리 접기가 0.239, 뛰쳐나감이 0.357이다. 0.28은 그 넷 중 가장
+     얕은 0.301과 허리 접기 0.239 사이이고 양쪽으로 0.02와 0.04가 남는다.
+     깊이 문턱은 하나다. 착지를 부르는 깊이와 무게가 실리는 깊이를 두 상수로 두면 큰 쪽만 일하고
+     작은 쪽은 이름만 남아, 그것을 반으로 낮춰도 화면이 안 움직인다(실측: 0.20을 0.05로 내려도
+     눌리는 프레임 넷이 그대로였다). */
+  const LAND_FALL = 0.28;
+  /* 떨어지던 속도가 가장 빨랐던 값의 이 비율 아래로 꺾이면 닿은 것이다. 절대 속도로 걸면 사건마다
+     낙하 속도가 달라 같은 뜻이 안 된다. 실측한 목 속도는 사건에 따라 초속 3에서 11미터로 떨어지고,
+     닿는 프레임에서 한두 프레임 만에 최고값의 10퍼센트대로 꺾인다. 끌려 들어가는 사건만 낙하가 두 번
+     오고, 0.10에서는 두 번째 낙하 끝까지 밀렸다(실측 25프레임, 첫 낙하가 끝나는 자리는 16).
+     0.15는 그 사건까지 첫 접지에서 걸린다. */
+  const LAND_SLOW = 0.15;
+  /* 착지한 몸이 누웠는가. 목과 두 무릎의 수평 거리이고 그늘이 이미 쓰던 수다.
+     깊이와 누움은 각자 다른 몸을 걸러 낸다. 깊이만 물으면 멀리 떨어졌다가 두 발로 버틴 몸이
+     통과하고(제껴짐과 뛰쳐나감이 그렇게 0.28을 넘는다), 누움만 물으면 허리를 접고 선 몸이
+     통과한다(빈 골대의 허리 접기는 누움이 눌리는 넷보다도 높다). 그래서 둘을 함께 묻는다.
+     0.56은 서서 끝나는 몸의 누움 위, 바닥에 누운 몸의 누움 아래에서 고른 자리다. */
+  const LAND_LIE = 0.56;
   // 0.30은 슬로모션으로 읽혔고 0.02는 프레임이 멈춘 것으로 읽혔다. 0.08이 걸리는 느낌이다.
   const HIT_SCALE = 0.08;
 
@@ -238,7 +258,7 @@ export function createScene(canvas) {
   // 지점마다 손으로 다는 대신 add를 감싸는 이유는, 한 서브시스템이 최상위에 여러 개를
   // 흩뿌려도 누락 없이 전부 귀속되기 때문이다.
   let subTag = 'stage';
-  // stage 구간에서 add되는 것은 아래 조명뿐이고 __subs는 조명을 세지 않는다. 그래서
+  // stage 구간에서 add되는 것은 아래 조명 셋뿐이고 __subs는 조명을 세지 않는다. 그래서
   // __subs에 stage가 0인 것은 하네스 결함이 아니라 설계상 필연이고, stage 컷도 나오지 않는다.
   const rawAdd = scene.add.bind(scene);
   scene.add = (...objs) => {
@@ -246,15 +266,19 @@ export function createScene(canvas) {
     return rawAdd(...objs);
   };
 
-  // 키트 app.mjs의 반구광 색과 세기로 무광 얼굴의 아래쪽도 읽게 한다.
-  scene.add(new THREE.HemisphereLight(0xe7f4ff, 0x9b9384, 2.1));
+  // 조명 셋. 방향 없는 암빛과 반대편 필은 밝기만 한 겹씩 더하고 있었고, 그 몫은 반구광의
+  // 하늘색과 땅색에 접어 넣을 수 있다. 밝기는 그대로 두고 방향이 살아 있는 빛만 남긴다.
+  // 실측: 하늘 0xd8edfe 땅 0xaeac9d 세기 1.7이면 위를 보는 면이 받던 빛이 다섯 개 시절과 같고,
+  // 흙 화소 휘도 p10/p50/p90이 64/93/148 그대로다.
+  scene.add(new THREE.HemisphereLight(0xd8edfe, 0xaeac9d, 1.7));
   // 키. 카메라 쪽 왼쪽 위에서 얼굴과 장갑을 친다. 그림자를 드리우는 빛도 이 하나다.
   // 둘이 드리우면 같은 몸이 두 방향으로 눕고, 그 그림은 조명이 둘이라는 정보가 아니라
   // 그림자가 잘못 그려졌다는 인상으로 읽힌다.
-  const key = new THREE.DirectionalLight(0xffedce, 3.2);
+  const key = new THREE.DirectionalLight(0xfff4dc, 2.05);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048); // 전체 해상도에서 둥근 발과 몸의 그림자 경계를 보존한다.
-  // 그림자 카메라의 기존 연출 범위는 유지하고 해상도만 키트에 맞춘다.
+  key.shadow.mapSize.set(1024, 1024);
+  // 그림자 카메라는 페널티 박스를 덮는다. 몸이 서는 땅이 그 판이고, 더 넓히면 같은 1024칸이
+  // 더 넓은 땅에 흩어져 발밑이 뭉갠다. 반폭 10은 박스 반폭 8.25에 누운 몸의 여유를 더한 값이다.
   const SHADOW_HALF = 10;
   key.shadow.camera.left = -SHADOW_HALF;
   key.shadow.camera.right = SHADOW_HALF;
@@ -266,7 +290,6 @@ export function createScene(canvas) {
   // 면과 그림자 지도가 같은 깊이를 다투면 자기 그림자가 줄무늬로 앉는다. 법선 쪽으로 밀어 피한다.
   key.shadow.normalBias = 0.04;
   key.shadow.bias = -0.0004;
-  key.shadow.radius = 3; // 키트의 PCF 필터 폭으로 그림자 가장자리를 부드럽게 한다.
   /* 빛을 박스 중심축으로 옮긴다. 방향 벡터는 (-6, 8, -4)를 2.4배 한 것이라 그대로이고,
      명암은 한 화소도 안 움직인다. 움직이는 것은 그림자 카메라가 덮는 땅뿐이다.
      타깃은 씬에 안 붙인다. 붙이면 조명이 아닌 자식이 하나 늘어 __subs의 stage 칸이 열린다. */
@@ -274,7 +297,10 @@ export function createScene(canvas) {
   key.target.position.set(0, 0, BOX_Z);
   key.target.updateMatrixWorld();
   scene.add(key);
-  // 키트의 반구광과 주광 하나로 무광 몸통의 넓은 명암을 만든다.
+  // 림. 뒤에서 치면 어깨와 머리 윤곽에 선이 생기고, 인물이 배경에서 떨어진다.
+  const rim = new THREE.DirectionalLight(0xffd9a0, 1.9);
+  rim.position.set(2, 6, 12);
+  scene.add(rim);
 
   subTag = 'pitch';
   const pitch = buildPitch(scene);
@@ -301,7 +327,6 @@ export function createScene(canvas) {
   const FG_A = 0.25;
   let fgOutline = null;
   const tagFg = (mat) => {
-    if (!PIX) return mat; // 전체 해상도는 후처리용 알파 태그 없이 실제 재질 투명도를 쓴다.
     if (mat.userData.fg) return mat;
     mat.userData.fg = true;
     mat.onBeforeCompile = (sh) => {
@@ -488,14 +513,16 @@ const TOUCHED = new Set(['contact']);
   // 배우 그림자. 공에만 그림자가 있으면 사람은 떠 보인다. 수치상 접지여도 화면은 그렇게 안 읽힌다.
   // 그늘 한 장은 균일하다. 실제로는 몸에 가까운 쪽이 더 짙고 가장자리로 갈수록 옅다.
   // 원판 두 장을 어긋나게 겹치면 그 농도 차이가 생긴다.
+  let blobSeed = 0x1f0b77;
   const blob = (r) => {
+    blobSeed += 0x9e37;
     const m = new THREE.Mesh(
-      new THREE.PlaneGeometry(r * 2, r * 2), // 발 접점의 방사형 음영을 담는 같은 폭의 면이다.
-      new THREE.MeshBasicMaterial({ color: SHADOW_INK, map:contactTex(), transparent: true, opacity: 0.72, depthWrite:false })
+      blobGeo(r, blobSeed),
+      new THREE.MeshBasicMaterial({ color: SHADOW_INK, transparent: true, opacity: 0.72 })
     );
     const core = new THREE.Mesh(
-      new THREE.PlaneGeometry(r * 1.12, r * 1.12), // 중심 음영은 기존 접점 폭을 보존한다.
-      new THREE.MeshBasicMaterial({ color: SHADOW_INK, map:contactTex(), transparent: true, opacity: 0.86, depthWrite:false })
+      blobGeo(r * 0.56, blobSeed + 0x31),
+      new THREE.MeshBasicMaterial({ color: SHADOW_INK, transparent: true, opacity: 0.86 })
     );
     // 정확히 겹치면 두 장인 줄 모른다. 반지름의 5분의 1만 밀어 발밑을 짙게 만든다.
     core.position.set(r * 0.18, -r * 0.14, 0.001);
@@ -522,22 +549,6 @@ const TOUCHED = new Set(['contact']);
   const footB = new THREE.Vector3();
   // 행인도 그림자가 있어야 땅을 딘는다. 말걸기 연출은 행인을 앞줄로 데려오므로 더 눈에 띄다.
   const passerShadows = passers.map(() => blob(0.28));
-  const footContacts=[], contactPoint=new THREE.Vector3(),contactBox=new THREE.Box3();
-  function syncFootContacts(actor,feet,index){
-    if(!footContacts[index])footContacts[index]=feet.map(()=>{
-      const m=new THREE.Mesh(new THREE.PlaneGeometry(0.65,0.72),new THREE.MeshBasicMaterial({color:SHADOW_INK,map:contactTex(),transparent:true,depthWrite:false})); // 키트 발 접촉 면의 폭과 깊이다.
-      m.rotation.x=-Math.PI/2;m.userData.probeIgnore=true;m.userData.sub='shadow';m.userData.contact=true;scene.add(m);return m;
-    });
-    actor.updateMatrixWorld(true);
-    feet.forEach((foot,i)=>{
-      foot.getWorldPosition(contactPoint);
-      if(!foot.geometry.boundingBox)foot.geometry.computeBoundingBox();
-      contactBox.copy(foot.geometry.boundingBox).applyMatrix4(foot.matrixWorld);
-      const m=footContacts[index][i];m.position.set(contactPoint.x,0.035,contactPoint.z); // 기존 바닥 음영보다 조금 위에서 깊이 충돌을 피한다.
-      m.material.opacity=0.8*Math.max(0,Math.min(1,1-contactBox.min.y*2)); // 발이 반 단위 이상 뜨면 접촉 음영을 없애 공중 접지를 만들지 않는다.
-      m.visible=actor.visible;
-    });
-  }
 
   const kicker = buildKicker();
   subTag = 'kicker';
@@ -1171,8 +1182,7 @@ const TOUCHED = new Set(['contact']);
       loose = gl;
       keeper.userData.bareHands[gi].visible = true;
     }
-    const headStartY = keeper.userData.head.getWorldPosition(new THREE.Vector3()).y; // 사건 첫 프레임의 낙하도 속도와 깊이에 포함하도록 움직이기 전에 기준을 잡는다.
-    tail = { kind, t0: vnow, from: ball.position.clone(), kx: keeper.position.x, neckTop: headStartY, neckWas: headStartY };
+    tail = { kind, t0: vnow, from: ball.position.clone(), kx: keeper.position.x };
     // 눈맞음이 어느 갈래인지. 자막을 고른 쪽이 넘겨 주므로 화면과 글자가 같은 갈래를 본다.
     tail.act = flavour || null;
     // 화면 전용 편차. 판정 rng가 아니라 여기서 뽑으므로 시드 재현 게이트를 흔들지 않는다.
@@ -2253,23 +2263,21 @@ const TOUCHED = new Set(['contact']);
        (실측: 자빠짐이 4프레임에 눌리고 몸은 15프레임에 닿았다).
        무게가 실렸는지는 몸이 누웠는지로 가른다. 두 발로 서서 끝나는 사건에는 실릴 무게가 없다. */
     if (tail) {
-      /* 머리 중심이 얼마나 내려왔고 지금 얼마나 빠르게 내려오는가. 프레임당 변위가 아니라 초속으로 잰다.
+      /* 목이 얼마나 내려왔고 지금 얼마나 빠르게 내려오는가. 프레임당 변위가 아니라 초속으로 잰다.
          히트스톱이 걸린 프레임은 세계시간이 8퍼센트로 흐르므로 변위만 보면 떨어지는 중인 몸이
          멈춘 것으로 읽힌다(실측: 그렇게 걸었더니 자빠짐이 16프레임에, 놓친 공이 8프레임에 눌렸다). */
-      const headFallY = keeper.userData.head.getWorldPosition(new THREE.Vector3()).y; // 목과 달리 회전하는 머리의 실제 높이가 화면의 낙하를 소유한다.
-      const bodyScale = keeper.userData.joints.spine.getWorldPosition(new THREE.Vector3()).distanceTo(keeper.position);
-      if (tail.neckTop === undefined) tail.neckTop = headFallY;
-      const fell = tail.neckWas === undefined ? 0 : tail.neckWas - headFallY;
-      tail.neckWas = headFallY;
+      if (tail.neckTop === undefined) tail.neckTop = headW.y;
+      const fell = tail.neckWas === undefined ? 0 : tail.neckWas - headW.y;
+      tail.neckWas = headW.y;
       tail.mps = stepDt > 0 ? fell / stepDt : 0;
       tail.peak = Math.max(tail.peak ?? 0, tail.mps);
       tail.conv = tail.aim && tail.d0 > 0 ? 1 - poseDist(poseNow.keeper, tail.aim) / tail.d0 : 1;
-      if (!tail.landed && tail.neckTop - headFallY >= LAND_FALL && tail.mps <= tail.peak * LAND_SLOW) {
+      if (!tail.landed && tail.neckTop - headW.y >= LAND_FALL && tail.mps <= tail.peak * LAND_SLOW) {
         tail.landed = true;
         tail.landLie = span;
-        tail.landFall = tail.neckTop - headFallY;
+        tail.landFall = tail.neckTop - headW.y;
         // 깊게 내려왔고 그 끝이 누운 몸일 때만 무게가 실린다. 하나만 보면 접고 선 몸이 통과한다.
-        if (span / bodyScale >= LAND_LIE) landSq = LAND_FOR;
+        if (span >= LAND_LIE) landSq = LAND_FOR;
       }
     }
     keeperShadow.position.set((headW.x + footX) * 0.5, 0.03, (headW.z + footZ) * 0.5);
@@ -2324,9 +2332,6 @@ const TOUCHED = new Set(['contact']);
       // 세계시간이 멈춘 첫 프레임이 그 한 걸음을 따라잡아 정지 프레임 두 장이 갈린다.
       passerShadows[i].position.set(p.position.x, 0.03, p.position.z);
     }
-    syncFootContacts(keeper,keeper.userData.contactFeet,0); // 재착용으로 리그가 바뀌어도 현재 발 앵커를 읽는다.
-    syncFootContacts(kicker,kicker.userData.contactFeet,1); // 키커도 실제 양발 위치를 따른다.
-    passers.forEach((p,i)=>syncFootContacts(p,p.userData.walker.feet,i+2)); // 두 선수 뒤의 슬롯은 행인 순서를 보존한다.
     kickerShadow.position.set(kicker.position.x, 0.03, kicker.position.z);
     // 잔상은 지나온 자리를 따라간다. 매 프레임 전부 옮기면 공이 여덟 개인 것으로 읽힌다.
     // 세계시간이 멈추면 잔상도 그 프레임의 모습 그대로 서 있어야 한다.
@@ -2530,8 +2535,7 @@ const TOUCHED = new Set(['contact']);
 
   // 어느 해상도로 구웠는지. 캔버스 크기만 보면 두 갈래가 같은 수를 내므로 밖에서 못 가른다.
   window.__pixState = () => ({
-    on: PIX, filtered:displayMat===postMat, stencil:rt.stencilBuffer, samples:rt.samples, shadowType:renderer.shadowMap.type,
-    lights:scene.children.filter(o=>o.isLight).map(o=>o.type),
+    on: PIX,
     rt: [rt.width, rt.height],
     canvas: [renderer.domElement.width, renderer.domElement.height],
     dpr: renderer.getPixelRatio()

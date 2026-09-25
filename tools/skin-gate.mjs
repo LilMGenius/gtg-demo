@@ -36,6 +36,23 @@ try {
   await p.reload({ waitUntil: "load" });
   await p.waitForSelector("#go", { timeout: 15000 });
   await p.click("#go", { force: true });
+  // condition-gate의 저장 경로로 외형 비교 전에 구매 조건만 충족한다.
+  await p.evaluate(async () => {
+    window.__persist();
+    const key = window.__saveKey(), data = JSON.parse(localStorage.getItem(key));
+    const gear = await import("/web/src/state/gear.mjs"), keeper = data.squad[data.pick];
+    for (const list of [gear.HAIRS, gear.TATTOOS, gear.GLOVES, gear.BOOTS, gear.KITS, gear.SOCKS]) {
+      for (const item of list) if (item.condition) {
+        const {key:field,min} = item.condition;
+        if (field === "fans") data.fans = Math.max(data.fans, min);
+        else keeper[field] = Math.max(keeper[field], min);
+      }
+    }
+    data.keeper = structuredClone(keeper);
+    localStorage.setItem(key, JSON.stringify(data));
+  });
+  await p.goto(BASE.split("&preset=")[0], {waitUntil:"load"});
+  await p.click("#go", {force:true});
   const from = await p.evaluate(() => window.__frames());
   await p.waitForFunction((n) => window.__frames() >= n, from + LEAD, { timeout: 20000 });
   // 세계를 멈춘다. 이 뒤의 두 장이 다르면 그 차이는 시간이 아니라 스킨이다.

@@ -9,17 +9,19 @@ const BLOCKS = 50;
 const REPLICATES = 1000;
 // HOTL 가설: 양측 95% 구간은 작은 가드 변동을 결함으로 오인하지 않기 위한 이번 랩의 해상도다.
 const TAIL = 0.025;
-// 고정 재표집 시드는 제품 난수와 별개라 게이트의 결정론 재현을 유지한다.
+// 2803은 P28-U3의 식별자를 재표집 시드로 쓴 값이며 제품 난수와 독립해 결정론 재현을 유지한다.
 const SEED = 2803;
 
-export function resolution(name, observations, scale = 100) {
+// 기본 배율 100은 비율을 퍼센트로 출력한다. 수입과 세트 간격은 배율 1로 원 단위를 유지한다.
+export function resolution(name, observations, scale = 100, statistic = null) {
   if (!observations.length) throw new Error('해상도 표본 없음: '+name);
   const width = observations[0].length;
   const blocks = Array.from({length:Math.min(BLOCKS,observations.length)},()=>Array(width).fill(0));
   observations.forEach((row,i)=>row.forEach((value,j)=>{ blocks[Math.floor(i*blocks.length/observations.length)][j]+=value; }));
   const total=blocks.reduce((sum,row)=>sum.map((v,j)=>v+row[j]),Array(width).fill(0));
   // 열 둘은 비율 하나, 열 넷은 같은 시드의 두 비율 차다. 0 분모는 정밀 부족이며 통과로 간주하지 않는다.
-  const estimate = row => row[0]/row[1]-(width===4 ? row[2]/row[3] : 0);
+  // 파생 구매 간격은 동일 블록의 수입 앵커를 기존 구매 순회에 넣는다. 판정 문턱에는 쓰지 않는다.
+  const estimate = statistic || (row => row[0]/row[1]-(width===4 ? row[2]/row[3] : 0));
   const point=estimate(total)*scale, rng=makeRng(SEED), draws=[];
   for(let b=0;b<REPLICATES;b++) {
     const sum=Array(width).fill(0);
