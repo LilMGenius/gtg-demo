@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { webcrypto } from 'node:crypto';
+import { createServer } from 'node:http';
+import { createRequire } from 'node:module';
+import { chromium } from 'playwright';
 import { VERSION } from '../web/src/build.mjs';
 import { createTelemetry, TELEMETRY_ENDPOINT, STORAGE_KEY, OPT_OUT_KEY, DNT_KEY,
   DAILY_LIMIT, RING_LIMIT, BATCH_BYTES } from '../web/src/telemetry.mjs';
@@ -36,7 +39,7 @@ const SHORT_LENGTH = 7;
 const BEFORE_MIDNIGHT = '2026-09-25T23:59:59';
 // 현지 날짜가 바뀌었을 때만 일일 예산이 다시 열려야 한다.
 const AFTER_MIDNIGHT = '2026-09-26T00:00:01';
-const evidenceDir = fileURLToPath(new URL('../.omo/evidence/p24-t1/', import.meta.url));
+const evidenceDir = fileURLToPath(new URL('../.omo/evidence/u4b/telemetry/', import.meta.url));
 mkdirSync(evidenceDir, { recursive: true });
 const invocation = 'node tools/telemetry-gate.mjs';
 const results = [];
@@ -309,10 +312,131 @@ try {
   globalThis.fetch = originalFetch;
 }
 
+// 기존 봇 계기가 쓰는 브라우저와 같은 실행 파일로 실제 화면 배선을 잰다.
+const executablePath = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
+const base = 'http://127.0.0.1:10310/web/index.html';
+// 호출자가 지정한 데스크톱 수용 시나리오다.
+const viewport = { width: 1280, height: 720 };
+// 신인 한 세트의 재시작과 자막을 모두 기다리는 상한이다. 타이머를 건너뛰지 않는다.
+const JOURNEY_MS = 180000;
+// 요청 수집을 비동기 Beacon 큐가 서버까지 전달할 때까지 기다리는 짧은 폴링이다.
+const POLL_MS = 100;
+// JPEG는 증거 화면을 읽을 수 있으면서 세션의 이미지 바이트를 제한한다.
+const JPEG_QUALITY = 80;
+// HTTP 성공 응답 코드로 죽은 정적 서버를 브라우저 실패와 구분한다.
+const HTTP_OK = 200;
+const plantedName = 'private-user-name';
+const batches = [];
+const server = createServer((req, res) => {
+  let body = '';
+  req.on('data', chunk => { body += chunk; });
+  req.on('end', () => { batches.push(JSON.parse(body)); res.end('ok'); });
+});
+let browser;
+let browserVersion;
+try {
+  assert.equal((await fetch(base)).status, HTTP_OK);
+  await new Promise(resolve => server.listen(ZERO, '127.0.0.1', resolve));
+  const endpoint = 'http://127.0.0.1:' + server.address().port + '/batch';
+  browser = await chromium.launch({ executablePath });
+  browserVersion = browser.version();
+  for (const mode of ['hand', 'bot']) {
+    await axis('browser-journey-' + mode, '실제 한 세트와 둘째 시작, 훈련, 봇 전환, 재방문 및 오류 범주', async () => {
+      const context = await browser.newContext({ viewport });
+      const page = await context.newPage();
+      const requests = [], errors = [];
+      page.on('request', request => {
+        if (new URL(request.url()).origin !== new URL(base).origin) requests.push(request.url());
+      });
+      page.on('pageerror', error => errors.push(error.message));
+      // 제품 기본값은 유지한다. 봇 대조군만 모듈 응답에서 시험 수집기를 주입한다.
+      await page.route('**/web/src/telemetry.mjs', async route => {
+        let source = (await (await route.fetch()).text()).replaceAll('\r\n', '\n');
+        if (mode === 'bot') source = source.replace("TELEMETRY_ENDPOINT = ''", 'TELEMETRY_ENDPOINT = ' + JSON.stringify(endpoint));
+        assert.ok(source.includes('return {\n    record, accrueIdle, flush,'));
+        source = source.replace('return {\n    record, accrueIdle, flush,', 'return window.__testTelemetry = {\n    record, accrueIdle, flush,');
+        await route.fulfill({ body: source, contentType: 'text/javascript' });
+      });
+      try {
+        await page.goto(base + '?seed=20&preset=veteran&src=' + plantedName);
+        await page.waitForFunction(() => window.__telemetry && window.__bot);
+        assert.deepEqual(await page.evaluate(() => window.__telemetry()), []);
+        if (mode === 'bot') {
+          // 크레딧은 구입 가능한 첫 봇의 한 판 이상분으로 넣고 실제 전환 버튼을 누른다.
+          await page.evaluate(async () => {
+            const { BOTS } = await import('/web/src/state/bot.mjs');
+            // 분 단위 상품을 저장소의 밀리초 단위로 바꾸는 환산이다.
+            const MINUTE_MS = 60000;
+            const [first] = BOTS;
+            Object.assign(window.__bot(), { tier: first.tier, ms: first.minutes * MINUTE_MS });
+          });
+          await page.locator('#auto').dispatchEvent('pointerdown');
+        }
+        await page.locator('#go').click({ force: true });
+        // waitForFunction은 Promise 자체를 참으로 볼 수 있어 동기 고리만 폴링한다.
+        await page.waitForFunction(() => window.__testTelemetry.snapshot().some(e => e.event === 'second_set_start'), null, { timeout: JOURNEY_MS });
+        await page.evaluate(() => window.__lockRound());
+        if (mode === 'hand') {
+          await page.locator('#gymBtn').dispatchEvent('pointerdown');
+          await page.locator('#gym .row button:not([disabled])').first().click();
+          await page.locator('#gym .close').click();
+        } else await page.locator('#auto').dispatchEvent('pointerdown');
+        const beforeError = await page.evaluate(() => window.__telemetry());
+        assert.deepEqual(errors, []);
+        // 자유 문자열을 가진 오류도 범주만 남고 허용 목록 밖 사건은 떨어져야 한다.
+        const rejected = await page.evaluate(name => {
+          const rejected = window.__testTelemetry.record(name, { mode: 'hand' });
+          dispatchEvent(new ErrorEvent('error', { message: name }));
+          return rejected;
+        }, plantedName);
+        assert.equal(rejected, false);
+        await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pagehide')));
+        const events = await page.evaluate(() => window.__telemetry());
+        const journey = events.filter(e => ['first_playable', 'first_contact', 'set_complete', 'second_set_start'].includes(e.event));
+        assert.deepEqual(journey.map(e => e.event), ['first_playable', 'first_contact', 'set_complete', 'second_set_start']);
+        assert.ok(journey.every(e => e.mode === mode));
+        assert.ok(events.some(e => e.event === 'training_spent' && e.data.amount > ZERO && e.mode === mode));
+        assert.equal(events.at(-ONE).event, 'error');
+        assert.deepEqual(events.at(-ONE).data, { category: 'runtime' });
+        assert.ok(events.every((e, index) => e.sequence === index + ONE && e.source === 'direct'));
+        const leaks = value => JSON.stringify(value).includes(plantedName);
+        assert.equal(leaks({ source: plantedName }), true);
+        assert.equal(leaks(events), false);
+        if (mode === 'hand') assert.equal(requests.length, ZERO);
+        else {
+          const until = Date.now() + JOURNEY_MS;
+          while (!batches.length && Date.now() < until) await new Promise(resolve => setTimeout(resolve, POLL_MS));
+          assert.ok(requests.includes(endpoint));
+          assert.deepEqual(batches.flatMap(batch => batch.events), events);
+          assert.equal(leaks(batches), false);
+          assert.ok(events.some(e => e.event === 'bot_on' && e.mode === 'bot'));
+          assert.ok(events.some(e => e.event === 'bot_off' && e.mode === 'hand'));
+        }
+        const screenshot = evidenceDir + mode + '-second-set.jpg';
+        await page.screenshot({ path: screenshot, type: 'jpeg', quality: JPEG_QUALITY });
+        await page.evaluate(() => window.__persist());
+        await page.reload();
+        await page.waitForFunction(() => window.__testTelemetry?.snapshot().some(e => e.event === 'return_visit'));
+        const returned = await page.evaluate(() => window.__telemetry());
+        assert.equal(returned.filter(e => e.event === 'return_visit').length, ONE);
+        assert.equal(returned[ZERO].install_id, events[ZERO].install_id);
+        assert.notEqual(returned[ZERO].session_id, events[ZERO].session_id);
+        return { events, beforeError, returned, rejected, crossOriginRequests: requests, batches: structuredClone(batches), screenshot };
+      } finally { await context.close(); }
+    });
+  }
+} catch (error) {
+  results.push({ name: 'browser-setup', scenario: '서버와 Chromium 실행', invocation, pass: false, error: error.stack });
+} finally {
+  await browser?.close();
+  await new Promise(resolve => server.close(resolve));
+}
+
 const failed = results.filter(result => !result.pass);
 const report = { invocation, captured_at: new Date().toISOString(),
   binary: { path: process.execPath, version: process.version,
-    declaredEngines: JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).engines ?? null },
+    declaredEngines: JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).engines ?? null,
+    playwright: createRequire(import.meta.url)('playwright/package.json').version, executablePath, browserVersion },
   pass: !failed.length, results };
 const artifact = evidenceDir + 'gate.json';
 writeFileSync(artifact, JSON.stringify(report, null, PAIR) + '\n');
