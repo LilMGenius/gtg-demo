@@ -1077,8 +1077,8 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #shop .card.gear .condition ~ .foot .buy:disabled .px:not(.bad-price):not(.bad-cash){color:var(--ink)}
 /* 조건 문구 다음 줄에 진행 막대와 분수를 함께 둔다. 0 최소 폭은 막대가 글자를 밀지 않게 한다. */
 /* 머리글은 조건 개수와 무관하게 한 번만 나타나고, 이름과 잠금 그림은 같은 줄에 선다. */
-/* 머리글은 본문의 80%로 낮춰 조건 이름보다 먼저 눈에 띄지 않게 한다. */
-#shop .card.gear > .condition-label{width:100%;font-size:.8em;color:var(--dim)}
+/* 조건 머리글도 본문 토큰을 쓰고 옅은 색으로 위계를 구분한다. */
+#shop .card.gear > .condition-label{width:100%;font-size:var(--fs-body);color:var(--dim)}
 #shop .card.gear .condition .condition-label{display:flex;align-items:center;gap:var(--gap-1);width:100%}
 /* 본문 한 글자 크기의 그림은 조건 이름의 기준선을 바꾸지 않는다. */
 #shop .card.gear .condition svg{width:1em;height:1em;flex:none}
@@ -1417,7 +1417,7 @@ h1,h2,h3,h4,h5,h6,#shop .card > b,#shop .venue-subtitle{ text-wrap:balance; }
    https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/transform-function/rotate3d
    rotate3d는 MDN 플랫폼 기능이며 단일 6도 회전으로 요청 상한 8도 안에 둔다.
    6초 대기·900ms 조작·160ms 응답은 승인 시안의 리듬이다. */
-#shop .pack-card,#shop .legend-showcase{--tier:var(--good);--gold:#ffd83d;--s1:var(--gap-1);--s2:var(--gap-2);--s3:var(--gap-3);--s6:24px;--name:24px;--title:32px;--body-size:var(--fs-body);--number:var(--fs-num);--idle:6s;--sweep:900ms;--response:160ms;--lean:6deg}
+#shop .pack-card,#shop .legend-showcase{--tier:var(--good);--idle:6s;--sweep:900ms;--response:160ms;--lean:6deg}
 /* 520px는 두 가격을 같은 줄에 읽는 폭, 100%는 작은 화면의 기둥을 넘지 않는 한계다. */
 #shop .card.pack-card{width:min(100%,520px);--tier:var(--good);border-color:var(--tier);background:linear-gradient(var(--panel),var(--edge))}
 #shop .card.pack-card.legend{--tier:#ffd83d}
@@ -1427,7 +1427,7 @@ h1,h2,h3,h4,h5,h6,#shop .card > b,#shop .venue-subtitle{ text-wrap:balance; }
 /* 포장 176×232는 카드 실물 비율이고 무대 254는 기울임과 그림자의 여백을 포함한다. */
 #shop .pack-stage{height:254px;display:grid;place-items:center}#shop .pack-art{position:relative;display:block;width:176px;height:232px;padding:0;border:0;background:none;isolation:isolate;filter:drop-shadow(0 12px 8px #0009);transition:transform var(--response),filter var(--response)}#shop .pack-art>svg{display:block;width:100%;height:100%}#shop .pack-card .foil{position:absolute;inset:0;overflow:hidden;clip-path:polygon(4% 0,96% 0,100% 4%,98% 96%,94% 100%,6% 100%,2% 96%,0 4%);pointer-events:none}
 /* 34~64% 빛띠와 ±100% 이동은 포장 바깥에서 시작·종료해 단절을 숨긴다. 700px 원근은 글자를 읽게 하고 14px 광택은 선택을 알린다. */
-#shop .pack-card .foil::before{content:'';position:absolute;inset:-30%;background:linear-gradient(115deg,transparent 34%,#fff8 48%,#fff1 53%,transparent 64%);mix-blend-mode:color-dodge;transform:translateX(-100%);animation:shop-foil var(--idle) ease-in-out infinite}#shop .pack-art:is(:hover,:focus-visible){transform:perspective(700px) rotate3d(1,-1,0,var(--lean));filter:drop-shadow(0 0 14px color-mix(in srgb,var(--tier),transparent 45%))}#shop .pack-art:is(:hover,:focus-visible) .foil::before{animation:shop-sweep var(--sweep) ease-out infinite}#shop .pack-art:focus-visible{outline:var(--line) solid var(--ink);outline-offset:var(--s2)}
+#shop .pack-card .foil::before{content:'';position:absolute;inset:-30%;background:linear-gradient(115deg,transparent 34%,#fff8 48%,#fff1 53%,transparent 64%);mix-blend-mode:color-dodge;transform:translateX(-100%);animation:shop-foil var(--idle) ease-in-out infinite}#shop .pack-art:is(:hover,:focus-visible){transform:perspective(700px) rotate3d(1,-1,0,var(--lean));filter:drop-shadow(0 0 14px color-mix(in srgb,var(--tier),transparent 45%))}#shop .pack-art:is(:hover,:focus-visible) .foil::before{animation:shop-sweep var(--sweep) ease-out infinite}#shop .pack-art:focus-visible{outline:var(--line) solid var(--ink);outline-offset:var(--gap-2)}
 /* 대기 반사는 회차 후반에만 지나가고 조작 반사는 바로 포장 전체를 지난다. */
 @keyframes shop-foil{0%,55%{transform:translateX(-100%);opacity:0}65%{opacity:.65}100%{transform:translateX(100%);opacity:0}}@keyframes shop-sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
 
@@ -1445,11 +1445,11 @@ h1,h2,h3,h4,h5,h6,#shop .card > b,#shop .venue-subtitle{ text-wrap:balance; }
 #shop .pack-card .buy.pull>i{max-width:100%}
 #shop .pack-card .buy.pull .price{flex-wrap:wrap;justify-content:center}
 /* 무대의 65% 광원 범위는 중앙 선수를 강조하고 3장의 동일 폭 카드는 한정 상품 오인을 피한다. */
-#shop .legend-showcase{background:radial-gradient(ellipse at 50% 0,#ffd83d30,transparent 65%),var(--panel);padding:var(--s3) 0;text-align:center}#shop .legend-showcase h2{font:var(--title) var(--disp);color:var(--gold)}#shop .legend-showcase>p{color:var(--dim);margin:var(--s2)}#shop .legend-showcase .players{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s6);padding:var(--s6)}
+#shop .legend-showcase{background:radial-gradient(ellipse at 50% 0,#ffd83d30,transparent 65%),var(--panel);padding:var(--gap-3) 0;text-align:center}#shop .legend-showcase h2{font:var(--fs-title) var(--disp);color:#ffd83d}#shop .legend-showcase>p{color:var(--dim);margin:var(--gap-2)}#shop .legend-showcase .players{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--gap-3);padding:var(--gap-3)}
 /* 3px 금테 바깥으로 빛이 새지 않게 격리하고 4초 주기는 전설 프레임의 신호다. */
-#shop .legend-showcase .player{position:relative;isolation:isolate;overflow:hidden;padding:var(--line);background:var(--gold);box-shadow:0 var(--s2) var(--s3) #000}#shop .legend-showcase .player::before{content:'';position:absolute;inset:-50%;background:conic-gradient(transparent 20%,#fff8 25%,transparent 30%,transparent 70%,#fff 75%,transparent 80%);animation:shop-rim 4s linear infinite;z-index:-1}#shop .legend-showcase .player-inner{background:linear-gradient(#30291b,var(--edge));height:100%;padding:var(--s3);position:relative}#shop .legend-showcase .player-inner::before{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 20%,#ffd83d15 50%,transparent 80%);pointer-events:none}#shop .legend-showcase .fame{position:absolute;left:var(--s3);top:var(--s3);color:var(--gold);font:var(--name) var(--disp)}#shop .legend-showcase .fame small{display:block;font:var(--body-size) var(--body)}
+#shop .legend-showcase .player{position:relative;isolation:isolate;overflow:hidden;padding:var(--line);background:#ffd83d;box-shadow:0 var(--gap-2) var(--gap-3) #000}#shop .legend-showcase .player::before{content:'';position:absolute;inset:-50%;background:conic-gradient(transparent 20%,#fff8 25%,transparent 30%,transparent 70%,#fff 75%,transparent 80%);animation:shop-rim 4s linear infinite;z-index:-1}#shop .legend-showcase .player-inner{background:linear-gradient(#30291b,var(--edge));height:100%;padding:var(--gap-3);position:relative}#shop .legend-showcase .player-inner::before{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 20%,#ffd83d15 50%,transparent 80%);pointer-events:none}#shop .legend-showcase .fame{position:absolute;left:var(--gap-3);top:var(--gap-3);color:#ffd83d;font:var(--fs-title) var(--disp)}#shop .legend-showcase .fame small{display:block;font:var(--fs-body) var(--body)}
 /* 262px 전신은 데스크톱 무대에서 이름보다 먼저 보이도록 기존 썸네일을 확대한다. */
-#shop .legend-showcase .player img{height:262px;max-width:100%;object-fit:contain;display:block;margin:auto}#shop .legend-showcase .player h3{font:var(--name) var(--disp);margin:var(--s2) 0}#shop .legend-showcase .stats{display:flex;justify-content:center;gap:var(--s3);color:var(--dim)}#shop .legend-showcase .stats b{display:block;color:var(--ink);font:var(--number) var(--disp)}#shop .legend-showcase .market{max-width:360px;margin:0 auto;--tier:var(--gold)}@keyframes shop-rim{to{transform:rotate(360deg)}}
+#shop .legend-showcase .player img{height:262px;max-width:100%;object-fit:contain;display:block;margin:auto}#shop .legend-showcase .player h3{font:var(--fs-title) var(--disp);margin:var(--gap-2) 0}#shop .legend-showcase .stats{display:flex;justify-content:center;gap:var(--gap-3);color:var(--dim)}#shop .legend-showcase .stats b{display:block;color:var(--ink);font:var(--fs-num) var(--disp)}#shop .legend-showcase .market{max-width:360px;margin:0 auto;--tier:#ffd83d}@keyframes shop-rim{to{transform:rotate(360deg)}}
 
 #shop .pack-nav button:focus-visible,#shop .legend-showcase .market:focus-visible{outline:var(--line) solid var(--ink);outline-offset:var(--gap-1)}
 /* 스코프가 붙은 쇼케이스는 진열 기둥 전체를 쓰고, 제목은 전역 h3 영향을 받지 않는다. */
@@ -1458,70 +1458,83 @@ h1,h2,h3,h4,h5,h6,#shop .card > b,#shop .venue-subtitle{ text-wrap:balance; }
 /* 520px 아래는 한 열에 전신을 유지한다. 포장 142×188과 무대 204는 세로 폰의 약속 공간을 남긴다. */
 @media(max-width:520px){#shop .pack-stage{height:204px}#shop .pack-art{width:142px;height:188px}#shop .legend-showcase .players{grid-template-columns:1fr}#shop .legend-showcase .player img{height:262px}}
 /* 480픽셀 이하 가로 화면은 전신과 이름·수치를 나란히 놓아 360픽셀 높이에도 세 선수를 비교한다.
-   112픽셀 전신과 44% 그림 열은 이름 두 줄·수치 두 줄을 남기며 14/18픽셀 글자는 작은 카드의 위계를 유지한다. */
+   112픽셀 전신과 44% 그림 열은 이름 두 줄·수치 두 줄을 남기며 글자 위계는 전역 토큰을 따른다. */
 @media (orientation:landscape) and (max-height:480px){
   #shop:has(.legend-showcase) .fitting{display:none}
-  #shop .legend-showcase{padding:var(--gap-1) 0;--name:18px;--number:18px;--body-size:14px}
+  #shop .legend-showcase{padding:var(--gap-1) 0}
   #shop .legend-showcase>h4{margin:0;font-size:var(--fs-body)}
-  #shop .legend-showcase>p{margin:var(--gap-1);font-size:var(--body-size)}
+  #shop .legend-showcase>p{margin:var(--gap-1);font-size:var(--fs-body)}
   #shop .legend-showcase .players{gap:var(--gap-2);padding:var(--gap-2)}
   #shop .legend-showcase .player-inner{display:grid;grid-template-columns:44% minmax(0,1fr);align-content:center;align-items:center;padding:var(--gap-1);column-gap:var(--gap-1)}
   #shop .legend-showcase .player img{grid-column:1;grid-row:1 / 4;width:100%;height:112px}
-  #shop .legend-showcase .fame{position:static;grid-column:2;font-size:var(--body-size)}
+  #shop .legend-showcase .fame{position:static;grid-column:2;font-size:var(--fs-body)}
   #shop .legend-showcase .fame small{display:inline;margin-right:var(--gap-1)}
   #shop .legend-showcase .player h3{grid-column:2;margin:var(--gap-1) 0;word-break:keep-all}
-  #shop .legend-showcase .stats{grid-column:2;display:grid;gap:var(--gap-1);font-size:var(--body-size)}
+  #shop .legend-showcase .stats{grid-column:2;display:grid;gap:var(--gap-1);font-size:var(--fs-body)}
   #shop .legend-showcase .stats span{display:flex;justify-content:space-between;gap:var(--gap-1);white-space:nowrap}
 }
 /* 감소 동작은 대기·조작·금테 모두 멈추며 초점 윤곽은 유지한다. */
 @media(prefers-reduced-motion:reduce){#shop .pack-card *,#shop .pack-card *::before,#shop .legend-showcase *,#shop .legend-showcase *::before{animation:none!important;transition:none!important}#shop .pack-art:is(:hover,:focus-visible){transform:none}#shop .pack-card .foil::before{transform:none;opacity:0}}
 
-/* 경기장은 시착 의상이 아니므로 진열에 폭을 돌린다. 그림 120픽셀과 제목 20픽셀은 네 시설의 비교 공간이다. */
+/* 경기장은 시착 의상이 아니므로 진열에 폭을 돌린다. */
 #shop:has(.card[data-spec="city"]) .fitting{display:none}
-#shop .rack:has(.card[data-spec="city"]){align-items:stretch}
-/* 데스크톱의 그림 96픽셀과 조건의 작은 여백은 값 버튼까지 첫 화면에 담는다. */
+#shop .rack:has(.card[data-spec="city"]){align-items:stretch;row-gap:var(--gap-1)}
+/* CSS subgrid를 재사용해 카드별 내용 높이를 같은 선반의 행에 맞춘다.
+   https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Grid_layout/Subgrid
+   아홉 행은 그림·제목·효과·조건 머리글·조건 셋·가격·예고 순서다. */
+#shop .card[data-spec="city"]{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;grid-template-rows:subgrid;grid-row:span 9}
+#shop .card[data-spec="city"]>.pic{grid-row:1}
+#shop .card[data-spec="city"]>b{grid-row:2}
+#shop .card[data-spec="city"]>em{grid-row:3}
+#shop .card[data-spec="city"]>.condition-label{grid-row:4}
+#shop .card[data-spec="city"]>.condition:nth-of-type(1){grid-row:5}
+#shop .card[data-spec="city"]>.condition:nth-of-type(2){grid-row:6}
+#shop .card[data-spec="city"]>.condition:nth-of-type(3){grid-row:7}
+#shop .card[data-spec="city"]>.foot{grid-row:8;align-self:end}
+#shop .card[data-spec="city"]>.venue-modes{grid-row:9;align-content:start}
+/* 그림 96픽셀은 기존 카드의 썸네일 높이를 유지한다. */
 #shop .card[data-spec="city"] .shot{height:96px;aspect-ratio:auto}
-/* 1.3줄 간격 두 줄을 예약해 개최 도시가 길어도 효과가 같은 높이에 선다. */
-#shop .card[data-spec="city"]>b{font-size:18px;min-height:2.6em}
-/* 14픽셀 본문과 48픽셀 예고는 조건 세 줄과 가격을 데스크톱 높이에 함께 남긴다. */
-#shop .card[data-spec="city"]{font-size:14px}
-#shop .card[data-spec="city"] em,#shop .card[data-spec="city"] .condition{font-size:14px}
-/* 조건 이름은 14픽셀, 분수는 12픽셀, 안쪽 여백은 2픽셀로 두어 가격을 함께 읽는다. */
-/* 회전한 카드에서도 조건 이름의 아래 경계와 분수가 겹치지 않게 기존 최소 간격 토큰을 쓴다. */
-#shop .card[data-spec="city"] .condition{padding:2px;gap:var(--gap-1);line-height:1.2}
-#shop .card[data-spec="city"] .condition small{font-size:12px;line-height:1.2}
-#shop .card[data-spec="city"] .mode-coming{min-height:48px}
-/* 480픽셀 이하 가로 화면은 그림·이름과 조건을 두 열에 놓는다. 440픽셀 카드는 좌우 스크롤로 비교하고 42%는 그림 몫이다. */
+#shop .card[data-spec="city"]>b{font-size:var(--fs-title);min-height:0}
+#shop .card[data-spec="city"],#shop .card[data-spec="city"] em{font-size:var(--fs-body)}
+/* 조건 이름 다음 행의 막대와 수치를 유지한다. 기존 1.2줄 높이와 세로 여백 0은 세 조건과 가격을 가로 폰에도 남긴다. */
+#shop .card[data-spec="city"] .condition{padding:0 var(--gap-1);gap:var(--gap-1);font-size:var(--fs-body);line-height:1.2}
+#shop .card[data-spec="city"] .condition small{font-size:var(--fs-body)}
+/* 구매 정보 다음에 출시 예고를 놓아 긴 예고가 가격을 밀지 못한다. */
+#shop .card[data-spec="city"]>.venue-modes{order:1}
+#shop .card[data-spec="city"]>.foot{margin-top:var(--gap-1)}
+/* 480픽셀 이하 가로 화면은 기존 440픽셀 카드의 그림·이름과 조건을 두 열로 나눈다. */
 @media (orientation:landscape) and (max-height:480px){
-  #shop .rack:has(.card[data-spec="city"]){display:flex;overflow-x:auto;max-height:none;align-items:stretch}
-  /* 첫 행 68·둘째 48픽셀에 그림과 조건을 놓고 이름 48·효과 54픽셀을 예약한다. 가격은 효과 옆에 두고 예고는 아래로 이어진다. */
-  #shop .card[data-spec="city"]{display:grid;grid-template-columns:42% minmax(0,1fr);flex:0 0 440px;align-content:start;grid-template-rows:68px 48px 48px 54px auto;column-gap:var(--gap-2)}
-  #shop .card[data-spec="city"]>.pic{grid-column:1;grid-row:1 / span 2}
-  #shop .card[data-spec="city"] .shot{height:120px}
-  #shop .card[data-spec="city"]>b{grid-column:1;grid-row:3}
-  #shop .card[data-spec="city"]>em{grid-column:1;grid-row:4}
-  #shop .card[data-spec="city"]>.condition-label{grid-column:2;grid-row:1;align-self:start}
+  /* 가로 카드의 일곱 행을 공유하고 기존 440픽셀 너비로 옆에 진열한다. */
+  #shop .rack:has(.card[data-spec="city"]){grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:440px;grid-template-rows:repeat(7,auto);overflow-x:auto;max-height:none;align-items:stretch}
+  /* 42%는 기존 그림 열 비율이다. 행 높이는 내용이 결정해 본문 확대에도 겹치지 않는다. */
+  #shop .card[data-spec="city"]{display:grid;grid-template-columns:42% minmax(0,1fr);grid-row:1 / span 7;align-content:start;column-gap:var(--gap-2)}
+  #shop .card[data-spec="city"]>.pic{grid-column:1;grid-row:1 / span 3}
+  #shop .card[data-spec="city"]>b{grid-column:1;grid-row:4 / span 2}
+  #shop .card[data-spec="city"]>em{grid-column:1;grid-row:6}
+  #shop .card[data-spec="city"]>.condition-label{grid-column:2;grid-row:1}
   #shop .card[data-spec="city"]>.condition{grid-column:2}
-  #shop .card[data-spec="city"]>.condition:nth-of-type(1){grid-row:1;margin-top:20px;align-self:start}
-  #shop .card[data-spec="city"]>.condition:nth-of-type(2){grid-row:2}
-  #shop .card[data-spec="city"]>.condition:nth-of-type(3){grid-row:3}
-  #shop .card[data-spec="city"]>.venue-modes{grid-column:1 / -1;grid-row:5}
-  #shop .card[data-spec="city"]>.foot{grid-column:2;grid-row:4;align-self:end}
+  /* 머리글 다음 세 행은 조건, 그 다음 행은 가격이라 순서와 좌표가 일치한다. */
+  #shop .card[data-spec="city"]>.condition:nth-of-type(1){grid-row:2}
+  #shop .card[data-spec="city"]>.condition:nth-of-type(2){grid-row:3}
+  #shop .card[data-spec="city"]>.condition:nth-of-type(3){grid-row:4}
+  #shop .card[data-spec="city"]>.foot{grid-column:2;grid-row:5 / span 2;align-self:end}
+  /* 출시 예고는 구매 정보 뒤의 전폭 행에서 줄바꿈한다. */
+  #shop .card[data-spec="city"]>.venue-modes{grid-column:1 / -1;grid-row:7}
 }
 /* 국기 시작값은 progression 계약의 24×18 CSS 픽셀과 안쪽 8픽셀이다. 2픽셀 모서리와 1/4픽셀 그림자는 흰 국기의 경계를 남긴다. */
 #shop .venue-flag{position:absolute;width:24px;height:18px;top:8px;right:8px;object-fit:cover;z-index:2;border-radius:2px;box-shadow:0 1px 4px #0008}
-/* 잠금은 채도 35%와 불투명도 65%로 시착 그림을 남긴다. 간격 4/6/8픽셀은 기존 작은 카드 간격이고 10/12픽셀 글자는 예고와 본문 위계를 나눈다. */
+/* 잠금은 채도 35%와 불투명도 65%로 시착 그림을 남긴다. 간격과 글자 크기는 전역 토큰을 따라 예고도 본문처럼 읽힌다. */
 #shop .venue-locked .shot{filter:saturate(.35);opacity:.65}
 #shop .card[data-spec="city"]>b{white-space:normal;word-break:keep-all;line-height:1.3}
 /* 보조 설명을 별도 줄로 두어도 가격을 첫 화면에 남기도록 기존 최소 간격 토큰으로 묶는다. */
 #shop .venue-modes{display:flex;flex-wrap:wrap;gap:var(--gap-1);margin-top:var(--gap-1)}
-#shop .venue-shipped{width:100%;font-size:12px;color:#c7ddc8}
+#shop .venue-shipped{width:100%;font-size:var(--fs-body);color:#c7ddc8}
 /* 시설명과 개최 도시, 출시 모드와 보조 설명은 각자 줄에서 읽는다. */
-#shop .venue-subtitle{display:block;width:100%;font:inherit;color:var(--dim)}
+#shop .venue-subtitle{display:block;width:100%;font-size:var(--fs-body);color:var(--dim)}
 /* 예고는 너비 44%로 둘씩 놓고 높이 64픽셀로 손가락 자리를 확보한다. 30픽셀 그림은 32픽셀 열에 들어가며 선 두께 2픽셀은 작은 화면에서도 윤곽을 남긴다. */
-#shop .mode-coming{flex:1 1 44%;min-height:64px;border:1px dashed #75869b;border-radius:6px;background:#172536;color:#becada;display:grid;grid-template-columns:32px 1fr;align-items:center;padding:6px;text-align:left;cursor:pointer}
+#shop .mode-coming{flex:1 1 44%;min-height:64px;border:1px dashed #75869b;border-radius:6px;background:#172536;color:#becada;display:grid;grid-template-columns:32px 1fr;align-items:center;padding:var(--gap-1);text-align:left;cursor:pointer}
 #shop .mode-coming svg{width:30px;fill:none;stroke:currentColor;stroke-width:2;grid-row:span 2}
-#shop .mode-coming span{font-size:12px;word-break:keep-all}
-#shop .mode-coming small{font-size:10px;color:#93a8c2}
+#shop .mode-coming span{font-size:var(--fs-body);word-break:keep-all}
+#shop .mode-coming small{font-size:var(--fs-body);color:#93a8c2}
 #shop .mode-coming[aria-expanded="true"]{border-color:#e9cf89;background:#233b51}
-#shop .mode-preview{width:100%;margin:0;font-size:12px;line-height:1.4;color:#e9cf89}
+#shop .mode-preview{width:100%;margin:0;font-size:var(--fs-body);line-height:1.4;color:#e9cf89}

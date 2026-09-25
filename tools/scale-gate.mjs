@@ -29,16 +29,52 @@ const fails = [];
 const notes = [];
 const check = (name, ok, detail) => (ok ? notes : fails).push((ok ? "  ok   " : "  FAIL ") + name + " " + detail);
 
+// CSS 선언은 주석을 제외하고 읽는다. 축약형도 크기 토큰을 직접 써야 하며
+// 별칭의 선언을 함께 보고 숨은 원시 크기를 진단한다. 상속은 새 크기를 만들지 않는다.
+function cssScaleViolations(input) {
+  const css = input.replace(/\/\*[\s\S]*?\*\//g, "");
+  const aliases = new Map();
+  for (const match of css.matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)) {
+    const values = aliases.get(match[1]) || [];
+    values.push(match[2].trim());
+    aliases.set(match[1], values);
+  }
+  const bad = [];
+  for (const match of css.matchAll(/(?:^|[;{])\s*(font-size|font)\s*:\s*([^;}]+)/g)) {
+    const [, property, raw] = match;
+    const value = raw.trim();
+    if (property === "font-size" ? ALLOWED.has(value) : value === "inherit") continue;
+    if (property === "font") {
+      // 굵기와 기울기는 크기 앞에 올 수 있다. 크기 뒤에는 선택 줄높이와 글꼴이 따른다.
+      const size = value.match(/^(?:(?:normal|italic|oblique|small-caps|bold|bolder|lighter|[1-9]00)\s+)*(var\(--fs-(?:title|body|num)\))(?=\s|\/)/);
+      if (size) continue;
+    }
+    const trace = [...value.matchAll(/var\((--[\w-]+)\)/g)]
+      .filter(m => aliases.has(m[1])).map(m => m[1] + "=" + aliases.get(m[1]).join("|"));
+    bad.push(property + ":" + value + (trace.length ? " [" + trace.join(", ") + "]" : ""));
+  }
+  return bad;
+}
+
 function inspectCss() {
   for (const [index, path] of CSS_PATHS.entries()) {
     const css = readFileSync(path, "utf8");
-    const declarations = [...css.matchAll(/font-size\s*:\s*([^;}'\n]+)/g)];
-    const bad = declarations
-      .map((match) => match[1].trim())
-      .filter((value) => !ALLOWED.has(value));
+    const declarations = [...css.matchAll(/font(?:-size)?\s*:/g)];
+    const bad = cssScaleViolations(css);
     check("css:font-size-declarations-use-scale-tokens:" + CSS_FILES[index], bad.length === 0,
       bad.length ? bad.join(", ") : declarations.length + " declarations");
   }
+  // 17px는 토큰을 우회하는 임의의 원시 크기이며 각각 독립적으로 빨개져야 한다.
+  for (const [name, planted] of [
+    ["raw-size", ".control{font-size:17px}"],
+    ["raw-shorthand", ".control{font:700 17px var(--body)}"],
+    ["alias-shorthand", ".control{--hidden:17px;font:var(--hidden) var(--body)}"],
+    ["alias-size", ".control{--hidden:17px;font-size:var(--hidden)}"]
+  ]) {
+    const observed = cssScaleViolations(planted);
+    check("control:" + name, observed.length > 0, observed.join(", "));
+  }
+  check("control:valid-tokens", cssScaleViolations(".control{font:700 var(--fs-body) var(--body);font-size:var(--fs-title)}").length === 0, "직접 토큰 허용");
 }
 
 const surfaces = [
