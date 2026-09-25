@@ -372,9 +372,13 @@ function attributeContact(keeper, shot, input) {
   probes.push(["judgement", { judgement: keeper.judgement + 1 }]);
   let bestGain = -Infinity;
   let restored = false;
+  // 실제 접촉을 구하는 키퍼 훈련을 키커 약화보다 먼저 설명한다. 구하지 못한 경우에는 기존 최대 이득을 쓴다.
+  let keeperRescue;
+  let rescueGain = -Infinity;
   for (const [cause, over] of probes) {
     const gain = contactMargin(keeper, shot, input, over) - base;
     restored ||= base + gain > 0;
+    if (!cause.startsWith("kicker") && base + gain > 0 && gain > rescueGain) { keeperRescue = cause; rescueGain = gain; }
     if (gain > bestGain) { bestGain = gain; best = cause; }
   }
   {
@@ -383,7 +387,7 @@ function attributeContact(keeper, shot, input) {
     // 수동 자리 탓은 스탯 한 칸으로 복원되지 않으며 공 앞에 섰을 때 닿는 경우뿐이다.
     if (!input.auto && !restored && contactMargin(keeper, shot, { ...input, x: clamp(shot.aimX, -X_MAX, X_MAX) }, null) > 0) return "position";
   }
-  return best;
+  return keeperRescue ?? best;
 }
 
 // U1 선형 보간을 재사용한다. 키커에게 주는 접촉 전 경계는 aimAt이 소유한다.
