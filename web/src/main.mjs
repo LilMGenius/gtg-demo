@@ -296,6 +296,10 @@ const R = (x, y, w, h) => '<rect x="' + x + '" y="' + y + '" width="' + w + '" h
 // 머리 하나와 어깨 한 단. 아는 얼굴 카드와 빈 칸이 같이 쓰므로 몸은 한 곳에서만 그린다.
 const FACE_PX = R(9, 3, 6, 6) + R(6, 12, 12, 3) + R(3, 15, 18, 6);
 const IC_FANS = G('팔로워', FACE_PX);
+// 기존 24픽셀 SVG와 3픽셀 격자를 재사용한다. 열린 고리만 오른쪽으로 들어 충족 여부를 가른다.
+const LOCK_BODY = R(3, 12, 18, 9);
+const IC_LOCK = G('조건 미충족', LOCK_BODY + R(6, 3, 12, 3) + R(6, 6, 3, 6) + R(15, 6, 3, 6));
+const IC_UNLOCK = G('조건 충족', LOCK_BODY + R(12, 0, 9, 3) + R(12, 3, 3, 9) + R(18, 3, 3, 3));
 /* 아는 얼굴이 아직 없는 칸에 서는 실루엣. 부를 이름이 없어 제목을 안 단다. 제목은 그 칸의
    글자가 되어, 빈 채로 둔 칸을 글자를 든 칸으로 바꾼다. 그림은 카드가 세우는 그 실루엣
    그대로다. 여기만 다른 것을 그리면 빈 칸이 가리키는 것이 사람인지가 안 읽힌다. */
@@ -513,9 +517,9 @@ function formChip() {
      라벨만 붙이면 계산은 되어도 읽어 주는 자에게 간다는 보장이 없고, 실측으로 이 판이
      role=generic에 이름을 얹어 돌려줬다. title은 같은 이름을 마우스에 준다. */
   const name = '컨디션 ' + (up ? '좋음' : dn ? '나쁨' : '보통');
-  box.setAttribute('aria-label', name + ': ' + HUD_LINKS.form.label);
-  box.setAttribute('title', name + ': ' + HUD_LINKS.form.label);
-  hudSay('form', name + ': ' + HUD_LINKS.form.label);
+  box.setAttribute('aria-label', name + ' ' + HUD_LINKS.form.label);
+  box.setAttribute('title', name + ' ' + HUD_LINKS.form.label);
+  hudSay('form', name + ' ' + HUD_LINKS.form.label);
 }
 
 // 자동 다이빙이 시작되면 이동이 닫힌 상태를 눈과 읽어 주는 자에게 같이 알린다.
@@ -825,7 +829,7 @@ function trainKeeper(stat) {
   track('training_spent', { amount: result.spent });
   if (stat === undefined) {
     const line = result.lines.at(-1);
-    lastAutoTraining = '자동 훈련: ' + CAUSE_LABEL[line.stat] + ' ' + line.before + ' → ' + line.after;
+    lastAutoTraining = '자동 훈련 ' + CAUSE_LABEL[line.stat] + ' ' + line.before + ' → ' + line.after;
   }
   persist();
   stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));
@@ -1898,11 +1902,11 @@ function nameOfField(field, rank) {
 function conditionHTML(item) {
   if (!item.condition && !item.conditions?.length) return '';
   const condition = purchaseCondition(item, state);
-  // 경기장의 복수 조건도 이름과 진행도를 각각 같은 버튼에 묶고, 이미 연 문은 잠그지 않는다.
-  // 복수 조건은 머리글을 한 번만 쓰고 각 버튼에서 이름과 진행도를 짝짓는다.
-  const heading = condition.parts ? '<span class="condition-label">구매 조건</span>' : '';
+  // 물건과 경기장은 머리글을 한 번만 쓰고 조건마다 같은 이름·그림·진행도 행을 쓴다. 이미 연 문은 잠그지 않는다.
+  const heading = '<span class="condition-label">구매 조건</span>';
   return heading + (condition.parts || [condition]).map(c => '<button class="condition" data-route="' + c.route + '" data-value="' + c.value + '" data-min="' + c.min + '">'
-    + '<span class="condition-label">' + (condition.met || c.met ? '🔓' : '🔒') + ' ' + (condition.parts ? '' : '구매 조건: ') + c.label + '</span>'
+    + '<span class="condition-label">' + (condition.met || c.met ? IC_UNLOCK : IC_LOCK)
+    + '<span class="condition-name">' + c.label.replace(/\s[\d,]+(?:회|명)?$/u, '') + '</span></span>'
     + '<span class="condition-progress"><progress aria-label="구매 조건 진행도" value="' + c.value + '" max="' + c.min + '"></progress>'
     + '<small>' + c.value.toLocaleString('ko-KR') + '/' + c.min.toLocaleString('ko-KR') + '</small></span></button>').join('');
 }

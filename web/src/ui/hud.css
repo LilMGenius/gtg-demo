@@ -1076,7 +1076,12 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 /* 조건 잠금은 자물쇠와 비활성 버튼이 말한다. 지갑이 충분한 가격 자체는 또렷하게 남긴다. */
 #shop .card.gear .condition ~ .foot .buy:disabled .px:not(.bad-price):not(.bad-cash){color:var(--ink)}
 /* 조건 문구 다음 줄에 진행 막대와 분수를 함께 둔다. 0 최소 폭은 막대가 글자를 밀지 않게 한다. */
-#shop .card.gear .condition-label{width:100%}
+/* 머리글은 조건 개수와 무관하게 한 번만 나타나고, 이름과 잠금 그림은 같은 줄에 선다. */
+/* 머리글은 본문의 80%로 낮춰 조건 이름보다 먼저 눈에 띄지 않게 한다. */
+#shop .card.gear > .condition-label{width:100%;font-size:.8em;color:var(--dim)}
+#shop .card.gear .condition .condition-label{display:flex;align-items:center;gap:var(--gap-1);width:100%}
+/* 본문 한 글자 크기의 그림은 조건 이름의 기준선을 바꾸지 않는다. */
+#shop .card.gear .condition svg{width:1em;height:1em;flex:none}
 #shop .card.gear .condition-progress{display:flex;align-items:center;gap:var(--gap-1);width:100%}
 /* 4px는 기존 최소 간격 토큰과 같은 얇은 막대 높이다. 분수와 잠금 표시가 색 이외의 신호다. */
 #shop .card.gear .condition progress{flex:1;min-width:0;height:4px;accent-color:var(--ink)}
@@ -1386,6 +1391,8 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
    keep-all은 띄어쓰기에서만 넘긴다. 한 낱말이 상자보다 길 때만 break-word가 받는다. */
 #hud, #hud *, .panel, .panel * { word-break: keep-all; overflow-wrap: break-word; }
 body { word-break: keep-all; overflow-wrap: break-word; }
+/* CSS의 줄 균형 배치를 사용해 한국어 제목의 마지막 낱말과 음절이 홀로 남지 않게 한다. */
+h1,h2,h3,h4,h5,h6,#shop .card > b,#shop .venue-subtitle{ text-wrap:balance; }
 
 /* 긁어야 나오는 상자에는 긁을 수 있다는 표시가 있어야 한다. 크롬 기본 스크롤바는 겹쳐 그려져
    손을 올리기 전에는 안 보이고, 그래서 접힘 아래에 있던 능력치 여섯이 여러 랩을 숨어 있었다.

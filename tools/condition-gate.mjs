@@ -66,6 +66,7 @@ try {
       const route = ['handling', 'agility'].includes(entry.item.condition.key) ? '#gym' : entry.item.condition.key === 'fans' ? '#gram' : null;
       check(width + ':' + entry.tab + ':route', route ? await page.locator(route).isVisible() : await page.locator('#shop').isHidden());
       card = await restore(entry, true);
+      check(width + ':' + entry.tab + ':met-icon', await card.locator('.condition svg').getAttribute('aria-label') === '조건 충족');
       const paidBefore = await snapshot();
       await card.locator('.buy').click({ force: true });
       after = await snapshot();
