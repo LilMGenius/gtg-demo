@@ -1,10 +1,10 @@
 import { chromium } from "playwright";
-import { gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt } from "../web/src/state/gear.mjs";
+import { gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, beardAt, inkAt } from "../web/src/state/gear.mjs";
 
 // 내 정보의 자. 사람은 자기가 무엇을 걸쳤는지를 산 자리가 아니라 자기 창에서 확인한다.
 // 상점 탈의실에만 그림이 서 있으면 장비는 사는 동안에만 존재하는 물건이 된다.
 //
-// 재는 것은 셋이다. 여덟 줄이 다 서는가, 각 줄이 저장이 든 그 등급의 이름을 말하는가,
+// 재는 것은 셋이다. 모든 장비 줄이 다 서는가, 각 줄이 저장이 든 그 등급의 이름을 말하는가,
 // 그 차림이 그림으로도 서는가. 이름은 선반 데이터에서 꺼내 맞대므로 화면이 옮겨 적으면 갈린다.
 // 대조군은 장비를 갈아입히는 것이다. 줄과 그림이 같이 바뀌지 않으면 위의 초록은 정지 화면을 잰 것이다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
@@ -16,7 +16,7 @@ t.unref();
 const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 // 화면이 부르는 이름과 저장이 든 등급을 잇는 표. 필드 이름은 상태가 소유하고 이 자는 읽기만 한다.
-const AT = { grip: gloveAt, studs: bootAt, pads: kitAt, socks: sockAt, hair: hairAt, ink: inkAt, frame: frameAt, city: cityAt };
+const AT = { grip: gloveAt, studs: bootAt, pads: kitAt, socks: sockAt, hair: hairAt, beard: beardAt, ink: inkAt, frame: frameAt, city: cityAt };
 const FIELDS = Object.keys(AT);
 
 let b;
@@ -46,7 +46,7 @@ try {
       const img = document.querySelector("#me .wear .shot img");
       const gear = window.__gear();
       const held = {};
-      for (const k of ["grip", "studs", "pads", "socks", "hair", "ink", "frame", "city"]) held[k] = gear[k];
+      for (const k of ["grip", "studs", "pads", "socks", "hair", "beard", "ink", "frame", "city"]) held[k] = gear[k];
       return { rows, src: img ? img.src : "", held };
     });
   };
@@ -67,8 +67,9 @@ try {
     im.src = s;
   }), src);
 
-  const bare = { grip: 0, studs: 0, pads: 0, socks: 0, hair: 0, ink: 0, frame: 0, city: 0 };
-  const rich = { grip: 3, studs: 2, pads: 3, socks: 1, hair: 2, ink: 3, frame: 3, city: 2 };
+  // 면도와 중간 수염 등급을 달리해 수염 줄도 갈아입기 대조군에 포함한다.
+  const bare = { grip: 0, studs: 0, pads: 0, socks: 0, hair: 0, beard: 0, ink: 0, frame: 0, city: 0 };
+  const rich = { grip: 3, studs: 2, pads: 3, socks: 1, hair: 2, beard: 2, ink: 3, frame: 3, city: 2 };
   const first = await dress(rich);
 
   check("instrument:every-worn-line-was-found", first.rows.length === FIELDS.length,
@@ -86,7 +87,7 @@ try {
   const then = await dress(bare);
   const stuck = then.rows.filter((r) => !AT[r.field] || r.text.indexOf(AT[r.field](then.held[r.field]).name) < 0);
   check("control:changing-the-gear-changes-the-lines", stuck.length === 0,
-    stuck.map((r) => r.field + " says " + r.text).join(" | ") || "all eight followed the save");
+    stuck.map((r) => r.field + " says " + r.text).join(" | ") || FIELDS.length + " lines followed the save");
   check("control:changing-the-gear-changes-the-portrait", then.src !== first.src && then.src.length > 64,
     then.src === first.src ? "same plate for both looks" : "two plates, " + then.src.length + " chars");
 
