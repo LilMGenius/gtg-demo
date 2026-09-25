@@ -39,6 +39,9 @@ try {
   await p.waitForTimeout(1300);
   await p.evaluate(() => window.__shop(true));
   await p.waitForTimeout(320);
+  // 탈의실은 입는 선반의 짝이라 뽑기 선반(상점의 첫 탭)에는 없다. 입는 선반 하나를 먼저 연다.
+  await p.click('#shop .tab[data-tab="glove"]', { force: true });
+  await p.waitForSelector("#shop .fitting", { timeout: 8000 });
 
   const spec = () => p.evaluate(() => {
     const e = document.querySelector("#shop .fitting .spec");

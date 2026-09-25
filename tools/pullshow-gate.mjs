@@ -436,11 +436,15 @@ try {
   if (shut) {
     await p.click("#shop .odds summary", { force: true });
     await p.waitForTimeout(220);
+    // 누른 포인터가 배너 위에 남으면 배너가 호버로 3px 뜬다. 그것은 표가 선반을 민 것이 아니므로 포인터를 치운 뒤 잰다.
+    await p.mouse.move(1, 1);
+    await p.waitForTimeout(220);
     const open = await readOdds();
     const head = open.rows.length ? open.rows[0] : [];
     const body = open.rows.slice(1);
+    // 배너가 둘이라 보조 기술 이름은 어느 팩의 확률인지를 앞에 단다. 화면 글자는 배너 안이라 한 낱말이다.
     check("pullshow:the-odds-open-from-the-named-link-on-the-market-tab",
-      shut.open === false && shut.face === "획득 확률" && shut.label === "획득 확률" && open.open === true,
+      shut.open === false && shut.face === "확률" && / 획득 확률$/.test(shut.label) && open.open === true,
       "shut " + shut.open + ", face " + JSON.stringify(shut.face) + ", label " + JSON.stringify(shut.label)
       + ", opened " + open.open);
     check("pullshow:the-odds-are-a-table-of-grade-and-chance-and-stock",

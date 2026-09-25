@@ -1403,51 +1403,94 @@ body { word-break: keep-all; overflow-wrap: break-word; }
 #hud:has(:is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is(#auto){translate:-96px 0}
 #hud:has(:is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is(#mute,#fullscreen,#wikiBtn,#gymBtn,#rosterBtn,#gramBtn,#shopBtn){translate:calc(100% + var(--col-r) + 12px) 0}
 
-/* 팩 시안 이식: packs.css의 포일과 금테를 재사용하고 상점에만 한정한다.
-   https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/transform-function/rotate3d
-   rotate3d는 MDN 플랫폼 기능이며 단일 6도 회전으로 요청 상한 8도 안에 둔다.
-   6초 대기·900ms 조작·160ms 응답은 승인 시안의 리듬이다. */
-#shop .pack-card,#shop .legend-showcase{--tier:var(--good);--gold:#ffd83d;--s1:var(--gap-1);--s2:var(--gap-2);--s3:var(--gap-3);--s6:24px;--name:24px;--title:32px;--body-size:var(--fs-body);--number:var(--fs-num);--idle:6s;--sweep:900ms;--response:160ms;--lean:6deg}
-/* 520px는 두 가격을 같은 줄에 읽는 폭, 100%는 작은 화면의 기둥을 넘지 않는 한계다. */
-#shop .card.pack-card{width:min(100%,520px);--tier:var(--good);border-color:var(--tier);background:linear-gradient(var(--panel),var(--edge))}
-#shop .card.pack-card.legend{--tier:#ffd83d}
-#shop .pack-nav{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--gap-2)}
-#shop .pack-nav button,#shop .legend-showcase .market{font:var(--fs-body) var(--body);padding:var(--gap-2) var(--gap-3);border:var(--line) solid var(--dim);background:var(--panel);color:var(--ink);cursor:pointer}
-#shop .pack-nav [aria-pressed=true]{border-color:var(--good)}
-/* 포장 176×232는 카드 실물 비율이고 무대 254는 기울임과 그림자의 여백을 포함한다. */
-#shop .pack-stage{height:254px;display:grid;place-items:center}#shop .pack-art{position:relative;display:block;width:176px;height:232px;padding:0;border:0;background:none;isolation:isolate;filter:drop-shadow(0 12px 8px #0009);transition:transform var(--response),filter var(--response)}#shop .pack-art>svg{display:block;width:100%;height:100%}#shop .pack-card .foil{position:absolute;inset:0;overflow:hidden;clip-path:polygon(4% 0,96% 0,100% 4%,98% 96%,94% 100%,6% 100%,2% 96%,0 4%);pointer-events:none}
-/* 34~64% 빛띠와 ±100% 이동은 포장 바깥에서 시작·종료해 단절을 숨긴다. 700px 원근은 글자를 읽게 하고 14px 광택은 선택을 알린다. */
-#shop .pack-card .foil::before{content:'';position:absolute;inset:-30%;background:linear-gradient(115deg,transparent 34%,#fff8 48%,#fff1 53%,transparent 64%);mix-blend-mode:color-dodge;transform:translateX(-100%);animation:shop-foil var(--idle) ease-in-out infinite}#shop .pack-art:is(:hover,:focus-visible){transform:perspective(700px) rotate3d(1,-1,0,var(--lean));filter:drop-shadow(0 0 14px color-mix(in srgb,var(--tier),transparent 45%))}#shop .pack-art:is(:hover,:focus-visible) .foil::before{animation:shop-sweep var(--sweep) ease-out infinite}#shop .pack-art:focus-visible{outline:var(--line) solid var(--ink);outline-offset:var(--s2)}
-/* 대기 반사는 회차 후반에만 지나가고 조작 반사는 바로 포장 전체를 지난다. */
-@keyframes shop-foil{0%,55%{transform:translateX(-100%);opacity:0}65%{opacity:.65}100%{transform:translateX(100%);opacity:0}}@keyframes shop-sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
-
-/* 확률은 포장 바로 아래의 읽을 수 있는 링크다. 100% 폭과 자동 높이는 기존 아이콘 원을 푼다. */
-#shop .pack-card .odds{display:block}
-#shop .pack-card .odds summary{width:100%;height:auto;min-height:0;border:0;border-radius:0;background:none;color:var(--dim);padding:var(--gap-2);text-decoration:underline}
-#shop .pack-card .odds em{right:0;top:100%;bottom:auto}
-/* 두 회차가 같은 폭을 가지며 76px는 보너스·보장까지 세 줄의 약속 공간이다. */
-#shop .pack-card .buys{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--gap-2);margin-top:var(--gap-2)}
-#shop .pack-offer{min-width:0;display:flex;flex-direction:column;gap:var(--gap-2)}
-#shop .promise-lines{display:flex;flex-direction:column;gap:var(--gap-1);min-height:76px;font:var(--fs-body) var(--body)}
-#shop .promise-lines .bonus,#shop .promise-lines .guarantee{color:var(--tier)}
-/* 자동 폭과 0 최소폭은 통화 표기가 격자를 밀지 않게 한다. */
-#shop .pack-offer .buy.pull{width:100%;min-width:0;flex:1;margin:0;padding:var(--gap-2) var(--gap-1)}
-#shop .pack-card .buy.pull>i{max-width:100%}
-#shop .pack-card .buy.pull .price{flex-wrap:wrap;justify-content:center}
-/* 무대의 65% 광원 범위는 중앙 선수를 강조하고 3장의 동일 폭 카드는 한정 상품 오인을 피한다. */
-#shop .legend-showcase{background:radial-gradient(ellipse at 50% 0,#ffd83d30,transparent 65%),var(--panel);padding:var(--s3) 0;text-align:center}#shop .legend-showcase h2{font:var(--title) var(--disp);color:var(--gold)}#shop .legend-showcase>p{color:var(--dim);margin:var(--s2)}#shop .legend-showcase .players{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s6);padding:var(--s6)}
-/* 3px 금테 바깥으로 빛이 새지 않게 격리하고 4초 주기는 전설 프레임의 신호다. */
-#shop .legend-showcase .player{position:relative;isolation:isolate;overflow:hidden;padding:var(--line);background:var(--gold);box-shadow:0 var(--s2) var(--s3) #000}#shop .legend-showcase .player::before{content:'';position:absolute;inset:-50%;background:conic-gradient(transparent 20%,#fff8 25%,transparent 30%,transparent 70%,#fff 75%,transparent 80%);animation:shop-rim 4s linear infinite;z-index:-1}#shop .legend-showcase .player-inner{background:linear-gradient(#30291b,var(--edge));height:100%;padding:var(--s3);position:relative}#shop .legend-showcase .player-inner::before{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 20%,#ffd83d15 50%,transparent 80%);pointer-events:none}#shop .legend-showcase .fame{position:absolute;left:var(--s3);top:var(--s3);color:var(--gold);font:var(--name) var(--disp)}#shop .legend-showcase .fame small{display:block;font:var(--body-size) var(--body)}
-/* 262px 전신은 데스크톱 무대에서 이름보다 먼저 보이도록 기존 썸네일을 확대한다. */
-#shop .legend-showcase .player img{height:262px;max-width:100%;object-fit:contain;display:block;margin:auto}#shop .legend-showcase .player h3{font:var(--name) var(--disp);margin:var(--s2) 0}#shop .legend-showcase .stats{display:flex;justify-content:center;gap:var(--s3);color:var(--dim)}#shop .legend-showcase .stats b{display:block;color:var(--ink);font:var(--number) var(--disp)}#shop .legend-showcase .market{max-width:360px;margin:0 auto;--tier:var(--gold)}@keyframes shop-rim{to{transform:rotate(360deg)}}
-
-#shop .pack-nav button:focus-visible,#shop .legend-showcase .market:focus-visible{outline:var(--line) solid var(--ink);outline-offset:var(--gap-1)}
-/* 스코프가 붙은 쇼케이스는 진열 기둥 전체를 쓰고, 제목은 전역 h3 영향을 받지 않는다. */
-#shop .legend-showcase{width:100%}
-#shop .legend-showcase .player h3{color:var(--ink)}
-/* 520px 아래는 한 열에 전신을 유지한다. 포장 142×188과 무대 204는 세로 폰의 약속 공간을 남긴다. */
-@media(max-width:520px){#shop .pack-stage{height:204px}#shop .pack-art{width:142px;height:188px}#shop .legend-showcase .players{grid-template-columns:1fr}#shop .legend-showcase .player img{height:262px}}
+/* 뽑기 배너. 두 팩이 나란히 서고 배너마다 포장, 그 팩에서 나올 수 있는 선수 셋의 부채꼴, 약속, 확률, 두 회차가 한 판에 선다.
+   상점의 판 문법(굵은 테두리, 어긋난 그림자, 제목 글꼴)은 그대로 두고 팩만 빛과 기울임을 받는다(docs/gamedev economy.md 뽑기 진열).
+   6초 대기, 900ms 조작 빛, 160ms 응답은 승인 시안의 리듬이다. */
+#shop .shopbody.pulling .goods{flex:1 1 100%;max-width:1060px}
+#shop .pull-bar{display:flex;align-items:center;justify-content:center;gap:var(--gap-3);width:100%}
+#shop .pull-bar .roles{display:inline-flex;border:var(--line) solid var(--edge);box-shadow:var(--lift) var(--lift) 0 var(--edge)}
+#shop .pull-bar .roles button{font:700 var(--fs-body) var(--body);padding:5px 20px 7px;border:0;background:var(--panel);color:var(--dim);cursor:pointer}
+#shop .pull-bar .roles [aria-pressed=true]{background:var(--good);color:var(--edge)}
+#shop .pull-bar .roles button:focus-visible{outline:var(--line) solid var(--ink);outline-offset:-6px}
+#shop .pull-bar .held{display:inline-flex;align-items:center;gap:var(--gap-1);font:var(--fs-num) var(--body);color:#ffd83d}
+#shop .pull-bar .held svg{width:18px;height:18px;display:block}
+#shop .banners{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(12px,2vw,26px);width:100%;padding-right:12px}
+/* 포장 높이는 화면 높이의 27%다. 무대가 포장 위로 부채꼴 머리 몫 45%를 더 쓰므로, 390px 가로 폰에서 탭 줄과 제목과 역할 줄 아래에
+   두 회차 버튼까지 한 판에 들어가는 몫이다. 108은 포장 문장이 읽히는 바닥, 200은 데스크톱에서 버튼이 포장보다 작아 보이지 않는 천장이다. */
+#shop .banner{--tier:var(--good);--glow:#4fd08a;--pack-h:clamp(108px,27vh,200px);--idle:6s;--sweep:900ms;--response:160ms;
+  position:relative;isolation:isolate;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;
+  gap:clamp(8px,1.4vw,20px);padding:clamp(8px,1.4vw,18px);border:var(--line) solid var(--tier);
+  background:radial-gradient(90% 110% at 24% 55%,color-mix(in srgb,var(--glow),transparent 70%),transparent 62%),
+    repeating-conic-gradient(from 4deg at 24% 58%,#ffffff0a 0 5deg,transparent 5deg 15deg),linear-gradient(160deg,#1f3021,#0f150d);
+  box-shadow:10px 12px 0 var(--edge);transition:translate var(--response),box-shadow var(--response)}
+#shop .banner.legend{--tier:#ffd83d;--glow:#ffb81c;
+  background:radial-gradient(90% 110% at 24% 55%,color-mix(in srgb,var(--glow),transparent 62%),transparent 62%),
+    repeating-conic-gradient(from 4deg at 24% 58%,#fff3c20f 0 5deg,transparent 5deg 15deg),linear-gradient(160deg,#3d2e0f,#140f06)}
+/* 전설 배너만 판 위로 금빛이 돈다. 6초 한 바퀴는 대기 반사와 같은 박자라 두 빛이 서로 쫓지 않는다.
+   돌리는 것은 판이 아니라 원뿔 그라디언트의 시작각이다. 판을 돌리면 판 밖으로 넘친 빛을 잘라야 하고,
+   자르면 확률 표가 배너 밖으로 못 뜬다. 각을 CSS 속성으로 등록해야 브라우저가 보간한다(MDN @property). */
+@property --rim{syntax:'<angle>';inherits:false;initial-value:0deg}
+#shop .banner.legend::after{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:conic-gradient(from var(--rim) at 30% 50%,transparent 0 72%,#ffd83d33 80%,transparent 88%);animation:shop-rim-sweep 6s linear infinite}
+@keyframes shop-rim-sweep{to{--rim:360deg}}
+#shop .banner:hover{translate:0 -3px;box-shadow:12px 16px 0 var(--edge),0 0 0 3px color-mix(in srgb,var(--tier),transparent 55%)}
+#shop .banner.empty .stage{filter:grayscale(1) brightness(.45)}
+/* 선수 카드는 포장 위로 부채꼴로 솟는다. 폭 1.5배와 높이 1.45배는 양옆 카드의 얼굴과 이름이 포장에 안 가리는 여백이다. */
+#shop .banner .stage{position:relative;width:calc(var(--pack-h) * 1.5);height:calc(var(--pack-h) * 1.45);display:grid;place-items:end center}
+#shop .banner .fan{position:absolute;inset:0;pointer-events:none}
+/* 카드 높이 78%는 머리가 포장 위로 나오는 크기다. 14도와 20도는 셋이 서로 안 덮고 포장 뒤에서 벌어지는 각이다. */
+#shop .banner .fan figure{margin:0;display:flex;flex-direction:column;position:absolute;left:50%;bottom:calc(var(--pack-h) * .42);height:calc(var(--pack-h) * .72);aspect-ratio:3/4;
+  background:radial-gradient(circle at 50% 30%,color-mix(in srgb,var(--glow),transparent 55%),#0b0f09 70%);border:2px solid var(--tier);box-shadow:4px 5px 0 var(--edge);
+  transform-origin:50% 100%;translate:-50% 0;transition:rotate var(--response),translate var(--response)}
+#shop .banner .fan figure.f0{rotate:-24deg;translate:-100% 4%}
+#shop .banner .fan figure.f1{translate:-50% -30%}
+#shop .banner .fan figure.f2{rotate:24deg;translate:0 4%}
+#shop .banner:hover .fan figure.f0{rotate:-28deg;translate:-106% -2%}
+#shop .banner:hover .fan figure.f1{translate:-50% -36%}
+#shop .banner:hover .fan figure.f2{rotate:28deg;translate:6% -2%}
+/* 얼굴이 카드 위쪽 70%를 채우고 이름 띠가 아래를 받는다. 이름은 카드 한 장 폭에서 한 줄로 끊는다. */
+#shop .banner .fan figure img{flex:1;min-height:0;width:100%;object-fit:contain;object-position:50% 20%;display:block}
+#shop .banner .fan figcaption{order:-1;flex:none;padding:2px 3px 3px;background:var(--edge);color:var(--tier);font:var(--fs-body) var(--disp);font-size:clamp(11px,1.1vw,15px);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#shop .banner .pack-art{position:relative;z-index:1;display:block;width:calc(var(--pack-h) * 176 / 232);height:var(--pack-h);padding:0;border:0;
+  background:none;cursor:pointer;isolation:isolate;filter:drop-shadow(0 10px 8px #000a);
+  transform:perspective(700px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) translateY(var(--up,0px));
+  transition:transform var(--response),filter var(--response)}
+#shop .banner .pack-art>svg{display:block;width:100%;height:100%}
+#shop .banner:hover .pack-art{--up:-6px;filter:drop-shadow(0 0 16px color-mix(in srgb,var(--tier),transparent 40%)) drop-shadow(0 14px 8px #000a)}
+/* 키보드 초점은 포인터가 없으니 고정된 기울임을 받는다. 두 축 4도의 합성 5.7도는 8도 상한 안이다. */
+#shop .banner .pack-art:focus-visible{--rx:4deg;--ry:-4deg;--up:-6px;outline:var(--line) solid var(--ink);outline-offset:6px}
+#shop .banner .foil{position:absolute;inset:0;overflow:hidden;pointer-events:none;clip-path:polygon(4% 0,96% 0,100% 4%,98% 96%,94% 100%,6% 100%,2% 96%,0 4%)}
+#shop .banner .foil::before{content:'';position:absolute;inset:-30%;background:linear-gradient(115deg,transparent 34%,#fff8 48%,#fff1 53%,transparent 64%);
+  mix-blend-mode:color-dodge;transform:translateX(-100%);animation:shop-foil var(--idle) ease-in-out infinite}
+/* 광택점은 포인터의 가로 위치를 따른다. 45%는 포장 절반을 덮지 않는 반경이다. */
+#shop .banner .foil::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at var(--mx,50%) 28%,#ffffff66,transparent 45%);
+  mix-blend-mode:overlay;opacity:0;transition:opacity var(--response)}
+#shop .banner:hover .foil::before,#shop .banner .pack-art:focus-visible .foil::before{animation:shop-sweep var(--sweep) ease-out infinite}
+#shop .banner:hover .foil::after{opacity:1}
+#shop .banner .side{display:flex;flex-direction:column;gap:var(--gap-1);min-width:0}
+#shop .banner h5{font:var(--fs-title) var(--disp);color:var(--tier);text-shadow:2px 2px 0 var(--edge);line-height:1.15;margin:0}
+#shop .banner .guarantee{font:700 var(--fs-body) var(--body);color:var(--ink);margin:0}
+#shop .banner .odds{position:relative;align-self:flex-start}
+#shop .banner .odds summary{cursor:pointer;list-style:none;display:inline;width:auto;height:auto;min-height:0;border:0;border-radius:0;background:none;box-shadow:none;color:var(--dim);font:var(--fs-body) var(--body);text-decoration:underline;padding:2px 0}
+#shop .banner .odds summary::-webkit-details-marker{display:none}
+#shop .banner .odds summary:focus-visible{outline:var(--line) solid var(--ink);outline-offset:2px}
+#shop .banner .odds em{left:0;right:auto;top:100%;bottom:auto;min-width:220px}
+#shop .banner .buys{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--gap-2);margin-top:var(--gap-1)}
+#shop .banner .pack-offer{min-width:0;display:flex;flex-direction:column;gap:2px}
+#shop .banner .promise-lines{display:flex;white-space:nowrap;align-items:center;gap:6px;font:700 var(--fs-body) var(--body);color:var(--ink)}
+#shop .banner .promise-lines .bonus{padding:0 6px 1px;background:var(--tier);color:var(--edge);font-size:.86em}
+#shop .banner .buy.pull{width:100%;min-width:0;margin:0;padding:8px 4px 10px}
+#shop .banner .buy.pull:not(:disabled){background:color-mix(in srgb,var(--tier),#101a10 62%)}
+#shop .banner .buy.pull .price{flex-wrap:wrap;justify-content:center}
+@keyframes shop-foil{0%,55%{transform:translateX(-100%);opacity:0}65%{opacity:.65}100%{transform:translateX(100%);opacity:0}}
+@keyframes shop-sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+@keyframes shop-rim{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){
+  #shop .banner,#shop .banner *,#shop .banner::after,#shop .banner .foil::before,#shop .banner .foil::after{animation:none!important;transition:none!important}
+  #shop .banner .pack-art{transform:none!important}
+  #shop .banner:hover{translate:none}
+}
+/* 620px 아래(세로 폰)는 두 배너가 한 열로 서고 배너 안에서도 무대가 글 위로 올라간다. 옆에 두면 두 버튼이 한 글자 폭으로 줄어든다. */
+@media(max-width:620px){#shop .banners{grid-template-columns:1fr}#shop .banner{--pack-h:150px;grid-template-columns:1fr;justify-items:center}#shop .banner .side{width:100%}}
 /* 세로 팩 진열은 회전 안내 뒤에 가리지 않는다. 경기 화면의 회전 계약은 그대로 둔다. */
-body:has(#shop:not([hidden]) :is(.pack-card,.legend-showcase)) #rotate{display:none}
-/* 감소 동작은 대기·조작·금테 모두 멈추며 초점 윤곽은 유지한다. */
-@media(prefers-reduced-motion:reduce){#shop .pack-card *,#shop .pack-card *::before,#shop .legend-showcase *,#shop .legend-showcase *::before{animation:none!important;transition:none!important}#shop .pack-art:is(:hover,:focus-visible){transform:none}#shop .pack-card .foil::before{transform:none;opacity:0}}
+body:has(#shop:not([hidden]) .banners) #rotate{display:none}

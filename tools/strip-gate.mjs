@@ -33,6 +33,9 @@ try {
   await p.waitForTimeout(1300);
   await p.evaluate(() => window.__shop(true));
   await p.waitForTimeout(320);
+  // 탈의실은 입는 선반의 짝이라 뽑기 선반(상점의 첫 탭)에는 없다. 입는 선반 하나를 먼저 연다.
+  await p.click('#shop .tab[data-tab="glove"]', { force: true });
+  await p.waitForSelector("#shop .fitting", { timeout: 8000 });
 
   /* 벗기는 늘 서 있고, 벗을 것이 없을 때 꺼진다. 그래서 세는 것만으로는 두 상태가 안 갈리고
      칠을 같이 읽어야 한다. disabled는 코드가 하는 말이고, color와 background는 화면이 하는 말이다. */
