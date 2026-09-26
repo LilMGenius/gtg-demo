@@ -47,18 +47,25 @@ const WRAP = function () {
     if (!s || !s.trim()) continue;
     const host = n.parentElement;
     if (!host || !host.getClientRects().length) continue;
+    // 화면 읽기에만 남긴 이름(2px 아래 상자, 위 잘림 자와 같은 문턱)은 글자마다 줄이 바뀌는 것이 설계라 사람이 보는 줄이 아니다.
+    if (host.getBoundingClientRect().width < 2) continue;
     const r = document.createRange();
     let prevTop = null;
+    let prevLeft = null;
     for (let i = 0; i < s.length; i += 1) {
       r.setStart(n, i);
       r.setEnd(n, i + 1);
       const box = r.getBoundingClientRect();
       if (!box.width && !box.height) continue;
-      if (prevTop !== null && box.top - prevTop > 1) wrapped += 1;
-      if (prevTop !== null && box.top - prevTop > 1 && s[i - 1] !== " ") {
-        bad.push(s.slice(Math.max(0, i - 7), i) + "|" + s.slice(i, i + 4));
+      // 줄이 넘어가면 다음 글자는 아래로 내려가면서 왼쪽 끝으로 돌아간다. 부채처럼 기운 카드의 이름은
+      // 글자마다 아래로 내려가도 오른쪽으로 나아가므로, 아래로만 재면 기운 글자를 잘린 낱말로 읽는다.
+      const broke = prevTop !== null && box.top - prevTop > 1 && box.left < prevLeft;
+      if (broke) wrapped += 1;
+      if (broke && s[i - 1] !== " ") {
+        bad.push(s.slice(Math.max(0, i - 7), i) + "|" + s.slice(i, i + 4) + " in " + host.tagName.toLowerCase() + "." + host.getAttribute("class") + " w" + Math.round(host.getBoundingClientRect().width));
       }
       prevTop = box.top;
+      prevLeft = box.left;
     }
   }
   return { bad: bad, wrapped: wrapped };

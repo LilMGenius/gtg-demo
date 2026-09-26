@@ -63,7 +63,10 @@ try {
         running: e.closest('.banner').getAnimations({ subtree: true }).filter((a) => a.playState === 'running').length };
     });
     for (const k of PULL_KINDS) {
-      const box = await p.locator('.banner[data-kind="' + k.id + '"] .pack-art').boundingBox();
+      // 세로 폰에서는 둘째 배너가 선반 몸의 스크롤 아래에 선다. 사람이 굴려서 닿는 자리를 굴려서 잰다.
+      const art = p.locator('.banner[data-kind="' + k.id + '"] .pack-art');
+      await art.scrollIntoViewIfNeeded(); await p.waitForTimeout(SETTLE);
+      const box = await art.boundingBox();
       await p.mouse.move(box.x + box.width * 0.95, box.y + box.height * 0.05); await p.waitForTimeout(SETTLE);
       const hov = await motion(k.id);
       check(tag + ':' + k.id + ':the-pack-leans-toward-the-pointer-within-the-cap', hov.angle > 1 && hov.angle <= MAX_TILT && hov.sweep === 'shop-sweep' && hov.running > 0, hov);

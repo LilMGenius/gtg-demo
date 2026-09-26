@@ -2517,8 +2517,10 @@ function renderShop() {
     '<button class="tab" data-tab="' + k + '"' + (shopTab === k ? ' aria-current="true"' : '') + '>'
     + TAB_ICON[k] + '<span>' + tabName(k) + '</span></button>').join('') + '</div>';
   const goods = SHELVES[shopTab] ? gearShelf(shopTab) : shopTab === 'bot' ? botShelf() : shopTab === 'buff' ? buffShelf() : pullShelf(pool);
-  // 탈의실은 입는 선반의 짝이다. 뽑기 선반에서는 입어 볼 것이 없으므로 그 폭을 배너에 준다.
-  box.innerHTML = '<div class="shopbody' + (shopTab === 'pull' ? ' pulling' : '') + '">' + (shopTab === 'pull' ? '' : fittingRoom()) + '<div class="goods">' + tabs + goods + '</div></div>'
+  /* 창의 뼈대는 탭 줄, 몸, 닫기 셋이고 선반이 바뀌어도 뼈대는 안 움직인다. 탭 줄이 선반 기둥 안에 있으면
+     탈의실이 있는 선반과 없는 선반에서 기둥 폭이 달라 탭이 다르게 접히고, 닫기가 선반 높이를 따라 뛴다.
+     탈의실은 입는 선반의 짝이라 뽑기 선반에서는 몸 안에서만 빠진다. */
+  box.innerHTML = tabs + '<div class="shopbody' + (shopTab === 'pull' ? ' pulling' : '') + '">' + (shopTab === 'pull' ? '' : fittingRoom()) + '<div class="goods">' + goods + '</div></div>'
     + '<button class="close">닫기</button>';
   // 탭을 다시 그려도 선택한 선반이 가로 스크롤 밖으로 사라지지 않게 브라우저가 위치를 맞춘다.
   box.querySelector('.tab[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
