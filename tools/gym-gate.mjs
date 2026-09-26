@@ -279,7 +279,9 @@ try {
   await blind.evaluate((n) => n.remove());
   await rp.waitForTimeout(150);
   const lit = await column(rp);
-  check("control:hiding-the-cue-reddens-the-resting-gym", !rested(blinded) && !allowed(blinded) && rested(lit) && allowed(lit),
+  /* 닫기는 모든 창이 같이 쓰는 붙박이 자리라 자국을 걷어도 손이 닿는다. 그래서 이 대조군이 빨갛게 만드는 것은
+     쉼 자리의 자국 축 하나이고, 닫기 축은 걷은 뒤에도 초록이어야 한다(붙박이가 풀리면 shell 게이트가 잡는다). */
+  check("control:hiding-the-cue-reddens-the-resting-gym", !rested(blinded) && allowed(blinded) && rested(lit) && allowed(lit),
     "planted " + saidCue(blinded) + " / " + saidClose(blinded) + " | restored " + saidCue(lit) + " / " + saidClose(lit));
   await roll.close();
   /* 살아 있는 크기 변화. 위의 두 문맥은 좁은 화면으로 부팅해서 그릴 때 한 번 센 값을 보는데, 사람이

@@ -25,6 +25,43 @@ check('shell:the-close-button-is-one-rule', copies === 0 && /:is\([^)]*\) > \.cl
 
 const b = await chromium.launch({ executablePath: EXE });
 try {
+  // 창과 창 사이. 닫기는 창마다가 아니라 게임에 한 자리다. 창을 바꿔도 닫기의 중심이 같고,
+  // 그 중심을 누르면 닫기가 잡혀야 한다(굴린 내용이 그 위를 지나가지 않는다).
+  const EVERY = ['gym', 'roster', 'gram', 'me', 'shop', 'wiki'];
+  for (const [W, H] of [[1920, 1080], [1280, 720], [844, 390], [740, 360]]) {
+    const p = await b.newPage({ viewport: { width: W, height: H } });
+    await p.goto(BASE); await p.locator('#go').click({ force: true }); await clearDraw(p);
+    const seen = [];
+    for (const id of EVERY) {
+      await p.evaluate((id) => window['__' + id](true), id); await p.waitForTimeout(400);
+      // 구르는 창은 끝까지 굴린 자리에서도 잰다. 내용이 닫기를 덮는 것은 굴린 뒤다.
+      await p.evaluate((id) => { for (const e of document.querySelectorAll('#' + id + ', #' + id + ' *')) if (e.scrollHeight > e.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(e).overflowY)) e.scrollTop = e.scrollHeight; }, id);
+      await p.waitForTimeout(200);
+      seen.push(await p.evaluate((id) => {
+        const c = document.querySelector('#' + id + ' > .close');
+        if (!c) return { id, none: true };
+        const r = c.getBoundingClientRect();
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        const hit = document.elementFromPoint(cx, cy);
+        return { id, c: [Math.round(cx), Math.round(cy)], hit: hit === c || c.contains(hit), inView: r.top >= 0 && r.bottom <= innerHeight };
+      }, id));
+      await p.evaluate((id) => window['__' + id](false), id); await p.waitForTimeout(200);
+    }
+    const tag = W + 'x' + H + ':every';
+    const base = seen.find((s) => s.c);
+    check(tag + ':instrument:every-panel-has-a-close', seen.every((s) => !s.none), seen.filter((s) => s.none).map((s) => s.id).join(', ') || EVERY.length + ' panels');
+    check(tag + ':shell:close-stands-in-one-place-across-panels', seen.every((s) => s.c && Math.abs(s.c[0] - base.c[0]) <= TOL && Math.abs(s.c[1] - base.c[1]) <= TOL), seen.map((s) => s.id + ' ' + (s.c || []).join(',')).join(' | '));
+    check(tag + ':shell:close-is-on-top-after-the-roll', seen.every((s) => s.hit && s.inView), seen.filter((s) => !s.hit || !s.inView).map((s) => s.id).join(', ') || 'all');
+    // 대조군. 한 창의 닫기를 흐름으로 되돌리면 그 창만 자리가 달라져 위 축이 빨개져야 계기가 산다.
+    if (W === 1280) {
+      const plant = await p.addStyleTag({ content: '#gym > .close{position:static!important;translate:none!important}' });
+      await p.evaluate(() => window.__gym(true)); await p.waitForTimeout(400);
+      const moved = await p.evaluate(() => { const r = document.querySelector('#gym > .close').getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)]; });
+      await p.evaluate(() => window.__gym(false)); await plant.evaluate((n) => n.remove());
+      check(tag + ':control:a-close-back-in-the-flow-moves', Math.abs(moved[1] - base.c[1]) > TOL, 'planted gym ' + moved.join(',') + ' against ' + base.c.join(','));
+    }
+    await p.close();
+  }
   for (const [W, H] of SIZES) {
     for (const panel of PANELS) {
       const p = await b.newPage({ viewport: { width: W, height: H } });
@@ -55,7 +92,7 @@ try {
       check(tag + ':shell:tab-rows-hold-equal-counts', new Set(seen[0].rows).size === 1, seen[0].rows.join('+'));
       // 대조군. 몸이 제 높이만큼 자라게 풀면 선반마다 닫기가 뛰어야 계기가 산다. 상점만 몸 높이가 선반마다 크게 다르다.
       if (panel.id === 'shop' && W === 1280) {
-        const plant = await p.addStyleTag({ content: '#shop{overflow:auto!important}#shop .shopbody{flex:none!important;overflow:visible!important}' });
+        const plant = await p.addStyleTag({ content: '#shop{overflow:auto!important}#shop .shopbody{flex:none!important;overflow:visible!important}#shop > .close{position:static!important;translate:none!important}' });
         const moved = [];
         for (const tab of tabs) {
           await p.evaluate((k) => document.querySelector('#shop .tab[data-tab="' + k + '"]').click(), tab); await p.waitForTimeout(160);

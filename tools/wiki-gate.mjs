@@ -319,7 +319,8 @@ try {
   check("wiki:the-close-button-closes", closer && byBtn === true, closer ? String(byBtn) : "no close button");
 
   /* 좁은 폭. 740x360에서 카테고리는 옆 기둥이 아니라 위 가로 탭이다. 기둥으로 두면 360px 높이에서
-     아홉 칸이 본문을 아래로 밀어내고, 본문 첫 줄이 화면 밖에서 시작한다. */
+     아홉 칸이 본문을 아래로 밀어내고, 본문 첫 줄이 화면 밖에서 시작한다. 가로 탭은 한 줄이거나
+     고른 두 줄이고(창 부품 규칙), 어느 쪽이든 모든 칸이 화면 안에 서고 본문 첫 줄이 화면 안이다. */
   await p.setViewportSize({ width: 740, height: 360 });
   await p.waitForTimeout(400);
   if (await p.evaluate(() => Boolean(document.getElementById("wikiBtn")))) await p.click("#wikiBtn", { force: true });
@@ -329,12 +330,17 @@ try {
     if (!c) return null;
     const s = getComputedStyle(c);
     const kids = [...c.children].map((e) => e.getBoundingClientRect());
-    const rows = new Set(kids.map((r) => Math.round(r.top)));
-    return { dir: s.flexDirection, rows: rows.size, scroll: s.overflowX };
+    const per = {};
+    for (const r of kids) per[Math.round(r.top)] = (per[Math.round(r.top)] || 0) + 1;
+    const counts = Object.values(per);
+    const body = document.querySelector("#wiki .body");
+    const bt = body ? body.getBoundingClientRect().top : 9999;
+    return { dir: s.flexDirection, rows: counts.length, counts, scroll: s.overflowX,
+      shown: kids.every((r) => r.left >= 0 && r.right <= innerWidth), bodyTop: Math.round(bt) };
   });
-  check("wiki:narrow-width-lays-the-categories-in-one-strip",
-    Boolean(strip) && strip.rows === 1 && /auto|scroll/.test(strip.scroll),
-    strip ? strip.rows + " rows, overflow-x " + strip.scroll : "no .cats");
+  check("wiki:narrow-width-lays-the-categories-in-even-rows",
+    Boolean(strip) && strip.rows <= 2 && new Set(strip.counts).size === 1 && strip.shown && strip.bodyTop < 360 / 2,
+    strip ? strip.counts.join("+") + " per row, every tab on screen " + strip.shown + ", body starts " + strip.bodyTop : "no .cats");
 
   const spill = [], split = [];
   let narrowRead = 0, breaks = 0, scanNodes = 0, scanChars = 0;

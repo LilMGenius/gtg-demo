@@ -1284,6 +1284,8 @@ function paintWiki() {
   box.innerHTML = wikiUI.wikiHTML(wikiAt);
   box.querySelector('.body').innerHTML = wikiUI.wikiBody(wikiAt);
   wikiUI.mountWikiBuild?.(box);
+  // 닫기는 모든 창이 같은 자리에 세우는 창의 부품이라 시트 격자 밖, 창의 직계로 옮긴다.
+  box.append(box.querySelector('.close'));
   for (const b of box.querySelectorAll('.cats [data-cat]')) b.onclick = () => { wikiAt = b.dataset.cat; paintWiki(); };
   box.querySelector('.close').onclick = closeWiki;
   for (const link of box.querySelectorAll('.wiki-prose a')) link.onclick = (event) => {
