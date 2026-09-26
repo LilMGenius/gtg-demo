@@ -11,7 +11,8 @@ const BASE = 'http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran'
 // 게임이 실제로 도는 가로 두 크기와 넓은 데스크톱. 세로 폰은 입는 선반이 회전 안내로 덮이므로 뼈대를 못 잰다.
 const SIZES = [[1920, 1080], [1280, 720], [844, 390]];
 // 탭이 있는 창과 그 창을 여는 손잡이. 새 탭 창이 생기면 여기 한 줄이 늘어난다.
-const PANELS = [{ id: 'shop', open: 'window.__shop(true)' }, { id: 'me', open: 'window.__me(true)' }];
+const PANELS = [{ id: 'shop', open: 'window.__shop(true)', tab: '.tab', key: 'tab', row: '.tabs' }, { id: 'me', open: 'window.__me(true)', tab: '.tab', key: 'tab', row: '.tabs' },
+  { id: 'roster', open: 'window.__roster(true)', tab: '.kind', key: 'pos', row: '.kinds' }];
 // 1px은 반올림 오차다. 탭의 기울임은 요소마다 고정이라 좌표를 흔들지 않는다.
 const TOL = 1;
 const t = setTimeout(() => { console.log('WATCHDOG'); process.exit(1); }, 240000); t.unref();
@@ -67,19 +68,20 @@ try {
       const p = await b.newPage({ viewport: { width: W, height: H } });
       await p.goto(BASE); await p.locator('#go').click({ force: true }); await clearDraw(p);
       await p.evaluate(panel.open); await p.waitForTimeout(400);
-      const tabs = await p.evaluate((id) => [...document.querySelectorAll('#' + id + ' .tab')].map((e) => e.dataset.tab), panel.id);
-      const at = () => p.evaluate((id) => {
+      const tabs = await p.evaluate((pn) => [...document.querySelectorAll('#' + pn.id + ' ' + pn.tab)].map((e) => e.dataset[pn.key]), panel);
+      const at = () => p.evaluate((pn) => {
+        const id = pn.id;
         const r = (s) => { const e = document.querySelector('#' + id + ' ' + s); if (!e) return null; const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width)]; };
         const c = document.querySelector('#' + id + ' > .close');
         const cb = c && c.getBoundingClientRect();
         // 줄마다 탭 수. 흘려 접으면 끝의 한 칸만 다음 줄로 떨어진다. 줄은 윗변으로 가른다.
         const rows = {};
-        for (const e of document.querySelectorAll('#' + id + ' .tab')) { const y = Math.round(e.getBoundingClientRect().top / 8); rows[y] = (rows[y] || 0) + 1; }
-        return { tabs: r('.tabs'), close: r('> .close'), inView: Boolean(cb && cb.top >= 0 && cb.bottom <= innerHeight), rows: Object.values(rows) };
-      }, panel.id);
+        for (const e of document.querySelectorAll('#' + pn.id + ' ' + pn.tab)) { const y = Math.round(e.getBoundingClientRect().top / 8); rows[y] = (rows[y] || 0) + 1; }
+        return { tabs: r(pn.row), close: r('> .close'), inView: Boolean(cb && cb.top >= 0 && cb.bottom <= innerHeight), rows: Object.values(rows) };
+      }, panel);
       const seen = [];
       for (const tab of tabs) {
-        await p.evaluate(([id, k]) => document.querySelector('#' + id + ' .tab[data-tab="' + k + '"]').click(), [panel.id, tab]);
+        await p.evaluate(([pn, k]) => document.querySelector('#' + pn.id + ' ' + pn.tab + '[data-' + pn.key + '="' + k + '"]').click(), [panel, tab]);
         await p.waitForTimeout(160);
         seen.push({ tab, ...(await at()) });
       }
@@ -89,6 +91,24 @@ try {
       check(tag + ':shell:the-tab-row-holds-still-across-tabs', drift('tabs').length === 0, drift('tabs').join(' | ') || 'still at ' + (seen[0].tabs || []).join(','));
       check(tag + ':shell:close-holds-still-across-tabs', drift('close').length === 0, drift('close').join(' | ') || 'still at ' + (seen[0].close || []).join(','));
       check(tag + ':shell:close-is-on-screen-on-every-tab', seen.every((s) => s.inView), seen.filter((s) => !s.inView).map((s) => s.tab).join(', ') || 'all');
+      // 몸을 끝까지 굴려도 탭 줄은 제자리다. 창 전체가 구르면 탭이 내용과 같이 화면 밖으로 밀린다.
+      const rollAll = () => p.evaluate((id) => { for (const e of document.querySelectorAll('#' + id + ', #' + id + ' *')) if (e.scrollHeight > e.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(e).overflowY)) e.scrollTop = e.scrollHeight; }, panel.id);
+      const before = (await at()).tabs;
+      await rollAll(); await p.waitForTimeout(200);
+      const after = (await at()).tabs;
+      const stays = (a, b) => Boolean(a && b) && a.every((v, i) => Math.abs(v - b[i]) <= TOL);
+      // 내 정보는 세로 520px 아래에서 창 전체가 구르는 것이 mepane 게이트의 계약이다(첫 단, 큰 수, 탭, 칸이
+      // 360px에 한 번에 못 선다). 그 폭에서 이 축은 빈 칸으로 적고 다음 랩의 과제로 남긴다.
+      const wholeRollContract = panel.id === 'me' && H < 520;
+      check(tag + ':shell:the-tab-row-stays-when-the-body-rolls', wholeRollContract || stays(before, after), (wholeRollContract ? 'open: me rolls whole below 520px, ' : '') + (before || []).join(',') + ' -> ' + (after || []).join(','));
+      if (panel.id === 'roster' && W === 1280) {
+        await p.evaluate(() => { for (const e of document.querySelectorAll('#roster, #roster *')) e.scrollTop = 0; });
+        const plant = await p.addStyleTag({ content: '#roster{overflow:auto!important}#roster > .rosterbody{flex:none!important;overflow:visible!important}' });
+        await p.waitForTimeout(150);
+        const pb = (await at()).tabs; await rollAll(); await p.waitForTimeout(200); const pa = (await at()).tabs;
+        await plant.evaluate((n) => n.remove());
+        check(tag + ':control:a-panel-that-rolls-whole-moves-the-tab-row', !stays(pb, pa), (pb || []).join(',') + ' -> ' + (pa || []).join(','));
+      }
       check(tag + ':shell:tab-rows-hold-equal-counts', new Set(seen[0].rows).size === 1, seen[0].rows.join('+'));
       // 대조군. 몸이 제 높이만큼 자라게 풀면 선반마다 닫기가 뛰어야 계기가 산다. 상점만 몸 높이가 선반마다 크게 다르다.
       if (panel.id === 'shop' && W === 1280) {

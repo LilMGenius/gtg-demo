@@ -487,6 +487,12 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 /* 세로 flex의 자식은 기본으로 줄어든다. 칸이 화면보다 길어지자 줄마다 눌려서 카드가 107px에서
    45px로 잘리고 이름이 사라졌다. 넘치는 것은 스크롤이 받아야지 줄이 받으면 안 된다. */
 #roster > *{flex:none}
+/* 창 뼈대. 제목과 포지션 탭은 제자리에 서고 명단 몸만 구른다. 창 전체가 구르면 탭이 명단과 같이 화면 밖으로 밀려
+   다른 자리로 가려면 맨 위까지 되감아야 했고, 명단 줄도 제 스크롤(52vh)을 따로 가져 굴림이 두 겹이었다. */
+#roster{overflow:hidden;justify-content:flex-start}
+#roster > .rosterbody{flex:1 1 auto;min-height:0;width:100%;overflow-y:auto;display:flex;flex-direction:column;
+  align-items:center;gap:12px;padding:4px 0 8px}
+#roster > .rosterbody > *{flex:none}
 #roster[hidden]{display:none}
 #roster h4{font-family:var(--disp);font-size:var(--fs-title);font-weight:400;
   color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);paint-order:stroke fill;
@@ -506,7 +512,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #roster .kind[aria-selected="true"]{background:#2b3a22;color:#ffd83d}
 #roster .kind:active{box-shadow:1px 1px 0 var(--edge)}
 #roster .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px;
-  width:min(94vw,940px);max-height:52vh;overflow-y:auto;padding:4px}
+  width:min(94vw,940px);padding:4px}
 #roster .row button{padding:9px 11px 11px;
   border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
   font-family:var(--body);font-size:var(--fs-body);font-weight:400;text-align:left;line-height:1.3;

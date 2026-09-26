@@ -990,7 +990,8 @@ function renderRoster() {
     : kickerPane(squadTab);
   const count = squadTab === 'gk' ? '보유 ' + state.squad.length + '명'
     : '주전 ' + (state.eleven.length + ELEVEN - FIELD) + ' / ' + ELEVEN + '명';
-  box.innerHTML = '<h4>선수단<small>' + count + '</small></h4>' + tabs + pane
+  // 창 뼈대. 제목과 포지션 탭은 붙박이고 굴리는 것은 명단 몸 하나다. 상점과 내 정보가 같은 뼈대를 쓴다.
+  box.innerHTML = '<h4>선수단<small>' + count + '</small></h4>' + tabs + '<div class="rosterbody">' + pane + '</div>'
     + '<button class="close">닫기</button>';
   for (const b of box.querySelectorAll('.kind')) b.onclick = () => { squadTab = b.dataset.pos; renderRoster(); };
   bindKickerPane(box);
