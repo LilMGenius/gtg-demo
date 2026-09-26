@@ -36,15 +36,17 @@ try {
   await p.waitForSelector("#go", { timeout: 15000 });
   await p.click("#go", { force: true });
 
-  // 대조군. 한 구도 안 돈 자리에서 피드는 비어 있어야 하고, 빈 이유를 자기 글자로 말해야 한다.
+  // 대조군. 한 구도 안 돈 자리에서 피드는 비어 있어야 하고, 빈 칸은 비워 두거나 아이콘 하나다(파운더 판정).
+  // 글자 한 줄은 판을 상자 위 라벨로 바꾸므로 보이는 글자는 0이고 그림 하나가 선다.
   await p.evaluate(() => window.__gram(true));
   await p.waitForTimeout(300);
   const empty = await p.evaluate(() => {
     const box = document.getElementById("gram");
     const posts = [...box.querySelectorAll(".post")];
-    return { count: posts.length, empty: posts.filter((x) => x.classList.contains("empty")).length, says: (posts[0] ? posts[0].textContent : "").trim().length };
+    return { count: posts.length, empty: posts.filter((x) => x.classList.contains("empty")).length, says: (posts[0] ? posts[0].textContent : "").trim().length,
+      icons: posts[0] ? posts[0].querySelectorAll("svg").length : 0 };
   });
-  check("control:a-fresh-save-shows-the-empty-feed", empty.empty === 1 && empty.says > 0, "posts " + empty.count + " empty " + empty.empty + " chars " + empty.says);
+  check("control:a-fresh-save-shows-the-empty-feed", empty.empty === 1 && empty.says === 0 && empty.icons === 1, "posts " + empty.count + " empty " + empty.empty + " chars " + empty.says + " icons " + empty.icons);
   await p.evaluate(() => window.__gram(false));
   /* 창이 열려 있는 동안 조작 기둥은 화면 밖으로 물러난다. 닫자마자 누르면 그 버튼은 아직 밖이고,
      클릭이 뷰포트 밖이라 조용히 시간만 끌다 죽는다. 기둥이 돌아온 것을 보고 누른다. */

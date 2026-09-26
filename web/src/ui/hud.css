@@ -688,6 +688,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 /* 먹힌 경기 게시물. 이름이 죽어야 넘긴 판과 구분된다. */
 #gram .post.bad b{color:#f6efdc99}
 #gram .post.empty{color:var(--dim);text-align:center}
+#gram .post.empty svg{display:block;width:24px;height:24px;margin:0 auto}
 
 /* 내 정보. 오른쪽 기둥은 286px에서 찼고 다음 칸은 크로스바 325px를 넘는다. 그래서 좌상단 레벨 칩이 진입이다. */
 /* 세 단이 서면서 칸이 세로 360px짜리 가로 모바일보다 길어졌다. 넘치면 창이 스스로 굴러야

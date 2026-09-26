@@ -272,6 +272,9 @@ const IC_FANS = G('팔로워', FACE_PX);
    글자가 되어, 빈 채로 둔 칸을 글자를 든 칸으로 바꾼다. 그림은 카드가 세우는 그 실루엣
    그대로다. 여기만 다른 것을 그리면 빈 칸이 가리키는 것이 사람인지가 안 읽힌다. */
 const IC_NOFACE = SVG('aria-hidden="true"', FACE_PX);
+// 아직 글이 없는 피드. 사진틀 테두리와 그 안의 산 하나. 틀만 있으면 네모 칸으로 읽혀 안을 채운다.
+const IC_NOPOST = SVG('aria-hidden="true"', R(3, 3, 18, 3) + R(3, 18, 18, 3) + R(3, 6, 3, 12) + R(18, 6, 3, 12)
+  + R(9, 12, 3, 3) + R(6, 15, 9, 3) + R(12, 9, 3, 3));
 // 좋아요. 3px 격자에서 하트는 봉우리 둘과 아래로 좁아지는 세 단이면 선다.
 // 24 격자의 가운데가 12라 마지막 단은 6폭이 하한이다. 3폭으로 좁히면 중심이 격자 밖으로 나간다.
 const IC_LIKE = G('좋아요', R(6, 3, 3, 3) + R(15, 3, 3, 3) + R(3, 6, 18, 3) + R(3, 9, 18, 3)
@@ -1180,7 +1183,9 @@ function renderGram() {
     + react(p) + cmtRow(p) + '</article>';
   const feed = state.posts.length
     ? state.posts.slice().reverse().map((p) => (p.ph ? photoCard(p) : (p.sf ? selfieCard(p) : myCard(p)))).join('')
-    : '<article class="post empty"><p class="txt">글 없음</p></article>';
+    /* 빈 칸은 비워 두거나 아이콘 하나다(파운더 판정). 글자 한 줄은 판을 상자 위 라벨로 바꾼다.
+       아는 얼굴의 빈 칸과 같은 문법으로 빈 사진틀 하나만 세운다. */
+    : '<article class="post empty">' + IC_NOPOST + '</article>';
   /* 쪽지는 피드 아래에 접혀 있다가 이름을 누르면 그 자리에서 펴진다. 예전에는 창을 통째로 덮어서
      계정을 연 사람이 제 글보다 남의 대화를 먼저 봤다. 대화는 계정의 일부지 계정의 첫 화면이 아니다.
      맞팔이 된 뒤 세 판이 지나면 그 사람이 다시 이 줄에 선다. */
