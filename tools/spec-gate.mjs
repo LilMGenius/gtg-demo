@@ -208,7 +208,10 @@ try {
   }
   const room = await np.evaluate(() => {
     const col = document.querySelector("#shop .fitting");
-    const shop = document.querySelector("#shop");
+    // 구르는 것은 상점 창 안에서 기둥을 품은 가장 가까운 스크롤 상자다. 창의 뼈대가 탭과 닫기를 붙박고
+    // 몸만 굴리므로, 창 자체를 스크롤 상자로 못 박으면 기둥이 닿는데도 못 닿는다고 읽는다.
+    let shop = col.parentElement;
+    while (shop && shop.id !== "shop" && !/auto|scroll/.test(getComputedStyle(shop).overflowY)) shop = shop.parentElement;
     const c = col.getBoundingClientRect();
     const s = shop.getBoundingClientRect();
     return { col: Math.round(c.height), view: window.innerHeight,

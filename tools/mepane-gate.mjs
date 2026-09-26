@@ -1124,23 +1124,30 @@ try {
   const saidFit = (c) => (c ? "hides " + c.over + "px of a " + paneLip + "px shade, cue "
     + (c.down ? c.down.op + " " + c.down.h + "px against " + Math.round(c.over) + "px" : "none") : "no panel");
   const saidShut = (s) => (s ? "close bottom " + s.bottom + ", spare " + s.spare + "px, " + closeFloorSaid(s.closeFloor) + ", hit " + s.hit : "no close");
+  /* 창 뼈대가 선 뒤로 넓은 화면의 창은 안 구른다. 칸 상자 높이를 창이 정하므로 닫기는 쉬는 자리에서
+     이미 손이 닿고, 창이 감추는 띠가 없으니 창의 그늘도 꺼져 있어야 한다. 창이 얇게 구르면(감춘 띠가
+     그늘보다 얇으면) 그 높이에 맞춘 그늘이 켜지고 굴린 끝에서 닫기가 닿아야 한다. 둘 중 하나가 서면 초록이다. */
+  const still = (c, s) => Boolean(c) && c.over <= 1 && (!c.down || c.down.op === 0) && reachable(s);
+  const thinRoll = (c, s, e) => fits(c) && !reachable(s) && reachable(e);
   check("mepane:a-shallow-roll-still-lights-a-fitted-cue",
-    fits(thin) && !reachable(thinShut) && reachable(thinEndShut),
+    still(thin, thinShut) || thinRoll(thin, thinShut, thinEndShut),
     saidFit(thin) + ", at rest " + saidShut(thinShut)
     + " | after the roll at " + (thinEnd ? thinEnd.at : "?") + " " + saidShut(thinEndShut));
-  /* 음성 대조군. 그늘을 26px로 되돌려 붙이면 그 겹이 감춘 16px보다 두꺼워진다. 그려진 높이로 묻는
-     판정식은 그때 빨개져야 하고, 안 빨개지면 위 축의 초록은 높이를 아예 안 읽는 경우와 같다. */
+  /* 음성 대조군. 칸 상자가 제 내용 길이로 자라게 풀면 창이 다시 구르고 닫기가 접힘 밖으로 밀린다.
+     그때 위 축의 두 갈래가 다 빨개져야 하고, 안 빨개지면 위 축의 초록은 창 높이를 안 읽는 경우와 같다. */
   await panelScrollTo(0);
   await p.waitForTimeout(150);
-  const thickPlant = await p.addStyleTag({ content: "#me > .cue.down{height:26px !important}" });
-  await p.waitForTimeout(150);
-  const thickened = await panelCue();
-  await thickPlant.evaluate((n) => n.remove());
-  await p.waitForTimeout(150);
-  const thinAgain = await panelCue();
-  check("control:a-shade-thicker-than-the-band-reddens-the-fitted-cue",
-    band(thickened) && !fits(thickened) && fits(thinAgain),
-    "planted " + saidFit(thickened) + " | restored " + saidFit(thinAgain));
+  const growPlant = await p.addStyleTag({ content: "#me .card{max-height:none !important}#me .panebox{flex:none !important;grid-template-rows:auto !important}" });
+  await p.waitForTimeout(200);
+  const grown = await panelCue();
+  const grownShut = await shutSeen();
+  await growPlant.evaluate((n) => n.remove());
+  await p.waitForTimeout(200);
+  const stillAgain = await panelCue();
+  const stillAgainShut = await shutSeen();
+  check("control:a-pane-that-grows-the-panel-reddens-the-still-axis",
+    !still(grown, grownShut) && still(stillAgain, stillAgainShut),
+    "planted " + saidFit(grown) + ", " + saidShut(grownShut) + " | restored " + saidFit(stillAgain) + ", " + saidShut(stillAgainShut));
   await p.setViewportSize({ width: 740, height: 360 });
   await p.waitForTimeout(450);
 
