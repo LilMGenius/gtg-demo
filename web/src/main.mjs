@@ -994,7 +994,7 @@ function renderRoster() {
   const count = squadTab === 'gk' ? '보유 ' + state.squad.length + '명'
     : '주전 ' + (state.eleven.length + ELEVEN - FIELD) + ' / ' + ELEVEN + '명';
   // 창 뼈대. 제목과 포지션 탭은 붙박이고 굴리는 것은 명단 몸 하나다. 상점과 내 정보가 같은 뼈대를 쓴다.
-  box.innerHTML = '<h4>선수단<small>' + count + '</small></h4>' + tabs + '<div class="rosterbody">' + pane + '</div>'
+  box.innerHTML = tabs + '<h4>선수단<small>' + count + '</small></h4><div class="rosterbody">' + pane + '</div>'
     + '<button class="close">닫기</button>';
   for (const b of box.querySelectorAll('.kind')) b.onclick = () => { squadTab = b.dataset.pos; renderRoster(); };
   bindKickerPane(box);
@@ -1506,13 +1506,15 @@ function renderMe() {
   const big = '<div class="big"><span><b>' + rate + '%</b><i>세이브율</i></span>'
     + '<span><b>' + led.s + '</b><i>막은 수</i></span>'
     + '<span><b>' + led.c + '</b><i>먹힌 수</i></span></div>';
-  box.innerHTML = '<h4><img class="pfp" alt="' + name + '" src="'
+  box.innerHTML = tabs + '<h4><img class="pfp" alt="' + name + '" src="'
     + thumbURL('face', k, lookOf(state.gear, state.keeper.name)) + '">' + name
     + '<small><i>Lv ' + k.level + '</i><i>' + k.height + 'cm</i><i>' + k.weight + 'kg</i>'
     + '<i class="cond">' + cond + '</i></small></h4>'
     /* 큰 수와 탭은 한 머리로 묶는다. 넓은 화면에서는 묶음이 없는 것처럼 서고(display:contents),
        세로가 짧은 화면에서는 카드가 구르는 동안 이 머리가 붙박이로 남는다. 상점과 선수단의 창 뼈대와 같다. */
-    + '<div class="card">' + wear + '<div class="mehead">' + tabs + big + '</div><div class="panebox"><div class="pane">' + pane + '</div>'
+    /* 걸친 것은 능력치 칸의 끝에 선다. 키퍼 자신의 것이라 얼굴과 전적 칸에는 안 선다. 칸 밖 띠로 세우면 탭이 창 위로 올라간 뒤
+       칸이 모자랄 때 답 대신 띠가 자리를 지켰다(1280x720에서 능력치 열다섯 중 다섯만 보였다). */
+    + '<div class="card"><div class="mehead">' + big + '</div><div class="panebox"><div class="pane">' + pane + (meTab === 'stat' ? wear : '') + '</div>'
     + '<div class="cue up" aria-hidden="true"></div><div class="cue down" aria-hidden="true"></div></div></div>'
     + '<button class="close">닫기</button>'
     /* 창이 구르는 화면에서 쓰는 신호. 칸의 것과 같은 클래스로 두어 그늘 규칙이 한 벌로 남는다.

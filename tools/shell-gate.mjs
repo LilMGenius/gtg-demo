@@ -250,6 +250,19 @@ try {
     await cp.goto(BASE); await cp.locator('#go').click({ force: true }); await clearDraw(cp);
     const hits = await cover(cp);
     check(W + 'x' + H + ':shell:close-covers-nothing-in-its-panel', hits.length === 0, hits.join(', ') || '7 panels clear');
+    /* 탭 줄은 창끼리도 한 줄에 선다. 창 안에서 탭을 바꿀 때만 재면, 창마다 제 머리 아래에 둔 탭이 74, 87, 98, 144px으로
+       갈려도 초록이었다(740x360). 대조군은 선수단 탭 줄을 제목 아래로 되돌린다. */
+    const ROWS = [['shop', '.tabs'], ['roster', '.kinds'], ['me', '.tabs'], ['wiki', '.cats']];
+    const tops = async () => { const out = []; for (const [id, row] of ROWS) { await cp.evaluate((i) => window['__' + i](true), id); await cp.waitForTimeout(250); out.push(id + ' ' + (await cp.evaluate(([i, r]) => Math.round(document.querySelector('#' + i + ' ' + r).getBoundingClientRect().top), [id, row]))); await cp.evaluate((i) => window['__' + i](false), id); await cp.waitForTimeout(120); } return out; };
+    const same = (list) => new Set(list.map((s) => Number(s.split(' ')[1]))).size === 1;
+    const rowTops = await tops();
+    check(W + 'x' + H + ':shell:tab-rows-share-one-top-across-panels', same(rowTops), rowTops.join(', '));
+    if (W === 740) {
+      const plant = await cp.addStyleTag({ content: '#roster > .kinds{order:2}#roster > h4{order:1}#roster > .rosterbody{order:3}' });
+      const planted = await tops();
+      await plant.evaluate((n) => n.remove());
+      check(W + 'x' + H + ':control:a-tab-row-under-its-title-is-caught', !same(planted), planted.join(', '));
+    }
     if (W === 740) {
       await cp.addStyleTag({ content: ':is(#gym,#roster,#gram,#me,#shop,#wiki,#date) > .close{top:calc(var(--strip-b) + var(--gap-2))!important}' });
       const old = await cover(cp);

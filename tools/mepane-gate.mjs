@@ -313,10 +313,14 @@ try {
   check("mepane:the-recent-rounds-stop-at-ten", seen.log.logs === 10, seen.log.logs + " rounds in the record pane");
   check("mepane:the-people-pane-holds-the-people", seen.face.faces > 0 && seen.stat.faces === 0 && seen.log.faces === 0,
     "stat " + seen.stat.faces + ", face " + seen.face.faces + ", log " + seen.log.faces);
-  check("mepane:the-wardrobe-stays-in-every-pane", TABS.every((id) => wardrobeOk(seen[id])),
+  /* 걸친 것은 능력치 칸 끝에 서고 얼굴과 전적 칸에는 없다. 탭이 창 위로 올라간 뒤 모든 칸 밖에 띠로 세우면 1280x720에서
+     능력치 열다섯 중 다섯만 보였다. 누구의 창인지는 초상 머리가 말한다. */
+  check("mepane:the-wardrobe-closes-the-stat-pane", wardrobeOk(seen.stat) && seen.face.wear === 0 && seen.log.wear === 0,
     "shelves " + wardrobe.join(",") + "; "
     + TABS.map((id) => id + " " + seen[id].wear + " lines, shot " + seen[id].shot).join(", "));
   // 선반 한 줄을 실제 DOM에서 빼면 같은 판정식이 거부하고, 제자리에 돌려놓으면 통과해야 한다.
+  await p.evaluate(() => document.querySelector('#me .tab[data-tab="stat"]').click());
+  await p.waitForTimeout(150);
   const removedWear = await p.evaluateHandle(() => {
     const row = document.querySelector("#me .wear .on i");
     const place = { row, parent: row.parentNode, next: row.nextSibling };
@@ -332,7 +336,7 @@ try {
   }
   const restoredWear = await read();
   check("control:a-missing-shelf-row-reddens-the-wardrobe-axis",
-    wardrobeOk(seen.log) && !wardrobeOk(missingWear) && wardrobeOk(restoredWear),
+    wardrobeOk(seen.stat) && !wardrobeOk(missingWear) && wardrobeOk(restoredWear),
     "expected " + wardrobe.length + ", missing " + missingWear.wear + ", restored " + restoredWear.wear);
   // 720p에서 능력치가 하나도 접힘 아래로 안 내려가야 한다. 실측으로 열다섯 중 아홉만 보이던 자리다.
   // 이 축은 능력치가 늘어나는 날에도 운다. 칸이 늘면 격자나 창 높이가 같이 움직여야 한다는 뜻이다.

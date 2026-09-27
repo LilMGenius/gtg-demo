@@ -174,7 +174,12 @@ const plantedLid = async (w, h) => {
     // 심을 자리는 영입 줄에서 고른다. 보유 줄은 지금 뛰는 사람이 눌리지 않는 상태라
     // 덮임 표본에서 빠지고, 그 위에 뚜껑을 얹어도 이 자는 아무것도 못 본다.
     const row = document.querySelector("#roster .row.hire") || document.querySelector("#roster .row");
-    const rr = row.getBoundingClientRect();
+    // 탭 줄이 위에 붙은 뒤로 영입 줄은 짧은 화면에서 접힘 아래에 선다. 화면 밖 카드에 얹은 뚜껑은 자가 못 본다.
+    row.scrollIntoView({ block: "center" });
+    // 뚜껑은 구르는 몸이 실제로 보여 주는 자리 안의 카드에 얹는다. 줄 상자만 보면 몸 밖으로 잘린 카드를 골라 자가 못 본다.
+    const body = row.closest(".rosterbody") || row;
+    const br = body.getBoundingClientRect(), rw = row.getBoundingClientRect();
+    const rr = { top: Math.max(br.top, rw.top), bottom: Math.min(br.bottom, rw.bottom) };
     const card = [...row.querySelectorAll("button")].find((e) => {
       const q = e.getBoundingClientRect();
       const cy = q.top + q.height / 2;
