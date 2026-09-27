@@ -97,7 +97,9 @@ try {
   await k.keyboard.press('Enter');
   await k.waitForSelector('#pull .tap');
   await k.keyboard.press('Escape');
-  check('keys:unfinished-reveal-stays-open', !(await hidden(k, 'pull')), 'Escape preserves card stages');
+  // 개봉 중 Esc는 건너뛰기다. 창은 남고 남은 카드가 한 번에 열려 결과 판(버튼 글자 닫기)에 선다. 다음 Esc가 닫는다.
+  const skipped = (await k.locator('#pull .tap').textContent()).trim();
+  check('keys:escape-skips-an-unfinished-reveal-to-its-results', !(await hidden(k, 'pull')) && skipped === '닫기', 'pull open, tap reads ' + skipped);
   for (let i = 0; i < 10 && (await k.locator('#pull .tap').textContent()).trim() !== '닫기'; i++) await k.keyboard.press('Enter');
   await k.keyboard.press('Escape');
   check('keys:completed-reveal-closes-to-shop', await hidden(k, 'pull') && !(await hidden(k, 'shop')) && await k.locator('#shop .banner[data-kind="town"] .buy[data-want="1"]').evaluate((b) => b === document.activeElement), 'Escape closes final reveal and restores purchase button');

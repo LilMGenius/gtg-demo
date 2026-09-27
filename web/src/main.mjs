@@ -2846,7 +2846,12 @@ addEventListener('keydown', (e) => {
   const id = panelStack.at(-1);
   if (binding?.action === 'close') {
     e.preventDefault();
-    if (id && (id !== 'pull' || (state.onboard >= ONBOARD_DONE && shown >= lastPull.length && pullStage === STAGE_LAST))) PANEL_SHUT[id]();
+    /* 개봉 중의 Esc는 건너뛰기다. 남은 카드를 한 번에 열어 결과 판에 세우고, 결과 판에서 한 번 더 누르면 닫는다.
+       바로 닫으면 값을 치르고 받은 것을 못 본 채 지나간다. 실측: 열 장을 사고 한 번 누른 뒤 Esc가 아무 일도 안 해,
+       창을 닫는 키가 이 창에서만 죽어 있었다. */
+    const done = shown >= lastPull.length && pullStage === STAGE_LAST;
+    if (id === 'pull' && !done) revealAll();
+    else if (id && (id !== 'pull' || state.onboard >= ONBOARD_DONE)) PANEL_SHUT[id]();
     return;
   }
   if (id && (binding?.action === 'category' || binding?.action === 'focus')) {

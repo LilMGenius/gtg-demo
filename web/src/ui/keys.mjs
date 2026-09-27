@@ -1,6 +1,6 @@
 // Native button activation and focus remain owned by the browser.
 export const KEY_MAP = [
-  { key: 'Escape', action: 'close', label: 'Escape', note: '창 닫기, 개봉은 순서대로 확인' },
+  { key: 'Escape', action: 'close', label: 'Escape', note: '창 닫기, 개봉은 남은 카드를 한 번에 연 뒤 닫기' },
   { key: 'Tab', action: 'category', label: 'Tab / Shift+Tab', note: '카테고리 다음 / 이전' },
   { key: 'F6', action: 'focus', label: 'F6 / Shift+F6', note: '창 안 버튼 다음 / 이전' },
   { keys: { w: 'wikiBtn', s: 'shopBtn', g: 'gymBtn', r: 'rosterBtn', m: 'meBtn', f: 'gramBtn' }, action: 'open', label: 'W / S / G / R / M / F', note: '위키 / 상점 / 훈련장 / 선수 명단 / 내 정보 / 아웃문그램' },
