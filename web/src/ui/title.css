@@ -108,3 +108,18 @@
    잘림 축은 이것을 통과시키고, 읽기 나쁨은 넘침과 다른 명제다.
    keep-all은 띄어쓰기에서만 넘긴다. 한 낱말이 상자보다 길 때만 break-word가 받는다. */
 #title, #title * { word-break: keep-all; overflow-wrap: break-word; }
+
+/* 세로가 짧은 가로 폰. 제목, 카피, 시작, 계정 칸을 한 기둥에 세우면 740x360에서 로그인과 가입이 화면 밖
+   369.83px과 363.52px까지 내려가고 위 딱지는 -1.43px에서 시작했다. 로고를 한 줄로 눕히고 간격과
+   입력 칸 높이만 줄여 기둥 전체를 화면 안에 넣는다. 크기 토큰과 화풍은 넓은 화면과 같다. */
+@media (max-height:480px){
+  #word{margin-top:4px}
+  #word span{display:inline}
+  #word span:last-child{margin-left:.35em}
+  #tag{margin-top:6px}
+  #go{margin-top:10px;padding:7px clamp(28px,4vw,48px) 9px}
+  #gate{margin-top:8px;gap:6px}
+  #gate input{padding:6px 12px 8px}
+  #gate button{padding:6px 0 8px}
+}
+

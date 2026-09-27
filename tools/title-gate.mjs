@@ -9,7 +9,7 @@ const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win6
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
 const LINE = String.fromCharCode(10);
 // 가로 두 폭. 넓은 쪽은 심사 화면이고 좁은 쪽은 손에 든 폰이다.
-const SIZES = [[1280, 720], [844, 390]];
+const SIZES = [[1280, 720], [844, 390], [740, 360]];
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);
 t.unref();
 
@@ -153,6 +153,14 @@ try {
     check("title:" + tag + ":says-its-name-and-a-line", words.word.length >= 4 && words.tag.length >= 8 && words.go.length >= 1, words.word + " / " + words.tag.slice(0, 14) + " / " + words.go);
     const clipped = await p.evaluate(SCAN);
     check("title:" + tag + ":no-text-is-clipped", clipped.length === 0, clipped.join(", ") || "nothing overruns its box");
+    /* 누를 것이 전부 화면 안인가. 740x360에서 로그인과 가입이 화면 아래로 10px 빠져 있었다.
+       글자 넘침 자는 상자 안의 글자만 재서 상자째 화면 밖에 선 버튼을 못 본다. */
+    const outside = await p.evaluate(() => [...document.querySelectorAll("#title button, #title input, #title #kicker")]
+      .filter((e) => e.getClientRects().length)
+      .map((e) => ({ e, r: e.getBoundingClientRect() }))
+      .filter(({ r }) => r.top < -1 || r.bottom > innerHeight + 1 || r.left < -1 || r.right > innerWidth + 1)
+      .map(({ e, r }) => (e.id || e.textContent.trim() || e.placeholder) + " " + Math.round(r.top) + ".." + Math.round(r.bottom)));
+    check("title:" + tag + ":every-control-is-on-screen", outside.length === 0, outside.join(", ") || "all inside " + w + "x" + h);
 
     /* 워드마크는 두 줄이다. 첫 줄의 잉크와 그림자가 둘째 줄 줄상자에 들어오면
        골키퍼의 그림자가 유령 사본으로 읽히고 그 위에 키우기가 얹힌다.
@@ -220,7 +228,10 @@ try {
       rng.selectNodeContents(s[1]);
       const two = rng.getBoundingClientRect();
       mark.style.transform = keep;
-      return { bottom: +one.bottom.toFixed(2), top: +two.top.toFixed(2), gap: +(two.top - one.bottom).toFixed(2) };
+      // 세로가 짧은 화면은 두 낱말을 한 줄에 눕힌다. 그때 떨어져 있어야 하는 것은 위아래가 아니라 좌우다.
+      const side = two.left >= one.right - 1 && Math.abs(two.top - one.top) < one.height / 2;
+      return { bottom: +one.bottom.toFixed(2), top: +two.top.toFixed(2), side,
+        gap: +(side ? two.left - one.right : two.top - one.bottom).toFixed(2) };
     });
     check("title:" + tag + ":the-lines-stand-apart", apart.gap >= -1,
       "line one ends at " + apart.bottom + ", line two starts at " + apart.top + ", gap " + apart.gap + "px");
