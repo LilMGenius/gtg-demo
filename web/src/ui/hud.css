@@ -874,6 +874,9 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #me .log span b.gone{background:var(--bad)}
 /* 상대 전적 표. 얼굴 칸과 수 칸의 폭을 못 박아, 이름 길이와 상관없이 수가 한 줄에 선다. */
 #me .pane table{width:100%;border-collapse:collapse;font-family:var(--body);font-size:var(--fs-body)}
+/* 표도 옆 칸들과 같은 판 위에 선다. 판 없이 두면 경기장이 줄 사이로 비치고, 실측 740x360에서
+   공과 골대와 오른쪽 이동 버튼의 화살표가 전적 줄 위에 겹쳐 읽혔다. */
+#me .pane table{background:#1b2318;border:var(--line) solid var(--edge)}
 #me .pane th{padding:3px 8px 5px;text-align:left;color:var(--dim);font-weight:400}
 #me .pane td{padding:3px 8px 5px;border-top:2px solid #ffffff14;color:var(--ink)}
 #me .pane td:first-child{width:36px;padding-right:0}

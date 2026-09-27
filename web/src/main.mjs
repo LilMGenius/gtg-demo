@@ -803,7 +803,8 @@ function renderGym() {
   // 성장 칸이 전부 상한이면 훈련은 더 쌓여도 쓸 곳이 없다. 그때만 환전 줄이 열린다.
   const maxed = GROWABLE.every((k) => state.keeper[k] >= 10);
   // 제목과 수를 점으로 잇지 않는다. 창 이름은 제목이 갖고 수는 그 뒤 작은 줄이 갖는다.
-  const head = '훈련장<small>' + (state.points > 0 ? '남은 훈련 ' + state.points + '회' : '밀린 훈련이 없다') + '</small>' + (lastAutoTraining ? '<small class="auto-training">' + lastAutoTraining + '</small>' : '');
+  // 남은 훈련이 없으면 작은 줄을 비운다. 없다는 문장은 빈 자리 위 라벨이고, 꺼진 칸들이 이미 그것을 말한다.
+  const head = '훈련장' + (state.points > 0 ? '<small>남은 훈련 ' + state.points + '회</small>' : '') + (lastAutoTraining ? '<small class="auto-training">' + lastAutoTraining + '</small>' : '');
   // 못 누르는 버튼도 사유를 글자로 들고 있다. 빈 자리는 왜 못 쓰는지를 말하지 않는다.
   const swap = maxed
     ? '<button class="swap"' + (state.points <= 0 ? ' disabled' : '') + '>'
@@ -987,9 +988,7 @@ function renderRoster() {
       + (squadTab === id) + '">' + POS_ICON[id] + '<span>' + POS_ABBR[id] + '</span></button>').join('') + '</div>';
   const pane = squadTab === 'gk'
     ? '<div class="row mine">' + mine + '</div>'
-      + '<h5>명단에서 데려오기</h5>'
-      + (hire ? '<div class="row hire">' + hire + '</div>'
-        : '<div class="note dim"><span></span></div>')
+      + (hire ? '<h5>명단에서 데려오기</h5><div class="row hire">' + hire + '</div>' : '')
     : kickerPane(squadTab);
   const count = squadTab === 'gk' ? '보유 ' + state.squad.length + '명'
     : '주전 ' + (state.eleven.length + ELEVEN - FIELD) + ' / ' + ELEVEN + '명';
@@ -1045,15 +1044,12 @@ function kickerPane(role) {
       + '<img alt="' + k.name + '" src="' + thumbURL("face", k, lookOf({}, k.name)) + '">'
       + '<span class="nm">' + k.name + '</span><em>' + PRICE(cost) + '</em></button>';
   }).join("");
+  /* 빈 목록은 제목째 안 선다. 빈 칸 위의 제목은 빈 상자 위 라벨이고, 빈 칸은 비워 두거나 아이콘이다(파운더 판정).
+     주전 줄만 남는다. 그 제목은 정원을 세는 수라 비어 있을 때가 오히려 읽어야 할 때다. */
   return '<h5>주전 ' + starting.length + ' / ' + slots + '</h5>'
-    + '<div class="row mine">' + (starting.map((n) => card(n, true)).join("")
-      || '<span class="note dim"></span>') + '</div>'
-    + '<h5>가진 사람</h5>'
-    + '<div class="row mine">' + (owned.map((n) => card(n, false)).join("")
-      || '<span class="note dim"></span>') + '</div>'
-    + '<h5>명단에서 데려오기</h5>'
-    + (hire ? '<div class="row hire">' + hire + '</div>'
-      : '<div class="note dim"><span></span></div>');
+    + '<div class="row mine">' + starting.map((n) => card(n, true)).join("") + '</div>'
+    + (owned.length ? '<h5>가진 사람</h5><div class="row mine">' + owned.map((n) => card(n, false)).join("") + '</div>' : '')
+    + (hire ? '<h5>명단에서 데려오기</h5><div class="row hire">' + hire + '</div>' : '');
 }
 
 /* 세우기와 내리기와 영입. 셋 다 한 곳에서 끝나야 정원 검사가 한 번만 적힌다.
@@ -1385,8 +1381,11 @@ function recordRows() {
   /* 표가 먼저 선다. 이 칸을 여는 이유가 누구한테 약한지라, 그 답이 굴리기 전에 서야 한다. 실측
      1280x720에서 칸이 접히는 자리가 243px인데, 최근 열 판이 위에 서면 표의 첫 줄이 접힘 아래
      214px에 선다. 최근은 그 답을 받치는 줄이라 아래로 내려가고, 아래끝 그늘이 거기 더 있다고 말한다. */
-  return '<div class="note"><b>상대 전적</b><i>막은 수 - 먹힌 수</i></div>' + table
-    + '<div class="note"><b>최근</b></div>' + recent;
+  /* 비어 있는 갈래는 제목째 안 선다. 빈 표 위의 제목은 빈 상자 위 라벨이다(빈 칸은 비워 두거나 아이콘, 파운더 판정).
+     둘 다 비면 아는 얼굴이 없을 때와 같은 얼굴 실루엣 하나만 선다. 막을 상대가 생겨야 채워질 자리라서다. */
+  if (!names.length && !played.length) return '<div class="note dim">' + IC_NOFACE + '</div>';
+  return (names.length ? '<div class="note"><b>상대 전적</b><i>막은 수 - 먹힌 수</i></div>' + table : '')
+    + (played.length ? '<div class="note"><b>최근</b></div>' + recent : '');
 }
 
 // 만남 버튼 글자. 문은 판정이 열고, 값을 어떻게 보여 줄지는 화면이 정한다.
