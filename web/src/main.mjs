@@ -2895,6 +2895,11 @@ addEventListener('keydown', (e) => {
 if (state.coach) trainKeeper();
 paintMovement();
 pips();
+/* 타이틀이 서 있는 동안 뒤의 경기 화면은 inert다. 안 막으면 첫 Tab이 보이지 않는 초상 버튼에 걸리고
+   시작 버튼까지 Tab 18번이 걸렸다(QA 12th). 타이틀을 여닫는 자리가 여럿이라 hidden 속성을 지켜본다. */
+const titleGate = () => { el('hud').inert = !el('title').hidden; };
+new MutationObserver(titleGate).observe(el('title'), { attributes: true, attributeFilter: ['hidden'] });
+titleGate();
 mountTitle(() => {
   stage.leaveTitle();
   stage.setKeeper(state.keeper, lookOf(state.gear, state.keeper.name));

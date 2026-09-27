@@ -113,6 +113,22 @@ try {
   check('keys:served-parent-control', red, { before, hiddenAfterEscape: await hidden(c, 'gym') });
   await c.context().close();
   const first = await fresh(false, '');
+  /* 타이틀의 첫 Tab은 시작 버튼이다. 뒤의 경기 화면이 inert가 아니면 첫 Tab이 안 보이는 초상 버튼에 걸렸다(QA 12th,
+     시작까지 Tab 18번). 대조군은 같은 화면에서 inert를 풀어 첫 Tab이 경기 화면으로 새는지 본다. */
+  const firstTab = async (leak) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    const q = await ctx.newPage();
+    await q.goto(BASE + '?seed=20'); await q.waitForSelector('#go');
+    if (leak) await q.evaluate(() => { const h = document.getElementById('hud'); new MutationObserver(() => { if (h.inert) h.inert = false; }).observe(h, { attributes: true }); h.inert = false; });
+    await q.keyboard.press('Tab');
+    const id = await q.evaluate(() => document.activeElement.id || document.activeElement.tagName);
+    await ctx.close();
+    return id;
+  };
+  const tabOne = await firstTab(false);
+  check('keys:the-first-tab-on-the-title-lands-on-start', tabOne === 'go', 'first Tab -> ' + tabOne);
+  const tabLeak = await firstTab(true);
+  check('keys:control:a-live-hud-behind-the-title-steals-the-first-tab', tabLeak !== 'go', 'first Tab -> ' + tabLeak);
   await first.waitForSelector('#pull .tap');
   await first.keyboard.press('Escape');
   check('keys:onboarding-does-not-skip', !(await hidden(first, 'pull')), 'Escape preserves first reveal');
