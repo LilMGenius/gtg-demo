@@ -1799,6 +1799,14 @@ function cardLine(kind, rank) {
     .map((r) => r.k + ' ' + r.v).join(', ');
 }
 
+/* 장비 카드의 효과는 한 효과에 한 줄이다. 한 문장으로 이어 흘리면 둘째 효과가 첫 줄 끝에서 낱말 가운데로
+   접혀 '손에서 흘리는 사...'처럼 이름이 말줄임에 먹혔다(1280x720 문어 빨판 장갑). 줄을 효과로 가르면
+   효과 이름과 수가 늘 같은 줄에 서고, 줄바꿈이 쉼표를 대신한다. 폭이 모자라면 줄어드는 것은 이름이고 수는 늘 다 보인다.
+   파는 것이 그 수라서다(실측: 1280x720 축구화 효과 238px이 205px 칸에서 수째로 잘렸다). */
+function cardLines(kind, rank) {
+  const rows = specRows(kind, rank).filter((r) => r.v && !/[분슛]$/.test(r.v));
+  return rows.map((r) => '<span class="ln"><span class="k">' + r.k + '</span> <i class="v">' + r.v + '</i></span>').join('');
+}
 
 /* 카드 테두리가 말하는 등급. 선반이 스스로 매긴 순번을 그대로 쓴다. 장비는 0에서 3, 봇은 1에서 3이다.
    버프 셋은 값이 220에서 300까지 한 칸 안이라 매길 순번이 없어 같은 등급으로 선다. */
@@ -1917,7 +1925,7 @@ function gearShelf(kind) {
        그림이 카드에서 차지하는 몫이 그만큼 줄어 다시 글자가 먼저 읽힌다. */
     return '<div class="card gear" data-spec="' + kind + '" data-at="' + rank + '" data-rare="' + rank + '">'
       + '<div class="pic"><div class="shot" data-kind="' + kind + '" data-rank="' + rank + '"></div>' + skins + '</div>'
-      + '<b>' + g.name + '</b><em>' + cardLine(kind, rank) + '</em>'
+      + '<b>' + g.name + '</b><em>' + cardLines(kind, rank) + '</em>'
       + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
   return '<h4>' + s.head + '</h4><div class="rack">' + rows.join('') + '</div>';

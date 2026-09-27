@@ -1084,6 +1084,9 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
    14.58이 넘었다). 기성작이 쓰는 문법도 이것이다. 클래시 오브 클랜의 자원 행과 FC 모바일의 효과 행은
    여러 줄로 접힌 이름 옆의 수 칸을 이름 블록 전체에 세로 가운데로 세운다. 마지막 줄 끝에 붙이는
    형태는 안 쓴다. */
+#shop .card.gear em .ln{display:flex;gap:.3em;white-space:nowrap}
+#shop .card.gear em .ln .k{min-width:0;overflow:hidden;text-overflow:ellipsis}
+#shop .card.gear em .ln .v{flex:none;font-style:normal}
 #shop .card.gear em:has(.eff){display:flex;align-items:center;overflow:visible}
 #shop .card.gear em .eff{min-width:0;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}

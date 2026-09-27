@@ -288,6 +288,21 @@ try {
     const align = await p.evaluate(ALIGN);
     const rows = await p.evaluate(ROWS);
     const plant = await p.evaluate(PLANT);
+    /* 파는 수가 다 보이는가. 장비 카드의 효과는 한 효과에 한 줄이고, 폭이 모자라면 이름이 줄고 수는 안 준다.
+       수 칸이 카드 안에 온전히 서고 제 글자를 다 담는지를 선반 전부에서 센다. 대조군은 이름을 줄지 않게
+       풀어 수가 밀려나는 사본이다. */
+    const values = await p.evaluate(() => {
+      const cut = []; let seen = 0;
+      const scan = () => { for (const tab of [...document.querySelectorAll("#shop .tab")]) { tab.click();
+        for (const card of document.querySelectorAll("#shop .rack .card.gear")) {
+          const cr = card.getBoundingClientRect();
+          for (const v of card.querySelectorAll("em .ln .v")) { seen += 1; const r = v.getBoundingClientRect();
+            if (v.scrollWidth > v.clientWidth + 1 || r.right > cr.right - 2 || r.width < 1) cut.push(tab.dataset.tab + " " + v.textContent); } } } };
+      scan(); const real = { cut: cut.slice(), seen };
+      const st = document.createElement("style"); st.textContent = "#shop .card.gear em .ln .k{flex:none!important;overflow:visible!important}"; document.head.append(st);
+      cut.length = 0; seen = 0; scan(); st.remove();
+      return { real, planted: { cut: cut.slice(), seen } };
+    });
     /* 내려온 설명 문장이 어디에 서 있는가. 페이지가 이미 불러 둔 판을 다시 부르는 것이라
        모듈이 두 번 돌지 않고, 화면에 안 그려지는 값을 화면 쪽에서 읽는 유일한 길이다. */
     const parked = await p.evaluate(async () => {
@@ -298,7 +313,7 @@ try {
       return out;
     }).catch(() => null);
     await ctx.close();
-    return { count, rare, fit, parked, dur, align, rows, plant };
+    return { count, rare, fit, parked, dur, align, rows, plant, values };
   };
   const full = await at(WIDE, 720);
   const thin = await at(NARROW, 720);
@@ -373,6 +388,14 @@ try {
   for (let i = 1; i < lum.length; i += 1) if (!(lum[i] > lum[i - 1])) rises = false;
   check("rack:the-frame-brightens-with-the-tier", rises,
     tiers.map((k, i) => k + " " + lum[i].toFixed(3)).join(" < "));
+  for (const [nm, run] of [["wide", full], ["narrow", thin]]) {
+    if (!run || !run.values) continue;
+    check("rack:" + nm + ":every-effect-value-shows-whole", run.values.real.seen > 0 && run.values.real.cut.length === 0,
+      run.values.real.cut.slice(0, 3).join(", ") || run.values.real.seen + " values whole");
+    // 좁은 폭은 격자 칸이 넓어 이름이 다 들어간다. 대조군은 이름이 모자라는 넓은 폭에서만 빨개질 수 있다.
+    if (nm === "wide") check("control:wide:a-name-that-will-not-shrink-cuts-a-value", run.values.planted.cut.length > 0,
+      run.values.planted.cut.length + " of " + run.values.planted.seen + " values pushed out");
+  }
 
   /* 내려온 설명 문장에 독자가 있는가. 카드에서 빠진 뒤로 이 문장들을 읽는 화면이 없어서,
      다음 청소가 죽은 값으로 보고 지울 수 있는 자리에 남았다. 위키 화면이 가져갈 때까지
