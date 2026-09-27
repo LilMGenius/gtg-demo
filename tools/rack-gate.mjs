@@ -547,6 +547,21 @@ try {
     stuckPlant.map((x) => x.at + " came back at em " + x.p.back.em + " px " + x.p.back.px + ", not " + x.p.before.em + " / " + x.p.before.px).join(", ")
       || plants.map((x) => x.at + " back to em " + x.p.back.em + " px " + x.p.back.px).join(", "));
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
+  /* 카드 안의 작은 조작도 손가락 바닥 44px을 지킨다. 변형 조각은 보이는 조각이 22x18이라 누르는 칸이
+     그 크기로 서기 쉽다(실측 740x360에서 22x18이었다). 선반마다 조각을 전부 재고, 대조군은 누르는 칸을 조각 크기로 되돌린다. */
+  const sp = await b.newPage({ viewport: { width: HAND_W, height: HAND_H } });
+  await sp.goto(BASE, { waitUntil: "load" }); await sp.waitForTimeout(600);
+  await sp.click("#go", { force: true }); await sp.waitForTimeout(900);
+  await sp.evaluate(() => window.__shop(true)); await sp.waitForTimeout(300);
+  const SW = () => { const out = []; for (const tab of [...document.querySelectorAll("#shop .tab")]) { tab.click(); for (const s of document.querySelectorAll("#shop .rack .skin")) { const r = s.getBoundingClientRect(); if (r.width) out.push(Math.round(Math.min(r.width, r.height))); } } return out; };
+  const swatches = await sp.evaluate(SW);
+  const smallSw = swatches.filter((n) => n < 44);
+  check("rack:every-swatch-takes-a-44px-tap", swatches.length > 0 && smallSw.length === 0,
+    smallSw.length ? smallSw.length + " of " + swatches.length + " under 44, smallest " + Math.min(...smallSw) : swatches.length + " swatches at least 44 at " + HAND_W + "x" + HAND_H);
+  await sp.addStyleTag({ content: "#shop .skin{width:22px!important;height:18px!important}" });
+  const plantedSw = await sp.evaluate(SW);
+  check("control:a-swatch-cut-to-its-chip-is-caught", plantedSw.some((n) => n < 44), "planted smallest " + Math.min(...plantedSw));
+  await sp.close();
   /* 효과 이름은 카드 한 줄에 서는 스탯 이름이라 짧아야 한다. 캡은 gamedev presentation 이름 절이 정한 10자이고,
      자는 데이터에서 센다. 같은 셈이 11자 심은 이름을 잡는지 대조군으로 같이 돌린다. */
   const longNames = (words) => Object.entries(words).filter((e) => [...e[1]].length > 10).map((e) => e[0] + "=" + e[1]);
