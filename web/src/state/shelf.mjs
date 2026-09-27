@@ -20,16 +20,18 @@ export const SHELF_WORDS = {
   ink: { head: '타투', list: TATTOOS, field: 'ink' }
 };
 
+/* 효과 이름은 카드 한 줄에 수와 같이 서는 라벨이라 10자 안의 명사구다(gamedev presentation 이름 절).
+   무엇이 줄고 느는지의 설명 문장은 위키가 갖는다. 문장을 라벨 자리에 두면 카드에서 이름이 말줄임에 먹혔다. */
 export const AXIS_WORD = {
-  tear: '장갑이 벗겨지는 사고',
-  spill: '손에서 흘리는 사고',
-  delay: '첫 발이 뜨는 데 걸리는 시간',
-  carry: '정면 강슛에 같이 밀려 들어가는 사고',
-  landing: '착지에 실패하는 사고',
-  neteat: '그물이 공을 먼저 먹는 확률',
-  gaze: '눈에 띄는 행인이 지나갈 확률',
-  passer: '동네에 서 있는 행인 수',
-  crowd: '소문이 퍼지는 배율'
+  tear: '장갑 벗겨짐',
+  spill: '공 흘림',
+  delay: '반응 지연',
+  carry: '강슛 밀림',
+  landing: '착지 실패',
+  neteat: '그물 흡수',
+  gaze: '눈길 행인',
+  passer: '행인 수',
+  crowd: '소문 배율'
 };
 // 축마다 단위가 다르다. 확률은 %p, 시간은 ms, 사람은 명이다.
 export const AXIS_UNIT = { delay: 'ms', passer: '명', crowd: '%', tear: '%p', spill: '%p', carry: '%p', landing: '%p', neteat: '%p' };

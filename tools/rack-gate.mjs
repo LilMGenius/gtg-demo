@@ -290,7 +290,7 @@ try {
     const plant = await p.evaluate(PLANT);
     /* 파는 수가 다 보이는가. 장비 카드의 효과는 한 효과에 한 줄이고, 폭이 모자라면 이름이 줄고 수는 안 준다.
        수 칸이 카드 안에 온전히 서고 제 글자를 다 담는지를 선반 전부에서 센다. 대조군은 이름을 줄지 않게
-       풀어 수가 밀려나는 사본이다. */
+       풀고 이름을 네 배로 늘려 수가 밀려나는 사본이다(지금 이름은 짧아서 풀기만 하면 아무것도 안 밀린다). */
     const values = await p.evaluate(() => {
       const cut = []; let seen = 0;
       const scan = () => { for (const tab of [...document.querySelectorAll("#shop .tab")]) { tab.click();
@@ -299,7 +299,7 @@ try {
           for (const v of card.querySelectorAll("em .ln .v")) { seen += 1; const r = v.getBoundingClientRect();
             if (v.scrollWidth > v.clientWidth + 1 || r.right > cr.right - 2 || r.width < 1) cut.push(tab.dataset.tab + " " + v.textContent); } } } };
       scan(); const real = { cut: cut.slice(), seen };
-      const st = document.createElement("style"); st.textContent = "#shop .card.gear em .ln .k{flex:none!important;overflow:visible!important}"; document.head.append(st);
+      const st = document.createElement("style"); st.textContent = "#shop .card.gear em .ln .k{flex:none!important;overflow:visible!important}#shop .card.gear em .ln .k::after{content:' 긴 이름 긴 이름 긴 이름'}"; document.head.append(st);
       cut.length = 0; seen = 0; scan(); st.remove();
       return { real, planted: { cut: cut.slice(), seen } };
     });
