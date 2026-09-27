@@ -1540,4 +1540,6 @@ body:has(#shop:not([hidden]) .banners) #rotate{display:none}
   /* 위키 시트는 화면을 거의 다 덮어 오른쪽 귀의 닫기가 분류 줄 끝에 선다. 분류 열은 다섯 칸 고른 두 줄로 접고
      닫기 폭만큼 오른쪽을 비운다. 한 줄로 두고 비우면 끝의 두 칸이 가로 스크롤 뒤로 숨는다. */
   #wiki .cats{display:grid;grid-template-columns:repeat(5,max-content);margin-right:96px}
+  /* 재화 띠는 창이 열려도 남는 규칙이다. 다른 창은 띠 아래에서 시작하는데 위키만 화면 맨 위부터 덮었다. */
+  #wiki{padding-top:calc(var(--strip-b) + var(--gap-1) + env(safe-area-inset-top))}
 }

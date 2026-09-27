@@ -339,7 +339,8 @@ try {
       shown: kids.every((r) => r.left >= 0 && r.right <= innerWidth), bodyTop: Math.round(bt) };
   });
   check("wiki:narrow-width-lays-the-categories-in-even-rows",
-    Boolean(strip) && strip.rows <= 2 && new Set(strip.counts).size === 1 && strip.shown && strip.bodyTop < 360 / 2,
+    // 본문 두 줄(한 줄 22px)이 화면 안에 서야 본문이 있다고 읽힌다.
+    Boolean(strip) && strip.rows <= 2 && new Set(strip.counts).size === 1 && strip.shown && strip.bodyTop < 360 - 2 * 22,
     strip ? strip.counts.join("+") + " per row, every tab on screen " + strip.shown + ", body starts " + strip.bodyTop : "no .cats");
 
   const spill = [], split = [];
