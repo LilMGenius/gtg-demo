@@ -12,7 +12,9 @@ const BASE = 'http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran'
 const SIZES = [[1920, 1080], [1280, 720], [844, 390]];
 // 탭이 있는 창과 그 창을 여는 손잡이. 새 탭 창이 생기면 여기 한 줄이 늘어난다.
 const PANELS = [{ id: 'shop', open: 'window.__shop(true)', tab: '.tab', key: 'tab', row: '.tabs' }, { id: 'me', open: 'window.__me(true)', tab: '.tab', key: 'tab', row: '.tabs' },
-  { id: 'roster', open: 'window.__roster(true)', tab: '.kind', key: 'pos', row: '.kinds' }];
+  { id: 'roster', open: 'window.__roster(true)', tab: '.kind', key: 'pos', row: '.kinds' },
+  // 위키 분류도 탭이다. 시트가 가운데에 서면 본문 길이를 따라 분류 열이 뛰었다(1920x1080 이 게임 y261, 장비 y25).
+  { id: 'wiki', open: 'window.__wiki(true)', tab: '.cats button', key: 'cat', row: '.cats' }];
 // 1px은 반올림 오차다. 탭의 기울임은 요소마다 고정이라 좌표를 흔들지 않는다.
 const TOL = 1;
 const t = setTimeout(() => { console.log('WATCHDOG'); process.exit(1); }, 240000); t.unref();

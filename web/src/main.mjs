@@ -1485,7 +1485,7 @@ function renderMe() {
   }).join('');
   const traits = (k.traits && k.traits.length)
     ? k.traits.map((t) => '<div class="note"><b>' + t + '</b><i>' + (TRAITS[t] ? TRAITS[t].note : '') + '</i></div>').join('')
-    : '<div class="note dim"><span></span></div>';
+    : '';
   const hidden = HIDDEN.map((h) => '<div class="note"><b>' + HIDDEN_LABEL[h] + '</b><i>' + hiddenBand(h, k[h]) + '</i></div>').join('');
   const pane = meTab === 'log' ? recordRows()
     : meTab === 'face' ? rapportRows()
@@ -1512,7 +1512,7 @@ function renderMe() {
     + '<i class="cond">' + cond + '</i></small></h4>'
     /* 큰 수와 탭은 한 머리로 묶는다. 넓은 화면에서는 묶음이 없는 것처럼 서고(display:contents),
        세로가 짧은 화면에서는 카드가 구르는 동안 이 머리가 붙박이로 남는다. 상점과 선수단의 창 뼈대와 같다. */
-    + '<div class="card">' + wear + '<div class="mehead">' + big + tabs + '</div><div class="panebox"><div class="pane">' + pane + '</div>'
+    + '<div class="card">' + wear + '<div class="mehead">' + tabs + big + '</div><div class="panebox"><div class="pane">' + pane + '</div>'
     + '<div class="cue up" aria-hidden="true"></div><div class="cue down" aria-hidden="true"></div></div></div>'
     + '<button class="close">닫기</button>'
     /* 창이 구르는 화면에서 쓰는 신호. 칸의 것과 같은 클래스로 두어 그늘 규칙이 한 벌로 남는다.

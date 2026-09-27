@@ -318,11 +318,13 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) #mo
 #wikiBtn[aria-expanded="true"]{background:#ffd83d;color:#12160e}
 /* 위키. 왼쪽이 카테고리 여덟이고 오른쪽이 본문이다. 도움말이 타이틀 패널과 재화 칩으로 갈려 있어서
    판 안에서는 무엇이 어떻게 도는지 물어볼 자리가 없었다. */
-#wiki{position:absolute;inset:0;pointer-events:auto;display:flex;align-items:center;justify-content:center;
-  background:#080b07c4;padding:calc(10px + env(safe-area-inset-top)) var(--pad-r) 10px var(--pad-l)}
+/* 창은 가운데가 아니라 재화 띠 아래에 선다. 가운데에 세우면 시트 높이가 본문 길이를 따라가서 분류를 바꿀 때마다
+   분류 열이 위아래로 뛰었다(실측 1920x1080: 이 게임 y261, 장비 y25). 시트 높이도 내용이 아니라 창이 정한다. */
+#wiki{position:absolute;inset:0;pointer-events:auto;display:flex;align-items:flex-start;justify-content:center;
+  background:#080b07c4;padding:calc(var(--strip-b) + var(--gap-2) + env(safe-area-inset-top)) var(--pad-r) 10px var(--pad-l)}
 #wiki[hidden]{display:none}
 #wiki .sheet{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;gap:var(--gap-3);
-  width:min(94vw,860px);max-height:88vh;padding:var(--gap-3);
+  width:min(94vw,860px);height:100%;padding:var(--gap-3);
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:5px 5px 0 var(--edge), var(--bevel)}
 /* 창 안의 갈래 탭은 한 벌이다. 상점 선반, 내 정보, 선수단 포지션, 위키 갈래가 같은 판때기와 같은 켜짐 색을 쓴다.
@@ -698,9 +700,12 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) #mo
 /* 세 단이 서면서 칸이 세로 360px짜리 가로 모바일보다 길어졌다. 넘치면 창이 스스로 굴러야
    첫 단이 화면 밖으로 안 밀린다. safe center는 짧을 때는 가운데, 길 때는 위쪽부터 세운다. */
 #me{position:absolute;inset:0;pointer-events:auto;
-  display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:var(--gap-1);
-  overflow:auto;padding:var(--gap-1) 0;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:var(--gap-1);
+  overflow:auto;padding:calc(var(--gap-2) + env(safe-area-inset-top)) 0 var(--gap-1);
   background:#080b07c4}
+/* 탭은 창 머리 바로 아래에 선다. 걸친 것 띠가 탭 위에 서면 1920x1080에서 탭이 y409로 내려가 다른 창의 탭 줄
+   (선수단 96, 상점 86)과 전혀 다른 자리였다. 걸친 것은 칸 뒤로 간다. 짧은 화면이 이미 쓰던 순서다. */
+#me .wear{order:1}
 /* 세로 flex의 자식은 기본으로 줄어든다. 칸이 화면보다 길어지면 초상과 큰 수가 같이 눌린다. */
 #me > *{flex:none}
 /* 큰 수와 탭의 묶음. 넓은 화면에서는 없는 것처럼 서서 카드의 간격을 그대로 받는다. */
@@ -751,13 +756,9 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) #mo
 #me .big b{font-family:var(--disp);font-size:var(--fs-title);font-weight:400;color:#ffd83d;line-height:1.1}
 #me .big i{font-style:normal;font-family:var(--body);font-size:var(--fs-body);font-weight:400;
   color:var(--dim);line-height:1.15}
-/* 46vh. 720px 화면에서 능력치 열다섯이 네 칸씩 네 줄로 한 번에 들어가는 높이다.
-   38vh였을 때는 열다섯 중 아홉만 보이고 나머지는 긁어야 나왔는데,
-   자기 선수의 능력치는 창을 연 이유 그 자체라 스크롤 아래에 두면 그 창이 답을 반만 한다.
+/* 46vh. 720px 화면에서 능력치 열다섯이 한 번에 들어가는 높이다. 칸 상자의 높이는 내용이 아니라 창이 정한다.
+   내용이 정하면 칸마다 길이가 달라 그 아래 걸친 것 띠가 탭을 바꿀 때마다 뛴다. 넘치는 내용은 칸이 굴린다.
    아래 여백 10px은 마지막 칸의 6px 그림자가 스크롤 경계에 잘리지 않게 둔 것이다. */
-/* 칸 상자의 높이는 내용이 아니라 창이 정한다. 46vh를 기준으로 두고 카드 상한 안에서만 줄어든다.
-   내용이 정하면 칸마다 길이가 달라 카드 높이가 바뀌고, 가운데 정렬된 창에서 탭 줄과 닫기가
-   칸을 바꿀 때마다 위아래로 뛴다. 상점과 같은 창 뼈대 규칙이다. 넘치는 내용은 칸이 굴린다. */
 #me .panebox{flex:1 1 46vh;grid-template-rows:minmax(0,1fr)}
 #me .pane{display:flex;flex-direction:column;gap:9px;min-height:0;overflow-y:auto;padding:2px 2px 10px}
 /* 세로가 짧은 가로 모바일. 첫 단과 둘째 단이 고정 높이라 칸 내용에 12px만 남았다(실측 740x360).
