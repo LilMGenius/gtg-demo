@@ -1,0 +1,63 @@
+name: release-wiki
+# A version bump ships a wiki rebuilt with the newest gamewiki release. The version gate reads the
+# stamp gamewiki writes into web/wiki/*/gamewiki.json; this job rebuilds from that release and
+# requires the committed wiki to match byte for byte, so a stamp cannot be typed in by hand.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  release-wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: game
+          fetch-depth: 0
+      - name: Decide whether this push is a version bump
+        id: bump
+        working-directory: game
+        shell: bash
+        run: |
+          now=$(node -p 'require("./package.json").version')
+          before=$(git show HEAD^:package.json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).version)}catch{console.log("")}})')
+          if [ "$now" != "$before" ] || [ "${{ github.ref_type }}" = tag ] || [ "${{ github.event_name }}" = workflow_dispatch ]; then echo "run=true" >> "$GITHUB_OUTPUT"; else echo "run=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Require read access to gamewiki
+        if: steps.bump.outputs.run == 'true'
+        env:
+          GAMEWIKI_TOKEN: ${{ secrets.GAMEWIKI_TOKEN }}
+        run: |
+          if [ -z "$GAMEWIKI_TOKEN" ]; then echo "::error::GAMEWIKI_TOKEN is missing: a read-only token for DaedalGames/gamewiki is needed to rebuild the release wiki"; exit 1; fi
+      - name: Check out gamewiki beside the game
+        if: steps.bump.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: DaedalGames/gamewiki
+          token: ${{ secrets.GAMEWIKI_TOKEN }}
+          path: gamewiki
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        if: steps.bump.outputs.run == 'true'
+        with:
+          node-version: 22
+      - name: Rebuild the wiki with the newest gamewiki release
+        if: steps.bump.outputs.run == 'true'
+        shell: bash
+        run: |
+          cd gamewiki
+          latest=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+          git checkout -q "$latest"
+          npm ci --ignore-scripts
+          cd ../game
+          npm ci --ignore-scripts
+          npm run wiki
+          test "$(node -p 'require("./web/wiki/site/gamewiki.json").version')" = "${latest#v}"
+          git diff --exit-code -- web/wiki
+      - name: Version gate
+        if: steps.bump.outputs.run == 'true'
+        working-directory: game
+        env:
+          GAMEWIKI_DIR: ${{ github.workspace }}/gamewiki
+        run: node tools/version-gate.mjs

@@ -89,6 +89,8 @@ HUD와 패널은 DOM이다. 캔버스는 경기장만 그린다. 패널이 열�
 
 표는 코드에서 한 번 뽑힌다. 값 상수와 KEY_MAP과 선반 목록과 BOTS와 BUFFS와 PULL_KINDS와 사고 짝은 `tools/wiki-facts.mjs`가 facts로 내고, 선반 어휘와 사고 짝은 `web/src/state/shelf.mjs`가 DOM 없이 갖는다. `web/src/ui/wiki.mjs`는 pages.json의 본문을 그대로 그리고 화면에서만 참인 것(버전 좌표, 사이트 링크, iPhone 안내)만 얹는다. 본문에는 숫자를 쓰지 않는다. wikisrc 게이트가 원본과 dist와 화면 셋의 동일을 묻고 wikisite 게이트가 원본과 site의 동일과 base 경로와 머리의 홈 링크와 두 출력의 본문 바이트 동일과 원본에 소비자별로 다르게 풀리는 링크가 없음을 묻는다.
 
+버전 범프는 그 시점 gamewiki 최신 릴리스로 위키를 다시 지어 같은 범프 커밋에 싣는다. 형제 클론을 gamewiki의 가장 높은 태그로 올리고 `npm run wiki`를 돌린 뒤 매니페스트와 함께 커밋한다. gamewiki가 출력의 gamewiki.json에 자기 릴리스를 적고, version 게이트가 범프 커밋의 그 도장을 범프 시각의 최신 gamewiki 태그와 대조한다. CI의 release-wiki 워크플로는 범프와 태그 푸시마다 최신 gamewiki 태그로 다시 지어 커밋된 위키와 바이트로 비교하므로, 도장만 손으로 고친 범프도 빨개진다. 비공개 레포를 읽는 GAMEWIKI_TOKEN 시크릿이 필요하다.
+
 ## 계기
 
 게이트는 `tools/<이름>-gate.mjs`이고 통과와 실패를 스스로 출력한다. 절대경로로만 만든다. 상대경로로 만들면 엉뚱한 레포 루트에 떨어져 추적되지 않고, 한 번도 안 돈 게이트는 빨간불도 파란불도 내지 않아 어떤 보고에도 안 나타난다.
