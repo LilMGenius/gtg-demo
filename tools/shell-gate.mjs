@@ -214,6 +214,47 @@ try {
   await ep.evaluate(() => window.__me(false));
   check('shell:control:a-planted-heading-over-an-empty-row-is-caught', plantedHead > 0, plantedHead + ' planted');
   await ep.close();
+  /* 닫기가 창 내용을 덮는가. 짧은 화면의 닫기가 재화 띠 아래 귀에 섰을 때 만남 첫 선택지와 훈련장 판단력 칸을 덮었는데,
+     위 축은 닫기가 눌리는지만 물어 초록이었다. 닫기 상자와 겹치는 창 안의 잎 요소(자식 요소가 없는 글자나 그림, 버튼)를 센다.
+     만남은 창 여섯과 따로 열리므로 여기서 같이 연다. 대조군은 닫기를 옛 자리(띠 아래)로 되돌린다. */
+  const cover = async (pg) => pg.evaluate(() => {
+    const hits = [];
+    for (const id of ['gym', 'roster', 'gram', 'me', 'shop', 'wiki', 'date']) {
+      if (id === 'date') window.__date(0, 0); else window['__' + id](true);
+      const box = document.getElementById(id);
+      const c = box.querySelector(':scope > .close');
+      const r = c.getBoundingClientRect();
+      for (const e of box.querySelectorAll('*')) {
+        if (e === c || c.contains(e) || e.contains(c)) continue;
+        const leaf = e.matches('button, img, svg, canvas') || (!e.children.length && e.textContent.trim());
+        if (!leaf || !e.getClientRects().length || getComputedStyle(e).visibility === 'hidden') continue;
+        /* 보이는 몫만 잰다. 구르는 상자 밖으로 잘린 줄은 닫기 밑에 있어도 화면에 없다. 조상마다 잘림 상자(테두리 안)를 겹친다. */
+        const q = e.getBoundingClientRect();
+        let [l, tp, rt, bt] = [q.left, q.top, q.right, q.bottom];
+        for (let a = e.parentElement; a && a !== document.body; a = a.parentElement) {
+          if (getComputedStyle(a).overflowY === 'visible' && getComputedStyle(a).overflowX === 'visible') continue;
+          const ab = a.getBoundingClientRect();
+          l = Math.max(l, ab.left + a.clientLeft); tp = Math.max(tp, ab.top + a.clientTop);
+          rt = Math.min(rt, ab.left + a.clientLeft + a.clientWidth); bt = Math.min(bt, ab.top + a.clientTop + a.clientHeight);
+        }
+        if (rt - l > 1 && bt - tp > 1 && l < r.right - 1 && rt > r.left + 1 && tp < r.bottom - 1 && bt > r.top + 1) { hits.push(id + ' ' + (e.className || e.tagName).toString().slice(0, 20)); break; }
+      }
+      if (id === 'date') window.__date(); else window['__' + id](false);
+    }
+    return hits;
+  });
+  for (const [W, H] of [[1280, 720], [844, 390], [740, 360]]) {
+    const cp = await b.newPage({ viewport: { width: W, height: H } });
+    await cp.goto(BASE); await cp.locator('#go').click({ force: true }); await clearDraw(cp);
+    const hits = await cover(cp);
+    check(W + 'x' + H + ':shell:close-covers-nothing-in-its-panel', hits.length === 0, hits.join(', ') || '7 panels clear');
+    if (W === 740) {
+      await cp.addStyleTag({ content: ':is(#gym,#roster,#gram,#me,#shop,#wiki,#date) > .close{top:calc(var(--strip-b) + var(--gap-2))!important}' });
+      const old = await cover(cp);
+      check(W + 'x' + H + ':control:the-old-close-under-the-strip-is-caught', old.length > 0, old.join(', ') || 'nothing caught');
+    }
+    await cp.close();
+  }
 } catch (e) { check('instrument:run-completed', false, String(e).slice(0, 300)); }
 await b.close();
 if (notes.length) console.log(notes.map((x) => '  ok   ' + x).join('\n'));

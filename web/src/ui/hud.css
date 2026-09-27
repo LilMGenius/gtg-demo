@@ -209,6 +209,8 @@ body.playing #hud{opacity:1}
    내 정보 첫 단 상자 안으로 13.6px 들어와 그 상자 27390px 중 2488px이 자막 글자였다.
    '골킥 차주는 중'이 '동네형 Lv 2 174cm 88kg' 아래에서 같이 읽힌다. */
 body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is(#stamp,#flash,#caption){animation:none;opacity:0}
+/* 첫 판 이동 안내도 경기 화면의 글자라 창이 열리면 물러난다. 실측 740x360 훈련장 아래끝에 창 바탕 너머로 읽혔다. */
+body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) #moveHint{visibility:hidden}
 @keyframes stampHit{
   0%{opacity:0;rotate:-13deg;scale:2.4}
   9%{opacity:1;rotate:-7deg;scale:.92}
@@ -1573,7 +1575,8 @@ body:has(#shop:not([hidden]) .banners) #rotate{display:none}
    훈련장은 538px, 만남은 475px, 상점은 684px(1280x720)에 섰고 선수단은 굴려야 나왔다. 손은 닫기를 자리로
    기억하므로 모든 창이 화면 아래 가운데 한 자리를 쓰고, 창은 그 몫만큼 아래를 투명 테두리로 비운다.
    여백이 아니라 테두리인 것은 창이 구를 때 내용이 여백은 지나가고 테두리에서는 잘리기 때문이다. 바탕은 테두리 밑까지 깔린다.
-   세로가 짧으면 아래 자리가 몸을 먹으므로 재화 띠 아래 오른쪽 귀로 올린다. */
+   세로가 짧으면 아래 자리가 몸을 먹으므로 오른쪽 위 귀, 재화 띠와 같은 줄로 올린다. 띠 아래에 두면 창 몸의 첫 줄과 겹쳤다
+   (실측 740x360: 만남 첫 선택지와 훈련장 판단력 칸을 닫기가 덮었다). 띠 줄의 오른쪽은 어느 창에서도 비어 있다. */
 :root{--close-room:calc(58px + var(--gap-3) + env(safe-area-inset-bottom))}
 :is(#gym,#roster,#gram,#me,#shop,#wiki,#date) > .close{position:fixed;left:50%;translate:-50% 0;
   bottom:calc(var(--gap-3) + env(safe-area-inset-bottom));z-index:6}
@@ -1581,11 +1584,10 @@ body:has(#shop:not([hidden]) .banners) #rotate{display:none}
 #wiki .sheet{max-height:100%}
 @media (max-height:520px){
   :is(#gym,#roster,#gram,#me,#shop,#wiki,#date) > .close{left:auto;translate:none;bottom:auto;
-    right:var(--gap-3);top:calc(var(--strip-b) + var(--gap-2) + env(safe-area-inset-top))}
+    right:var(--gap-3);top:calc(var(--gap-2) + env(safe-area-inset-top))}
   :is(#gym,#roster,#gram,#me,#shop,#wiki,#date){border-bottom-width:0}
-  /* 위키 시트는 화면을 거의 다 덮어 오른쪽 귀의 닫기가 분류 줄 끝에 선다. 분류 열은 다섯 칸 고른 두 줄로 접고
-     닫기 폭만큼 오른쪽을 비운다. 한 줄로 두고 비우면 끝의 두 칸이 가로 스크롤 뒤로 숨는다. */
-  #wiki .cats{display:grid;grid-template-columns:repeat(5,max-content);margin-right:96px}
+  /* 분류 열은 다섯 칸 고른 두 줄로 접는다. 한 줄로 두면 끝의 칸들이 가로 스크롤 뒤로 숨는다. */
+  #wiki .cats{display:grid;grid-template-columns:repeat(5,max-content)}
   /* 재화 띠는 창이 열려도 남는 규칙이다. 다른 창은 띠 아래에서 시작하는데 위키만 화면 맨 위부터 덮었다. */
   #wiki{padding-top:calc(var(--strip-b) + var(--gap-1) + env(safe-area-inset-top))}
 }
