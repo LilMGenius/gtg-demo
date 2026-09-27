@@ -97,10 +97,7 @@ try {
       await rollAll(); await p.waitForTimeout(200);
       const after = (await at()).tabs;
       const stays = (a, b) => Boolean(a && b) && a.every((v, i) => Math.abs(v - b[i]) <= TOL);
-      // 내 정보는 세로 520px 아래에서 창 전체가 구르는 것이 mepane 게이트의 계약이다(첫 단, 큰 수, 탭, 칸이
-      // 360px에 한 번에 못 선다). 그 폭에서 이 축은 빈 칸으로 적고 다음 랩의 과제로 남긴다.
-      const wholeRollContract = panel.id === 'me' && H < 520;
-      check(tag + ':shell:the-tab-row-stays-when-the-body-rolls', wholeRollContract || stays(before, after), (wholeRollContract ? 'open: me rolls whole below 520px, ' : '') + (before || []).join(',') + ' -> ' + (after || []).join(','));
+      check(tag + ':shell:the-tab-row-stays-when-the-body-rolls', stays(before, after), (before || []).join(',') + ' -> ' + (after || []).join(','));
       if (panel.id === 'roster' && W === 1280) {
         await p.evaluate(() => { for (const e of document.querySelectorAll('#roster, #roster *')) e.scrollTop = 0; });
         const plant = await p.addStyleTag({ content: '#roster{overflow:auto!important}#roster > .rosterbody{flex:none!important;overflow:visible!important}' });

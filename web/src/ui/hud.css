@@ -699,6 +699,8 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
   background:#080b07c4}
 /* 세로 flex의 자식은 기본으로 줄어든다. 칸이 화면보다 길어지면 초상과 큰 수가 같이 눌린다. */
 #me > *{flex:none}
+/* 큰 수와 탭의 묶음. 넓은 화면에서는 없는 것처럼 서서 카드의 간격을 그대로 받는다. */
+#me .mehead{display:contents}
 #me[hidden]{display:none}
 /* 창이 스스로 구르는 화면에서 쓰는 신호. 칸의 신호는 감싼 상자에 붙어 그 상자와 같이 서지만,
    구르는 것이 창이면 그 상자가 곧 굴러가는 내용이라 붙박이로는 내용과 같이 밀려 내려간다.
@@ -764,7 +766,12 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
      길어진 만큼은 창이 제 스크롤로 받는다(숨은 높이 436px에서 503px). */
   #me{padding-top:calc(var(--strip-b) + var(--lift) + var(--gap-1) + env(safe-area-inset-top));gap:var(--gap-1);
     justify-content:flex-start}
-  #me .card{max-height:none;gap:var(--gap-1)}
+  /* 창 뼈대. 창 전체가 구르면 탭이 칸과 같이 화면 밖으로 밀리고 칸 내용이 닫기 밑을 지나갔다. 제목은 붙박이이고
+     카드가 구르며, 큰 수와 탭은 카드 위끝에 붙어 남는다. 걸친 것은 순서 1로 칸 뒤에 선다. */
+  #me{overflow:hidden;padding-bottom:0}
+  #me .card{max-height:none;gap:var(--gap-1);flex:1 1 auto;min-height:0;overflow-y:auto;padding-bottom:0}
+  #me .mehead{display:flex;flex-direction:column;gap:var(--gap-1);position:sticky;top:0;z-index:2;
+    background:#0b0f0a}
   #me .panebox{flex:none;grid-template-rows:auto}
   #me .pane{gap:var(--gap-1);padding-top:0}
   /* 걸친 것은 맨 아래로 간다. 창을 연 이유는 탭 안의 답이고 걸친 것은 그 답이 아닌데,

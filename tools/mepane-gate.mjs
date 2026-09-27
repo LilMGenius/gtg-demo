@@ -379,7 +379,7 @@ try {
      접힘은 구르는 상자 둘 중 먼저 자르는 자리다. 넓은 화면에서는 칸이 구르고 좁은 화면에서는
      창이 구르므로, 한쪽만 재면 다른 화면에서 이 자가 화면 밖을 접힘으로 읽는다. */
   const foldRead = () => p.evaluate(() => {
-    const box = document.getElementById("me");
+    const box = window.__meRoller ? window.__meRoller() : document.getElementById("me");
     const pane = box ? box.querySelector(".pane") : null;
     if (!pane) return null;
     const bTxt = (n) => { const b = n.querySelector("b"); return b ? b.textContent.trim() : ""; };
@@ -456,7 +456,7 @@ try {
      구르는 상자 안에 들어오는지 본다. 한 자리에서 셋이 같이 보이는지는 줄 높이가 늘면 깨지는
      우연이고, 끝까지 굴린 한 장면만 보면 상자보다 긴 격자가 반쯤 걸린 채 빨개진다. */
   const foldReach = await p.evaluate(() => {
-    const box = document.getElementById("me");
+    const box = window.__meRoller ? window.__meRoller() : document.getElementById("me");
     const pane = box ? box.querySelector(".pane") : null;
     const grid = pane ? pane.querySelector(".log") : null;
     if (!grid) return null;
@@ -808,11 +808,11 @@ try {
      들어 있어, 안 좁히면 창의 신호 대신 칸의 것을 읽기 때문이다. 아래끝은 창 상자와 화면 중
      위엣것을 쓴다. 화면 밖으로 내려간 상자 끝을 그대로 자르면 찍기가 죽는다. */
   const panelCue = () => p.evaluate(() => {
-    const box = document.getElementById("me");
+    const host = document.getElementById("me"); const box = window.__meRoller ? window.__meRoller() : host;
     if (!box) return null;
     const r = box.getBoundingClientRect();
     const seat = (sel) => {
-      const e = box.querySelector(":scope > " + sel);
+      const e = host.querySelector(":scope > " + sel);
       if (!e) return null;
       const q = e.getBoundingClientRect();
       return { h: Math.round(q.height), w: Math.round(q.width), bottom: Math.round(q.bottom),
@@ -828,7 +828,7 @@ try {
     return (await p.screenshot({ clip: { x: c.left, y, width: c.w, height: h } })).toString("base64");
   };
   const panelScrollTo = (to) => p.evaluate((v) => {
-    const box = document.getElementById("me");
+    const box = window.__meRoller ? window.__meRoller() : document.getElementById("me");
     if (!box) return -1;
     box.scrollTop = v < 0 ? box.scrollHeight : v;
     box.dispatchEvent(new Event("scroll"));

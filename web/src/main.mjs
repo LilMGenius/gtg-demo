@@ -1276,7 +1276,19 @@ function meCues() {
   const box = el('me');
   if (!box) return;
   scrollCue(box.querySelector('.panebox'));
-  scrollCue(box, box);
+  const roll = meRoller();
+  scrollCue(box, roll);
+  /* 창 신호의 위끝. 카드가 구르면 굴림의 위끝은 화면 맨 위가 아니라 붙박이 머리(큰 수와 탭) 바로 아래다. */
+  const up = box.querySelector(':scope > .cue.up');
+  const head = roll !== box ? roll.querySelector('.mehead') : null;
+  if (up) up.style.top = head ? Math.round(head.getBoundingClientRect().bottom) + 'px' : '';
+}
+
+/* 내 정보에서 실제로 구르는 상자. 넓은 화면은 창(칸이 제 스크롤을 가짐), 세로가 짧은 화면은 카드다. */
+function meRoller() {
+  const box = el('me');
+  const card = box && box.querySelector('.card');
+  return card && /auto|scroll/.test(getComputedStyle(card).overflowY) ? card : box;
 }
 
 // 위키. 물음표 하나가 여는 카테고리 가이드다. 재화 칩이 열던 버는 법도 이 안의 한 칸이다.
@@ -1498,7 +1510,9 @@ function renderMe() {
     + thumbURL('face', k, lookOf(state.gear, state.keeper.name)) + '">' + name
     + '<small><i>Lv ' + k.level + '</i><i>' + k.height + 'cm</i><i>' + k.weight + 'kg</i>'
     + '<i class="cond">' + cond + '</i></small></h4>'
-    + '<div class="card">' + wear + big + tabs + '<div class="panebox"><div class="pane">' + pane + '</div>'
+    /* 큰 수와 탭은 한 머리로 묶는다. 넓은 화면에서는 묶음이 없는 것처럼 서고(display:contents),
+       세로가 짧은 화면에서는 카드가 구르는 동안 이 머리가 붙박이로 남는다. 상점과 선수단의 창 뼈대와 같다. */
+    + '<div class="card">' + wear + '<div class="mehead">' + big + tabs + '</div><div class="panebox"><div class="pane">' + pane + '</div>'
     + '<div class="cue up" aria-hidden="true"></div><div class="cue down" aria-hidden="true"></div></div></div>'
     + '<button class="close">닫기</button>'
     /* 창이 구르는 화면에서 쓰는 신호. 칸의 것과 같은 클래스로 두어 그늘 규칙이 한 벌로 남는다.
@@ -1515,6 +1529,7 @@ function renderMe() {
   /* 창 자신이 구르는 화면에서는 손가락이 미는 것이 칸이 아니라 창이다. 여기를 안 이으면
      그 화면에서 신호가 그릴 때 한 번 서고 그대로 굳어, 끝까지 굴려도 안 뒤집힌다. */
   box.onscroll = meCues;
+  box.querySelector('.card').onscroll = meCues;
   if (!meWatch) meWatch = new ResizeObserver(meCues);
   meWatch.disconnect();
   meWatch.observe(paneEl);
@@ -1783,6 +1798,7 @@ function cardLine(kind, rank) {
   return specRows(kind, rank).filter((r) => r.v && !/[분슛]$/.test(r.v))
     .map((r) => r.k + ' ' + r.v).join(', ');
 }
+
 
 /* 카드 테두리가 말하는 등급. 선반이 스스로 매긴 순번을 그대로 쓴다. 장비는 0에서 3, 봇은 1에서 3이다.
    버프 셋은 값이 220에서 300까지 한 칸 안이라 매길 순번이 없어 같은 등급으로 선다. */
@@ -2716,6 +2732,7 @@ window.__gym = (open) => { if (open) openGym(); else closeGym(); };
 window.__beat = () => ({ retired: true });
 window.__gram = (open) => { if (open) openGram(); else closeGram(); };
 window.__me = (open) => { if (open) openMe(); else closeMe(); };
+window.__meRoller = () => meRoller();
 // 만남은 내 정보 안의 버튼으로만 열린다. 게이트가 그 버튼까지 클릭해서 오게 하려면 좌표가 필요하다.
 window.__date = (city, passer) => { if (city === undefined) closeDate(); else openDate(city, passer); };
 window.__shop = (open) => { if (open) openShop(); else closeShop(); };
