@@ -13,18 +13,28 @@ const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 // 창 밖(경기 화면)에서 누르는 것과 창 안에서 누르는 것. 창은 열고 재고 닫는다.
 const SPOTS = [
-  { at: "hud", open: null, sel: ["#lv", "#form", "#gymBtn", "#rosterBtn", "#gramBtn", "#shopBtn", "#wikiBtn", "#mute", "#fullscreen"] },
-  { at: "gram", open: "gram", sel: ["#gramFollowers"] },
+  { at: "hud", open: null, sel: ["#meBtn", "#lv", "#form", "#pips", "#purse .cur", "#gymBtn", "#rosterBtn", "#gramBtn", "#shopBtn", "#wikiBtn", "#mute", "#fullscreen"] },
+  { at: "gram", open: "gram", sel: ["#gramFollowers", "#gramEffect"] },
   { at: "shop", open: "shop", tab: "pull", sel: ["#shop .odds-link"] },
-  { at: "wiki", open: "wiki", sel: ["#wiki .body a"] }
+  { at: "wiki", open: "wiki", sel: ["#wiki .body a", "#wiki .copy"] }
 ];
+/* 44px 정사각은 조작의 가운데에 맞출 수도, 한 변에 붙일 수도 있다. 재화 띠처럼 줄이 30px 간격이면 칸을 줄 경계에서
+   갈라야 해서 가운데 정사각은 이웃 줄과 겹친다. 조작의 상자를 품는 자리 가운데 하나라도 다섯 점이 전부 제 것이면 통과다. */
 const probe = (sels) => sels.flatMap((sel) => [...document.querySelectorAll(sel)].filter((e) => e.getClientRects().length && getComputedStyle(e).visibility !== "hidden").slice(0, 3).map((e) => {
   e.scrollIntoView({ block: "center", inline: "center" });
   const r = e.getBoundingClientRect();
-  const cx = r.left + r.width / 2, cy = r.top + r.height / 2, h = 44 / 2 - 1;
-  const pts = [[cx, cy], [cx - h, cy - h], [cx + h, cy - h], [cx - h, cy + h], [cx + h, cy + h]];
-  const miss = pts.filter(([x, y]) => { const t = document.elementFromPoint(x, y); return !t || !(t === e || e.contains(t)); }).length;
-  return { sel, box: Math.round(r.width) + "x" + Math.round(r.height), miss };
+  const S = 44, h = S / 2 - 1;
+  // 정사각의 가운데를 조작 상자 위 2px 간격으로 옮겨 가며 찾는다. 손가락은 조작 위 어디에 떨어져도 된다.
+  const span = (a, b) => { const out = []; for (let v = a; v <= b; v += 2) out.push(v); out.push(b); return out; };
+  const xs = span(r.left, r.right), ys = span(r.top, r.bottom);
+  const own = (x, y) => { const t = document.elementFromPoint(x, y); return Boolean(t) && (t === e || e.contains(t)); };
+  let miss = 5, why = "";
+  for (const cx of xs) for (const cy of ys) {
+    const pts = [[cx, cy], [cx - h, cy - h], [cx + h, cy - h], [cx - h, cy + h], [cx + h, cy + h]];
+    const lost = pts.filter(([x, y]) => !own(x, y));
+    if (lost.length < miss) { miss = lost.length; why = lost.map(([x, y]) => { const t = document.elementFromPoint(x, y); return Math.round(x) + "," + Math.round(y) + "=" + (t ? (t.id || String(t.className).slice(0, 12) || t.tagName) : "null"); }).join(" "); }
+  }
+  return { sel, box: Math.round(r.width) + "x" + Math.round(r.height), miss, why };
 }));
 const measure = async (p) => {
   const out = [];
@@ -49,7 +59,7 @@ try {
     check(W + "x" + H + ":instrument:every-target-was-found", lost.length === 0, lost.join(", ") || seen.size + " selectors");
     const bad = rows.filter((r) => r.miss > 0);
     check(W + "x" + H + ":touch:every-target-answers-a-44px-finger", rows.length > 0 && bad.length === 0,
-      bad.map((r) => r.at + " " + r.sel + " " + r.box + " misses " + r.miss + "/5").join(", ") || rows.length + " targets");
+      bad.map((r) => r.at + " " + r.sel + " " + r.box + " misses " + r.miss + "/5 [" + r.why + "]").join(", ") || rows.length + " targets");
     if (W === 740) {
       await p.addStyleTag({ content: "*::after{content:none!important}" });
       const planted = (await measure(p)).filter((r) => r.miss > 0);

@@ -1602,12 +1602,30 @@ body:has(#shop:not([hidden]) .banners) #rotate{display:none}
   /* 모양을 키우면 자리가 밀리는 작은 조작은 누르는 칸만 키운다. 보이는 상자는 그대로 두고 가운데를 맞춘 투명 칸이
      44px을 받는다. 칸이 48인 것은 기운 메뉴(-2.9도) 귀가 들려 44 정사각의 한 귀가 새기 때문이다. 실측 740x360: 레벨 칩 39x25, 컨디션 24x24, 팔로워 28x20, 확률 26x22, 위키 본문 링크 26x18,
      오른쪽 메뉴 66x40. 흐름 속 요소만 relative를 받는다. 이미 absolute인 메뉴에 주면 자리가 무너진다. */
-  :is(#lv,#form,#gramFollowers,#shop .odds-link,#wiki .body a){position:relative}
-  :is(#lv,#form,#gramFollowers,#shop .odds-link,#wiki .body a,#mute,#fullscreen,#wikiBtn,#auto,#gymBtn,#rosterBtn,#gramBtn,#shopBtn)::after{
+  /* :is가 아니라 목록이다. :is는 가장 센 인자(#shop .odds-link)의 세기를 모두에게 줘서, 아래의 한 조작 규칙이 못 이겼다. */
+  #lv,#form,#gramFollowers,#shop .odds-link,#wiki .body a{position:relative}
+  #lv::after,#form::after,#gramFollowers::after,#shop .odds-link::after,#wiki .body a::after,#mute::after,#fullscreen::after,
+  #wikiBtn::after,#auto::after,#gymBtn::after,#rosterBtn::after,#gramBtn::after,#shopBtn::after{
     content:"";position:absolute;left:50%;top:50%;width:max(100%,48px);height:max(100%,48px);translate:-50% -50%}
   /* 레벨 칩은 초상 버튼 아래끝에 걸쳐 선다. 가운데를 맞춘 칸은 초상의 아래 절반을 덮어 그 자리를 누르면 내 정보가 아니라 위키가 열린다.
      칩의 칸만 윗변에서 시작해 아래로 편다. 아래는 경기장이라 받을 조작이 없다. */
   #lv::after{top:0;translate:-50% 0}
   /* 컨디션 칸도 초상 쪽이 아니라 오른쪽으로 편다. 가운데를 맞추면 초상의 오른쪽 위 귀를 먹는다. */
   #form::after{left:0;translate:0 -50%}
+  /* 재화 띠는 두 줄이 30px 간격이라 가운데를 맞춘 44px 칸은 서로 겹친다. 칸을 줄 경계에서 가른다. 윗줄(컨디션, 세이브)은
+     칸 아래끝이 경계 44px에 서도록 아래로 6px 편 44px이고, 아랫줄(재화 칩)은 경계에서 시작해 아래로 편다.
+     컨디션은 칸 폭 44px을 제 칸으로 잡는다. 칸만 넓히면 초상 버튼의 오른쪽 귀를 먹는다(실측 740x360 초상 45x45 중 3귀). */
+  #top #form{min-width:44px;display:flex;justify-content:center}
+  /* 초상 버튼은 아래 7px을 레벨 칩이 덮는다(칩이 초상에 걸쳐 서는 룩). 제 칸을 칩 윗변에서 위로 44px 편다. 위는 띠 여백뿐이다. */
+  #meBtn{position:relative}
+  #meBtn::after{content:"";position:absolute;left:-3px;width:calc(100% + 6px);bottom:8px;height:52px}
+  #form::after{left:-2px;top:auto;bottom:-9px;width:calc(100% + 4px);height:48px;translate:none}
+  :is(#pips,#purse .cur,#gramEffect){position:relative}
+  #pips::after{content:"";position:absolute;left:50%;bottom:-9px;width:max(100%,48px);height:48px;translate:-50% 0}
+  #purse .cur::after{content:"";position:absolute;left:50%;top:-4px;width:max(100%,48px);height:48px;translate:-50% 0}
+  #gramEffect::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,48px);height:max(100%,48px);translate:-50% -50%}
+  #wiki .copy{min-height:48px}
+  /* 복사 버튼 바로 아래 선 링크는 제 줄이 44px이다. 18px 줄에 가운데 칸을 펴면 복사 버튼 아래를 먹는다. */
+  #wiki a.site{display:flex;align-items:center;min-height:44px;margin-top:var(--gap-1)}
+  #wiki a.site::after{display:none}
 }
