@@ -2545,7 +2545,8 @@ function renderShop() {
   // 이름은 선반 데이터가 소유하고 이적시장과 봇과 버프만 따로 적는다. 열한 줄을 손으로 늘어놓으면
   // 선반 이름을 고친 날 탭만 옛 이름을 부른다.
   const tabName = (k) => (SHELVES[k] ? SHELVES[k].head : { pull: '이적시장', bot: '봇', buff: '버프' }[k]);
-  const tabs = '<div class="tabs">' + SHOP_TABS.map((k) =>
+  // data-now는 세로가 짧은 화면에서 탭 줄 끝의 고정 칸이 지금 선반 이름을 그리는 데 쓴다.
+  const tabs = '<div class="tabs" data-now="' + tabName(shopTab) + '">' + SHOP_TABS.map((k) =>
     '<button class="tab" data-tab="' + k + '"' + (shopTab === k ? ' aria-current="true"' : '') + '>'
     + TAB_ICON[k] + '<span>' + tabName(k) + '</span></button>').join('') + '</div>';
   const goods = SHELVES[shopTab] ? gearShelf(shopTab) : shopTab === 'bot' ? botShelf() : shopTab === 'buff' ? buffShelf() : pullShelf(pool);

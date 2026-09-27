@@ -77,7 +77,10 @@ try {
         // 줄마다 탭 수. 흘려 접으면 끝의 한 칸만 다음 줄로 떨어진다. 줄은 윗변으로 가른다.
         const rows = {};
         for (const e of document.querySelectorAll('#' + pn.id + ' ' + pn.tab)) { const y = Math.round(e.getBoundingClientRect().top / 8); rows[y] = (rows[y] || 0) + 1; }
-        return { tabs: r(pn.row), close: r('> .close'), inView: Boolean(cb && cb.top >= 0 && cb.bottom <= innerHeight), rows: Object.values(rows) };
+        // 탭 하나하나의 왼끝과 가장 작은 변. 줄 상자가 그대로여도 안의 탭이 옆으로 뛰면 손이 헛짚는다.
+        const each = [...document.querySelectorAll('#' + pn.id + ' ' + pn.tab)].map((e) => e.getBoundingClientRect());
+        return { tabs: r(pn.row), close: r('> .close'), inView: Boolean(cb && cb.top >= 0 && cb.bottom <= innerHeight), rows: Object.values(rows),
+          lefts: each.map((b) => Math.round(b.left)), small: Math.round(Math.min(...each.map((b) => Math.min(b.width, b.height)))) };
       }, panel);
       const seen = [];
       for (const tab of tabs) {
@@ -91,6 +94,21 @@ try {
       check(tag + ':shell:the-tab-row-holds-still-across-tabs', drift('tabs').length === 0, drift('tabs').join(' | ') || 'still at ' + (seen[0].tabs || []).join(','));
       check(tag + ':shell:close-holds-still-across-tabs', drift('close').length === 0, drift('close').join(' | ') || 'still at ' + (seen[0].close || []).join(','));
       check(tag + ':shell:close-is-on-screen-on-every-tab', seen.every((s) => s.inView), seen.filter((s) => !s.inView).map((s) => s.tab).join(', ') || 'all');
+      check(tag + ':shell:each-tab-holds-its-place-across-tabs', drift('lefts').length === 0, drift('lefts').slice(0, 2).join(' | ') || 'still');
+      // 손가락 하나가 닿는 44px 바닥. 세로가 짧은 폭만 잰다. 넓은 화면의 탭은 마우스 표적이라 이 바닥의 대상이 아니다.
+      if (H < 520) check(tag + ':shell:every-tab-clears-the-touch-floor', seen.every((s) => s.small >= 44), 'smallest side ' + Math.min(...seen.map((s) => s.small)) + 'px');
+      // 대조군. 지금 탭에만 이름을 다시 달면 그 탭이 넓어져 뒤의 탭이 선반마다 옆으로 뛰어야 한다.
+      if (H < 520 && panel.id === 'shop') {
+        const plant = await p.addStyleTag({ content: '#shop .tab[aria-current] span{position:static!important;width:auto!important;height:auto!important;clip-path:none!important}' });
+        const moved = [];
+        for (const tab of tabs.slice(0, 4)) {
+          await p.evaluate(([pn, k]) => document.querySelector('#' + pn.id + ' ' + pn.tab + '[data-' + pn.key + '="' + k + '"]').click(), [panel, tab]);
+          await p.waitForTimeout(120); moved.push({ tab, ...(await at()) });
+        }
+        await plant.evaluate((n) => n.remove());
+        const jumps = moved.filter((s) => s.lefts.some((v, i) => Math.abs(v - moved[0].lefts[i]) > TOL)).length;
+        check(tag + ':control:a-named-current-tab-makes-the-others-jump', jumps > 0, jumps + ' of ' + moved.length + ' selections moved the row');
+      }
       // 몸을 끝까지 굴려도 탭 줄은 제자리다. 창 전체가 구르면 탭이 내용과 같이 화면 밖으로 밀린다.
       const rollAll = () => p.evaluate((id) => { for (const e of document.querySelectorAll('#' + id + ', #' + id + ' *')) if (e.scrollHeight > e.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(e).overflowY)) e.scrollTop = e.scrollHeight; }, panel.id);
       const before = (await at()).tabs;
