@@ -1101,14 +1101,18 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #shop .card.gear .duration{flex:0 0 auto;margin-left:var(--gap-2);color:var(--dim);font-size:var(--fs-body);
   font-style:normal;font-weight:700;white-space:nowrap}
 /* 변형 조각. 한 등급이 여러 모양을 들고 있다는 것을 썸네일 위에서 알린다.
-   18px는 손가락으로 누르기엔 작지만 카드 높이를 안 밀고, 눌리는 것은 조각이 아니라 그 줄 전체다.
+   조각마다 제 누름이 따로 있으므로 누르는 칸은 손가락 바닥 44px이고, 보이는 조각은 그 안의 22x18이다.
+   실측 740x360에서 누르는 칸이 조각 그대로 22x18이었다. 칸 사이 틈은 두지 않는다. 틈에 떨어진 손가락은
+   카드의 시착으로 새고, 칸 폭 44가 조각 사이를 이미 22px 벌린다.
    그림 위에 겹치는 이유는 값 버튼 위에 한 줄로 깔면 그 줄만큼 카드가 길어지기 때문이다. */
-#shop .skins{position:absolute;left:var(--gap-1);bottom:var(--gap-1);display:flex;gap:var(--gap-1);margin:0}
-#shop .skin{width:22px;height:18px;padding:0;border:2px solid var(--edge);background:var(--sw);
-  box-shadow:2px 2px 0 var(--edge);cursor:pointer}
+#shop .skins{position:absolute;left:0;bottom:0;display:flex;gap:0;margin:0}
+#shop .skin{position:relative;width:44px;height:44px;padding:0;border:0;background:none;box-shadow:none;cursor:pointer}
+#shop .skin::before{content:"";position:absolute;left:var(--gap-1);bottom:var(--gap-1);width:22px;height:18px;
+  box-sizing:border-box;border:2px solid var(--edge);background:var(--sw);box-shadow:2px 2px 0 var(--edge)}
 /* 고른 조각만 테를 밝힌다. 색만으로 표시하면 어두운 변형끼리 무엇이 켜졌는지가 안 보인다. */
-#shop .skin.on{border-color:#e8d463;box-shadow:0 0 0 2px #e8d46355, 2px 2px 0 var(--edge)}
-#shop .skin:active{transform:translate(2px,2px);box-shadow:none}
+#shop .skin.on::before{border-color:#e8d463;box-shadow:0 0 0 2px #e8d46355, 2px 2px 0 var(--edge)}
+#shop .skin:active::before{transform:translate(2px,2px);box-shadow:none}
+#shop .skin:focus-visible{outline:2px solid #e8d463;outline-offset:-2px}
 /* 값 배지. 아이콘과 숫자만 들고 제 폭만 쓴다. 카드 폭을 다 먹는 버튼이면 값이 카드에서
    가장 큰 덩어리가 되고, 그림보다 먼저 읽힌다. */
 #shop .card.gear .buy{flex:0 0 auto;width:auto;margin:0;padding:6px 11px 8px;font-size:var(--fs-num)}
@@ -1131,6 +1135,29 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
   #shop .card.gear .shot{aspect-ratio:12 / 5}
   #shop .card.gear em{-webkit-line-clamp:1}
   #shop .card.gear em .eff{-webkit-line-clamp:1}
+  /* 효과가 한 줄에 하나씩 서면서 카드 높이가 효과 수를 따라 늘었다. 실측 740x360에서 효과 셋인 동네 선반과
+     둘인 장갑 선반의 첫 줄 값 배지가 화면 아래로 잘렸다. 고정 비율 그림은 그 늘어난 몫을 못 받으므로,
+     짧은 화면에서는 줄 높이를 선반 창이 정하고 그림이 남는 몫을 받는다. 효과가 몇 줄이든 첫 줄 카드는
+     통째로 화면 안에 서고, 다음 줄은 창 안에서 구른다. */
+  #shop .shopbody{flex-wrap:nowrap;align-items:stretch}
+  #shop .goods{min-height:0}
+  #shop .rack{flex:1 1 0;min-height:0;overflow-y:auto;grid-auto-rows:100%}
+  #shop .card.gear{min-height:0;overflow:hidden}
+  #shop .card.gear .pic{flex:1 1 0;min-height:0;display:flex}
+  #shop .card.gear .shot{flex:1 1 auto;aspect-ratio:auto;min-height:0}
+  /* 효과 줄은 흘려 세운다. 셋인 동네 선반이 세 줄을 쓰면 그림 몫이 띠 한 줄로 줄었다. 흘리면 두 줄에 선다. */
+  #shop .card.gear em:has(.ln){display:flex;flex-wrap:wrap;column-gap:.7em}
+  /* 효과 칸과 값 칸은 선반 안에서 같은 높이를 잡는다. 그림이 남는 몫을 받으므로 둘 중 하나라도 카드마다 다르면
+     그림 높이가 갈리고, 같은 줄 옆 카드와 효과 줄이 어긋난다(실측: 착용 버튼 39.6px과 값 배지 43.6px이 3px을 갈랐다).
+     두 줄 몫은 효과가 둘 이상인 선반에서만 잡는다. 늘 잡으면 효과가 하나뿐인 선반의 그림까지 띠로 줄어든다. */
+  #shop .card.gear em{min-height:1.5em}
+  #shop .rack:has(em .ln:nth-child(2)) .card.gear em{min-height:3em}
+  #shop .card.gear .foot{height:44px;align-items:flex-end}
+  /* 탈의실도 같은 높이로 서므로 넘치는 버튼은 그 판 안에서 구른다. 판 테두리를 넘어 그려지면 안 된다. */
+  #shop .fitting{min-height:0;overflow-y:auto}
+  #shop .fitting > *{flex-shrink:0}
+  #shop .fitting .acts{flex-wrap:nowrap}
+  #shop .fitting .acts .all{flex:1 1 auto;width:auto}
   /* 짧은 화면에서는 이름 칸을 도로 거둔다. 카드 아래끝이 353px이라 360px 화면에 7px밖에 안 남는데,
      두 줄 자리는 한 줄 22.2px을 더해 그 끝을 375px으로 밀어 값 배지를 화면 밖에 세운다.
      이 폭에서는 어느 이름도 안 접히므로(실측: 740x360에서 열 선반 카드 38장이 전부 한 줄)
