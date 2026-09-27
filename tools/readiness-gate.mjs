@@ -176,8 +176,9 @@ axis('wiki-searchable-odds', () => {
 axis('currency-placeholder', () => {
   assert(read('web/wiki/src/cash-rate.md').includes('[[coin]]'));
   const sentence = '골드와 캐시는 나중에 바꿀 수 있는 임시 일반 재화 이름이다.';
-  assert(read('web/wiki/src/coin.md').includes(sentence));
-  assert(JSON.parse(read('web/wiki/dist/pages.json')).find(p => p.id === 'coin').bodyHtml.includes(sentence)); return 'cash-rate -> coin; placeholder sentence exists in source and built text';
+  // 임시 이름이라는 기록은 재화를 정의하는 코드 곁에 선다. 플레이어 도움말에 두면 개발 메모가 게임 화면에 뜬다.
+  assert(read('web/src/state/wallet.mjs').includes(sentence));
+  assert(!JSON.parse(read('web/wiki/dist/pages.json')).find(p => p.id === 'coin').bodyHtml.includes('임시')); return 'cash-rate -> coin; placeholder record sits beside the currency code and stays out of the player wiki';
 });
 axis('payment-sdk-scan', () => {
   const files = [...walk('web/src'), ...walk('src'), 'web/index.html', 'package.json'].filter(p => /\.(mjs|js|html|json)$/.test(p));
