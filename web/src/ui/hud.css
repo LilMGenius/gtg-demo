@@ -1597,4 +1597,16 @@ body:has(#shop:not([hidden]) .banners) #rotate{display:none}
 @media (max-height:520px){
   #shop .pull-bar .roles button{min-height:44px}
   #wiki .cats button{min-height:44px}
+  #pull .skip{min-height:44px}
+  /* 모양을 키우면 자리가 밀리는 작은 조작은 누르는 칸만 키운다. 보이는 상자는 그대로 두고 가운데를 맞춘 투명 칸이
+     44px을 받는다. 칸이 48인 것은 기운 메뉴(-2.9도) 귀가 들려 44 정사각의 한 귀가 새기 때문이다. 실측 740x360: 레벨 칩 39x25, 컨디션 24x24, 팔로워 28x20, 확률 26x22, 위키 본문 링크 26x18,
+     오른쪽 메뉴 66x40. 흐름 속 요소만 relative를 받는다. 이미 absolute인 메뉴에 주면 자리가 무너진다. */
+  :is(#lv,#form,#gramFollowers,#shop .odds-link,#wiki .body a){position:relative}
+  :is(#lv,#form,#gramFollowers,#shop .odds-link,#wiki .body a,#mute,#fullscreen,#wikiBtn,#auto,#gymBtn,#rosterBtn,#gramBtn,#shopBtn)::after{
+    content:"";position:absolute;left:50%;top:50%;width:max(100%,48px);height:max(100%,48px);translate:-50% -50%}
+  /* 레벨 칩은 초상 버튼 아래끝에 걸쳐 선다. 가운데를 맞춘 칸은 초상의 아래 절반을 덮어 그 자리를 누르면 내 정보가 아니라 위키가 열린다.
+     칩의 칸만 윗변에서 시작해 아래로 편다. 아래는 경기장이라 받을 조작이 없다. */
+  #lv::after{top:0;translate:-50% 0}
+  /* 컨디션 칸도 초상 쪽이 아니라 오른쪽으로 편다. 가운데를 맞추면 초상의 오른쪽 위 귀를 먹는다. */
+  #form::after{left:0;translate:0 -50%}
 }

@@ -18,6 +18,7 @@ const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 // 스스로 스크롤을 갖도록 만든 상자는 넘치는 것이 설계이므로 뺀다.
 const SCAN = function () {
   const out = [];
+  if (!document.getElementById("__scan")) document.head.insertAdjacentHTML("beforeend", '<style id="__scan">.__scan::after{display:none!important}</style>');
   for (const el of document.querySelectorAll("body *")) {
     if (el.childElementCount > 0) continue;
     const txt = (el.textContent || "").trim();
@@ -27,7 +28,11 @@ const SCAN = function () {
     const st = getComputedStyle(el);
     if (st.overflowX === "auto" || st.overflowX === "scroll") continue;
     if (st.visibility === "hidden" || st.display === "none") continue;
+    /* 잴 때는 그 잎의 ::after를 걷는다. scrollWidth는 상자 밖으로 편 빈 누름 칸까지 넘침으로 세서, 글자가 다 보이는
+       레벨 칩을 7px 잘렸다고 읽었다. 글자가 아닌 칸은 이 자가 묻는 잘림이 아니다. */
+    el.classList.add("__scan");
     const over = el.scrollWidth - el.clientWidth;
+    el.classList.remove("__scan");
     if (over > 1) out.push({ where: el.tagName.toLowerCase() + "." + (el.className || ""), txt: txt.slice(0, 20), over });
   }
   return out;
@@ -302,7 +307,7 @@ try {
   const narrowTabs = tabScan(844, 390);
   for (const w of narrow.cut.slice(0, 6)) console.log("  narrow cut " + w);
   check("narrow:no-word-is-cut-across-lines", narrow.cut.length === 0, narrow.cut.length + " words split" + (narrow.cut.length ? " first " + narrow.cut[0] : ""));
-  check("narrow:no-text-is-clipped", narrow.found.length === 0, narrow.found.length + " clipped");
+  check("narrow:no-text-is-clipped", narrow.found.length === 0, narrow.found.length + " clipped" + (narrow.found.length ? " " + JSON.stringify(narrow.found.slice(0, 6)).slice(0, 900) : ""));
   // 탭은 상자를 안 넘치고도 화면 밖으로 나갈 수 있다. 그것은 잔림이 아니라 밀림이다.
   // 눈으로 보고 알았다. 지금 서 있는 탭이 왼쪽으로 나가 있으면 어느 선반인지를 화면이 안 말한다.
   const tabsOut = await narrowTabs;
