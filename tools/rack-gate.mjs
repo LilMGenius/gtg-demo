@@ -178,7 +178,8 @@ const ALIGN = () => {
       const name = (((card.querySelector("b") || {}).textContent) || "").trim();
       const em = card.querySelector("em");
       /* 효과가 한 줄에 하나씩 서면서 기간은 마지막 효과 줄 끝에 붙는다. 그 줄이 이름 블록이다. */
-      const eff = card.querySelector(".eff") || card.querySelector("em .ln:last-child");
+      /* 효과 줄은 격자의 한 줄이라(.ln이 display:contents) 줄 상자가 없다. 그 줄의 이름 칸이 이름 블록이다. */
+      const eff = card.querySelector(".eff") || card.querySelector("em .ln:last-child .k");
       const dur = card.querySelector(".duration");
       if (!em || !eff || !dur) { out.push({ tab: kind, name: name, split: false }); continue; }
       const live = read(eff, dur);
@@ -320,7 +321,7 @@ try {
         probe.style.cssText = "display:block;text-wrap:wrap;width:" + (rg.getBoundingClientRect().width + 2) + "px";
         const l = lastLine(probe); flowed = { lone: l && l.lines > 1 && l.tail <= 1 ? ["planted"] : [], names: 1 };
         probe.textContent = keep[0]; probe.style.cssText = keep[1]; }
-      const st = document.createElement("style"); st.textContent = "#shop .card.gear em .ln .k{flex:none!important;overflow:visible!important}#shop .card.gear em .ln .k::after{content:' 긴 이름 긴 이름 긴 이름'}"; document.head.append(st);
+      const st = document.createElement("style"); st.textContent = "#shop .card.gear em:has(.ln){grid-template-columns:max-content max-content!important}#shop .card.gear em .ln .k{flex:none!important;overflow:visible!important;white-space:nowrap!important}#shop .card.gear em .ln .k::after{content:' 긴 이름 긴 이름 긴 이름'}"; document.head.append(st);
       cut.length = 0; seen = 0; scan(); st.remove();
       return { real, flowed, planted: { cut: cut.slice(), seen } };
     });
