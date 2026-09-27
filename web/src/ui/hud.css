@@ -323,10 +323,17 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
   width:min(94vw,860px);max-height:88vh;padding:var(--gap-3);
   border:var(--line) solid var(--edge);background:var(--panel);
   box-shadow:5px 5px 0 var(--edge), var(--bevel)}
+/* 창 안의 갈래 탭은 한 벌이다. 상점 선반, 내 정보, 선수단 포지션, 위키 갈래가 같은 판때기와 같은 켜짐 색을 쓴다.
+   창마다 따로 적으면 한 곳만 바뀐다(실측: 위키만 켜진 탭이 노랑 바탕에 40px이었고 나머지 셋은 초록 바탕에 44px이었다).
+   창이 다르게 갖는 것은 여백과 기울기뿐이라 그것만 각 창의 규칙에 남긴다. */
+:is(#shop .tab,#me .tab,#roster .kind,#wiki .cats button){min-height:44px;
+  border:var(--line) solid var(--edge);background:var(--panel);color:var(--dim);
+  font-family:var(--body);font-size:var(--fs-body);font-weight:400;
+  box-shadow:5px 5px 0 var(--edge), var(--bevel)}
+:is(#shop .tab,#me .tab,#wiki .cats button)[aria-current="true"],#roster .kind[aria-selected="true"]{background:#2b3a22;color:#ffd83d}
+:is(#shop .tab,#me .tab,#roster .kind,#wiki .cats button):active{box-shadow:1px 1px 0 var(--edge)}
 #wiki .cats{grid-column:1;grid-row:1;display:flex;flex-direction:column;gap:var(--gap-1);min-width:0;min-height:0;overflow-x:auto}
-#wiki .cats button{padding:7px 12px 9px;border:var(--line) solid var(--edge);background:#1b2318;
-  color:var(--dim);font-family:var(--body);font-size:var(--fs-body);white-space:nowrap;text-align:left}
-#wiki .cats button[aria-current="true"]{background:#ffd83d;color:#12160e}
+#wiki .cats button{padding:7px 12px 9px;white-space:nowrap;text-align:left}
 /* 신호를 안은 상자. 격자 칸은 이 상자가 받고 구르는 것은 그 안의 칸이다. 신호를 안쪽에 두면
    내용과 같이 굴러가 아래끝에 못 선다. 위키 본문과 내 정보의 칸이 같은 규칙을 쓴다. */
 #wiki .bodybox,#me .panebox{position:relative;min-width:0;min-height:0;display:grid}
@@ -502,15 +509,10 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 #roster .kinds{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--gap-2)}
 /* 44px. 손가락 하나가 닿는 최소 높이이고, 이 파일이 초상화 버튼에서 이미 쓰는 바닥이다.
    실측으로 740x360에서 이 탭이 39px이라 5px 모자랐다. */
-#roster .kind{display:inline-flex;align-items:center;justify-content:center;min-height:44px;
-  gap:var(--gap-1);padding:6px 14px 8px;
-  border:var(--line) solid var(--edge);background:var(--panel);color:var(--dim);
-  font-family:var(--body);font-size:var(--fs-body);font-weight:400;
-  box-shadow:4px 4px 0 var(--edge), var(--bevel);transform:rotate(-.7deg)}
+#roster .kind{display:inline-flex;align-items:center;justify-content:center;
+  gap:var(--gap-1);padding:6px 14px 8px;transform:rotate(-.7deg)}
 #roster .kind:nth-child(2n){transform:rotate(.8deg)}
 #roster .kind svg{width:16px;height:16px;flex:none}
-#roster .kind[aria-selected="true"]{background:#2b3a22;color:#ffd83d}
-#roster .kind:active{box-shadow:1px 1px 0 var(--edge)}
 #roster .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px;
   width:min(94vw,940px);padding:4px}
 #roster .row button{padding:9px 11px 11px;
@@ -842,13 +844,9 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
    같은 화면 안에서 문법이 둘이 된다. 아이콘이 없어 좌우 여백만 상점보다 넓게 잡았다. */
 #me .tabs{display:flex;justify-content:center;gap:9px;margin:2px 0 1px}
 /* 같은 44px 바닥. 실측으로 740x360에서 41px이었다. */
-#me .tab{display:inline-flex;align-items:center;justify-content:center;min-height:44px;
-  padding:7px 15px 9px;border:var(--line) solid var(--edge);
-  background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);font-weight:400;
-  box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(-.8deg)}
+#me .tab{display:inline-flex;align-items:center;justify-content:center;
+  padding:7px 15px 9px;transform:rotate(-.8deg)}
 #me .tab:nth-child(2n){transform:rotate(1deg)}
-#me .tab[aria-current]{background:#2b3a22;color:#ffd83d}
-#me .tab:active{box-shadow:1px 1px 0 var(--edge)}
 #me .note{padding:9px 12px 11px;border:var(--line) solid var(--edge);background:#1b2318;
   color:var(--ink);font-family:var(--body);font-size:var(--fs-body);font-weight:400;line-height:1.35;
   box-shadow:6px 6px 0 var(--edge), var(--bevel)}
@@ -1010,14 +1008,9 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) :is
 /* 아이콘과 이름을 한 줄에 세운다. 좌우 여백과 사이 간격은 아이콘이 먹는 폭만큼 줄여,
    1280px에서 열한 칸이 아이콘을 달기 전과 같이 한 줄로 선다. 16px은 16px 글자와 같은 키라
    아이콘이 이름을 안 누르면서도 형태가 안 뭉개지는 크기다. */
-#shop .tab{padding:7px 11px 9px;display:inline-flex;align-items:center;gap:5px;
-  border:var(--line) solid var(--edge);
-  background:var(--panel);color:var(--dim);font-family:var(--body);font-size:var(--fs-body);font-weight:400;
-  box-shadow:5px 5px 0 var(--edge), var(--bevel);transform:rotate(-.8deg)}
+#shop .tab{padding:7px 11px 9px;display:inline-flex;align-items:center;gap:5px;transform:rotate(-.8deg)}
 #shop .tab:nth-child(2n){transform:rotate(1deg)}
-#shop .tab[aria-current]{background:#2b3a22;color:#ffd83d}
 #shop .tab svg{width:16px;height:16px;flex:none}
-#shop .tab:active{box-shadow:1px 1px 0 var(--edge)}
 #shop .card{width:min(88vw,430px);padding:15px 18px 17px;text-align:center;
   border:var(--line) solid var(--edge);background:#1b2318;color:var(--ink);
   font-family:var(--body);font-size:var(--fs-body);font-weight:400;line-height:1.45;

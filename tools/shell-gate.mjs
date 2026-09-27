@@ -155,6 +155,65 @@ try {
       await p.close();
     }
   }
+  /* 창 안의 갈래 탭은 한 벌이다. 켜진 탭의 바탕과 글자색과 높이를 네 창에서 읽어 한 모양인지 본다.
+     위키만 노랑 바탕에 40px이었을 때 이 자가 없어 아무도 못 봤다. 대조군은 위키 켜진 탭을 옛 노랑으로 되돌린다. */
+  const TABS = [['shop', '.tab[aria-current="true"]'], ['me', '.tab[aria-current="true"]'], ['roster', '.kind[aria-selected="true"]'], ['wiki', '.cats button[aria-current="true"]']];
+  const tp = await b.newPage({ viewport: { width: 1280, height: 720 } });
+  await tp.goto(BASE); await tp.locator('#go').click({ force: true }); await clearDraw(tp);
+  const lit = async () => {
+    const out = [];
+    for (const [id, sel] of TABS) {
+      await tp.evaluate((id) => window['__' + id](true), id); await tp.waitForTimeout(300);
+      out.push(await tp.evaluate(([id, sel]) => {
+        const e = document.querySelector('#' + id + ' ' + sel);
+        if (!e) return { id, none: true };
+        const s = getComputedStyle(e);
+        return { id, look: s.backgroundColor + ' / ' + s.color, h: Math.round(e.getBoundingClientRect().height) };
+      }, [id, sel]));
+      await tp.evaluate((id) => window['__' + id](false), id); await tp.waitForTimeout(150);
+    }
+    return out;
+  };
+  const tabsNow = await lit();
+  check('shell:instrument:every-panel-shows-a-lit-tab', tabsNow.every((s) => !s.none), tabsNow.filter((s) => s.none).map((s) => s.id).join(', ') || TABS.length + ' panels');
+  check('shell:a-lit-tab-looks-the-same-in-every-panel', new Set(tabsNow.map((s) => s.look)).size === 1 && tabsNow.every((s) => s.h >= 44),
+    tabsNow.map((s) => s.id + ' ' + s.look + ' ' + s.h + 'px').join(' | '));
+  const oldWiki = await tp.addStyleTag({ content: '#wiki .cats button[aria-current="true"]{background:#ffd83d!important;color:#12160e!important}' });
+  const planted = await lit();
+  await oldWiki.evaluate((n) => n.remove());
+  check('shell:control:the-old-yellow-wiki-tab-is-caught', new Set(planted.map((s) => s.look)).size > 1, planted.map((s) => s.id + ' ' + s.look).join(' | '));
+  await tp.close();
+  /* 빈 목록 위 제목. 빈 칸은 비워 두거나 아이콘 하나이고(gamedev 창 절), 그 위에 제목이 서면 빈 상자 위 라벨이 된다.
+     빈 목록이 생기는 것은 새 저장이라 프리셋 없이 열고, 탭 있는 창은 탭마다 잰다. 비었다는 것은 글자도 그림도
+     없는 상자다. h5는 뒤가 없거나 빈 상자면 걸리고, 이름과 값이 한 줄에 선 .note 줄은 마지막 줄일 수 있으므로
+     뒤에 빈 상자가 있을 때만 걸린다(실측: 내 정보 히든 줄 '프로의식 적당'을 제목으로 잘못 셌다).
+     대조군은 내 정보에 제목과 빈 줄을 심는다. */
+  const ep = await b.newPage({ viewport: { width: 1280, height: 720 } });
+  await ep.goto(BASE.split('&preset=')[0]); await ep.locator('#go').click({ force: true }); await clearDraw(ep);
+  const PANES = { gym: null, roster: '.kind[data-pos]', gram: null, me: '.tab[data-tab]', wiki: null };
+  const bare = async () => {
+    const out = [];
+    for (const [id, tabSel] of Object.entries(PANES)) {
+      await ep.evaluate((id) => window['__' + id](true), id); await ep.waitForTimeout(300);
+      const keys = tabSel ? await ep.evaluate(([id, s]) => [...document.querySelectorAll('#' + id + ' ' + s)].map((e) => e.dataset.pos || e.dataset.tab), [id, tabSel]) : [null];
+      for (const k of keys) {
+        if (k) { await ep.evaluate(([id, s, k]) => [...document.querySelectorAll('#' + id + ' ' + s)].find((e) => (e.dataset.pos || e.dataset.tab) === k).click(), [id, tabSel, k]); await ep.waitForTimeout(200); }
+        out.push(...(await ep.evaluate(([id, k]) => [...document.querySelectorAll('#' + id + ' h5, #' + id + ' .note:has(> b)')]
+          .filter((h) => h.getClientRects().length)
+          .filter((h) => { const n = h.nextElementSibling; const empty = (e) => !e.textContent.trim() && !e.querySelector('img,svg,canvas'); return h.tagName === 'H5' ? (!n || empty(n)) : Boolean(n) && empty(n); })
+          .map((h) => id + (k ? ':' + k : '') + ' "' + h.textContent.trim().slice(0, 12) + '"'), [id, k])));
+      }
+      await ep.evaluate((id) => window['__' + id](false), id); await ep.waitForTimeout(150);
+    }
+    return out;
+  };
+  const emptyHeads = await bare();
+  check('shell:no-heading-stands-over-an-empty-list', emptyHeads.length === 0, emptyHeads.join(', ') || Object.keys(PANES).length + ' panels on a fresh save');
+  await ep.evaluate(() => { window.__me(true); const pane = document.querySelector('#me .pane') || document.querySelector('#me'); pane.insertAdjacentHTML('beforeend', '<h5>심은 제목</h5><div class="row"></div>'); });
+  const plantedHead = await ep.evaluate(() => [...document.querySelectorAll('#me h5')].filter((h) => { const n = h.nextElementSibling; return !n || (!n.children.length && !n.textContent.trim()); }).length);
+  await ep.evaluate(() => window.__me(false));
+  check('shell:control:a-planted-heading-over-an-empty-row-is-caught', plantedHead > 0, plantedHead + ' planted');
+  await ep.close();
 } catch (e) { check('instrument:run-completed', false, String(e).slice(0, 300)); }
 await b.close();
 if (notes.length) console.log(notes.map((x) => '  ok   ' + x).join('\n'));
