@@ -1,10 +1,10 @@
 import { chromium } from "playwright";
-import { gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt } from "../web/src/state/gear.mjs";
+import { gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, inkAt, beardAt } from "../web/src/state/gear.mjs";
 
 // 내 정보의 자. 사람은 자기가 무엇을 걸쳤는지를 산 자리가 아니라 자기 창에서 확인한다.
 // 상점 탈의실에만 그림이 서 있으면 장비는 사는 동안에만 존재하는 물건이 된다.
 //
-// 재는 것은 셋이다. 여덟 줄이 다 서는가, 각 줄이 저장이 든 그 등급의 이름을 말하는가,
+// 재는 것은 셋이다. 선반마다 한 줄이 다 서는가(수염이 제 선반을 가진 뒤로 아홉), 각 줄이 저장이 든 그 등급의 이름을 말하는가,
 // 그 차림이 그림으로도 서는가. 이름은 선반 데이터에서 꺼내 맞대므로 화면이 옮겨 적으면 갈린다.
 // 대조군은 장비를 갈아입히는 것이다. 줄과 그림이 같이 바뀌지 않으면 위의 초록은 정지 화면을 잰 것이다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
@@ -16,7 +16,7 @@ t.unref();
 const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
 // 화면이 부르는 이름과 저장이 든 등급을 잇는 표. 필드 이름은 상태가 소유하고 이 자는 읽기만 한다.
-const AT = { grip: gloveAt, studs: bootAt, pads: kitAt, socks: sockAt, hair: hairAt, ink: inkAt, frame: frameAt, city: cityAt };
+const AT = { grip: gloveAt, studs: bootAt, pads: kitAt, socks: sockAt, hair: hairAt, beard: beardAt, ink: inkAt, frame: frameAt, city: cityAt };
 const FIELDS = Object.keys(AT);
 
 let b;
