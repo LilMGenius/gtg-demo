@@ -1,5 +1,6 @@
 import { chromium } from "playwright";
 import { GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, BEARDS, TATTOOS } from "../web/src/state/gear.mjs";
+import { AXIS_WORD } from "../web/src/state/shelf.mjs";
 
 // 선반이 화면 폭을 쓰는지 재는 자.
 // 상품을 한 열로 세우면 폭의 대부분이 비고 넷째 장은 스크롤 뒤로 숨는다. 눌러 볼 생각이 들려면
@@ -546,6 +547,15 @@ try {
     stuckPlant.map((x) => x.at + " came back at em " + x.p.back.em + " px " + x.p.back.px + ", not " + x.p.before.em + " / " + x.p.before.px).join(", ")
       || plants.map((x) => x.at + " back to em " + x.p.back.em + " px " + x.p.back.px).join(", "));
   check("console:no-errors", errs.length === 0, errs.slice(0, 2).join(" | ") || "clean");
+  /* 효과 이름은 카드 한 줄에 서는 스탯 이름이라 짧아야 한다. 캡은 gamedev presentation 이름 절이 정한 10자이고,
+     자는 데이터에서 센다. 같은 셈이 11자 심은 이름을 잡는지 대조군으로 같이 돌린다. */
+  const longNames = (words) => Object.entries(words).filter((e) => [...e[1]].length > 10).map((e) => e[0] + "=" + e[1]);
+  const longWords = longNames(AXIS_WORD);
+  check("axis:every-effect-name-fits-ten-characters", longWords.length === 0,
+    longWords.join(", ") || Object.keys(AXIS_WORD).length + " names at most 10");
+  const plantedWord = longNames(Object.assign({}, AXIS_WORD, { planted: "가나다라마바사아자차카" }));
+  check("control:a-planted-eleven-character-name-is-caught", plantedWord.length === longWords.length + 1,
+    plantedWord.join(", ") || "planted name slipped through");
 
   for (const k of racks) console.log("  " + k.padEnd(7) + " cards " + wide[k].cards + "  columns " + wide[k].cols + " at " + WIDE + "px, " + narrow[k].cols + " at " + NARROW + "px");
   console.log("  표본 범위: 선반 " + racks.length + "칸 x 폭 " + WIDE + "/" + NARROW + "/" + HAND_W + "px, 카드 " + rare.length + "장");
