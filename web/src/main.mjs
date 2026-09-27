@@ -24,6 +24,7 @@ import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualB
 import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost } from './state/rapport.mjs';
 import { passerName } from './state/passer.mjs';
 import { DATE_COST, MOVES, dateOdds, dateOutcome, applyDate, dateGate } from './state/date.mjs';
+import { withRo } from './ui/josa.mjs';
 import { applyPreset, ONBOARD_KEEPER, ONBOARD_KICKERS, ONBOARD_DONE } from './state/inject.mjs';
 import { thumbURL, startSpin, stopSpin } from './render/thumb.mjs';
 import * as wikiUI from './ui/wiki.mjs';
@@ -1565,7 +1566,7 @@ function renderDm(city, passer, tier) {
       + (said.fans ? ' ' + IC_FANS + ' +' + said.fans : '') + '</div>'
     : '<div class="line them">' + dmSay(city, passer, tier) + '</div>'
       + '<div class="pick">' + DM_MOVES.map((m) => '<button data-dm="' + m.id + '">' + m.label
-        + '<em>' + CAUSE_LABEL[m.stat] + ' ' + state.keeper[m.stat] + '로 성공 ' + dmOdds(state.keeper, m.id) + '%</em></button>').join('') + '</div>';
+        + '<em>' + CAUSE_LABEL[m.stat] + ' ' + withRo(state.keeper[m.stat]) + ' 성공 ' + dmOdds(state.keeper, m.id) + '%</em></button>').join('') + '</div>';
   return '<div class="dm">' + body + '</div><button class="close fold">접기</button>';
 }
 
@@ -1633,7 +1634,7 @@ function renderDate(city, passer, done) {
     return;
   }
   const moves = MOVES.map((m) => '<button data-move="' + m.id + '">' + m.label
-    + '<em>' + CAUSE_LABEL[m.stat] + ' ' + state.keeper[m.stat] + '로 성공 ' + dateOdds(state.keeper, m.id) + '%</em></button>').join('');
+    + '<em>' + CAUSE_LABEL[m.stat] + ' ' + withRo(state.keeper[m.stat]) + ' 성공 ' + dateOdds(state.keeper, m.id) + '%</em></button>').join('');
   box.innerHTML = '<h4>' + who + '</h4><div class="card">' + moves + '</div><button class="close">그냥 지나간다</button>';
   box.querySelector('.close').onclick = closeDate;
   for (const b of box.querySelectorAll('[data-move]')) b.onclick = () => commitDate(city, passer, b.dataset.move);
