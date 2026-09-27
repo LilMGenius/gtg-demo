@@ -292,16 +292,34 @@ try {
        수 칸이 카드 안에 온전히 서고 제 글자를 다 담는지를 선반 전부에서 센다. 대조군은 이름을 줄지 않게
        풀고 이름을 네 배로 늘려 수가 밀려나는 사본이다(지금 이름은 짧아서 풀기만 하면 아무것도 안 밀린다). */
     const values = await p.evaluate(() => {
-      const cut = []; let seen = 0;
+      const cut = []; let seen = 0; const lone = []; let names = 0;
+      // 이름의 마지막 줄이 글자 하나인가. 한 글자 줄은 뜻 덩어리에서 떨어져 나온 조각으로 읽힌다.
+      // 카드가 조금 기울어 있어 한 줄 안에서도 글자 윗변이 몇 px씩 흔들린다. 줄바꿈은 아래로 내려가면서 왼쪽으로 돌아간 자리다.
+      const lastLine = (el) => { const n = el.firstChild; if (!n || n.nodeType !== 3) return null; const r = document.createRange();
+        let lines = 1, tail = 0, prev = null;
+        for (let i = 0; i < n.nodeValue.length; i += 1) { r.setStart(n, i); r.setEnd(n, i + 1); if (!n.nodeValue[i].trim()) continue; const q = r.getBoundingClientRect(); if (!q.width && !q.height) continue;
+          if (prev && q.left < prev.left - 4 && q.top > prev.top + q.height / 2) { lines += 1; tail = 0; }
+          tail += 1; prev = q; }
+        return { lines, tail }; };
       const scan = () => { for (const tab of [...document.querySelectorAll("#shop .tab")]) { tab.click();
+        for (const card of document.querySelectorAll("#shop .rack .card > b")) { const l = lastLine(card); if (!l) continue; names += 1;
+          if (l.lines > 1 && l.tail <= 1) lone.push(tab.dataset.tab + " " + card.textContent); }
         for (const card of document.querySelectorAll("#shop .rack .card.gear")) {
           const cr = card.getBoundingClientRect();
           for (const v of card.querySelectorAll("em .ln .v")) { seen += 1; const r = v.getBoundingClientRect();
             if (v.scrollWidth > v.clientWidth + 1 || r.right > cr.right - 2 || r.width < 1) cut.push(tab.dataset.tab + " " + v.textContent); } } } };
-      scan(); const real = { cut: cut.slice(), seen };
+      scan(); const real = { cut: cut.slice(), seen, lone: lone.slice(), names };
+      // 대조군. 이름 하나를 다섯 글자와 한 글자로 심고 폭을 다섯 글자에 맞추면 한 글자 줄이 서야 자가 산다.
+      const probe = document.querySelector("#shop .rack .card > b");
+      let flowed = { lone: [], names: 0 };
+      if (probe) { const keep = [probe.textContent, probe.style.cssText]; probe.textContent = "가나다라마 바";
+        const rg = document.createRange(); rg.setStart(probe.firstChild, 0); rg.setEnd(probe.firstChild, 5);
+        probe.style.cssText = "display:block;text-wrap:wrap;width:" + (rg.getBoundingClientRect().width + 2) + "px";
+        const l = lastLine(probe); flowed = { lone: l && l.lines > 1 && l.tail <= 1 ? ["planted"] : [], names: 1 };
+        probe.textContent = keep[0]; probe.style.cssText = keep[1]; }
       const st = document.createElement("style"); st.textContent = "#shop .card.gear em .ln .k{flex:none!important;overflow:visible!important}#shop .card.gear em .ln .k::after{content:' 긴 이름 긴 이름 긴 이름'}"; document.head.append(st);
       cut.length = 0; seen = 0; scan(); st.remove();
-      return { real, planted: { cut: cut.slice(), seen } };
+      return { real, flowed, planted: { cut: cut.slice(), seen } };
     });
     /* 내려온 설명 문장이 어디에 서 있는가. 페이지가 이미 불러 둔 판을 다시 부르는 것이라
        모듈이 두 번 돌지 않고, 화면에 안 그려지는 값을 화면 쪽에서 읽는 유일한 길이다. */
@@ -395,6 +413,10 @@ try {
     // 좁은 폭은 격자 칸이 넓어 이름이 다 들어간다. 대조군은 이름이 모자라는 넓은 폭에서만 빨개질 수 있다.
     if (nm === "wide") check("control:wide:a-name-that-will-not-shrink-cuts-a-value", run.values.planted.cut.length > 0,
       run.values.planted.cut.length + " of " + run.values.planted.seen + " values pushed out");
+    check("rack:" + nm + ":no-card-name-ends-on-a-lone-syllable", run.values.real.names > 0 && run.values.real.lone.length === 0,
+      run.values.real.lone.slice(0, 3).join(", ") || run.values.real.names + " names");
+    if (nm === "wide") check("control:wide:a-planted-lone-syllable-is-caught", run.values.flowed.lone.length > 0,
+      run.values.flowed.lone.slice(0, 2).join(", ") || "none of " + run.values.flowed.names);
   }
 
   /* 내려온 설명 문장에 독자가 있는가. 카드에서 빠진 뒤로 이 문장들을 읽는 화면이 없어서,
