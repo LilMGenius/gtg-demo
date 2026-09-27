@@ -2849,7 +2849,9 @@ addEventListener('keydown', (e) => {
        창을 닫는 키가 이 창에서만 죽어 있었다. */
     const done = shown >= lastPull.length && pullStage === STAGE_LAST;
     if (id === 'pull' && !done) revealAll();
-    else if (id && (id !== 'pull' || state.onboard >= ONBOARD_DONE)) PANEL_SHUT[id]();
+    // 첫 진입 개봉의 결과 판은 누름과 같은 걸음을 밟는다. 닫으면 키퍼 다음 키커가 이어 열리고, 끝났으면 닫힌다.
+    else if (id === 'pull' && state.onboard < ONBOARD_DONE) { stopReveal(); onboardStep(); }
+    else if (id) PANEL_SHUT[id]();
     return;
   }
   if (id && (binding?.action === 'category' || binding?.action === 'focus')) {

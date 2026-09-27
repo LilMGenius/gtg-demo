@@ -116,8 +116,10 @@ try {
   await first.waitForSelector('#pull .tap');
   await first.keyboard.press('Escape');
   check('keys:onboarding-does-not-skip', !(await hidden(first, 'pull')), 'Escape preserves first reveal');
-  for (let i = 0; i < 100 && !(await hidden(first, 'pull')); i++) await first.keyboard.press('Enter');
-  check('keys:onboarding-keyboard-completes', await hidden(first, 'pull'), 'Enter traverses keeper and kicker reveals');
+  // 첫 진입도 Esc만으로 끝까지 간다. 키퍼 결과 판의 Esc가 키커를 열고, 키커 결과 판의 Esc가 닫는다.
+  // 실측: 결과 판에서 Esc를 네 번 눌러도 창이 남았다. 누름과 Esc가 결과 판에서 다른 일을 했다.
+  for (let i = 0; i < 12 && !(await hidden(first, 'pull')); i++) await first.keyboard.press('Escape');
+  check('keys:onboarding-escape-completes', await hidden(first, 'pull'), 'Escape alone traverses keeper and kicker reveals');
   await first.context().close();
   check('keys:no-browser-errors', errors.length === 0, errors);
 } catch (e) { check('keys:exception', false, e.stack); }
