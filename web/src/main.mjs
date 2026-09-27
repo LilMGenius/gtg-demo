@@ -1792,20 +1792,18 @@ function specLines(kind, rank) {
   return specRows(kind, rank).map((r) => (r.v ? r.k + ' ' + r.v : r.k));
 }
 
-/* 카드가 파는 것을 한 줄로 말한다. 값이 붙은 항목만 세운다. 값 없는 항목은 그 자체로 정보가 없고,
-   기간과 횟수는 카드의 보조행이 따로 받으므로 여기서 빠진다. 항목과 값을 가른 표는 효과 칸의 몫이다. */
-function cardLine(kind, rank) {
-  return specRows(kind, rank).filter((r) => r.v && !/[분슛]$/.test(r.v))
-    .map((r) => r.k + ' ' + r.v).join(', ');
-}
-
 /* 장비 카드의 효과는 한 효과에 한 줄이다. 한 문장으로 이어 흘리면 둘째 효과가 첫 줄 끝에서 낱말 가운데로
    접혀 '손에서 흘리는 사...'처럼 이름이 말줄임에 먹혔다(1280x720 문어 빨판 장갑). 줄을 효과로 가르면
    효과 이름과 수가 늘 같은 줄에 서고, 줄바꿈이 쉼표를 대신한다. 폭이 모자라면 줄어드는 것은 이름이고 수는 늘 다 보인다.
    파는 것이 그 수라서다(실측: 1280x720 축구화 효과 238px이 205px 칸에서 수째로 잘렸다). */
-function cardLines(kind, rank) {
+/* 봇과 버프의 기간·횟수는 마지막 효과 줄 끝에 붙는다. 한 문장으로 이어 흘릴 때는 740x360 자양강장제의
+   둘째 효과가 수째로 말줄임에 먹혔다('한눈팔기 -50%, 수다...'). */
+function cardLines(kind, rank, tail) {
   const rows = specRows(kind, rank).filter((r) => r.v && !/[분슛]$/.test(r.v));
-  return rows.map((r) => '<span class="ln"><span class="k">' + r.k + '</span> <i class="v">' + r.v + '</i></span>').join('');
+  const end = tail ? '<small class="duration">' + tail + '</small>' : '';
+  if (!rows.length) return end;
+  return rows.map((r, i) => '<span class="ln"><span class="k">' + r.k + '</span> <i class="v">' + r.v + '</i>'
+    + (i === rows.length - 1 ? end : '') + '</span>').join('');
 }
 
 /* 카드 테두리가 말하는 등급. 선반이 스스로 매긴 순번을 그대로 쓴다. 장비는 0에서 3, 봇은 1에서 3이다.
@@ -2445,7 +2443,7 @@ function botShelf() {
       + '<div class="pic"><div class="shot" data-kind="bot" data-rank="' + b.tier + '"></div></div>'
       + '<b>' + b.name + '</b>'
       // 효과 문장만 접는다. 기간과 횟수는 그 접기 밖에 서야 안 잘린다.
-      + '<em><span class="eff">' + cardLine('bot', b.tier) + '</span><small class="duration">' + duration + '</small></em>'
+      + '<em>' + cardLines('bot', b.tier, duration) + '</em>'
       + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-bot="' + b.tier + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
   return '<h4>봇</h4><div class="rack">' + rows.join('') + '</div>';
@@ -2512,7 +2510,7 @@ function buffShelf() {
       + '<div class="pic"><div class="shot" data-kind="buff" data-rank="' + at + '"></div></div>'
       + '<b>' + b.name + '</b>'
       // 효과 문장만 접는다. 기간과 횟수는 그 접기 밖에 서야 안 잘린다.
-      + '<em><span class="eff">' + cardLine('buff', b.kind) + '</span><small class="duration">' + duration + '</small></em>'
+      + '<em>' + cardLines('buff', b.kind, duration) + '</em>'
       + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-buff="' + b.kind + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
   return '<h4>버프</h4><div class="rack">' + rows.join('') + '</div>';

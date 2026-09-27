@@ -117,7 +117,7 @@ const DURATION = () => {
       const name = (card.querySelector("b") || {}).textContent || "";
       const dur = card.querySelector(".duration");
       const em = card.querySelector("em");
-      const eff = card.querySelector(".eff");
+      const eff = card.querySelector(".eff") || card.querySelector("em .ln:last-child") || em;
       if (!dur) { out.push({ tab: kind, name: name.trim(), has: false }); continue; }
       /* 화면 밖의 점은 elementFromPoint가 null을 낸다. 좁은 폭에서는 카드가 접힌 자리 아래에 서므로
          먼저 화면 가운데로 끌어오고, 끌어온 뒤의 좌표로 다시 잰다.
@@ -177,18 +177,20 @@ const ALIGN = () => {
     for (const card of document.querySelectorAll("#shop .rack .card.gear")) {
       const name = (((card.querySelector("b") || {}).textContent) || "").trim();
       const em = card.querySelector("em");
-      const eff = card.querySelector(".eff");
+      /* 효과가 한 줄에 하나씩 서면서 기간은 마지막 효과 줄 끝에 붙는다. 그 줄이 이름 블록이다. */
+      const eff = card.querySelector(".eff") || card.querySelector("em .ln:last-child");
       const dur = card.querySelector(".duration");
       if (!em || !eff || !dur) { out.push({ tab: kind, name: name, split: false }); continue; }
       const live = read(eff, dur);
-      /* 대조군은 같은 화면에서 만든다. 칸을 첫 줄에 못 박고 같은 자로 다시 재는 것이라,
+      /* 대조군은 같은 화면에서 만든다. 기간을 효과 줄 밖, 제 줄로 떼어 놓고 같은 자로 다시 재는 것이라,
          묻는 것은 문턱이 맞는가가 아니라 이 자가 어긋남을 보기는 하는가다.
-         잰 뒤에 인라인 값을 도로 지운다. 남겨 두면 뒤에 오는 축이 이 자가 민 화면을 잰다. */
-      em.style.alignItems = "flex-start";
-      dur.style.alignSelf = "flex-start";
+         잰 뒤에 제자리로 도로 붙인다. 남겨 두면 뒤에 오는 축이 이 자가 민 화면을 잰다. */
+      const home = dur.parentNode, next = dur.nextSibling;
+      em.after(dur);
+      dur.style.display = "block";
       const pinned = read(eff, dur);
-      em.style.alignItems = "";
-      dur.style.alignSelf = "";
+      dur.style.display = "";
+      home.insertBefore(dur, next);
       out.push({ tab: kind, name: name, split: true, live: live, pinned: pinned });
     }
   }
@@ -475,24 +477,17 @@ try {
     for (const a of rows) alignRows.push({ at: a.name + " " + w + "x" + h, a: a });
   const paired = alignRows.filter((r) => r.a.split);
   const hung = paired.filter((r) => r.a.live.off > r.a.live.lh / 2);
-  const wrapped = paired.filter((r) => r.a.live.rows >= 2);
-  check("rack:a-wrapped-name-keeps-its-value-beside-it", paired.length > 0 && hung.length === 0,
+  check("rack:the-duration-rides-its-effect-line", paired.length > 0 && hung.length === 0,
     hung.slice(0, 3).map((r) => r.at + " value mid " + r.a.live.vMid + " against name mid " + r.a.live.nMid
       + " over " + r.a.live.rows + " lines, off " + r.a.live.off + " past " + (r.a.live.lh / 2)).join(", ")
-      || paired.length + " readings, " + wrapped.length + " of them two-line, worst off "
+      || paired.length + " readings, worst off "
         + Math.max.apply(null, paired.map((r) => r.a.live.off)) + " inside half a line");
-  /* 두 줄 표본이 없으면 이 축은 아무것도 안 물은 것이다. 한 줄짜리만 모아 놓고 초록을 내면
-     그 초록은 정렬이 옳다는 뜻이 아니라 접힌 이름을 한 장도 못 만났다는 뜻이다. */
-  check("instrument:a-two-line-effect-name-stood-in-the-sample", wrapped.length > 0,
-    wrapped.length ? wrapped.length + " of " + paired.length + " readings draw two lines: "
-      + wrapped.map((r) => r.at + " range " + r.a.live.range).join(", ")
-      : "no card drew a two-line effect name over " + paired.length + " readings");
-  // 대조군. 같은 카드의 칸을 첫 줄에 못 박으면 위 축이 빨개져야 한다. 안 빨개지면 이 자가 눈이 먼 것이다.
-  const unseen = wrapped.filter((r) => r.a.pinned.off <= r.a.pinned.lh / 2);
-  check("control:a-value-pinned-to-the-first-line-is-caught", wrapped.length > 0 && unseen.length === 0,
+  // 대조군. 같은 카드의 기간을 제 줄로 떼면 위 축이 빨개져야 한다. 안 빨개지면 이 자가 눈이 먼 것이다.
+  const unseen = paired.filter((r) => r.a.pinned.off <= r.a.pinned.lh / 2);
+  check("control:a-duration-on-its-own-line-is-caught", paired.length > 0 && unseen.length === 0,
     unseen.slice(0, 2).map((r) => r.at + " stays inside " + (r.a.pinned.lh / 2) + " at off " + r.a.pinned.off).join(", ")
-      || wrapped.length + " two-line readings go red when pinned to the first line, off "
-        + wrapped.map((r) => r.a.pinned.off).join(" / "));
+      || paired.length + " readings go red when the duration leaves its line, off "
+        + paired.map((r) => r.a.pinned.off).join(" / "));
   /* 선반 줄. 세 폭에서 열 선반을 훑어 격자 줄마다 효과 줄의 위끝과 값 배지의 아래끝을 맞댄다.
      문턱 1px은 지어낸 수가 아니라 offsetTop이 정수라 같은 자리도 반올림 하나가 갈리는 폭이다. */
   const bucket = new Map();
