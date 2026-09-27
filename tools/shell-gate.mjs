@@ -33,11 +33,18 @@ try {
     const p = await b.newPage({ viewport: { width: W, height: H } });
     await p.goto(BASE); await p.locator('#go').click({ force: true }); await clearDraw(p);
     const seen = [];
+    const touch = [];
     for (const id of EVERY) {
       await p.evaluate((id) => window['__' + id](true), id); await p.waitForTimeout(400);
       // 구르는 창은 끝까지 굴린 자리에서도 잰다. 내용이 닫기를 덮는 것은 굴린 뒤다.
       await p.evaluate((id) => { for (const e of document.querySelectorAll('#' + id + ', #' + id + ' *')) if (e.scrollHeight > e.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(e).overflowY)) e.scrollTop = e.scrollHeight; }, id);
       await p.waitForTimeout(200);
+      // 창 안의 전환 칸도 손가락 바닥을 지킨다. 탭이 아닌 전환(이적시장 키퍼/키커)과 위키 분류다.
+      const SWITCHES = { shop: '.pull-bar .roles button', wiki: '.cats button' };
+      if (H < 520 && SWITCHES[id]) touch.push(await p.evaluate(([id, sel]) => {
+        const b = [...document.querySelectorAll('#' + id + ' ' + sel)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
+        return { id, n: b.length, small: b.length ? Math.round(Math.min(...b.map((r) => Math.min(r.width, r.height)))) : 0 };
+      }, [id, SWITCHES[id]]));
       seen.push(await p.evaluate((id) => {
         const c = document.querySelector('#' + id + ' > .close');
         if (!c) return { id, none: true };
@@ -53,6 +60,14 @@ try {
     check(tag + ':instrument:every-panel-has-a-close', seen.every((s) => !s.none), seen.filter((s) => s.none).map((s) => s.id).join(', ') || EVERY.length + ' panels');
     check(tag + ':shell:close-stands-in-one-place-across-panels', seen.every((s) => s.c && Math.abs(s.c[0] - base.c[0]) <= TOL && Math.abs(s.c[1] - base.c[1]) <= TOL), seen.map((s) => s.id + ' ' + (s.c || []).join(',')).join(' | '));
     check(tag + ':shell:close-is-on-top-after-the-roll', seen.every((s) => s.hit && s.inView), seen.filter((s) => !s.hit || !s.inView).map((s) => s.id).join(', ') || 'all');
+    if (H < 520) check(tag + ':shell:panel-switches-clear-the-touch-floor', touch.length === 2 && touch.every((t) => t.n > 0 && t.small >= 44), touch.map((t) => t.id + ' ' + t.n + ' smallest ' + t.small + 'px').join(', '));
+    if (W === 740) {
+      const plant = await p.addStyleTag({ content: '#shop .pull-bar .roles button{min-height:0!important}' });
+      await p.evaluate(() => window.__shop(true)); await p.waitForTimeout(300);
+      const low = await p.evaluate(() => Math.round(Math.min(...[...document.querySelectorAll('#shop .pull-bar .roles button')].map((e) => e.getBoundingClientRect().height))));
+      await p.evaluate(() => window.__shop(false)); await plant.evaluate((n) => n.remove());
+      check(tag + ':control:a-switch-without-its-floor-falls-under-44', low < 44, 'planted switch ' + low + 'px');
+    }
     // 대조군. 한 창의 닫기를 흐름으로 되돌리면 그 창만 자리가 달라져 위 축이 빨개져야 계기가 산다.
     if (W === 1280) {
       const plant = await p.addStyleTag({ content: '#gym > .close{position:static!important;translate:none!important}' });
