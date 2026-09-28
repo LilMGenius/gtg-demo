@@ -7,10 +7,9 @@ categories: [drill]
 aliases: [drill]
 relations:
   relatedTo: [gear]
-valueFrom: 'wallet.COIN_DRILL'
 ---
 판이 끝나면 훈련 기회가 두 번 쌓인다
 
 [[drill|훈련]]은 능력 한 칸을 올린다
 
-올릴 칸이 없으면 훈련 한 회가 {{value}} 골드로 바뀐다
+능력치에는 상한이 없다. 열을 넘으면 한 칸이 버는 몫이 점점 줄어든다

@@ -103,7 +103,7 @@ try {
   const three = await p.evaluate(() => window.__points());
   check("offline:one-hour-away-pays-exactly-three", three === 3, String(three));
 
-  // 만렙 데드락. 전 스탯 10인 저장에 밀린 훈련이 쌓여도 진행이 멈추면 안 된다.
+  // 무릎 저장. 전 스탯 10인 저장에 밀린 훈련이 쌓여도 진행이 멈추면 안 된다. 능력치에 상한이 없으므로 훈련장도 열려 있다.
   // 강제 팝업을 훈련장 패널로 옮긴 뒤에도 같은 상황을 다시 잰다. 문턱은 그대로다.
   await p.evaluate(() => {
     const s = JSON.parse(localStorage.getItem(window.__saveKey()));
@@ -122,7 +122,7 @@ try {
   // 타이틀이 화면을 덮고 있는 동안은 HUD 버튼을 눌러도 타이틀이 받는다. 먼저 들어가야 한다.
   await p.click('#go', { force: true });
   await p.waitForTimeout(900);
-  // 열자마자 아무것도 못 고르는 상태여야 정상이다. 칸은 열다섯 그대로고 전부 잠긴다.
+  // 칸은 열다섯 그대로고 전부 눌린다. 10은 체감 곡선의 무릎일 뿐 상한이 아니다.
   await p.click('#gymBtn', { force: true });
   await p.waitForTimeout(300);
   const panel = await p.evaluate(() => {
@@ -130,9 +130,9 @@ try {
     const bs = [...g.querySelectorAll('.row button')];
     return { open: !g.hidden, n: bs.length, live: bs.filter((b) => !b.disabled).length, close: !!g.querySelector('.close') };
   });
-  check('maxed:gym-opens-with-fifteen-locked-stats', panel.open && panel.n === 15 && panel.live === 0, JSON.stringify(panel));
+  check('maxed:gym-opens-with-fifteen-open-stats', panel.open && panel.n === 15 && panel.live === 15, JSON.stringify(panel));
   check('maxed:panel-always-carries-a-way-out', panel.close, String(panel.close));
-  // 고를 게 없는 패널이 포인트를 삼키면 안 된다. 닫고 나서도 열둘 그대로여야 한다.
+  // 열고 고르지 않고 닫은 패널이 포인트를 삼키면 안 된다. 닫고 나서도 열둘 그대로여야 한다.
   await p.click('#gym .close', { force: true });
   await p.waitForTimeout(300);
   const kept = await p.evaluate(() => window.__points());

@@ -123,8 +123,9 @@ try {
 
   // 값을 말하는 판 셋. 상점과 선수단은 훅으로 열리고 훈련장은 버튼으로만 열린다.
   // 아는 얼굴은 라포가 쌓여야 만남 줄이 서므로 신규 표본에서는 잴 값이 없다.
-  const panes = [["shop", "__shop"], ["roster", "__roster"], ["gym", null]];
-  for (const [id, hook] of panes) {
+  // 셋째 칸은 값이 서는 판인가다. 훈련장은 환전 줄이 능력치 상한과 함께 사라져 값이 없고, 글자 축만 잰다.
+  const panes = [["shop", "__shop", true], ["roster", "__roster", true], ["gym", null, false]];
+  for (const [id, hook, priced] of panes) {
     if (hook) await p.evaluate((h) => { window[h](true); }, hook);
     else await p.click("#gymBtn", { force: true });
     await p.waitForTimeout(320);
@@ -164,10 +165,12 @@ try {
     check("price:" + id + "-says-no-currency-in-letters", seenAll === "", seenAll || "clean over " + tabs.length + " view(s)");
     check("unit:" + id + "-counts-rounds-in-the-new-word", unitAll === "", unitAll || "clean over " + tabs.length + " view(s)");
     check("prose:" + id + "-joins-values-with-words-not-a-bullet", dotAll === "", dotAll || "clean over " + tabs.length + " view(s)");
-    check("price:" + id + "-every-price-carries-the-icon", total > 0 && blind === 0,
-      total + " prices, " + blind + " without an icon");
-    // 값을 하나도 안 그린 선반은 잰 것이 없다. 그 선반이 앞의 축을 초록으로 만들지 않도록 따로 적는다.
-    check("instrument:" + id + "-every-view-had-a-price", dark.length === 0, dark.join(", ") || "all views priced");
+    if (priced) {
+      check("price:" + id + "-every-price-carries-the-icon", total > 0 && blind === 0,
+        total + " prices, " + blind + " without an icon");
+      // 값을 하나도 안 그린 선반은 잰 것이 없다. 그 선반이 앞의 축을 초록으로 만들지 않도록 따로 적는다.
+      check("instrument:" + id + "-every-view-had-a-price", dark.length === 0, dark.join(", ") || "all views priced");
+    } else check("price:" + id + "-draws-no-price", total === 0, total + " prices");
     if (hook) await p.evaluate((h) => { window[h](false); }, hook);
     else await p.click("#gym .close", { force: true });
     await p.waitForTimeout(120);

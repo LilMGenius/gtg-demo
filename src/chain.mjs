@@ -14,7 +14,7 @@ export const X_MAX = GOAL_HALF_W - 0.4;
 // 서서 뻗는 0.45단위는 약 0.75m다(P15 HOTL 가설).
 const STAND = 0.45;
 // 옆걸음은 민첩성 1~10에서 약 1.9~4.0m/s가 된다(P15 HOTL 가설).
-export const moveSpeed = (keeper) => 1.0 + 0.14 * clamp(keeper.agility, 1, 10);
+export const moveSpeed = (keeper) => 1.0 + 0.14 * clamp(simStats(keeper).agility, 1, STAT_TOP);
 
 // 서서 손을 뻗었을 때 닿는 기준선. 수직 반경은 여기서부터 잰다.
 const SHOULDER = 0.90;
@@ -84,6 +84,28 @@ export function makeRng(seed) {
 }
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+/* 상한 없는 능력치. 저장된 값은 훈련한 만큼 끝없이 오르고, 판정은 그 값을 체감 곡선에 통과시킨 실효값을 읽는다.
+   10까지는 그대로라 지금까지 잰 밸런스가 한 칸도 안 움직이고, 10을 넘는 몫은 쌍곡선으로 줄어 STAT_TOP에 점근한다.
+   식은 방어력 A가 피해를 A/(A+100)만큼 줄이는 방식과 같은 꼴이다. 상한이 없어도 한 칸의 몫이 계속 줄어,
+   하루 방치로 수십 칸이 쌓여도 퍼센트가 빨리 오르지 않는다. 10에서 한 칸은 실효 0.5칸, 20에서는 0.125칸이다. */
+export const STAT_KNEE = 10;
+export const STAT_TOP = 15;
+// 위키와 게이트가 곡선을 보이는 표본. 무릎, 무릎 너머 둘, 먼 값 둘이다.
+export const CURVE_SAMPLES = [10, 15, 20, 40, 100];
+const STAT_HALF = 10;
+export function statValue(v) {
+  const n = Number(v) || 0;
+  if (n <= STAT_KNEE) return n;
+  const over = n - STAT_KNEE;
+  return STAT_KNEE + (STAT_TOP - STAT_KNEE) * over / (over + STAT_HALF);
+}
+// 판정에 들어가는 키퍼. 10을 넘는 칸이 없으면 같은 객체를 돌려준다. 판정이 적는 연속 실점과 기복이 원본에 그대로 남는다.
+function simStats(keeper) {
+  if (!keeper || !GROWABLE.some((k) => keeper[k] > STAT_KNEE)) return keeper;
+  const out = { ...keeper };
+  for (const k of GROWABLE) out[k] = statValue(keeper[k]);
+  return out;
+}
 const pct = (rng, p) => rng() * 100 < p;
 
 export function newKeeper() {
@@ -228,7 +250,7 @@ export function buildSet(rng, level = 5, city = 0, pool) {
 // 서 있는 자리가 밀린 거리. 앞에서 한 칸이 크고 뒤에서 작다.
 // 가설: 커버 배수 4.44, 지수 0.2는 0.01 간격 첫 통과값으로 칩 대가 뒤 순이득을 0.5~2%p에 둔다.
 function lateralGap(offball) {
-  const d = 10 - clamp(offball, 1, 10);
+  const d = Math.max(0, 10 - clamp(offball, 1, STAT_TOP));
   return Math.sqrt(d) * K_LAT * 2.6 - K_LAT * 3 * (4.44 - 2.6) * ((9 - d) / 9) ** 0.2;
 }
 
@@ -244,8 +266,9 @@ function placement(keeper, shot) {
    화면의 타이밍 자가 이 값을 그대로 그린다. 두 곳에서 각자 구하면 그린 창과 재는 창이 갈리고,
    플레이어가 자를 못 믿게 되는 순간 그 자는 없느니만 못하다. */
 export function judgeWindow(keeper, shot, input, over) {
+  keeper = simStats(keeper);
   const form = keeper.form || 0;
-  const s = (k) => clamp((over && k in over ? over[k] : keeper[k]) + form, 1, 10);
+  const s = (k) => clamp((over && k in over ? over[k] : keeper[k]) + form, 1, STAT_TOP);
   const power = over && "kickerPower" in over ? over.kickerPower : shot.kicker.power;
   const flight = clamp(1.05 - power * 0.05 - (shot.strong ? 0.1 : 0), 0.55, 1.1);
   // 판정 창과 기동. 반응속도가 인지이고 민첩성이 기동이다.
@@ -293,7 +316,7 @@ function bareContactMargin(keeper, shot, input, over) {
   const positional = Array.isArray(input.trace);
   if (positional) input = positionDive(keeper, shot, input, over);
   const form = keeper.form || 0;
-  const s = (k) => clamp((over && k in over ? over[k] : keeper[k]) + form, 1, 10);
+  const s = (k) => clamp((over && k in over ? over[k] : keeper[k]) + form, 1, STAT_TOP);
   const k = shot.kicker;
   const power = over && "kickerPower" in over ? over.kickerPower : k.power;
   // 프로브는 한 칸만 움직인다. 커브를 절반으로 줄이면 한 칸이 아니라 다섯 칸을 준 것이 된다.
@@ -385,6 +408,7 @@ function attributeContact(keeper, shot, input) {
 // 손가락이 만든 실패와 스탯이 만든 실패를 갈라놓는 것이 공정성의 전부이므로,
 // 여기서 나온 실패는 손가락 셋으로 귀속하고 스탯 원장에 섞지 않는다.
 export function autoInput(keeper, shot, rng) {
+  keeper = simStats(keeper);
   const j = keeper.judgement;
   // 가설: 등급당 방향 판단 0.03은 같은 판단력에도 값을 주고 완전 수동 1.0 아래에 둔다.
   const readP = Math.min(0.999, 0.34 + j * 0.065 + (keeper.botTier || 0) * 0.03) * 100;
@@ -421,6 +445,7 @@ function positionAt(trace, ms, fallback) {
 
 // 접촉 때 한 번 확정한다. 선택 난수를 주면 U1의 이동 역이용도 같은 값으로 재현한다.
 export function aimAt(keeper, shot, preTrace, rng) {
+  keeper = simStats(keeper);
   if (shot.aimed) return shot;
   const trace = preTrace.filter(p => p.ms <= 0);
   const raw = { trace, x: trace.at(-1)?.x || 0 };
@@ -446,12 +471,14 @@ export function aimAt(keeper, shot, preTrace, rng) {
 
 // K6의 옆 다이빙 약 600ms와 상단 약 1000ms를 기준으로 한 P15-U1b HOTL 계수다.
 export function diveNeed(keeper, dist) {
+  keeper = simStats(keeper);
   // 몸 앞 0.45단위는 서서 막고, 출발 120ms와 2.0+0.1D 단위/s를 밀리초로 환산한다.
-  return dist <= STAND ? 0 : 120 + (dist - STAND) / (2.0 + 0.1 * clamp(keeper.diving, 1, 10)) * 1000;
+  return dist <= STAND ? 0 : 120 + (dist - STAND) / (2.0 + 0.1 * clamp(keeper.diving, 1, STAT_TOP)) * 1000;
 }
 
 export function diveTrigger(keeper, shot, x, t) {
-  const reflex = clamp(keeper.reflex, 1, 10);
+  keeper = simStats(keeper);
+  const reflex = clamp(keeper.reflex, 1, STAT_TOP);
   // P15-U1b HOTL: 반응 하한 280-12R ms, 안전 여유 60-4R ms라 숙련자는 더 오래 움직인다.
   return t >= 280 - 12 * reflex && shot.flight * 1000 - t <= diveNeed(keeper, Math.abs(shot.aimX - x)) + 60 - 4 * reflex;
 }
@@ -459,7 +486,7 @@ export function diveTrigger(keeper, shot, x, t) {
 // 선형 자취의 각 구간과 서서 막는 경계를 나눠 최초 발동을 찾는다. 고정 시간 샘플링은 쓰지 않는다.
 function triggerOnTrace(keeper, shot, trace, fallback) {
   // 발동 탐색의 양끝은 반응 하한과 공 도착이다. 단위는 ms다.
-  const rt = 280 - 12 * clamp(keeper.reflex, 1, 10), arrival = shot.flight * 1000;
+  const rt = 280 - 12 * clamp(keeper.reflex, 1, STAT_TOP), arrival = shot.flight * 1000;
   const samples = trace.filter(p => Number.isFinite(p.ms) && Number.isFinite(p.x)).sort((a,b) => a.ms-b.ms);
   const at = t => positionAt(samples, t, fallback);
   const knots = [rt, ...samples.map(p => p.ms).filter(t => t > rt && t < arrival), arrival];
@@ -481,7 +508,7 @@ function triggerOnTrace(keeper, shot, trace, fallback) {
     if (fires(leftTime)) return { ...at(leftTime), triggerMs: leftTime };
     if (fires(rightTime)) {
       // 구간 내부에서 거리와 남은 시간은 선형이다. U1 보간처럼 두 끝으로 교점을 직접 구한다.
-      const gap = t => diveNeed(keeper, Math.abs(shot.aimX-at(t).x)) + 60 - 4*clamp(keeper.reflex,1,10) + t-arrival;
+      const gap = t => diveNeed(keeper, Math.abs(shot.aimX-at(t).x)) + 60 - 4*clamp(keeper.reflex, 1, STAT_TOP) + t-arrival;
       const left = gap(leftTime), right = gap(rightTime);
       const root = leftTime + (rightTime-leftTime)*(-left)/(right-left);
       const triggerMs = Math.min(rightTime, root + 1e-7);
@@ -495,6 +522,7 @@ function triggerOnTrace(keeper, shot, trace, fallback) {
 
 // U1 봇의 접촉 전 자리를 유지하고 접촉 뒤에는 실제 이동 속도로 공을 따라간다.
 export function reactTrace(keeper, shot, trace, reactionMs, aimX = shot.aimX) {
+  keeper = simStats(keeper);
   const x = trace.at(-1).x, target = clamp(aimX, -X_MAX, X_MAX);
   const arrival = shot.flight * 1000;
   const finish = reactionMs + Math.abs(target-x)/moveSpeed(keeper)*1000;
@@ -509,7 +537,7 @@ export function reactTrace(keeper, shot, trace, reactionMs, aimX = shot.aimX) {
 }
 
 function positionDive(keeper, shot, raw, over) {
-  const j = clamp(over?.judgement ?? keeper.judgement, 1, 10);
+  const j = clamp(over?.judgement ?? keeper.judgement, 1, STAT_TOP);
   const rel = shot.aimX - raw.x;
   // 몸 앞은 오독 없이 서고, 비행 중 방향 단서는 휨과 칩에서 흐려진다는 P15 가설이다.
   // P15-U1b HOTL: 비행 중 직선 공은 기저 0.90, 판단당 0.008로 거의 오독하지 않는다. 휨 0.20/단위와 칩 0.16은 속임 단서를 남긴다.
@@ -536,8 +564,9 @@ function positionInput(keeper, shot, raw, rng) {
 
 // 봇은 접촉 전 계획과 접촉 뒤 추적을 잇는다. 소비자는 trace.aimedShot을 같은 공으로 쓴다.
 export function botPlan(keeper, shot, rng) {
+  keeper = simStats(keeper);
   // P15 가설: 오프더볼 1의 표준편차 0.12단위가 만렙에서 사라진다.
-  const sigma = 0.12 * (10 - clamp(keeper.offball, 1, 10)) / 9;
+  const sigma = 0.12 * Math.max(0, 10 - clamp(keeper.offball, 1, STAT_TOP)) / 9;
   // 새 경로 전용 난수: Box-Muller 표준정규 변환으로 위치 오차의 표준편차를 맞춘다.
   const noise = Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng()) * sigma;
   const start = clamp(noise, -X_MAX, X_MAX);
@@ -559,11 +588,11 @@ export function botPlan(keeper, shot, rng) {
   trace.push({ ms: 0, x: start + Math.sign(target - start) * Math.min(Math.abs(target - start), moveSpeed(keeper) * tMove / 1000) });
   const aimed = aimAt(keeper, shot, trace);
   // P15-U1b HOTL: 판단 1~10의 반응은 335~200ms이며 인간 시험값 250ms와 교차한다.
-  return reactTrace(keeper, aimed, trace, 350 - 15 * clamp(keeper.judgement, 1, 10));
+  return reactTrace(keeper, aimed, trace, 350 - 15 * clamp(keeper.judgement, 1, STAT_TOP));
 }
 
 export function resolve(input) {
-  const keeper = input.keeper;
+  const keeper = simStats(input.keeper);
   let shot = input.shot;
   const rng = input.rng;
   let raw = input.input || autoInput(keeper, shot, rng);
@@ -592,6 +621,7 @@ export function resolve(input) {
   const done = (conceded, cause, untested) => {
     // 연속 실점은 상태로 남는다. 다음 구의 판정 창을 회복탄력성이 방어한다.
     keeper.streak = conceded ? (keeper.streak || 0) + 1 : 0;
+    if (keeper !== input.keeper) input.keeper.streak = keeper.streak;
     events.push({ t: "result", line: conceded ? "실점" : "세이브", cause: cause || null });
     // 유명한 키커를 막으면 더 오르고, 유명한 키커에게 먹히면 덜 오른다. STATS 4절의 M 경로다.
     return { events, conceded, cause: conceded ? cause : null, stage: state.stage, rolls: state.rolls,
@@ -612,7 +642,8 @@ export function resolve(input) {
   // 0단 배치. 나가서 생긴 사고와 안 와도 될 공에 누운 사고는 같은 판단에서 나온다.
   // 한 단계는 롤 하나를 쓴다. 두 사고는 같은 난수를 구간으로 나눠 가른다.
   const centerish = shot.course === "정면" || shot.chip;
-  const overP = shot.chip ? Math.max(0, (clamp(keeper.offball, 1, 10) - 3) * 5 + shot.kicker.flair * 4 + (place.depth + inp.advance > 1.0 ? 30 : 0)) : 0;
+  // 위험 쪽 항은 무릎에서 멈춘다. 10을 넘는 훈련이 이득 항만 키우고 제 칸의 대가를 더 키우지 않게 한다.
+  const overP = shot.chip ? Math.max(0, (clamp(keeper.offball, 1, STAT_KNEE) - 3) * 5 + shot.kicker.flair * 4 + (place.depth + inp.advance > 1.0 ? 30 : 0)) : 0;
   const diveP = centerish && inp.dive !== 0 ? Math.max(0, keeper.diving * 4.2 - keeper.judgement * 3.4) : 0;
   // 한눈팔기. 행인이 지나가는 구에서만 열리고 집중력이 소유한다.
   // 같은 단계의 사고는 롤 하나를 구간으로 나눠 가른다. 새 롤을 뒤면 한 구가 일곱 번 굴러간다.
@@ -625,7 +656,7 @@ export function resolve(input) {
   // 말 걸기. 의사소통이 여는 사고다. 눈으로 따라가는 것과 입을 여는 것은 다른 사건이다.
   // 팔로워를 버는 칸이 같은 자리에서 골을 먹인다. 이 칸이 양날인 이유가 그것이다.
   // 같은 약이 이 구간도 줄인다. talked가 줄면 followerGain의 flair 2.2배가 같이 사라져 교환이 된다.
-  const talkP = shot.gaze ? Math.max(0, keeper.communication * keeper.mischief * 0.55) * focusAid : 0;
+  const talkP = shot.gaze ? Math.max(0, Math.min(keeper.communication, STAT_KNEE) * Math.min(keeper.mischief, STAT_KNEE) * 0.55) * focusAid : 0;
   if (wideP > 0 || overP > 0 || diveP > 0 || gazeP > 0 || talkP > 0) {
     const d = draw();
     /* 헛구가 이 구간의 맨 앞이다. 키커가 못 맞히면 키퍼가 무엇을 하려 했는지는 물을 일이 없다.
@@ -696,7 +727,7 @@ export function resolve(input) {
   const rosin = input.rosin ? 1 : 0;
   let gloveP = keeper.handling <= 4 ? Math.max(0, (5 - keeper.handling) * 5 - (grip + rosin) * GRIP_TEAR) : 0;
   // 훈련이 자란 만큼 감산을 유계 승산으로 넘겨 마지막 등급이 확률 바닥에 지워지지 않는다.
-  const rookieShare = (10 - clamp(keeper.handling, 1, 10)) / 9;
+  const rookieShare = Math.max(0, 10 - clamp(keeper.handling, 1, STAT_TOP)) / 9;
   let spillP = Math.max(0, 100 - (34 + keeper.handling * 6 + (grip + rosin) * GRIP_SPILL * rookieShare + LOCKED.punching * -4));
   // 가산 위 유계 승산: 미훈련 손의 실패 몫과 비교해 만렙의 장갑과 유니폼도 산다.
   const carry0 = shot.strong ? Math.max(0, 40 - 4.4 - brace) : 0;
@@ -754,7 +785,7 @@ export function resolve(input) {
     }
     // 양말 등급. 앞의 셋과 같은 이유로 선반 밖의 값은 잘라 넣는다.
     const socks = Math.min(3, Math.max(0, Math.floor(Number(input.socks) || 0)));
-    const landing = Math.max(0, (10 - keeper.balance) * 11 + keeper.diving * 2 - socks * SOCK_LAND);
+    const landing = Math.max(0, Math.max(0, 10 - keeper.balance) * 11 + keeper.diving * 2 - socks * SOCK_LAND);
     const downed = inp.dive !== 0 && roll(landing);
     // 무거우면 일어나는 데 시간이 더 든다.
     const reboundWindow = (18 + keeper.reflex * 4.5) * (1 - (keeper.weight - 84) * 0.006);
@@ -780,7 +811,7 @@ export function resolve(input) {
   // 4단 악동. 돌진이 잠긴 v0.2에서는 시행이 구마다 하나로 고정이다.
   // 돌진은 분모만 늘리는 칸이므로, 잠긴 동안 분모를 다른 칸에서 빌려 오면 두 칸이 한 칸이 된다.
   state.stage = 4;
-  if (!roll(keeper.mischief * 4.6 * (1 + LOCKED.charge * 0.2))) {
+  if (!roll(Math.min(keeper.mischief, STAT_KNEE) * 4.6 * (1 + LOCKED.charge * 0.2))) {
     say("save", "잡고 끝냈습니다. 세이브입니다.", null);
     return done(false, null);
   }
@@ -809,9 +840,10 @@ export function ballInHand(result) {
 // 재시작 템포. 판 수가 시간당 수익과 성장을 정하므로 이 식이 회전율을 소유한다.
 // 공이 손에 있으면 스로잉이, 그물이나 필드에 있으면 골킥이 임자다.
 export function restartDelay(keeper, result) {
-  const rise = result.events.some((e) => e.t === "downed") ? (10 - clamp(keeper.balance, 1, 10)) * 0.25 : 0;
+  keeper = simStats(keeper);
+  const rise = result.events.some((e) => e.t === "downed") ? Math.max(0, 10 - clamp(keeper.balance, 1, STAT_TOP)) * 0.25 : 0;
   // 먹힌 뒤 고개를 드는 시간. 회복탄력성이 짧게 만든다.
-  const shake = result.conceded ? (10 - clamp(keeper.resilience, 1, 10)) * 0.22 : 0;
+  const shake = result.conceded ? Math.max(0, 10 - clamp(keeper.resilience, 1, STAT_TOP)) * 0.22 : 0;
   if (ballInHand(result)) return Math.max(1.6, 4.0 - 0.20 * keeper.throwing - 0.06 * LOCKED.pass) + rise + shake;
   return Math.max(2.4, 6.5 - 0.26 * keeper.goalKick - 0.09 * LOCKED.firstTouch) + rise + shake;
 }
@@ -820,6 +852,7 @@ export function restartDelay(keeper, result) {
 // 동네 등급은 소문의 배율이다. 사람이 많은 곳에서 막을수록 더 퍼진다.
 // look은 외형 선반 승수다. 판정에는 안 들어가고 소문에만 붙는다.
 export function followerGain(keeper, result, city = 0, look = 1, boost = 1, rapport = 1, social = 1) {
+  keeper = simStats(keeper);
   const saved = !result.conceded;
   /* 키퍼가 손을 안 댄 구는 화제가 안 된다. 막아 낸 것이 아니라 상대가 못 찬 것이기 때문이다.
      세이브와 같은 값을 주면 못 차는 키커를 세우는 쪽이 이득이 되어 선택이 거꾸로 선다.
@@ -830,12 +863,12 @@ export function followerGain(keeper, result, city = 0, look = 1, boost = 1, rapp
        34는 실점 쪽의 천장 위다. 먹힌 구는 기본 8에 명성 항이 최대 20까지 붙어 28까지 오르므로,
        20으로 두면 유명한 키커에게 먹히는 쪽이 헛구보다 화제가 되어 순서가 뒤집힌다.
        세이브 쪽 바닥은 기본 40에 명성 9라 49다. 34는 그 아래다. */
-    const talkTerm = 6 * clamp(keeper.communication, 1, 10) + 3 * clamp(keeper.mischief, 1, 10);
+    const talkTerm = 6 * clamp(keeper.communication, 1, STAT_TOP) + 3 * clamp(keeper.mischief, 1, STAT_TOP);
     return Math.round((34 + talkTerm) * (1 + CITY_CROWD * clamp(city, 0, 3)));
   }
   const flair = result.events.some((e) => e.t === "beat" || e.t === "charge" || e.t === "talked");
   const base = saved ? 40 : 8;
-  const talk = 6 * clamp(keeper.communication, 1, 10) + 3 * clamp(keeper.mischief, 1, 10);
+  const talk = 6 * clamp(keeper.communication, 1, STAT_TOP) + 3 * clamp(keeper.mischief, 1, STAT_TOP);
   const fame = clamp(result.fame || 1, 1, 10) * (saved ? 9 : 2);
   const crowd = 1 + CITY_CROWD * clamp(city, 0, 3);
   // boost는 바이럴 떡밥이고 social은 맞팔이다. 넷 다 판정 밖 축이라 곱셈 인자가 따로 선다.
@@ -855,7 +888,7 @@ export function growthGain(keeper, rng) {
 }
 
 export function growthOffer(rng, keeper) {
-  const pool = GROWABLE.filter((k) => keeper[k] < 10);
+  const pool = GROWABLE.slice();
   const out = [];
   while (out.length < 3 && pool.length) out.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
   return out;

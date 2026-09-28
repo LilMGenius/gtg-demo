@@ -7,12 +7,15 @@
 
 import { GROWABLE } from '../../../src/ledger.mjs';
 
-// 스탯 상한. main.mjs 훈련장의 만렙 판정과 같은 값이어야 주입된 표본이 실제 만렙이 된다.
+// 체감 곡선의 무릎. 능력치에 상한은 없고, 이 값까지는 한 칸이 한 칸이다(chain.mjs STAT_KNEE).
 const STAT_MAX = 10;
 
-// 만렙 표본에 훈련을 5회 남긴다. 0이면 올릴 칸도 없고 쓸 훈련도 없어
-// 잉여 훈련 환전 경로가 화면에 아예 안 뜬다. 그 경로까지 재려면 남은 훈련이 있어야 한다.
+// 무릎 표본에 훈련을 5회 남긴다. 10을 넘는 훈련이 실제로 쌓이는지를 재려면 쓸 훈련이 있어야 한다.
 export const MAXED_POINTS = 5;
+
+// 완봉 한 판 몫의 지갑. 가장 싼 1등급 140에 못 미쳐 아무것도 못 사지만 0은 아니라,
+// 값 자리가 모자란 액수가 아니라 정가를 적는지를 이 지갑에서 가를 수 있다.
+export const POCKET_COIN = 60;
 
 /* 첫 진입이 어디까지 왔는가. 0은 키퍼 한 장, 1은 키커 열 장, 2는 끝난 상태다.
    저장에 실리는 칸이라 그 뜻은 상태 쪽이 소유하고, main의 개봉 단계가 이 수를 읽는다.
@@ -39,7 +42,7 @@ export const TICKETS_HELD = 12;
 
 // 프리셋은 상태를 바꾸는 함수다. 값 덩어리로 두면 어느 칸이 정본인지가 호출부로 샌다.
 const PRESETS = {
-  // 성장 칸 전부 상한. 체격 둘과 히든은 GROWABLE 밖이라 손대지 않는다.
+  // 성장 칸 전부 체감 곡선의 무릎. 체격 둘과 히든은 GROWABLE 밖이라 손대지 않는다.
   maxed(state) {
     // 정본은 squad[pick]이다. keeper는 같은 객체이므로 한쪽만 쓰면 된다.
     const head = state.squad[state.pick];
@@ -54,6 +57,9 @@ const PRESETS = {
   },
   // 팔로워만 채운다. 팔로워는 0에서 시작하고 아래로 안 내려가므로,
   // 잃는 쪽을 재는 게이트는 신규 저장에서 감소가 0으로 보여 관측 자체가 안 된다.
+  pocket(state) {
+    state.wallet.coin = POCKET_COIN;
+  },
   famous(state) {
     state.fans = START_FANS;
   },

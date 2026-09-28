@@ -32,9 +32,9 @@ export function impactBase(keeper, city = 0, sets = IMPACT_SETS) {
   return sample(keeper, Math.max(1, keeper.level || 1), city, sets);
 }
 
-// cap보다 낮은 칸만 잰다. 반환은 세이브 퍼센트포인트 차와 팔로워 증가율.
-export function statImpact(keeper, stat, base, city = 0, sets = IMPACT_SETS, cap = 10) {
-  if (!GROWABLE.includes(stat) || keeper[stat] >= cap) return null;
+// 반환은 세이브 퍼센트포인트 차와 팔로워 증가율. 상한이 없으므로 어느 값에서든 잰다.
+export function statImpact(keeper, stat, base, city = 0, sets = IMPACT_SETS) {
+  if (!GROWABLE.includes(stat)) return null;
   const after = sample({ ...keeper, [stat]: keeper[stat] + 1 }, Math.max(1, keeper.level || 1), city, sets);
   const save = after.save - base.save;
   const fans = base.fans > 0 ? (after.fans / base.fans - 1) * 100 : 0;

@@ -8,7 +8,6 @@ import { makeRng, buildSet, resolve, newKeeper, keeperAtLevel } from "./position
 import { autoTrain, trainStat, TRAINING_PRIORITY, SAVE_PATH, LAG } from "../web/src/state/coach.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 import { readFileSync } from "node:fs";
-import { COIN_DRILL } from "../web/src/state/wallet.mjs";
 
 /* 방치해도 나빠지지 않는다는 축은 제품의 자동 훈련 사다리를 읽는다.
    스탯을 고정한 사다리는 제품이 아니라 훈련 없는 대조군이다. 그 하락도 따로 확인해야
@@ -22,7 +21,6 @@ import { COIN_DRILL } from "../web/src/state/wallet.mjs";
    가드 C: 인접 표본 변화량을 레벨 차이로 나눈다. 레벨당 하락 1.0 이하, 상승 8.0 이하이다.
    표본 레벨은 1, 3, 5, 8, 13이므로 간격은 2, 2, 3, 5다. 표본당 변화와 레벨당 변화는 다르다.
    가드 D: balance BASE 감시 결과 불변, growth와 tempo와 cause와 gym 초록.
-   가드 E: COIN_DRILL은 24/N으로 나누어 만렙의 판당 환전을 24 골드로 유지한다.
    레벨마다 2000 시드와 다섯 슛, 기존 완전 입력을 사용한다.
    공통 대조군: 25.60 → 25.60 → 24.09 → 21.32 → 17.49.
    공통 세 포인트 참고선: 25.77 → 28.46 → 28.64 → 29.05 → 29.88.
@@ -79,7 +77,8 @@ check("coach:capped-priority-advances", next.lines[0].stat === TRAINING_PRIORITY
 check("coach:input-is-unchanged", GROWABLE.every((k) => base[k] === 3), "frozen input retains all stats at 3");
 const capped = Object.freeze(Object.assign({}, base, Object.fromEntries(GROWABLE.map((k) => [k, 10])), { diving: 9 }));
 const finish = autoTrain(capped, 5, () => 0);
-check("coach:cap-retains-unused-budget", finish.spent === 1 && finish.keeper.diving === 10, JSON.stringify(finish.lines) + ", remaining=" + (5 - finish.spent));
+// 능력치에 상한이 없으니 무릎(10)에 선 칸도 계속 오른다. 예산이 남아 쌓이면 방치가 멈춘다.
+check("coach:spends-whole-budget-past-the-knee", finish.spent === 5 && finish.lines.some((l) => l.after > 10), JSON.stringify(finish.lines) + ", remaining=" + (5 - finish.spent));
 let emptyRolls = 0;
 const empty = autoTrain(base, 0, () => { emptyRolls += 1; return 0; });
 check("coach:zero-budget-does-not-roll", empty.spent === 0 && emptyRolls === 0 && empty.keeper === base, "spent=" + empty.spent + ", rolls=" + emptyRolls);
@@ -186,7 +185,6 @@ check("manual:does-not-decay", manualOne.at(-1) >= manualOne[0], manualOne.map(F
 check("idle:ceiling", auto.at(-1) <= 44, F(auto.at(-1)) + " <= 44.00");
 const steps = auto.slice(1).map((v, i) => ({ gap: LEVELS[i + 1] - LEVELS[i], delta: Number((v - auto[i]).toFixed(2)), perLevel: (v - auto[i]) / (LEVELS[i + 1] - LEVELS[i]) }));
 check("idle:smoothness", steps.every(s => s.perLevel >= -1 && s.perLevel <= 8), "delta / levelGap in [-1, 8]: " + JSON.stringify(steps));
-check("economy:training-gold-per-set", POINTS_PER_SET === 2 && POINTS_PER_SET * COIN_DRILL === 24, POINTS_PER_SET + " * " + COIN_DRILL + " = " + POINTS_PER_SET * COIN_DRILL);
 const LINE = String.fromCharCode(10);
 if (notes.length) console.log(notes.map((x) => "  ok   " + x).join(LINE));
 if (fails.length) console.log(fails.map((x) => "  FAIL " + x).join(LINE));

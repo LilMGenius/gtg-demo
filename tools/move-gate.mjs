@@ -3,7 +3,8 @@ import * as chain from '../src/chain.mjs';
 
 // 최소 이천 시드의 다섯 슛을 자동과 수동 양쪽에서 고정한다.
 const SEEDS = 2000;
-const PIN = '6cc9c59dc3205ff3d49362a7e4f493c97e22031328a957c1422fba14932d4182';
+// 능력치 상한을 푼 뒤 다시 박았다. 바뀐 시드 271개(4000 중)는 전부 무릎 10을 넘는 칸이 있는 키퍼이고 무릎 아래는 한 구도 안 바뀌었다.
+const PIN = '2b98681622769ca2e7c341a78114132af189d7fc2cde507300f4db4a586b557a';
 const failures = [];
 function check(axis, ok, detail) {
   console.log(`${ok ? 'PASS' : 'FAIL'} move:${axis} ${detail}`);

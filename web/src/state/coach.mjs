@@ -1,4 +1,4 @@
-import { growthGain } from '../../../src/chain.mjs';
+import { growthGain, STAT_KNEE } from '../../../src/chain.mjs';
 import { GROWABLE } from '../../../src/ledger.mjs';
 
 /* tools/idle-gate.mjs의 같은 시드에서 능력 3과 6의 차이를 잰다. 레벨 13 내림차순이며 동률은 GROWABLE 순서다.
@@ -29,9 +29,10 @@ export const LAG = 1;
 
 // 손 훈련의 growthGain을 그대로 쓴다. 한 번 굴릴 때 한 포인트만 쓴다.
 export function trainStat(keeper, stat, rng) {
-  if (!GROWABLE.includes(stat) || keeper[stat] >= 10) return { keeper, spent: 0, lines: [] };
+  if (!GROWABLE.includes(stat)) return { keeper, spent: 0, lines: [] };
   const before = keeper[stat];
-  const after = Math.min(10, before + growthGain(keeper, rng));
+  // 능력치에 상한이 없다. 저장된 값은 끝없이 오르고 판정이 체감 곡선(chain.mjs statValue)을 씌운다.
+  const after = before + growthGain(keeper, rng);
   return { keeper: { ...keeper, [stat]: after }, spent: 1, lines: [{ stat, before, after }] };
 }
 
@@ -39,11 +40,10 @@ export function autoTrain(keeper, points, rng) {
   let trained = keeper;
   const lines = [];
   for (let spent = 0; spent < Math.floor(points); spent += 1) {
-    const pool = SAVE_PATH.filter(stat => trained[stat] < 10);
-    const minV = Math.min(...pool.map(stat => trained[stat]));
-    const stat = trained.handling < 10 ? "handling"
-      : pool.length ? TRAINING_PRIORITY.find(stat => pool.includes(stat) && trained[stat] <= minV + LAG)
-        : TRAINING_PRIORITY.find(stat => trained[stat] < 10);
+    // 핸들링을 체감 곡선의 무릎(10)까지 먼저 채우는 오프닝은 그대로다. 그 뒤는 세이브 칸을 최저 +LAG 안에서 목록 순서로 올린다.
+    const minV = Math.min(...SAVE_PATH.map(stat => trained[stat]));
+    const stat = trained.handling < STAT_KNEE ? "handling"
+      : TRAINING_PRIORITY.find(stat => SAVE_PATH.includes(stat) && trained[stat] <= minV + LAG);
     if (stat === undefined) break;
     const result = trainStat(trained, stat, rng);
     trained = result.keeper;

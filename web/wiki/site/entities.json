@@ -113,8 +113,7 @@
       ]
     },
     "title": "능력",
-    "type": "guide",
-    "valueFrom": "wallet.COIN_DRILL"
+    "type": "guide"
   },
   {
     "aliases": [

@@ -32,7 +32,7 @@ const SHELVES = [
 const WORN_AT = { frame: '설치', city: '이용' };
 const wornOf = (tab) => WORN_AT[tab] || '착용';
 const PAST = '보유';
-// 잉여 훈련 환전으로 들어오는 돈. MAXED_POINTS 5 × COIN_DRILL 12다.
+// 대조군 지갑. inject.mjs의 POCKET_COIN, 완봉 한 판 몫이다.
 // 지갑이 0이면 모자란 값과 정가가 같은 수라, 버튼이 어느 쪽을 적었는지 화면으로 못 가른다.
 // 가장 싼 1등급이 140이므로 이 돈으로는 여전히 아무것도 못 사고, 대조군의 뜻은 안 바뀐다.
 const GYM_COIN = 60;
@@ -144,9 +144,8 @@ try {
   }, [a, c, PIXEL_DELTA]);
 
   /* 대조군. 주입이 없으면 지갑이 비어 최상급 칸은 죽어 있다.
-     이게 없으면 본시험의 녹색은 버튼이 원래 늘 살아 있는 것과 구분되지 않는다.
-     maxed는 훈련장의 잉여 훈련 환전 줄을 여는 데 쓴다. 그 줄이 이 대조군의 지갑을 0에서 띄운다. */
-  await boot("?seed=20&preset=maxed,veteran");
+     이게 없으면 본시험의 녹색은 버튼이 원래 늘 살아 있는 것과 구분되지 않는다. */
+  await boot("?seed=20&preset=veteran");
   const emptyCoin = await p.evaluate(() => window.__wallet().coin);
   let poorTop = 0;
   for (const s of SHELVES) {
@@ -157,29 +156,13 @@ try {
   check("control:top-rank-is-dead-on-a-fresh-wallet", poorTop === SHELVES.length, poorTop + "/" + SHELVES.length);
   const deadPaint = await paintShot(SHELVES[0].tab);
 
-  /* 지갑을 조금 채운다. 주입이 아니라 사람이 도는 경로다. 남은 훈련을 환전하면 값이 들어오고,
-     그 뒤에도 버튼이 적는 수가 안 내려가야 그 수가 모자란 값이 아니라 값이다. */
-  await p.evaluate(() => window.__shop(false));
-  await p.waitForTimeout(160);
-  // 훈련장 문은 pointerdown으로 열린다. click()은 그 문을 안 건드리므로 창을 여는 훅으로 연다.
-  await p.evaluate(() => window.__gym(true));
-  await p.waitForTimeout(320);
-  const swapped = await p.evaluate(() => {
-    const sw = document.querySelector("#gym .swap");
-    if (!sw) return "no swap row";
-    if (sw.disabled) return "swap row is dead";
-    sw.click();
-    return "";
-  });
-  await p.waitForTimeout(200);
-  await p.evaluate(() => window.__gym(false));
-  await p.waitForTimeout(160);
-  await p.evaluate(() => window.__shop(true));
-  await p.waitForTimeout(300);
+  /* 지갑을 조금 채운 저장. 완봉 한 판 몫이라 사람이 한 판 돌고 닿는 자리다. 그 뒤에도 버튼이 적는 수가
+     안 내려가야 그 수가 모자란 값이 아니라 값이다. 옛 경로는 만렙 훈련 환전이었는데 능력치 상한이 없어져 사라졌다. */
+  await boot("?seed=20&preset=pocket,veteran");
   const shortCoin = await p.evaluate(() => window.__wallet().coin);
-  check("instrument:the-control-wallet-left-zero-through-the-gym",
-    emptyCoin === 0 && shortCoin === GYM_COIN && !swapped,
-    emptyCoin + " -> " + shortCoin + " want 0 -> " + GYM_COIN + (swapped ? ", " + swapped : ""));
+  check("instrument:the-control-wallet-went-from-zero-to-a-pocket",
+    emptyCoin === 0 && shortCoin === GYM_COIN,
+    emptyCoin + " -> " + shortCoin + " want 0 -> " + GYM_COIN);
 
   let poorSaid = 0;
   const short = {};

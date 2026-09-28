@@ -11,14 +11,8 @@ import { readCloseFloor, closeFloorSaid } from "./close-floor.mjs";
 // 그림자는 레이아웃 상자 밖에 그려져서 rect만 재면 안 보인다. 계산된 box-shadow의 x 오프셋을 더한다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 const BASE = "http://127.0.0.1:10310/web/index.html";
-// 훈련 한 회의 환전 단가. wallet.mjs의 COIN_DRILL과 같은 값이어야 한다.
-const COIN_DRILL = 12;
 // 성장 칸 수. ledger.mjs GROWABLE의 길이다.
 const SLOTS = 15;
-// 성장 상한이 값 자리에 내는 글자. main.mjs 훈련장의 만렙 판정과 같은 값이어야 한다.
-const CEIL_TEXT = "10";
-// 상한 칸이 값과 꺼짐을 한 몸으로 들고 있는가. 심은 대조군이 같은 식을 다시 타야 한다.
-const cappedOk = (rows) => rows.length === SLOTS && rows.every((r) => r.tail === CEIL_TEXT && r.off);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 150000);
 t.unref();
 
@@ -58,52 +52,31 @@ try {
   };
   const boot = (q) => bootOn(p, q);
 
-  // 대조군. 주입이 없으면 성장 칸은 상한이 아니고, 환전 줄 자체가 화면에 없다.
-  // 이게 없으면 본시험의 녹색은 화면이 늘 그렇게 생긴 것과 구분되지 않는다.
+  // 대조군. 주입 없는 저장에서도 칸은 값과 다음 값을 적는다. 이 줄이 없으면 아래의 10 → 11이 화면이 늘 그렇게 생긴 것과 구분되지 않는다.
   await boot("?seed=20&preset=veteran");
   const plain = await gym();
-  check("control:fresh-save-is-not-at-the-ceiling", plain.rows.every((r) => r.tail !== CEIL_TEXT), plain.rows.filter((r) => r.tail === CEIL_TEXT).length + "/" + plain.rows.length + " at the cap, first tail " + JSON.stringify(plain.rows[0] ? plain.rows[0].tail : ""));
-  check("control:swap-row-is-absent-below-the-ceiling", plain.swap === null, plain.swap ? plain.swap.text : "absent");
+  const arrowOk = (rows) => rows.length === SLOTS && rows.every((r) => /^\d+ → \d+$/.test(r.tail));
+  check("control:a-fresh-save-reads-value-and-next", arrowOk(plain.rows), plain.rows.map((r) => r.tail).slice(0, 3).join(", "));
 
-  // 본시험. 만렙 저장에서 훈련장을 연다.
+  // 본시험. 능력치에는 상한이 없다. 10에 선 저장에서도 칸이 열려 있고 다음 값을 적는다.
   await boot("?seed=20&preset=maxed,veteran");
   const applied = await p.evaluate(() => window.__preset);
   check("preset:maxed-was-applied", Array.isArray(applied) && applied.includes("maxed"), JSON.stringify(applied));
   const maxed = await gym();
-  check("ceiling:every-slot-reads-max", maxed.rows.length === SLOTS && maxed.rows.every((r) => r.tail === CEIL_TEXT), maxed.rows.filter((r) => r.tail === CEIL_TEXT).length + "/" + maxed.rows.length);
-  check("ceiling:every-slot-is-unclickable", maxed.rows.every((r) => r.off), maxed.rows.filter((r) => !r.off).map((r) => r.k).join(",") || "all off");
-  /* 상한 칸이 화면에 내는 글자. 값 자리에는 값만 서고, 못 누른다는 사실은 버튼이 들고 있다.
-     위 두 줄과 같은 표본을 보지만 묻는 것이 다르다. 저쪽은 열다섯이 다 상한인가이고,
-     이쪽은 상한 칸 하나가 값과 꺼짐을 한 몸으로 들고 있는가다. */
-  check("gym:a-capped-drill-shows-the-number-and-stays-disabled", cappedOk(maxed.rows),
-    maxed.rows.filter((r) => r.tail === CEIL_TEXT && r.off).length + "/" + maxed.rows.length
-    + " capped drills draw " + JSON.stringify(CEIL_TEXT) + " with the button disabled, first tail "
-    + JSON.stringify(maxed.rows[0] ? maxed.rows[0].tail : "") + " off=" + (maxed.rows[0] ? maxed.rows[0].off : "none"));
-  /* 대조군. 상한 칸 하나에 낱말을 심으면 위 축이 빨개져야 한다. 심고 곧바로 도로 뺀다.
-     이게 없으면 위 줄의 초록은 판정식이 아무것도 안 재는 경우와 구분되지 않는다. */
-  await p.evaluate(() => { const e = document.querySelector("#gym .row button em"); e.dataset.was = e.textContent; e.textContent = "MAX"; });
-  const worded = await gym();
-  await p.evaluate(() => { const e = document.querySelector("#gym .row button em"); e.textContent = e.dataset.was; delete e.dataset.was; });
-  const wordBack = await gym();
-  check("control:a-worded-tail-reddens-the-capped-drill-axis", !cappedOk(worded.rows) && cappedOk(wordBack.rows),
-    "planting a word in one tail left " + worded.rows.filter((r) => r.tail === CEIL_TEXT && r.off).length + "/"
-    + worded.rows.length + " capped, restored to "
-    + wordBack.rows.filter((r) => r.tail === CEIL_TEXT && r.off).length + "/" + wordBack.rows.length);
-
-  const before = await p.evaluate(() => ({ points: window.__points(), coin: window.__wallet().coin }));
-  // 이 게이트의 산출물. 만렙에서 훈련이 사표가 되지 않고 환전으로 빠져나갈 문이 있는가.
-  check("exit:swap-row-is-open-at-the-ceiling", maxed.swap !== null && !maxed.swap.off, maxed.swap ? maxed.swap.text + " off=" + maxed.swap.off : "absent");
-  // 못 누르는 사유든 값이든 버튼 글자가 들고 있어야 한다. 환율을 화면 밖에서 알아낼 길은 없다.
-  const want = String(before.points * COIN_DRILL);
-  check("exit:swap-row-states-the-rate-in-its-own-text", !!maxed.swap && maxed.swap.text.includes("골드") && maxed.swap.text.includes(want), (maxed.swap ? maxed.swap.text : "absent") + " want " + want);
-
-  await p.click("#gym .swap", { force: true });
-  await p.waitForTimeout(400);
-  const after = await p.evaluate(() => ({ points: window.__points(), coin: window.__wallet().coin }));
-  check("exit:swap-drains-the-training-backlog", after.points === 0, String(after.points));
-  check("exit:swap-pays-the-declared-rate", after.coin === before.coin + before.points * COIN_DRILL, before.coin + "+" + before.points * COIN_DRILL + " -> " + after.coin);
-  const done = await gym();
-  check("exit:spent-swap-row-says-why-it-is-dead", !!done.swap && done.swap.off && done.swap.text.includes("바꿀 훈련이 없다"), done.swap ? done.swap.text + " off=" + done.swap.off : "absent");
+  const open = (rows) => rows.length === SLOTS && rows.every((r) => r.tail === "10 → 11" && !r.off);
+  check("gym:no-stat-stops-at-ten", open(maxed.rows), maxed.rows.filter((r) => r.off || r.tail !== "10 → 11").map((r) => r.k + " " + r.tail + (r.off ? " off" : "")).slice(0, 3).join(", ") || "15 slots read 10 → 11 and stay open");
+  check("gym:no-swap-row-stands", maxed.swap === null && plain.swap === null, maxed.swap ? maxed.swap.text : "absent");
+  // 대조군. 한 칸을 꺼 두면 위 축이 빨개져야 한다. 심고 곧바로 도로 뺀다.
+  await p.evaluate(() => { document.querySelector("#gym .row button").disabled = true; });
+  const shut = await gym();
+  await p.evaluate(() => { document.querySelector("#gym .row button").disabled = false; });
+  check("control:a-disabled-slot-reddens-the-open-axis", !open(shut.rows) && open((await gym()).rows), "planted one disabled slot");
+  // 훈련이 10을 넘어 실제로 쌓이는가. 한 칸을 누르면 그 값이 오르고 남은 훈련이 하나 준다.
+  const before = await p.evaluate(() => ({ points: window.__points(), stat: window.__keeperStats().diving }));
+  await p.evaluate(() => document.querySelector('#gym .row button[data-k="diving"]').click());
+  await p.waitForTimeout(300);
+  const after = await p.evaluate(() => ({ points: window.__points(), stat: window.__keeperStats().diving }));
+  check("gym:a-drill-past-ten-raises-the-stored-value", after.stat > before.stat && after.points === before.points - 1, before.stat + " -> " + after.stat + ", points " + before.points + " -> " + after.points);
 
   // 카드 한 장의 오른끝. 레이아웃 상자에 그림자 x 오프셋을 더한 값이고, inset 그림자는 상자 안이라 뺀다.
   const edges = () => {

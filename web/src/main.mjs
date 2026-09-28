@@ -13,7 +13,7 @@ import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dm
 import { load, save, readSquad, offlineGain, readRecord, readSquadKickers, useAccount, saveKey } from './state/save.mjs';
 import { autoTrain, trainStat } from './state/coach.mjs';
 import { currentId } from './state/account.mjs';
-import { coinGain, readWallet, COIN_DRILL, cashPrice, pay } from './state/wallet.mjs';
+import { coinGain, readWallet, cashPrice, pay } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, BEARDS, MAX_BEARD, beardAt, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { AXIS_WORD, AXIS_UNIT, SHELF_NOTES_FOR_WIKI } from './state/shelf.mjs';
@@ -844,7 +844,7 @@ function fillImpact(kind = 'next', boxId = 'gym', after = null) {
       memo[stat] = kind === 'held' ? statHeld(state.keeper, stat, impactBaseline, city)
         : statImpact(state.keeper, stat, impactBaseline, city);
       const slot = box.querySelector('[data-fx="' + stat + '"]');
-      if (slot && (kind === 'held' || state.keeper[stat] < 10)) slot.innerHTML = fxText(stat, kind);
+      if (slot) slot.innerHTML = fxText(stat, kind);
       // 칸이 한 줄씩 자라면 창이 접힘 아래로 넘친다. 굴러간다는 자국을 다시 잰다.
       if (after) after(box);
     }
@@ -858,39 +858,21 @@ function fillImpact(kind = 'next', boxId = 'gym', after = null) {
 // 포인트가 0이어도 열린다. 그때는 내 스탯을 보는 창이다.
 function renderGym() {
   const box = el('gym');
-  // 성장 칸이 전부 상한이면 훈련은 더 쌓여도 쓸 곳이 없다. 그때만 환전 줄이 열린다.
-  const maxed = GROWABLE.every((k) => state.keeper[k] >= 10);
   // 제목과 수를 점으로 잇지 않는다. 창 이름은 제목이 갖고 수는 그 뒤 작은 줄이 갖는다.
   // 남은 훈련이 없으면 작은 줄을 비운다. 없다는 문장은 빈 자리 위 라벨이고, 꺼진 칸들이 이미 그것을 말한다.
   const head = '훈련장' + (state.points > 0 ? '<small>남은 훈련 ' + state.points + '회</small>' : '') + (lastAutoTraining ? '<small class="auto-training">' + lastAutoTraining + '</small>' : '');
-  // 못 누르는 버튼도 사유를 글자로 들고 있다. 빈 자리는 왜 못 쓰는지를 말하지 않는다.
-  const swap = maxed
-    ? '<button class="swap"' + (state.points <= 0 ? ' disabled' : '') + '>'
-      + (state.points > 0 ? '남은 훈련 ' + state.points + '회를 ' + SW(state.points * COIN_DRILL) + '으로' : '바꿀 훈련이 없다')
-      + '</button>'
-    : '';
   box.innerHTML = '<h4>' + head + '</h4><div class="row">' + GROWABLE.map((k) => {
     const v = state.keeper[k];
-    // 10은 성장 상한이다. 상한에 닿은 칸을 눌리게 두면 포인트만 사라진다.
-    const off = v >= 10 || state.points <= 0;
-    // 값 자리에는 값만 적는다. 상한에 닿은 것은 못 누르는 버튼이 말한다.
-    const tail = v >= 10 ? String(v) : v + ' → ' + (v + 1);
+    // 능력치에 상한이 없다. 남은 훈련이 없을 때만 꺼진다. 10을 넘는 몫은 판정이 체감 곡선으로 줄이고, 그 몫은 아래 줄이 말한다.
+    const off = state.points <= 0;
+    const tail = v + ' → ' + (v + 1);
     return '<button data-k="' + k + '"' + (off ? ' disabled' : '') + '><span class="who">' + STAT_ICON[k]
-      + CAUSE_LABEL[k] + '</span><em>' + tail + '</em><small class="fx" data-fx="' + k + '">' + (v >= 10 ? '' : fxText(k)) + '</small></button>';
-  }).join('') + '</div>' + swap + '<button class="close">닫기</button>'
+      + CAUSE_LABEL[k] + '</span><em>' + tail + '</em><small class="fx" data-fx="' + k + '">' + fxText(k) + '</small></button>';
+  }).join('') + '</div><button class="close">닫기</button>'
     /* 굴러간다는 자국. 내 정보가 쓰는 그 겹을 같은 클래스로 둔다. 마지막에 두는 것은 칠하는 차례
        때문이다. 앞에 두면 자리를 잡은 칸들이 이 겹을 덮는다. */
     + '<div class="cue down" aria-hidden="true"></div>';
   box.querySelector('.close').onclick = closeGym;
-  const sw = box.querySelector('.swap');
-  if (sw) sw.onclick = () => {
-    if (state.points <= 0) return;
-    state.wallet.coin += state.points * COIN_DRILL;
-    state.points = 0;
-    persist();
-    pips();
-    renderGym();
-  };
   for (const b of box.querySelectorAll('.row button')) {
     b.onclick = () => {
       if (b.disabled || state.points <= 0) return;
@@ -1551,7 +1533,7 @@ function renderMe() {
     const v = k[s];
     // 10은 성장 상한이다. 훈련장과 같은 기준이어야 두 창이 어긋나지 않는다.
     // 값 자리에는 값만 적는다. 상한에 닿은 것은 max 칸이 말한다.
-    return '<span class="' + (v >= 10 ? 'max' : '') + '" title="훈련 전(1)에 비해 지금 이 능력치가 버는 몫"><span class="who">' + STAT_ICON[s] + CAUSE_LABEL[s]
+    return '<span title="훈련 전(1)에 비해 지금 이 능력치가 버는 몫"><span class="who">' + STAT_ICON[s] + CAUSE_LABEL[s]
       + '</span><b>' + v + '</b><small class="fx" data-fx="' + s + '">' + fxText(s, 'held') + '</small></span>';
   }).join('');
   const traits = (k.traits && k.traits.length)

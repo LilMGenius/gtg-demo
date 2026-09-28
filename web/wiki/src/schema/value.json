@@ -40,7 +40,6 @@
         "wallet.CASH_RATE",
         "wallet.COIN_SAVE",
         "wallet.COIN_CONCEDED",
-        "wallet.COIN_DRILL",
         "roster.PULL_COST",
         "roster.PULL_BULK",
         "roster.PULL_BONUS",

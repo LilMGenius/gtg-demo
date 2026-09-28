@@ -3,7 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 // 화면 값은 구현의 상수가 아니라 배포 매니페스트와 맞댄다.
 const RELEASE = JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version;
-import { COIN_SAVE, COIN_CONCEDED, COIN_DRILL, COIN_FAME_STEP, CASH_RATE } from "../web/src/state/wallet.mjs";
+import { COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP, CASH_RATE } from "../web/src/state/wallet.mjs";
+import { statValue, CURVE_SAMPLES } from "../src/chain.mjs";
 import { BOTS } from "../web/src/state/bot.mjs";
 import { BUFFS } from "../web/src/state/buff.mjs";
 import { LIKE_BASE, LIKE_PER_CITY, MUTUAL_STEP, MUTUAL_CAP, SELFIE_BASE } from "../web/src/state/gram.mjs";
@@ -34,8 +35,8 @@ const GATED = ["coin", "drill", "pull", "gram", "bot", "buff"];
    부동소수 비교가 되고, 천 단위 쉼표가 붙은 날 조용히 지나간다. 글자로 맞대면 서식이 바뀐 것도 잡힌다. */
 const S = (v) => String(v);
 const WANT = {
-  coin: [COIN_SAVE, COIN_CONCEDED, COIN_DRILL, COIN_SAVE + COIN_FAME_STEP * 9, CASH_RATE].map(S),
-  drill: [COIN_DRILL].map(S),
+  coin: [COIN_SAVE, COIN_CONCEDED, COIN_SAVE + COIN_FAME_STEP * 9, CASH_RATE].map(S),
+  drill: CURVE_SAMPLES.flatMap((v) => [S(v), statValue(v).toFixed(1)]),
   pull: [PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP].map(S),
   gram: [LIKE_BASE, LIKE_PER_CITY, MUTUAL_STEP, MUTUAL_CAP, SELFIE_BASE].map(S),
   bot: BOTS.flatMap((b) => [b.judge, b.minutes, b.cost]).map(S),
@@ -227,6 +228,11 @@ try {
   // 별도 페이지라 현재 모듈 캐시를 대조군이 물려받지 않는다.
   const parentPage = await ctx.newPage();
   await parentPage.route('**/src/ui/wiki.mjs', route => route.fulfill({ contentType: 'text/javascript', body: parentSource }));
+  // 부모 모듈이 읽던 상수가 뒤에 지워질 수 있다(COIN_DRILL은 능력치 상한과 함께 사라졌다). 지갑은 지금 판에 부모가 읽던 그 한 줄을 부모 값으로 덧붙여 준다.
+  // 지갑 전체를 부모 판으로 바꾸면 지금 main이 읽는 cashPrice가 사라져 페이지가 통째로 안 뜬다.
+  const parentDrill = execFileSync('git', ['show', '9566a7e:web/src/state/wallet.mjs'], { encoding: 'utf8' }).match(/export const COIN_DRILL = \d+;/)[0];
+  const parentWallet = readFileSync(new URL('../web/src/state/wallet.mjs', import.meta.url), 'utf8') + '\n' + parentDrill + '\n';
+  await parentPage.route('**/src/state/wallet.mjs', route => route.fulfill({ contentType: 'text/javascript', body: parentWallet }));
   await parentPage.goto(BASE);
   await parentPage.click('#go', { force: true });
   await parentPage.click('#wikiBtn', { force: true });
