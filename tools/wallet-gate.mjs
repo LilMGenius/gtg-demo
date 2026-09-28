@@ -31,7 +31,8 @@ async function cashLane(ctx, parent = false) {
     }
     await page.click('#go', { force: true });
     await page.evaluate(() => { window.__wallet().cash = 8000; window.__shop(true); });
-    const tabs = await page.locator('#shop .tab').evaluateAll(es => es.map(e => e.dataset.tab));
+    // 유틸은 캐시 전용이 설계라 환산 표에 안 선다. 캐시 단독 표기는 price 게이트가 잰다.
+    const tabs = (await page.locator('#shop .tab').evaluateAll(es => es.map(e => e.dataset.tab))).filter(t => t !== 'util');
     const rows = [];
     for (const tab of tabs) {
       await page.locator('#shop .tab[data-tab="' + tab + '"]').click({ force: true });
@@ -51,8 +52,12 @@ async function cashLane(ctx, parent = false) {
       check('control:a-planted-rate-mismatch-is-caught', red && planted.length > 0, JSON.stringify(planted[0]));
     }
     await page.evaluate(() => window.__shop(true));
+    // 창을 다시 열면 뽑기 선반에 선다. 등급 버튼은 장갑 선반에 있다.
+    await page.locator('#shop .tab[data-tab="glove"]').click({ force: true });
     result['cash:gold-is-paid-first'] = await page.evaluate(() => {
       const w=window.__wallet(), b=document.querySelector('#shop .buy[data-rank="1"]');
+      // 단추가 없으면 그 축은 선 것이 아니라 못 선 것이다. 부모 대조군은 시작 화면을 못 넘어 단추가 없고, 여기서 죽으면 대조군이 판정 없이 사라진다.
+      if (!b) return false;
       const c=b.querySelector('.price'); if(!c) return false;
       const gold=+c.dataset.coin, coin=w.coin, cash=w.cash; b.click();
       return w.coin===coin-gold && w.cash===cash;
@@ -60,13 +65,15 @@ async function cashLane(ctx, parent = false) {
     // Same drain path as price-gate: mutate the exposed wallet, then re-render.
     result['cash:cash-pays-when-gold-is-short'] = await page.evaluate(() => {
       const w=window.__wallet(); w.coin=0; window.__shop(true);
-      const b=document.querySelector('#shop .buy[data-rank="3"]'), c=b.querySelector('.price'); if(!c || b.disabled) return false;
+      const b=document.querySelector('#shop .buy[data-rank="3"]'); if (!b) return false;
+      const c=b.querySelector('.price'); if(!c || b.disabled) return false;
       const cash=w.cash, cost=+c.dataset.cash; b.click(); return w.coin===0 && w.cash===cash-cost && window.__gear().grip===3;
     });
     result['cash:both-short-disables'] = await page.evaluate(() => {
       const w=window.__wallet(); w.coin=0; w.cash=0;
       document.querySelector('#shop .tab[data-tab="boot"]').click();
-      const b=document.querySelector('#shop .buy[data-rank="3"]'), g=b.querySelector('.px:not(.cash)'), c=b.querySelector('.cash');
+      const b=document.querySelector('#shop .buy[data-rank="3"]'); if (!b) return false;
+      const g=b.querySelector('.px:not(.cash)'), c=b.querySelector('.cash');
       return b.disabled && g?.classList.contains('bad-price') && c?.classList.contains('bad-cash') && getComputedStyle(g).color===getComputedStyle(c).color;
     });
     return result;
