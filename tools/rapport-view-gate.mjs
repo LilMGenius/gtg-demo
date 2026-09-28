@@ -85,7 +85,7 @@ async function run(fixture) {
         headPresent: head >= 0,
         headSeen,
         headSub: head >= 0 && kids[head].querySelector('i') ? kids[head].querySelector('i').textContent : '',
-        rows: rows.map((n) => ({ b: n.querySelector('b').textContent, i: n.querySelector('i') ? n.querySelector('i').textContent : '' })),
+        rows: rows.map((n) => ({ b: n.querySelector('b').textContent, i: n.querySelector('i') ? n.querySelector('i').textContent : '', cnt: n.querySelector('.cnt') ? n.querySelector('.cnt').textContent : '', on: n.querySelectorAll('.bar u.on').length, all: n.textContent })),
         dim,
         scrollHeight: card.scrollHeight,
         clientHeight: card.clientHeight,
@@ -132,7 +132,12 @@ const keys = Object.keys(FIX).sort((x, y) => FIX[y] - FIX[x]);
 check('view:row-count-matches-keys', main.shot.rows.length === keys.length, main.shot.rows.length + '/' + keys.length);
 check('view:fixture-survived-injection', JSON.stringify(main.kept) === JSON.stringify(FIX), JSON.stringify(main.kept));
 
-const counts = main.shot.rows.map((r) => num(r.i, '말 섞은 횟수', '단계'));
+/* 줄은 게임 UI의 호감도 문법이다. 대화 수는 말풍선 칸(n 또는 n/다음), 단계는 찬 칸 수, 효과는 이름과 값 칩.
+   문장 낱말(말 섞은 횟수, 단계, 감소, 초면)이 돌아오면 빨갛다(파운더 2026-09-28). */
+const counts = main.shot.rows.map((r) => Number((r.cnt.match(/\d+/) || [NaN])[0]));
+const SENTENCE = /말 섞은 횟수|\d단계|감소|초면/;
+check('view:rows-speak-in-chips-not-sentences', main.shot.rows.length > 0 && main.shot.rows.every((r) => !SENTENCE.test(r.all) && r.cnt), main.shot.rows.map((r) => r.cnt + '|' + r.i).join(' ; '));
+check('control:the-old-sentence-is-caught', SENTENCE.test('말 섞은 횟수 15. 3단계. 한눈팔기 30% 감소'), 'planted sentence');
 check('view:rows-descending', counts.every((n, i) => i === 0 || counts[i - 1] >= n), counts.join(','));
 
 let mismatch = [];
@@ -143,9 +148,9 @@ keys.forEach((k, idx) => {
   const aid = Math.round((1 - rapportGazeAid(FIX, 0, passer)) * 100);
   const fans = Math.round((rapportBoost(FIX, 0, passer) - 1) * 100);
   const tier = rapportTier(FIX, 0, passer);
-  const gotAid = num(row.i, '한눈팔기', '감소');
-  const gotFans = num(row.i, '팔로워');
-  const tierOk = tier === 0 ? row.i.includes(TIER0) : row.i.includes(String(tier) + '단계');
+  const gotAid = row.i.includes('한눈팔기') ? -num(row.i, '한눈팔기') : 0;
+  const gotFans = row.i.includes('팔로워') ? num(row.i, '팔로워') : 0;
+  const tierOk = row.on === tier;
   if (counts[idx] !== FIX[k] || gotAid !== aid || gotFans !== fans || !tierOk) {
     mismatch.push(k + ' screen=' + counts[idx] + '/' + gotAid + '/' + gotFans + ' calc=' + FIX[k] + '/' + aid + '/' + fans + ' tier=' + tier);
   }

@@ -21,7 +21,7 @@ export { SHELF_NOTES_FOR_WIKI };
 import { BUFFS, BUFF_CAP, newBuff, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
 import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds, photoOdds, selfieFans,
   DM_MOVES, dmOdds, dmOutcome, dmClock, dmWaiting, applyDm } from './state/gram.mjs';
-import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost } from './state/rapport.mjs';
+import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost, RAPPORT_STEPS } from './state/rapport.mjs';
 import { passerName } from './state/passer.mjs';
 import { DATE_COST, MOVES, dateOdds, dateOutcome, applyDate, dateGate } from './state/date.mjs';
 import { withRo } from './ui/josa.mjs';
@@ -1447,16 +1447,19 @@ function rapportRows() {
     const fans = Math.round((rapportBoost(state.rapport, city, passer) - 1) * 100);
     // 이름은 라포 1단계부터 열린다. 그 전에는 차림새로만 부른다.
     const who = passerName(city, passer, tier);
-    const face = tier > 0 ? tier + '단계' : '초면';
+    // 다음 단계까지의 대화 수. 마지막 문턱을 넘으면 분모가 없다.
+    const next = RAPPORT_STEPS.find((s) => s > n);
     // 만남은 이 사람에게 붙은 행동이라 그 줄 안에 둔다. 못 누르는 사유도 버튼이 직접 말한다.
     const g = dateGate(state.rapport, city, passer, state.wallet.coin, state.wallet.cash);
     /* 줄이 아니라 카드다. 실루엣과 동네와 단계 바와 만남 버튼이 한 장에 같이 서야 이 사람이
        지금 어디까지 왔는지가 수를 읽기 전에 보인다. 생김새는 저장에 없으므로 실루엣이다. */
     return '<div class="note met"><span class="ava anon">' + IC_FANS + '</span>'
-      + '<b>' + cityAt(city).name + '에서 마주친 ' + who + '</b><i>말 섞은 횟수 ' + n
-      + '. ' + face + '. 한눈팔기 ' + aid + '% 감소, 팔로워 +' + fans + '%</i>'
-      + '<span class="bar">' + Array.from({ length: TIER_TOP }, (_, at) =>
-        '<u' + (at < tier ? ' class="on"' : '') + '></u>').join('') + '</span>'
+      /* 게임 UI의 호감도 문법. 이름과 동네 태그, 단계 칸과 다음 단계까지의 대화 수(말풍선 n/다음),
+         효과는 이름과 값의 칩이다. 문장(말 섞은 횟수 n. 2단계. 한눈팔기 x% 감소)은 수를 글 속에 숨겨 가독성이 나빴다(파운더 2026-09-28). */
+      + '<b>' + who + '<small>' + cityAt(city).name + '</small></b>'
+      + '<span class="bar" role="img" aria-label="' + tier + ' / ' + TIER_TOP + '">' + Array.from({ length: TIER_TOP }, (_, at) =>
+        '<u' + (at < tier ? ' class="on"' : '') + '></u>').join('') + '<em class="cnt">' + IC_CMT.replace('댓글', '대화') + n + (next ? '/' + next : '') + '</em></span>'
+      + (aid || fans ? '<i class="fx">' + (aid ? '<s>한눈팔기<b>-' + aid + '%</b></s>' : '') + (fans ? '<s>팔로워<b>+' + fans + '%</b></s>' : '') + '</i>' : '')
       + '<button class="go' + (g.short > 0 ? ' bad-price' : '') + '" data-city="' + city + '" data-passer="' + passer + '"' + (g.open ? '' : ' disabled') + '>' + dateLabel(g) + '</button></div>';
   }).join('');
   return rows;

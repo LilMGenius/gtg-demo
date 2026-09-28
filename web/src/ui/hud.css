@@ -956,6 +956,16 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) #mo
 #me .note.met .bar{display:flex;gap:3px;margin-top:4px}
 #me .note.met .bar u{flex:1;height:7px;background:#ffffff26;border:2px solid var(--edge)}
 #me .note.met .bar u.on{background:var(--good)}
+#me .note.met b small{font-size:var(--fs-body);font-weight:400;color:var(--dim);margin-left:var(--gap-2)}
+#me .note.met .bar{align-items:center}
+#me .note.met .bar .cnt{flex:none;display:inline-flex;align-items:center;gap:3px;margin-left:var(--gap-2);font-style:normal;
+  font-size:var(--fs-body);font-variant-numeric:tabular-nums;color:var(--ink)}
+#me .note.met .bar .cnt svg{width:14px;height:14px;color:var(--dim)}
+/* 효과 칩. 이름은 흐리게, 값은 굵게 초록이라 수가 먼저 읽힌다. */
+#me .note.met .fx{display:flex;flex-wrap:wrap;gap:var(--gap-1) var(--gap-2);margin-top:4px;font-style:normal}
+#me .note.met .fx s{text-decoration:none;display:inline-flex;align-items:baseline;gap:4px;font-size:var(--fs-body);color:var(--dim);
+  padding:1px 6px;border:2px solid var(--edge);background:#141a12}
+#me .note.met .fx s b{color:var(--good);font-weight:700}
 #me .note.met .go{grid-column:3;grid-row:1 / span 3;width:auto;margin-top:0;align-self:center}
 
 /* 상점. 선반은 이적시장과 장비 칸들이고, 여는 탭은 전부 동작한다. 빈 탭은 선반이 아니라 광고다. */
