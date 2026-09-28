@@ -258,7 +258,7 @@ try {
     const rowTops = await tops();
     check(W + 'x' + H + ':shell:tab-rows-share-one-top-across-panels', same(rowTops), rowTops.join(', '));
     if (W === 740) {
-      const plant = await cp.addStyleTag({ content: '#roster > .kinds{order:2}#roster > h4{order:1}#roster > .rosterbody{order:3}' });
+      const plant = await cp.addStyleTag({ content: '#roster > .ptitle{position:static;translate:none;order:1}#roster > .kinds{order:2}#roster > .rosterbody{order:3}' });
       const planted = await tops();
       await plant.evaluate((n) => n.remove());
       check(W + 'x' + H + ':control:a-tab-row-under-its-title-is-caught', !same(planted), planted.join(', '));

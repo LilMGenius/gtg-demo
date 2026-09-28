@@ -107,7 +107,7 @@ state.record = readRecord(saved);
    주전을 고르는 것은 난도를 올려 보상 밀도를 사는 선택이다. */
 {
   const names = KICKERS.map((k) => k.name);
-  const got = readSquadKickers(saved, names, defaultEleven(), FIELD, (name) => kickerByName(name)?.role, ROLE_SLOTS);
+  const got = readSquadKickers(saved, names, defaultEleven(), FIELD);
   state.kickers = got.kickers;
   state.eleven = got.eleven;
 }
@@ -956,20 +956,13 @@ const POS_ABBR = { gk: 'GK', '수비수': 'DF', '미드필더': 'MF', '공격수
 // 보유 판정은 이름으로 한다. 로스터 항목과 저장된 키퍼는 다른 객체이기 때문이다.
 function renderRoster() {
   const box = el('roster');
-  const here = state.squad[state.pick];
-  /* 가진 사람과 데려올 사람은 다른 질문이라 목록을 가른다. 명단 하나로 둘을 겸하면
-     명단 밖에서 시작한 첫 키퍼는 어느 줄에도 없고, 다른 사람을 세우는 순간 못 돌아온다. */
+  /* 골키퍼 칸. 지금 뛰는 사람은 밝은 카드 하나로 서고 나머지는 누르면 세운다. 상태 글자(출전, 교체)는 안 붙인다.
+     밝기가 이미 그 말을 하고, 글자를 붙이면 같은 뜻이 두 번 선다(파운더 2026-09-28). */
   const mine = state.squad.map((k, i) => {
     const now = i === state.pick;
-    const tail = now ? '출전' : '교체';
-    return '<button data-at="' + i + '"' + (now ? ' class="here" disabled' : '') + '>'
-      /* 이름만 늘어놓으면 명단이 글자 목록이라 누가 누군지가 이름을 읽어야 안다.
-         얼굴을 앞에 세우면 세우려는 사람을 찾는 눈이 글자를 안 지난다. */
+    return '<button data-at="' + i + '"' + (now ? ' class="here" aria-pressed="true" disabled' : ' aria-pressed="false"') + '>'
       + '<img alt="' + k.name + '" src="' + thumbURL('face', k, lookOf({}, k.name)) + '">'
-      /* 이름과 레벨과 상태를 각각 제 칸에 세운다. 한 줄로 이으면 쉼표가 셋을 한 덩어리로 묶어
-         레벨이 상태의 일부로 읽히고, 카드 폭이 줄면 그 덩어리가 통째로 접힌다. */
-      + '<span class="nm">' + k.name + '</span><em>Lv ' + k.level + '</em>'
-      + '<i class="tag">' + tail + '</i></button>';
+      + '<span class="nm">' + k.name + '</span><em>Lv ' + k.level + '</em></button>';
   }).join('');
   // 아직 없는 사람만 영입 줄에 선다. 가진 사람이 값과 함께 다시 뜨면 두 번 살 수 있는 것처럼 읽힌다.
   const pool = KEEPERS.filter((e) => !state.squad.some((k) => k.name === e.name));
@@ -980,21 +973,18 @@ function renderRoster() {
       + '<img alt="' + entry.name + '" src="' + thumbURL('face', entry, lookOf({}, entry.name)) + '">'
       + '<span class="nm">' + entry.name + '</span><em>' + PRICE(cost) + '</em></button>';
   }).join('');
-  /* 포지션 줄. 선발 열하나는 골키퍼 한 명과 필드 열 명이다.
-     골키퍼는 세우는 사람이 하나뿐이고, 키커는 포지션 정원 안에서 열 명을 고른다. */
-  /* 지금 어느 자리를 보는지는 색이 아니라 aria-selected로 선다. 색만 칠하면 그 상태가 화면에만
-     있고, 누른 탭과 안 누른 탭이 계기에게 같은 모양이라 탭이 도는지를 아무도 못 잰다. */
+  /* 포지션 탭. 탭마다 그 자리의 보유 수를 전체 풀과 함께 단다(1/12). 제목 옆에 지금 탭 하나의 수만 적으면
+     다른 자리의 보유는 탭을 눌러야 보였다. 지금 어느 자리를 보는지는 aria-selected가 소유한다. */
   const tabs = '<div class="kinds" role="tablist">' + ['gk'].concat(ROLES)
-    .map((id) => '<button class="kind" role="tab" data-pos="' + id + '" aria-selected="'
-      + (squadTab === id) + '">' + POS_ICON[id] + '<span>' + POS_ABBR[id] + '</span></button>').join('') + '</div>';
+    .map((id) => { const [have, all] = ownedOf(id); return '<button class="kind pos-' + POS_ABBR[id].toLowerCase() + '" role="tab" data-pos="' + id + '" aria-selected="'
+      + (squadTab === id) + '" aria-label="' + POS_ABBR[id] + ' 보유 ' + have + ' / ' + all + '">' + POS_ICON[id] + '<span>' + POS_ABBR[id] + '</span><small>' + have + '/' + all + '</small></button>'; }).join('') + '</div>';
   const pane = squadTab === 'gk'
     ? '<div class="row mine">' + mine + '</div>'
-      + (hire ? '<h5>명단에서 데려오기</h5><div class="row hire">' + hire + '</div>' : '')
+      + (hire ? '<h5>영입</h5><div class="row hire">' + hire + '</div>' : '')
     : kickerPane(squadTab);
-  const count = squadTab === 'gk' ? '보유 ' + state.squad.length + '명'
-    : '주전 ' + (state.eleven.length + ELEVEN - FIELD) + ' / ' + ELEVEN + '명';
-  // 창 뼈대. 제목과 포지션 탭은 붙박이고 굴리는 것은 명단 몸 하나다. 상점과 내 정보가 같은 뼈대를 쓴다.
-  box.innerHTML = tabs + '<h4>선수단<small>' + count + '</small></h4><div class="rosterbody">' + pane + '</div>'
+  /* 창 뼈대. 창 이름은 맨 위 머리 띠에 붙박이로 서고 탭이 그 아래 공통 줄에 선다. 굴리는 것은 명단 몸 하나다.
+     주전 수(11/11)는 안 적는다. 시작 때 열하나를 공짜로 주어 비는 일이 없고, 몇 명이 섰는지는 왼쪽 판이 그림으로 말한다. */
+  box.innerHTML = '<h4 class="ptitle">선수단</h4>' + tabs + '<div class="rosterbody">' + formationBoard() + '<div class="rosterlist">' + pane + '</div></div>'
     + '<button class="close">닫기</button>';
   for (const b of box.querySelectorAll('.kind')) b.onclick = () => { squadTab = b.dataset.pos; renderRoster(); };
   bindKickerPane(box);
@@ -1018,25 +1008,49 @@ function renderRoster() {
   };
 }
 
-// 세우는 자리 하나. 영입과 교체가 같은 길로 끝나야 한 쪽만 고쳐지는 일이 없다.
+// 한 자리의 보유 수와 그 자리의 전체 풀. 골키퍼는 명단 밖에서 시작한 첫 키퍼까지 센다.
+function ownedOf(id) {
+  if (id === 'gk') {
+    const all = new Set(KEEPERS.map((k) => k.name).concat(state.squad.map((k) => k.name)));
+    return [state.squad.length, all.size];
+  }
+  const inRole = KICKERS.filter((k) => k.role === id);
+  return [inRole.filter((k) => state.kickers.indexOf(k.name) >= 0).length, inRole.length];
+}
+
+/* 포메이션 판. 선발 열하나를 포지션 색 점으로 경기장 위에 세운다. 골키퍼가 맨 아래, 공격이 맨 위다.
+   포지션 색은 축구 UI의 관례다(GK 노랑, DF 파랑, MF 초록, FW 빨강; FIFA/EA FC 선수 카드와 포메이션 화면).
+   4-3-3으로 못 박지 않는다. 한 자리에 선 수대로 줄을 세우고 한 줄은 다섯까지라 수비 열이면 파랑 두 줄이다. */
+const LINE_MAX = 5;
+function formationBoard() {
+  const dot = (cls, name) => '<i class="dot pos-' + cls + '" title="' + name + '"></i>';
+  const lines = [];
+  for (const role of ROLES.slice().reverse()) {
+    const names = state.eleven.filter((n) => kickerByName(n)?.role === role);
+    const cls = POS_ABBR[role].toLowerCase();
+    for (let i = names.length; i > 0; i -= LINE_MAX) lines.push('<div class="line">' + names.slice(Math.max(0, i - LINE_MAX), i).map((n) => dot(cls, n)).join('') + '</div>');
+  }
+  lines.push('<div class="line">' + dot('gk', state.keeper.name) + '</div>');
+  return '<div class="pitch" role="img" aria-label="선발 ' + (state.eleven.length + 1) + '명">' + lines.join('') + '</div>';
+}
 
 // 선수단 창에서 보고 있는 포지션. 창 수명만 사는 값이라 저장에 안 싣는다.
 let squadTab = 'gk';
 
-/* 한 포지션의 칸. 위는 지금 세운 사람, 아래는 데려올 사람이다. 정원이 차 있으면 새로 세우기 전에
-   내려야 하므로, 정원과 지금 수를 칸 머리에 적어 누르기 전에 알 수 있게 한다. */
+/* 한 포지션의 칸. 선발(밝은 카드)이 먼저, 가진 벤치가 다음, 영입이 마지막이다. 선발과 벤치는 한 격자에 서고
+   누르면 토글된다. 머리(가진 사람)도 상태 글자(선발, 해제)도 안 단다. 밝기와 판 위의 점이 그 말을 한다.
+   필드 열 명이 차면 벤치 카드는 흐려진다. 자리별 정원은 없다(파운더 2026-09-28: 4-3-3 고정 아님). */
 function kickerPane(role) {
-  const slots = ROLE_SLOTS[role] || 0;
   const inRole = (n) => { const k = kickerByName(n); return k && k.role === role; };
   const starting = state.eleven.filter(inRole);
   const owned = state.kickers.filter((n) => inRole(n) && starting.indexOf(n) < 0);
+  const full = state.eleven.length >= FIELD;
   const card = (n, on) => {
     const k = kickerByName(n);
     if (!k) return "";
-    return '<button data-kick="' + n + '"' + (on ? ' class="here"' : '') + '>'
+    return '<button data-kick="' + n + '" aria-pressed="' + on + '"' + (on ? ' class="here"' : full ? ' class="full" aria-disabled="true"' : '') + '>'
       + '<img alt="' + n + '" src="' + thumbURL("face", k, lookOf({}, n)) + '">'
-      + '<span class="nm">' + n + '</span><em>결정력 ' + k.finishing + '</em>'
-      + '<i class="tag">' + (on ? "해제" : "선발") + '</i></button>';
+      + '<span class="nm">' + n + '</span><em>결정력 ' + k.finishing + '</em></button>';
   };
   const hire = KICKERS.filter((k) => k.role === role && state.kickers.indexOf(k.name) < 0).map((k) => {
     const cost = kickerCost(k);
@@ -1045,26 +1059,21 @@ function kickerPane(role) {
       + '<img alt="' + k.name + '" src="' + thumbURL("face", k, lookOf({}, k.name)) + '">'
       + '<span class="nm">' + k.name + '</span><em>' + PRICE(cost) + '</em></button>';
   }).join("");
-  /* 빈 목록은 제목째 안 선다. 빈 칸 위의 제목은 빈 상자 위 라벨이고, 빈 칸은 비워 두거나 아이콘이다(파운더 판정).
-     주전 줄만 남는다. 그 제목은 정원을 세는 수라 비어 있을 때가 오히려 읽어야 할 때다. */
-  return '<h5>주전 ' + starting.length + ' / ' + slots + '</h5>'
-    + '<div class="row mine">' + starting.map((n) => card(n, true)).join("") + '</div>'
-    + (owned.length ? '<h5>가진 사람</h5><div class="row mine">' + owned.map((n) => card(n, false)).join("") + '</div>' : '')
-    + (hire ? '<h5>명단에서 데려오기</h5><div class="row hire">' + hire + '</div>' : '');
+  const mineRow = starting.map((n) => card(n, true)).join("") + owned.map((n) => card(n, false)).join("");
+  return (mineRow ? '<div class="row mine">' + mineRow + '</div>' : '')
+    + (hire ? '<h5>영입</h5><div class="row hire">' + hire + '</div>' : '');
 }
 
 /* 세우기와 내리기와 영입. 셋 다 한 곳에서 끝나야 정원 검사가 한 번만 적힌다.
-   정원을 넘겨 세우는 것은 막는다. 넘긴 채로 판이 열리면 열둘이 도는 셈이 된다. */
+   필드 열 명을 넘겨 세우는 것은 막는다. 넘긴 채로 판이 열리면 열둘이 도는 셈이 된다. */
 function bindKickerPane(box) {
   for (const b of box.querySelectorAll("[data-kick]")) b.onclick = () => {
     const n = b.dataset.kick;
-    const k = kickerByName(n);
-    if (!k) return;
+    if (!kickerByName(n)) return;
     const at = state.eleven.indexOf(n);
     if (at >= 0) state.eleven.splice(at, 1);
     else {
-      const here = state.eleven.filter((x) => { const e = kickerByName(x); return e && e.role === k.role; }).length;
-      if (here >= (ROLE_SLOTS[k.role] || 0)) return;
+      if (state.eleven.length >= FIELD) return;
       state.eleven.push(n);
     }
     persist();
@@ -1082,6 +1091,8 @@ function bindKickerPane(box) {
     renderRoster();
   };
 }
+
+// 세우는 자리 하나. 영입과 교체가 같은 길로 끝나야 한 쪽만 고쳐지는 일이 없다.
 function swapTo(at) {
   if (!(at >= 0 && at < state.squad.length)) return;
   // 참조 재대입이다. 값을 복사하면 훈련이 보유 목록에 안 남는다.

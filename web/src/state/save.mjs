@@ -126,21 +126,16 @@ export const OFFLINE_MS = 20 * 60 * 1000;
 
 /* 저장에서 키커 보유와 주전을 꺼낸다. 이전 배포본 저장에는 이 칸이 없고, 그때는 시작 주전으로 연다.
    명단에 없는 이름은 버린다. 로스터가 바뀐 뒤에도 저장이 유령을 판에 세우면 안 된다.
-   포지션 초과는 벤치에 남기고, 빈자리는 시작 명단 다음 보유 명단 순서로 채운다. */
-export function readSquadKickers(saved, all, fallback, cap, roleOf, slots) {
+   자리별 정원은 없고 필드 합계(cap)만 지킨다. 넘친 이름은 벤치에 남기고 빈자리는 시작 명단 다음 보유 명단 순서로 채운다. */
+export function readSquadKickers(saved, all, fallback, cap) {
   const own = new Set(fallback);
   if (Array.isArray(saved?.kickers)) for (const n of saved.kickers) if (all.includes(n)) own.add(n);
   const kickers = [...own];
   const seen = [];
-  const counts = {};
   const add = (n) => {
-    const role = roleOf(n);
-    if (!own.has(n) || seen.includes(n) || seen.length >= cap || !(counts[role] < slots[role])) return;
+    if (!own.has(n) || seen.includes(n) || seen.length >= cap) return;
     seen.push(n);
-    counts[role] += 1;
   };
-  // 빈 포지션은 영 명에서 시작해야 첫 선수를 받을 수 있다.
-  for (const role of Object.keys(slots)) counts[role] = 0;
   if (Array.isArray(saved?.eleven)) for (const n of saved.eleven) add(n);
   for (const n of fallback) add(n);
   for (const n of kickers) add(n);

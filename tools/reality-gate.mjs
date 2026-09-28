@@ -99,18 +99,18 @@ console.log('  ok controls:clause-mismatch-and-4-4-3-rejected');
 const all = KICKERS.map((k) => k.name);
 const fallback = defaultEleven();
 const roleOf = (name) => kickerByName(name)?.role;
-const read = (saved, defaults = fallback) => readSquadKickers(saved, all, defaults, FIELD, roleOf, ROLE_SLOTS);
+const read = (saved, defaults = fallback) => readSquadKickers(saved, all, defaults, FIELD);
+// 자리별 정원은 없다(파운더 2026-09-28, 포메이션 자유). 필드 합계와 중복 없음만 지킨다.
 const full = (got) => {
   assert.equal(got.eleven.length, rule.maximum - rule.goalkeepers);
   assert.equal(new Set(got.eleven).size, got.eleven.length);
-  for (const [role, slots] of Object.entries(ROLE_SLOTS)) assert.equal(got.eleven.filter((n) => roleOf(n) === role).length, slots);
 };
 const old = Object.entries(oldSlots).flatMap(([role, count]) => KICKERS.filter((k) => k.role === role).slice(-count).map((k) => k.name));
 const saved = { kickers: old, eleven: old };
 const before = JSON.stringify(saved);
 const migrated = read(saved);
 full(migrated);
-const overflow = old.filter((n) => roleOf(n) === '미드필더').at(-1);
+const overflow = old.at(-1);
 assert.deepEqual(migrated.eleven, old.filter((n) => n !== overflow));
 assert.ok(migrated.kickers.includes(overflow));
 assert.ok(old.every((n) => migrated.kickers.includes(n)));

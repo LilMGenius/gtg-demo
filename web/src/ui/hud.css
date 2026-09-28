@@ -546,9 +546,6 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) #mo
 #roster .row button .nm{display:block}
 #roster .row button em{display:inline-block;font-style:normal;font-size:var(--fs-num);font-weight:700;
   color:var(--good);margin-top:3px}
-#roster .row button .tag{font-style:normal;font-size:var(--fs-body);color:var(--dim);margin-left:var(--gap-2)}
-#roster .row button:disabled .tag{color:#f6efdc44}
-#roster .row button.here .tag{color:#ffd83d}
 /* 지금 뛰는 자리와 골드가 모자란 카드. 눌러도 아무 일이 없다는 것이 먼저 보여야 한다. */
 #roster .row button:disabled{color:#f6efdc5c;background:#141a12;cursor:default}
 #roster .row button:disabled em{color:#f6efdc44}
@@ -564,6 +561,44 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) #mo
 #roster .row button:not(:disabled):hover{background:#25301f;transform:translateY(-4px);
   box-shadow:8px 10px 0 var(--edge), var(--bevel)}
 #roster .row button:not(:disabled):active{transform:translateY(3px);box-shadow:2px 2px 0 var(--edge)}
+/* 포지션 색. 축구 UI의 관례(FIFA/EA FC 포메이션 화면과 선수 카드): GK 노랑, DF 파랑, MF 초록, FW 빨강.
+   탭 표지와 포메이션 판의 점이 이 네 값 하나를 같이 쓴다. */
+#roster{--pos-gk:#f2c84b;--pos-df:#4a8be8;--pos-mf:#43b86e;--pos-fw:#e5533f}
+/* 창 이름. 탭 줄 위 머리 띠(재화 띠와 같은 높이)의 가운데에 붙박이로 선다. 탭 아래에 두면 창 이름이 탭보다 늦게 읽히고
+   탭 줄이 창마다 다른 자리로 밀린다(--tab-top 규칙). */
+#roster > .ptitle{position:absolute;top:calc(8px + env(safe-area-inset-top));left:50%;translate:-50% 0;
+  height:calc(var(--strip-b) - 19px);display:flex;align-items:center;margin:0;pointer-events:none;white-space:nowrap}
+#roster .kind small{font-size:var(--fs-body);color:var(--dim);font-variant-numeric:tabular-nums;margin-left:2px}
+#roster .kind[aria-selected="true"] small{color:var(--ink)}
+#roster .kind svg{color:var(--pc)}
+#roster .pos-gk{--pc:var(--pos-gk)}
+#roster .pos-df{--pc:var(--pos-df)}
+#roster .pos-mf{--pc:var(--pos-mf)}
+#roster .pos-fw{--pc:var(--pos-fw)}
+/* 몸은 두 칸이다. 왼쪽 포메이션 판은 제자리에 서고 오른쪽 명단만 구른다. 판이 명단과 같이 구르면
+   카드를 누른 결과(점이 생기고 사라짐)가 화면 밖에서 일어난다. */
+#roster > .rosterbody{flex-direction:row;align-items:flex-start;justify-content:center;gap:var(--gap-3);
+  width:min(96vw,1240px);overflow:hidden;padding:4px 8px 8px}
+#roster .rosterlist{flex:1 1 auto;min-width:0;max-height:100%;overflow-y:auto;display:flex;flex-direction:column;
+  align-items:center;gap:12px;padding:4px 4px 8px}
+#roster .rosterlist > *{flex:none}
+#roster .rosterlist .row{width:100%}
+#roster .rosterlist .row.hire{grid-template-columns:repeat(auto-fill,minmax(212px,1fr))}
+/* 판. 골키퍼가 아래, 공격이 위다. 줄은 선 사람 수대로 서고 한 줄은 다섯까지다. */
+#roster .pitch{flex:none;width:clamp(112px,17vw,210px);aspect-ratio:2/3;max-height:100%;position:relative;
+  display:flex;flex-direction:column;justify-content:space-evenly;padding:8px 4px;
+  background:repeating-linear-gradient(180deg,#2f5a25 0 12.5%,#2a5121 12.5% 25%);
+  border:var(--line) solid var(--edge);box-shadow:5px 6px 0 var(--edge), inset 0 0 0 3px #ffffff30}
+#roster .pitch::before{content:"";position:absolute;left:3px;right:3px;top:50%;border-top:2px solid #ffffff38}
+#roster .pitch::after{content:"";position:absolute;left:28%;right:28%;bottom:3px;height:16%;border:2px solid #ffffff38;border-bottom:0}
+#roster .pitch .line{position:relative;z-index:1;display:flex;justify-content:space-evenly;align-items:center}
+#roster .pitch .dot{width:clamp(16px,2.2vw,24px);aspect-ratio:1;border-radius:50%;background:var(--pc);
+  border:2px solid var(--edge);box-shadow:1px 2px 0 var(--edge)}
+/* 선발 카드는 밝고 벤치는 어둡다. 필드 열 명이 차면 벤치 카드는 더 흐려져 눌러도 안 선다는 것을 먼저 말한다. */
+#roster .row button[aria-pressed="false"]{background:#141a12;color:#f6efdcb0}
+#roster .row button.full{opacity:.5;cursor:default}
+#roster .row button.full:hover{transform:none;background:#141a12}
+
 
 /* 아웃문그램 진입. 선수단 162px 아래 174px에서 시작해 214px에 끝난다. 크로스바 325px 위다. */
 #gramBtn{--col-r:var(--pad-r);position:absolute;right:var(--col-r);top:calc(174px + env(safe-area-inset-top));
@@ -748,7 +783,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) #mo
 #me h4 .pfp{grid-row:1 / span 2;grid-column:1;width:48px;height:48px;object-fit:cover;
   object-position:center top;image-rendering:pixelated;border:2px solid var(--edge);background:#141a12}
 /* 창 이름 아래 붙는 수. 제목과 점으로 잇지 않고 줄을 나눈다. 세 창이 같은 규칙을 쓴다. */
-#me h4 small,#gym h4 small,#roster h4 small{display:block;font-size:var(--fs-title);color:var(--ink);
+#me h4 small,#gym h4 small{display:block;font-size:var(--fs-title);color:var(--ink);
   -webkit-text-stroke:2px var(--edge);text-shadow:2px 3px 0 var(--edge);margin-top:4px}
 /* 값 셋을 가운뎃점으로 이으면 화면에서는 목록 기호로 읽혀 세 값이 한 항목처럼 붙는다.
    14px. 글자 13px보다 넓어야 사이가 기호 없이도 갈린다. */
