@@ -39,18 +39,21 @@ try {
       kind: e.dataset.kind,
       title: e.querySelector("title") ? e.querySelector("title").textContent : "",
       glyph: e.querySelector("svg") ? e.querySelector("svg").innerHTML : "",
-      count: e.querySelector("b") ? Number(e.querySelector("b").textContent) : -1,
+      count: e.querySelector("b") ? parseInt(e.querySelector("b").textContent, 10) : -1,
       text: e.textContent.trim()
     }));
     const chip = document.querySelector("#purse .cur u");
     const chipGlyph = chip && chip.parentElement.querySelector("svg") ? chip.parentElement.querySelector("svg").innerHTML : "";
     const arrow = document.querySelector("#form .up") ? "up" : document.querySelector("#form .dn") ? "dn" : "";
-    // 효과 배지가 엄지 화살표와 그림자 폭 이상 떨어져 있는지 실제 상자로 잰다.
-    const beat = document.querySelector('.move-arrow').getBoundingClientRect();
+    /* 효과 배지가 엄지 화살표와 그림자 폭 이상 떨어져 있는지 실제 상자로 잰다. 화살표는 양 끝에 선 두 판이다.
+       판이 64px이던 동안은 위아래 간격만 재도 됐는데, 192px 판은 배지보다 높이 솟아도 옆으로 비켜 있어
+       위아래만 재면 겹치지 않는 배지가 빨개진다. 두 판 각각과 가로, 세로 중 벌어진 쪽의 간격을 잰다. */
     const r = box.getBoundingClientRect();
+    const apart = (a) => Math.max(a.left - r.right, r.left - a.right, a.top - r.bottom, r.top - a.bottom);
+    const gapToArrows = Math.min(...[...document.querySelectorAll('.move-arrow')].map((e) => apart(e.getBoundingClientRect())));
     const lift = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--lift")) || 0;
     return { hidden: box.hidden, tags, chipGlyph, arrow, shots: window.__buff().shots, kind: window.__buff().kind,
-      gap: beat.top - r.bottom, lift, onScreen: r.top >= 0 && r.bottom <= innerHeight };
+      gap: gapToArrows, lift, onScreen: r.top >= 0 && r.bottom <= innerHeight };
   });
 
   await open();
@@ -76,12 +79,13 @@ try {
     if (spec.kind === "tonic") {
       await p.evaluate(() => window.__resumeRound());
       await p.locator('.move-arrow[data-move="-1"]').click({ force: true });
-      await p.waitForFunction(() => document.querySelector('#aura .tag[data-kind="tonic"] b')?.textContent === "11",
-        null, { timeout: 24000 });
+      const sold = BUFFS.find((s) => s.kind === "tonic").shots;
+      await p.waitForFunction((n) => parseInt(document.querySelector('#aura .tag[data-kind="tonic"] b')?.textContent, 10) === n,
+        sold - 1, { timeout: 24000 });
       const after = await p.evaluate(() => ({ applied: window.__lastBuff, remaining: window.__buff().shots,
-        badge: Number(document.querySelector('#aura .tag[data-kind="tonic"] b')?.textContent) }));
+        badge: parseInt(document.querySelector('#aura .tag[data-kind="tonic"] b')?.textContent, 10) }));
       check("aura:the-badge-count-after-a-shot-is-the-shots-still-to-come",
-        after.applied?.kind === "tonic" && after.applied.shots === 12 && after.remaining === 11 && after.badge === 11,
+        after.applied?.kind === "tonic" && after.applied.shots === sold && after.remaining === sold - 1 && after.badge === sold - 1,
         JSON.stringify(after));
       await p.evaluate(() => window.__lockRound());
     }
