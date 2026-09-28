@@ -4,12 +4,12 @@ import { makeRng, buildSet, resolve, newKeeper, keeperFromRoster, botPlan, X_MAX
 import { aimAt, diveTrigger } from '../../src/chain.mjs';
 import { CAUSE_LABEL, GROWABLE, HIDDEN } from '../../src/ledger.mjs';
 import { KEY_MAP } from './ui/keys.mjs';
-import { KEEPERS, KICKERS, keeperCost, kickerCost, kickerByName, ROLES, ROLE_SLOTS, ELEVEN, FIELD, defaultEleven, TRAITS, PULL_COST, PULL_BULK, PULL_BONUS, pullYield, TICKET_CAP, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
+import { KEEPERS, KICKERS, keeperCost, kickerCost, kickerByName, ROLES, ROLE_SLOTS, FIELD, defaultEleven, TRAITS, PULL_BULK, PULL_BONUS, pullYield, TICKET_CAP, PULL_KINDS, pullKindOf, poolFor, pullCostOf, pullBill, ticketGain, pullWeight, pullFrom } from '../../src/roster.mjs';
 import { createScene } from './render/scene.mjs';
 import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
-import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dmLine, gazeAct } from './ui/lines.mjs';
+import { eventLine, setEndLine, postLine, commentLine, photoLine, gazeAct } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord, readSquadKickers, useAccount, saveKey } from './state/save.mjs';
 import { autoTrain, trainStat } from './state/coach.mjs';
 import { currentId } from './state/account.mjs';
@@ -21,18 +21,18 @@ import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOAL
 import { AXIS_WORD, AXIS_UNIT, SHELF_NOTES_FOR_WIKI } from './state/shelf.mjs';
 export { SHELF_NOTES_FOR_WIKI };
 import { BUFFS, BUFF_CAP, newBuff, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
-import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds, photoOdds, selfieFans,
-  DM_MOVES, dmOdds, dmOutcome, dmClock, dmWaiting, applyDm } from './state/gram.mjs';
+import { readSocial, mutualBoost, likesFor, commentOdds, photoOdds } from './state/gram.mjs';
 import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost, RAPPORT_STEPS } from './state/rapport.mjs';
 import { passerName } from './state/passer.mjs';
-import { DATE_COST, MOVES, dateOdds, dateOutcome, applyDate, dateGate } from './state/date.mjs';
-import { withRo } from './ui/josa.mjs';
+import { DATE_COST, dateGate } from './state/date.mjs';
 import { applyPreset, ONBOARD_KEEPER, ONBOARD_KICKERS, ONBOARD_DONE } from './state/inject.mjs';
 import { thumbURL, startSpin, stopSpin } from './render/thumb.mjs';
 import * as wikiUI from './ui/wiki.mjs';
 import { createImpact } from './ui/impact-view.mjs';
+import { createGramPanel } from './ui/gram-panel.mjs';
+import { createDatePanel } from './ui/date-panel.mjs';
 import { scrollCue } from './ui/scroll-cue.mjs';
-import { SVG, G, R, FACE_PX, IC_FANS, IC_NOFACE, IC_NOPOST, IC_LIKE, IC_GOLD, IC_CASH, IC_TIME, IC_UP, IC_DOWN, IC_MID, IC_BUFF, IC_TICKET, BUFF_ICON, buffIcon, TAB_ICON, STAT_ICON, POS_ICON, IC_MUTUAL, IC_CMT } from './ui/icons.mjs';
+import { IC_FANS, IC_NOFACE, IC_GOLD, IC_CASH, IC_TIME, IC_UP, IC_DOWN, IC_MID, IC_TICKET, buffIcon, TAB_ICON, STAT_ICON, POS_ICON, IC_CMT } from './ui/icons.mjs';
 
 const el = (id) => document.getElementById(id);
 const stage = createScene(el('stage'));
@@ -733,6 +733,9 @@ function renderGym() {
 // 어떤 창도 안 열린다. 개봉판은 화면 전체를 덮어 사람의 클릭을 이미 막고 있으므로, 열리는 창은
 // 손잡이로만 열리는 창이고 그때 첫 진입 개봉이 조용히 걷힌다. 처음 오는 사람이 자기가 무엇을
 // 들고 시작하는지를 못 보고 지나가는 자리이고, 계기가 사람이 못 가는 상태를 재게 되는 자리다.
+/* 아웃문그램과 만남 창. 쪽지와 만남의 열린 자리를 스스로 들고, 게임 상태와 저장과 창 전환만 받는다. 창 닫기 표가 닫는 함수를 읽으므로 그 표보다 먼저 선다. */
+const { openGram, closeGram } = createGramPanel({ state, el, roll, persist, pips, shutOthers });
+const { openDate, closeDate } = createDatePanel({ state, el, roll, persist, pips, shutOthers, renderMe, purchase, FEED_CAP });
 const PANEL_SHUT = { gym: closeGym, roster: closeRoster, gram: closeGram, me: closeMe, date: closeDate, shop: closeShop, wiki: closeWiki, pull: stopReveal };
 const CATEGORY = { wiki: '.cats [data-cat]', roster: '.kind[data-pos]', me: '.tab[data-tab]', shop: '.tab[data-tab]' };
 const panelStack = [];
@@ -975,141 +978,6 @@ function closeRoster() {
 }
 
 
-// 아웃문그램. 계정 머리 아래로 글이 카드로 쌓인다. 최신 순이다.
-function renderGram() {
-  const box = el('gram');
-  /* 계정 머리. 초상과 계정명과 숫자 두 칸이다. 계정을 여는 첫 신호는 이름이 아니라 얼굴이라
-     48px 판때기가 먼저 서고(명단 한 줄의 얼굴은 38px이다. 여기는 계정 주인의 자리라 더 크다),
-     맞팔 수가 팔로워 증가에 곱해지므로 그 배율은 맞팔 칸의 배지로 붙는다. 배율을 설명하는 문장은
-     그 칸의 title과 aria-label이 갖는다. 머리에 서는 것은 숫자고, 문장은 손을 얹은 사람에게만 온다. */
-  const myFace = thumbURL('face', state.keeper, lookOf(state.gear, state.keeper.name));
-  const mut = mutualCount(state.social);
-  const boost = Math.round((mutualBoost(state.social) - 1) * 100);
-  const tip = '맞팔 ' + mut + '명이면 팔로워가 ' + boost + '% 더 붙는다';
-  const head = '<img class="pfp" alt="' + state.keeper.name + '" src="' + myFace + '">'
-    + '<span class="who">' + state.keeper.name + '</span>'
-    + '<small><button class="stat" id="gramFollowers" ' + linkAttrs('gramFollowers') + '>' + IC_FANS + '<em>' + state.fans.toLocaleString() + '</em></button>'
-    + '<button class="stat" id="gramEffect" ' + linkAttrs('gramEffect') + ' aria-description="' + tip + '">' + IC_MUTUAL
-    + '<em>' + mut + '</em><i>+' + boost + '%</i></button></small>';
-  /* 작성자 초상. img가 아니라 판때기 배경으로 깐다. img로 세우면 사진 글의 첫 그림이 초상이 되고,
-     사진을 화소로 재는 자들이 얼굴을 그 글의 사진으로 읽는다. 행인은 생김새가 저장에 없어 실루엣이다. */
-  const plate = (face) => (face
-    ? '<span class="ava" style="background-image:url(' + face + ')"></span>'
-    : '<span class="ava anon">' + IC_FANS + '</span>');
-  // 선팔 버튼. 카드 우측 상단의 작은 판때기다. 관계가 바뀌는 자리라 지금 상태가 글자로 서 있다.
-  const folBtn = (city, passer, tier) => {
-    const key = whoKey(city, passer);
-    const label = isMutual(state.social, key) ? '맞팔' : (isFollowing(state.social, key) ? '팔로우 중' : '선팔');
-    const off = isFollowing(state.social, key) ? ' disabled' : '';
-    return '<button class="fol" data-key="' + key + '" data-tier="' + tier + '"' + off + '>' + label + '</button>';
-  };
-  /* 반응 줄. 아이콘이 먼저 서고 수가 따라온다. 옛 저장의 글에는 좋아요 칸이 아예 없는데,
-     그때 줄을 통째로 비우면 한 장은 반응 줄이 서고 한 장은 안 서서 아이콘과 수의 자리가 흔들린다.
-     없는 수는 0으로 세운다. 팔로워는 오른 글에만 붙는다. */
-  const react = (p) => {
-    const seen = '<i class="like">' + IC_LIKE + '<em>' + (Number(p.l) > 0 ? p.l : 0) + '</em></i>'
-      + '<i class="talk">' + IC_CMT + '<em>' + (p.cm ? 1 : 0) + '</em></i>';
-    const fans = p.g > 0 ? '<i class="fans">' + IC_FANS + '<em>+' + p.g + '</em></i>' : '';
-    return '<div class="react">' + seen + fans + '</div>';
-  };
-  /* 굵게 서는 이름은 남의 이름이다. 내 계정에서 내 이름은 담담하게 서고, 내가 올린 글에서 굵은 것은
-     그 판의 키커다. 앞에 내 이름을 굵게 세우면 그 글이 부르는 이름이 바뀐다. */
-  const mineBy = plate(myFace) + '<span class="nm">' + state.keeper.name + '</span>';
-  /* 내가 올린 셀카. 주어가 둘이라 상대 이름이 작성자 줄 끝에 서고, 팔로워는 그 자리에서 이미 올랐다.
-     사진은 저장에 안 들어 있고 그때의 차림만 남아 있어, 열 때마다 그 차림으로 다시 굽는다. */
-  const selfieCard = (p) => '<article class="post shot mine">'
-    + '<div class="by">' + mineBy + '<b class="tag">' + p.n + '</b></div>'
-    + '<img class="pic" alt="' + p.n + '과 찍은 사진" src="' + thumbURL('body', { height: p.sf.h, weight: p.sf.w }, p.sf.look) + '">'
-    + '<p class="txt">' + p.t + '</p>' + react(p) + '</article>';
-  /* 남이 올린 사진. 그림은 저장에 안 들어 있고 그때의 차림만 남아 있어 열 때마다 다시 굽는다.
-     한 장이 47KB라 열두 장을 저장에 실으면 한도를 위협하고, 굽는 비용은 상점이 이미 스물넉 장으로 치른다. */
-  const photoCard = (p) => '<article class="post shot' + (p.c ? ' bad' : '') + '">'
-    + '<div class="by">' + plate('') + '<b class="nm">' + p.n + '</b>'
-    + folBtn(p.ph.city, p.ph.passer, p.ph.tier) + '</div>'
-    + '<img class="pic" alt="' + p.n + '이 찍은 사진" src="' + thumbURL('body', { height: p.ph.h, weight: p.ph.w }, p.ph.look) + '">'
-    + '<p class="txt">' + p.t + '</p>' + react(p) + '</article>';
-  // 댓글. 카드 안에 있되 한 칸 들여써야 남이 쓴 줄로 읽힌다. 그 사람도 선팔이 걸리는 사람이다.
-  const cmtRow = (p) => (p.cm
-    ? '<div class="cmt"><b>' + p.cm.who + '</b><span>' + p.cm.text + '</span>'
-      + folBtn(p.cm.city, p.cm.passer, p.cm.tier) + '</div>'
-    : '');
-  const myCard = (p) => '<article class="post' + (p.c ? ' bad' : '') + '">'
-    + '<div class="by">' + mineBy + '</div>'
-    + '<p class="txt">' + p.t.replace(p.n, '<b>' + p.n + '</b>') + '</p>'
-    + react(p) + cmtRow(p) + '</article>';
-  const feed = state.posts.length
-    ? state.posts.slice().reverse().map((p) => (p.ph ? photoCard(p) : (p.sf ? selfieCard(p) : myCard(p)))).join('')
-    /* 빈 칸은 비워 두거나 아이콘 하나다(파운더 판정). 글자 한 줄은 판을 상자 위 라벨로 바꾼다.
-       아는 얼굴의 빈 칸과 같은 문법으로 빈 사진틀 하나만 세운다. */
-    : '<article class="post empty">' + IC_NOPOST + '</article>';
-  /* 쪽지는 피드 아래에 접혀 있다가 이름을 누르면 그 자리에서 펴진다. 예전에는 창을 통째로 덮어서
-     계정을 연 사람이 제 글보다 남의 대화를 먼저 봤다. 대화는 계정의 일부지 계정의 첫 화면이 아니다.
-     맞팔이 된 뒤 세 판이 지나면 그 사람이 다시 이 줄에 선다. */
-  const keys = dmWaiting(state.social, dmClock(state.record));
-  // 답장을 보낸 사람은 대기 목록에서 빠진다. 펴 둔 대화가 그 자리에서 사라지지 않게 손잡이를 남긴다.
-  if (dmOpen && keys.indexOf(dmOpen) < 0) keys.unshift(dmOpen);
-  const dms = keys.length
-    ? '<section class="dms">' + keys.map((key) => {
-      const part = key.split(':');
-      const city = Number(part[0]);
-      const passer = Number(part[1]);
-      const tier = rapportTier(state.rapport, city, passer);
-      const on = key === dmOpen;
-      return '<button class="dmOpen' + (on ? ' on' : '') + '" data-key="' + key + '">' + IC_CMT
-        + '<span>' + passerName(city, passer, tier) + '</span>'
-        + (on ? '' : '<em>새 쪽지</em>') + '</button>'
-        + (on ? renderDm(city, passer, tier) : '');
-    }).join('') + '</section>'
-    : '';
-  box.innerHTML = '<h4>' + head + '</h4><div class="feed">' + feed + '</div>' + dms
-    + '<button class="close">닫기</button>';
-  for (const b of box.querySelectorAll('.dmOpen')) {
-    b.onclick = () => { dmOpen = dmOpen === b.dataset.key ? null : b.dataset.key; dmSaid = null; renderGram(); };
-  }
-  for (const b of box.querySelectorAll('.fol')) {
-    b.onclick = () => {
-      // 맞팔 여부는 여기서 한 번 굴린다. 열 때마다 다시 굴리면 같은 사람이 매번 다른 답을 준다.
-      state.social = follow(state.social, b.dataset.key, roll() * 100, Number(b.dataset.tier) || 0);
-      persist();
-      renderGram();
-    };
-  }
-  if (dmOpen) {
-    const part = dmOpen.split(':');
-    const city = Number(part[0]);
-    const passer = Number(part[1]);
-    const tier = rapportTier(state.rapport, city, passer);
-    for (const b of box.querySelectorAll('[data-dm]')) b.onclick = () => sendDm(city, passer, tier, b.dataset.dm);
-    const fold = box.querySelector('.close.fold');
-    if (fold) fold.onclick = () => { dmOpen = null; dmSaid = null; renderGram(); };
-  }
-  // 접기 버튼도 .close라 첫 번째를 잡으면 창이 아니라 대화가 닫힌다. 창을 닫는 것은 뒤엣것이다.
-  box.querySelector('.close:not(.fold)').onclick = closeGram;
-}
-
-function openGram() {
-  if (!shutOthers('gram')) return;
-  el('gram').hidden = false;
-  renderGram();
-}
-
-/* 굴릴 것이 남았다는 자국. 칸은 굴러가지만 화면에는 그 사실이 하나도 안 적혀 있었다.
-   실측으로 위키 본문은 740x360에서 여덟 칸이 전부 넘쳤고, 내 정보의 전적 칸은 1280x720에서
-   243px 자리에 700px을 담아 상대 전적 표가 통째로 접힘 아래 있었다. 아래끝 그늘이 남은 것이
-   있다는 말이고, 끝까지 굴리면 그 그늘이 꺼지고 위끝으로 옮겨 간다. 1px은 굴림값이 소수로
-   남는 자리를 넘기는 폭이다. 두 창이 한 함수를 쓴다. 따로 적으면 한쪽만 고친 날 둘이 갈린다.
-   구르는 것은 감싼 상자가 아니라 그 안의 칸이라, 신호 둘이 아닌 첫 자식이 그 칸이다.
-   다만 늘 그렇지는 않다. 세로가 짧으면 칸의 상한이 걷혀 칸이 안 구르고 창이 스스로 구른다.
-   그때는 구르는 것을 밖에서 받는다. 안 받으면 첫 자식인 제목 줄을 재게 되어 넘침이 늘 0이고
-   신호가 영영 안 켜진다. 신호는 감싼 상자의 자식에서만 찾는다. 창을 상자로 넘기면 그 안에
-   칸의 신호가 같이 들어 있어, 안 좁히면 창의 신호 대신 칸의 것을 두 번 켠다.
-   그늘은 감춘 것보다 더 많이 가리지 않는다. 감춘 것이 그늘의 높이보다 얇으면 그 높이를 감춘
-   만큼으로 줄여서 켠다. 26px을 그대로 켜면 그 겹이 감춘 것보다 두꺼워 버튼만 흐려지고, 그렇다고
-   안 켜면 아래에 더 있다는 말이 화면에 한 군데도 안 남는다. 실측으로 740x400의 훈련장은 14px을
-   감춘 채 닫기 버튼을 접힘 밖 2.45px에 세우고, 1280x720의 내 정보는 16px을 감춘다. 둘 다 신호가
-   꺼져 있었다. 높이를 여기 상수로 안 적고 그려진 값을 읽는 것은 그 수가 CSS 한 곳에만 있어야
-   하기 때문이다. 읽기 전에 붙여 둔 높이를 먼저 걷는다. 안 걷으면 줄여 둔 값을 상한으로 되읽어
-   한 번 줄어든 그늘이 다시 안 큰다. */
 
 
 /* 내 정보 창의 신호 둘. 칸이 구르는 화면과 창이 구르는 화면이 갈리므로 둘을 같이 다시 센다.
@@ -1179,12 +1047,6 @@ function closeWiki() {
   el('wikiBtn').setAttribute('aria-expanded', 'false');
 }
 
-function closeGram() {
-  el('gram').hidden = true;
-  // 닫을 때 대화를 비운다. 남겨 두면 다음에 계정을 열었을 때 남의 대화가 먼저 뜬다.
-  dmOpen = null;
-  dmSaid = null;
-}
 
 // 히든 둘은 숫자가 아니라 문구로 뜬다. 숫자를 걸면 훈련장에서 올릴 수 있는 칸으로 읽힌다.
 const HIDDEN_LABEL = { consistency: '기복', professionalism: '프로의식' };
@@ -1406,122 +1268,7 @@ function closeMe() {
   meTab = 'stat';
 }
 
-/* 지금 열어 둔 쪽지. 키는 도시와 행인 인덱스이고, 답장을 보내면 결과가 여기 남는다.
-   창을 닫으면 비운다. 남겨 두면 다음에 계정을 열었을 때 남의 대화가 먼저 뜬다. */
-let dmOpen = null;
-let dmSaid = null;
 
-/* 쪽지 한 통. 맞팔이라야 오고, 답장하면 다음 말은 세 판 뒤에 온다.
-   피드 아래 접힌 자리에서 펴지므로 이 함수는 창을 갈아 끼우지 않고 그 자리에 들어갈 조각을 돌려준다. */
-function renderDm(city, passer, tier) {
-  const said = dmSaid && dmSaid.key === dmOpen ? dmSaid : null;
-  const body = said
-    ? '<div class="line them">' + said.said + '</div><div class="line me">' + said.pick + '</div>'
-      + '<div class="out ' + (said.won ? 'win' : 'lose') + '">' + said.line
-      + (said.fans ? ' ' + IC_FANS + ' +' + said.fans : '') + '</div>'
-    : '<div class="line them">' + dmSay(city, passer, tier) + '</div>'
-      + '<div class="pick">' + DM_MOVES.map((m) => '<button data-dm="' + m.id + '">' + m.label
-        + '<em>' + CAUSE_LABEL[m.stat] + ' ' + withRo(state.keeper[m.stat]) + ' 성공 ' + dmOdds(state.keeper, m.id) + '%</em></button>').join('') + '</div>';
-  return '<div class="dm">' + body + '</div><button class="close fold">접기</button>';
-}
-
-/* 먼저 온 말은 한 번 뽑아 그 대화가 열려 있는 동안 고정한다. 매 렌더마다 다시 뽑으면
-   답장 버튼을 보다가 상대의 말이 바뀐다. */
-let dmHeld = null;
-function dmSay(city, passer, tier) {
-  if (!dmHeld || dmHeld.key !== dmOpen) dmHeld = { key: dmOpen, text: dmLine(tier, roll) };
-  return dmHeld.text;
-}
-
-// 답장. 성공하면 라포가 한 칸 오르고 팔로워가 붙는다. 실패해도 잃는 것은 없고 다음 말이 밀린다.
-function sendDm(city, passer, tier, moveId) {
-  const out = dmOutcome(state.keeper, moveId, roll() * 100);
-  if (!out) return;
-  const move = DM_MOVES.find((m) => m.id === moveId);
-  state.social = applyDm(state.social, dmOpen, dmClock(state.record));
-  if (out.won) {
-    state.fans += out.fans;
-    state.rapport = addRapport(state.rapport, city, passer);
-  }
-  dmSaid = { key: dmOpen, said: dmSay(city, passer, tier), pick: move ? move.label : '', won: out.won, line: out.line, fans: out.fans };
-  persist();
-  pips();
-  renderGram();
-}
-
-/* 셀카 한 장. 내 계정에 올라가고 팔로워가 그 자리에서 오른다.
-   사진은 저장에 안 실린다. 행인이 찍은 사진과 같은 이유로 그때의 차림만 남기고 열 때 다시 굽는다.
-   상대 이름을 글에 박는 것은 이 사진의 주어가 둘이기 때문이다. */
-function takeSelfie(city, passer, tier) {
-  const fans = selfieFans(tier, state.gear.city);
-  state.fans += fans;
-  state.posts.push({ n: passerName(city, passer, tier), c: false, g: fans,
-    t: selfieLine(roll), lb: fans, ct: state.gear.city,
-    l: likesFor(fans, state.gear.city, roll()),
-    sf: { city, passer, tier, h: state.keeper.height, w: state.keeper.weight, look: lookOf(state.gear, state.keeper.name) } });
-  while (state.posts.length > FEED_CAP) state.posts.shift();
-  persist();
-  pips();
-  return fans;
-}
-
-// 만남. 세 갈래를 한 번에 보여주고 하나를 고르면 그 자리에서 끝난다.
-// 무르기는 없다. 다시 열려면 라포를 다시 쌓아야 한다.
-function renderDate(city, passer, done) {
-  const box = el('date');
-  const who = passerName(city, passer, rapportTier(state.rapport, city, passer));
-  if (done) {
-    /* 눈이 맞았으면 한 장 찍는다. 라포를 쌓아 값을 치르고 만나러 간 것이 여기서 회수된다.
-       진 만남에는 이 자리가 없다. 있으면 져도 얻는 것이 있어 만남의 결과가 화면에서 사라진다.
-       한 번 찍으면 버튼이 닫힌다. 이 화면이 열려 있는 동안 두 번 누르면 같은 사진이 두 장 올라간다. */
-    const tier = rapportTier(state.rapport, city, passer);
-    const shoot = done.won && !done.shot
-      ? '<button class="selfie">같이 한 장 찍는다<em>' + IC_FANS + ' +' + selfieFans(tier, state.gear.city) + '</em></button>'
-      : (done.shot ? '<div class="took">' + IC_FANS + ' +' + done.shot + ' 올렸다</div>' : '');
-    box.innerHTML = '<h4>' + who + '</h4>'
-      + '<div class="out">' + done.line + '<i class="' + (done.won ? 'win' : 'lose') + '">'
-      + '팔로워 ' + (done.fans > 0 ? '+' : '') + done.fans + '. '
-      + (done.won ? '이 동네에서는 이제 눈이 안 흔들린다' : '처음부터 다시 말을 섞어야 한다')
-      + '</i></div>' + shoot + '<button class="close">닫기</button>';
-    box.querySelector('.close').onclick = closeDate;
-    const cam = box.querySelector('.selfie');
-    if (cam) cam.onclick = () => { done.shot = takeSelfie(city, passer, tier); renderDate(city, passer, done); };
-    return;
-  }
-  const moves = MOVES.map((m) => '<button data-move="' + m.id + '">' + m.label
-    + '<em>' + CAUSE_LABEL[m.stat] + ' ' + withRo(state.keeper[m.stat]) + ' 성공 ' + dateOdds(state.keeper, m.id) + '%</em></button>').join('');
-  box.innerHTML = '<h4>' + who + '</h4><div class="card">' + moves + '</div><button class="close">그냥 지나간다</button>';
-  box.querySelector('.close').onclick = closeDate;
-  for (const b of box.querySelectorAll('[data-move]')) b.onclick = () => commitDate(city, passer, b.dataset.move);
-}
-
-// 굴림은 화면 쪽 난수다. 판정용 rng를 쓰면 그 뒤 모든 구가 밀려 네 게이트가 통째로 흔들린다.
-function commitDate(city, passer, moveId) {
-  const out = dateOutcome(state.keeper, moveId, roll() * 100);
-  if (!out) return;
-  if (!purchase(DATE_COST)) return;
-  state.fans = Math.max(0, state.fans + out.fans);
-  state.rapport = applyDate(state.rapport, city, passer, out.won);
-  persist();
-  pips();
-  renderDate(city, passer, out);
-  // 뒤에 열려 있는 내 정보도 같이 그린다. 안 그리면 방금 쓴 골드와 내려간 라포가
-  // 반투명 배경 너머에서 옛 값으로 남아 만남 버튼이 아직 열린 것처럼 보인다.
-  renderMe();
-}
-
-function openDate(city, passer) {
-  if (!shutOthers('date')) return;
-  el('date').hidden = false;
-  renderDate(city, passer, null);
-}
-
-// 닫을 때 내 정보를 다시 그린다. 라포와 지갑이 방금 바뀌었는데 뒤 화면이 옛 값이면
-// 같은 사람에게 만남 버튼이 아직 열린 것처럼 보인다.
-function closeDate() {
-  el('date').hidden = true;
-  renderMe();
-}
 
 // 상점. 선반은 이적시장과 장비 둘이다. 지목 구매는 값을 알고 이름을 사는 축이고
 // 이적시장은 값을 알고 이름을 모르는 축이라 두 축이 겹치지 않는다.

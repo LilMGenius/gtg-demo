@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { withRo } from "../web/src/ui/josa.mjs";
 
 // 수 뒤의 조사를 재는 자. 만남 선택지가 '의사소통 3로'라고 적었다. 수를 문자열에 바로 이어 붙이면
@@ -11,8 +11,12 @@ const wrong = Object.entries(KEY).filter(([n, want]) => withRo(Number(n)) !== wa
 check("josa:every-number-takes-its-own-particle", wrong.length === 0, wrong.join(", ") || Object.keys(KEY).length + " numbers");
 // 손으로 이은 조사. 값 표에서 꺼낸 수(대괄호로 끝나는 식) 바로 뒤에 로나 으로로 시작하는 글자를 붙이는 줄이다.
 const HAND = /\]\s*\+\s*'(으)?로[ ']/;
-const src = readFileSync(new URL("../web/src/main.mjs", import.meta.url), "utf8").split(String.fromCharCode(10));
-const hand = src.map((l, i) => [i + 1, l]).filter(([, l]) => HAND.test(l)).map(([i]) => "main.mjs:" + i);
+/* 화면 코드 전부를 읽는다. main 하나만 읽으면 창을 컴포넌트로 떼어 낸 날 그 창의 문장이 이 자 밖으로 나간다. */
+const SRC = new URL("../web/src/", import.meta.url);
+const files = readdirSync(SRC, { recursive: true }).filter((p) => String(p).endsWith(".mjs"));
+const hand = files.flatMap((p) => readFileSync(new URL(String(p).split("\\").join("/"), SRC), "utf8").split(String.fromCharCode(10))
+  .map((l, i) => [i + 1, l]).filter(([, l]) => HAND.test(l)).map(([i]) => String(p) + ":" + i));
+check("instrument:the-scan-reaches-the-extracted-panels", files.some((p) => /gram-panel/.test(String(p))) && files.length > 20, files.length + " modules");
 check("josa:no-particle-is-glued-by-hand", hand.length === 0, hand.join(", ") || "none");
 check("control:a-glued-particle-is-caught", HAND.test("CAUSE_LABEL[m.stat] + ' ' + state.keeper[m.stat] + '로 성공'"), "planted line");
 check("control:a-wrong-table-entry-is-caught", withRo(3) !== "3로", "3 -> " + withRo(3));
