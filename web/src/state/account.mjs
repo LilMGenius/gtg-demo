@@ -109,7 +109,8 @@ export function namedAccounts() {
   return readDir().filter((a) => !a.guest).map((a) => ({ id: a.id, nick: a.nick }));
 }
 
-// 이름만 바꾼다. 아이디와 판은 그대로다.
+/* 이름만 바꾼다. 아이디와 판은 그대로다. 판이 같은 이름으로 읽는 표기 고침(대소문자, 띄어쓰기)은
+   변경 횟수에 안 센다. 그 이름은 판에서 한 번도 안 바뀌었기 때문이다. */
 export function setNick(id, nick) {
   const key = normalId(id);
   const name = String(nick || '').trim();
@@ -118,8 +119,8 @@ export function setNick(id, nick) {
   const list = readDir();
   const acc = list.find((a) => a.id === key);
   if (!acc) return { ok: false, why: '없는 아이디다' };
+  if (nickKey(acc.nick) !== nickKey(name)) acc.renames = (Number(acc.renames) || 0) + 1;
   acc.nick = name;
-  acc.renames = (Number(acc.renames) || 0) + 1;
   writeDir(list);
   return { ok: true };
 }

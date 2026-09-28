@@ -11,7 +11,7 @@ import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dmLine, gazeAct } from './ui/lines.mjs';
 import { load, save, readSquad, offlineGain, readRecord, readSquadKickers, useAccount, saveKey, peek } from './state/save.mjs';
-import { RANK_BOARDS, RANK_MIN_SHOTS, rankLine, sortBoard, rankValue, qualifies, sendRankLine, fetchLines, claimNick } from './state/rank.mjs';
+import { RANK_BOARDS, RANK_MIN_SHOTS, rankLine, sortBoard, rankValue, qualifies, sendRankLine, fetchLines, claimNick, nickKey } from './state/rank.mjs';
 import { autoTrain, trainStat } from './state/coach.mjs';
 import { currentId, nickOf, isGuest, namedAccounts, nickProblem, setNick, renamesOf } from './state/account.mjs';
 import { UTILS, utilAt, payCash, renamePrice } from './state/util.mjs';
@@ -2686,6 +2686,15 @@ function bindUtil(box) {
       if (nick === nickOf(me)) { utilSay = '지금 닉네임과 같다'; return renderShop(); }
       const bad = nickProblem(nick, me);
       if (bad) { utilSay = bad; return renderShop(); }
+      /* 판이 같은 이름으로 읽는 표기 고침은 값을 안 받는다. 판의 이름이 그대로인데 캐시와 다음 값만 움직이면
+         변경권이 아무것도 안 판 것이 된다(검증자가 1000에서 970을 쟀다). */
+      if (nickKey(nick) === nickKey(nickOf(me))) {
+        setNick(me, nick);
+        await claimNick(me, nick);
+        utilOpen = null;
+        utilSay = '';
+        return renderShop();
+      }
       const cost = renamePrice(renamesOf(me));
       if (state.wallet.cash < cost) return renderShop();
       // 서버가 있으면 이름을 먼저 건다. 서버가 거절하면 캐시를 안 받는다.

@@ -56,6 +56,13 @@ check("guests-never-take-a-nick", namedAccounts().length === 1 && nickProblem("�
 const three = signUp("gamma", "pass3", "수문장");
 const moved = setNick("alpha", "골문장인");
 check("renaming-frees-the-old-nick", three.ok && moved.ok && nickProblem("골문지기", "delta") === "" && nickProblem("골문장인", "delta") !== "", JSON.stringify(namedAccounts()));
+const before = namedAccounts().find((a) => a.id === "gamma");
+const fix = setNick("gamma", "수문장 ".trim().toUpperCase());
+const { renamesOf } = await import("../web/src/state/account.mjs");
+const beforeCount = renamesOf("gamma");
+setNick("gamma", "SuMun"); const afterReal = renamesOf("gamma");
+setNick("gamma", "sumun"); const afterStyle = renamesOf("gamma");
+check("a-restyle-of-the-same-name-is-not-a-rename", fix.ok && Boolean(before) && afterReal === beforeCount + 1 && afterStyle === afterReal, [beforeCount, afterReal, afterStyle].join(" -> "));
 check("a-nick-past-twelve-is-refused", nickProblem("가".repeat(13), "x") !== "" && nickProblem("가".repeat(12), "x") === "", "12");
 
 // 서버: 같은 이름 409, 같은 계정의 다시 걸기 200, 바꾸면 옛 이름을 놓는다, 이름 없는 줄은 403.
