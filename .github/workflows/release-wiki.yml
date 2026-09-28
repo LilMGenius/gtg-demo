@@ -54,7 +54,9 @@ jobs:
           npm ci --ignore-scripts
           npm run wiki
           test "$(node -p 'require("./web/wiki/site/gamewiki.json").version')" = "${latest#v}"
-          git diff --exit-code -- web/wiki
+          # The two Pagefind wasm runtimes come pre-gzipped from the native Pagefind binary of the build platform, so a
+          # Linux rebuild of a wiki built on Windows differs in those two files alone (gamewiki AGENTS, build section).
+          git diff --exit-code -- web/wiki ':(exclude)web/wiki/site/pagefind/wasm.*.pagefind'
       - name: Version gate
         if: steps.bump.outputs.run == 'true'
         working-directory: game
