@@ -44,7 +44,7 @@ check("save-reads-like-a-batting-average", rankValue("save", 0.7234) === ".723" 
 check("stat-shows-two-decimals", rankValue("stat", 10.456) === "10.46" && rankValue("fans", 12345) === "12,345", rankValue("stat", 10.456) + " " + rankValue("fans", 12345));
 
 // 이름 비교는 사람이 같은 이름으로 읽는 둘을 같게 본다.
-check("nick-key-folds-case-space-and-composition", nickKey("  Kim  Keeper ") === nickKey("kim keeper") && nickKey("\u1100\u1161") === nickKey("\uAC00"), JSON.stringify(nickKey("  Kim  Keeper ")));
+check("nick-key-folds-case-space-and-composition", nickKey("  Kim  Keeper ") === nickKey("kim keeper") && nickKey(String.fromCharCode(0x1100, 0x1161)) === nickKey(String.fromCharCode(0xAC00)), JSON.stringify(nickKey("  Kim  Keeper ")));
 check("control:raw-compare-fails-the-fold-axis", "  Kim  Keeper " !== "kim keeper", "raw strings differ");
 
 // 이 기기: 둘째 계정은 같은 이름을 못 든다. 손님은 이름을 안 잡는다.

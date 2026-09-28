@@ -16,7 +16,8 @@ export const WIKI_CATS = [
   { key: 'gram', label: '아웃문그램' },
   { key: 'bot', label: '봇' },
   { key: 'buff', label: '버프' },
-  { key: 'risk', label: '사고' }
+  { key: 'risk', label: '사고' },
+  { key: 'rank', label: '랭킹' }
 ];
 
 const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

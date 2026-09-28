@@ -24,7 +24,7 @@ const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win6
 const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
 const LINE = String.fromCharCode(10);
 // 카테고리 아홉. 키는 ASCII다. 화면 라벨로 찾으면 라벨을 다듬은 날 자가 같이 죽는다.
-const KEYS = ["game", "hand", "coin", "drill", "gear", "pull", "gram", "bot", "buff", "risk"];
+const KEYS = ["game", "hand", "coin", "drill", "gear", "pull", "gram", "bot", "buff", "risk", "rank"];
 /* 수를 싣는 여섯. hand와 risk는 자리와 이름만 싣는 표라 수가 0인 것이 정상이고,
    그래서 아래 계기 축이 요구하는 "수가 한 칸 이상"의 대상에서 빠진다. */
 /* 신호가 옮겨야 하는 최소 화소 몫. 그늘이 DOM에만 있고 화면을 안 건드리면 위의 축은 빈 초록이다.
@@ -348,7 +348,8 @@ try {
   });
   check("wiki:narrow-width-lays-the-categories-in-even-rows",
     // 본문 두 줄(한 줄 22px)이 화면 안에 서야 본문이 있다고 읽힌다.
-    Boolean(strip) && strip.rows <= 2 && new Set(strip.counts).size === 1 && strip.shown && strip.bodyTop < 360 - 2 * 22,
+    // 같은 수가 아니라 줄끼리 한 칸 차이까지다. 카테고리가 소수(열하나)이면 같은 수는 한 줄뿐이다.
+    Boolean(strip) && strip.rows <= 2 && Math.max(...strip.counts) - Math.min(...strip.counts) <= 1 && strip.shown && strip.bodyTop < 360 - 2 * 22,
     strip ? strip.counts.join("+") + " per row, every tab on screen " + strip.shown + ", body starts " + strip.bodyTop : "no .cats");
 
   const spill = [], split = [];

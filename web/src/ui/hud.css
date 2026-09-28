@@ -1716,7 +1716,8 @@ body:has(#shop:not([hidden]) .banners) #rotate{display:none}
     right:var(--gap-3);top:calc(var(--gap-2) + env(safe-area-inset-top))}
   :is(#gym,#roster,#gram,#me,#shop,#wiki,#date){border-bottom-width:0}
   /* 분류 열은 다섯 칸 고른 두 줄로 접는다. 한 줄로 두면 끝의 칸들이 가로 스크롤 뒤로 숨는다. */
-  #wiki .cats{display:grid;grid-template-columns:repeat(5,max-content)}
+  /* 카테고리 열하나. 여섯 칸 줄이면 6+5로 끝줄에 혼자 남는 칸이 없다. */
+  #wiki .cats{display:grid;grid-template-columns:repeat(6,max-content)}
 }
 
 /* 손가락 바닥 44px. 세로가 짧은 폭은 손에 든 화면이라 누르는 칸이 손가락 하나를 받아야 한다. 실측 740x360에서

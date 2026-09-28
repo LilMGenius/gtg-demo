@@ -315,6 +315,24 @@
   },
   {
     "aliases": [
+      "rank",
+      "ranking"
+    ],
+    "categories": [
+      "rank"
+    ],
+    "game": "gtg",
+    "id": "rank",
+    "relations": {
+      "relatedTo": [
+        "drill"
+      ]
+    },
+    "title": "랭킹",
+    "type": "guide"
+  },
+  {
+    "aliases": [
       "risk"
     ],
     "categories": [

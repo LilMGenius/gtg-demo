@@ -18,7 +18,7 @@ const SOURCE = join(ROOT, 'web/wiki/src');
 const FACTS = join(ROOT, 'web/wiki/facts.json');
 const DIST = join(ROOT, 'web/wiki/dist');
 const EVIDENCE = join(ROOT, '.omo/evidence');
-const KEYS = ['game', 'hand', 'coin', 'drill', 'gear', 'pull', 'gram', 'bot', 'buff', 'risk'];
+const KEYS = ['game', 'hand', 'coin', 'drill', 'gear', 'pull', 'gram', 'bot', 'buff', 'risk', 'rank'];
 const modules = { wallet, roster, gram };
 const report = { started: new Date().toISOString(), invocation: process.argv, axes: [], builds: [], bodies: [] };
 mkdirSync(EVIDENCE, { recursive: true });
@@ -141,12 +141,17 @@ try {
   const parent = execFileSync('git', ['show', '71ac803:web/src/ui/wiki.mjs'], { cwd: ROOT, encoding: 'utf8' });
   const parentPage = await context.newPage();
   await parentPage.route('**/src/ui/wiki.mjs', r => r.fulfill({ contentType: 'text/javascript', body: parent }));
+  // 부모 모듈이 읽던 COIN_DRILL은 능력치 상한과 함께 지갑에서 사라졌다. wiki 게이트와 같이 지금 지갑에 부모 값 한 줄을 덧붙인다.
+  const parentDrill = execFileSync('git', ['show', '9566a7e:web/src/state/wallet.mjs'], { cwd: ROOT, encoding: 'utf8' }).match(/export const COIN_DRILL = \d+;/)[0];
+  const parentWallet = readFileSync(join(ROOT, 'web/src/state/wallet.mjs'), 'utf8') + '\n' + parentDrill + '\n';
+  await parentPage.route('**/src/state/wallet.mjs', r => r.fulfill({ contentType: 'text/javascript', body: parentWallet }));
   await parentPage.goto(BASE);
   await parentPage.click('#go', { force: true });
   await parentPage.click('#wikiBtn', { force: true });
   const parentRows = [];
   // 역사 대조군은 당시 선언한 칸만 잰다. 새 칸 부재는 wiki 게이트의 좌표 축이 잰다.
-  for (const key of KEYS.filter(key => key !== 'game')) {
+  // 부모가 선언한 칸만 누른다. 뒤에 생긴 칸(랭킹)을 부모에서 누르면 없는 단추를 30초 기다리다 실행이 죽는다.
+  for (const key of KEYS.filter(key => key !== 'game' && parent.includes("'" + key + "'"))) {
     await parentPage.locator('#wiki .cats [data-cat="' + key + '"]').click();
     parentRows.push({ key, visible: await parentPage.locator('#wiki').isVisible(), tables: await parentPage.locator('#wiki table').count() });
   }

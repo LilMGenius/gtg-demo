@@ -11,6 +11,8 @@ import { CAUSE_LABEL, INPUT_CAUSES } from '../src/ledger.mjs';
 import { LIKE_BASE, LIKE_PER_CITY, MUTUAL_STEP, MUTUAL_CAP, SELFIE_BASE } from '../web/src/state/gram.mjs';
 import { MISHAP_SHELF, SHELF_NOTES_FOR_WIKI } from '../web/src/state/shelf.mjs';
 import { statValue, CURVE_SAMPLES } from '../src/chain.mjs';
+import { RANK_BOARDS, RANK_MIN_SHOTS } from '../web/src/state/rank.mjs';
+import { renamePrice } from '../web/src/state/util.mjs';
 
 const values = {
   'coin-save': COIN_SAVE, 'coin-conceded': COIN_CONCEDED, 'cash-rate': CASH_RATE,
@@ -32,6 +34,9 @@ const tables = {
   gram: [kv([['좋아요', LIKE_BASE], ['동네 한 등급', LIKE_PER_CITY], ['맞팔 한 명', MUTUAL_STEP], ['맞팔 한도', MUTUAL_CAP], ['같이 한 장', SELFIE_BASE]])],
   bot: [{ columns: ['이름', '판단력', '분', '값'], rows: BOTS.map((b) => [b.name, b.judge, b.minutes, b.cost]) }],
   buff: [{ columns: ['이름', '효과', '지속(회)', '값'], rows: BUFFS.map((b) => [b.name, b.note, b.shots, b.cost]) }],
+  // 판 목록과 문턱과 변경권 값. 판이나 값이 바뀐 날 이 표도 같이 바뀐다.
+  rank: [{ columns: ['판', '무엇'], rows: RANK_BOARDS.map((b) => [b.label, b.id === 'save' ? RANK_MIN_SHOTS + ' 슈팅부터' : '제한 없음']) },
+    kv([['첫 변경(캐시)', renamePrice(0)], ['두 번째(캐시)', renamePrice(1)], ['최고(캐시)', renamePrice(99)]])],
   risk: [
     { columns: ['입력', '무엇'], rows: [[CAUSE_LABEL[INPUT_CAUSES[0]], '고른 자리'], [CAUSE_LABEL[INPUT_CAUSES[1]], '누른 때'], [CAUSE_LABEL[INPUT_CAUSES[2]], '나간 거리']] },
     { columns: ['사고', '깎는 선반'], rows: MISHAP_SHELF }

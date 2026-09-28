@@ -178,6 +178,19 @@ export default defineConfig({ base: "/gtg-demo/web/wiki/site", build: { format: 
       "items": [
         {
           "label": "Overview",
+          "link": "/category-72616e6b.html"
+        },
+        {
+          "label": "랭킹",
+          "link": "/rank.html"
+        }
+      ],
+      "label": "rank"
+    },
+    {
+      "items": [
+        {
+          "label": "Overview",
           "link": "/category-7269736b.html"
         },
         {

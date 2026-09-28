@@ -19,7 +19,7 @@ title: "능력"
 
 ### relatedTo
 
-<ul><li><a href="./coin.html">버는 법</a></li></ul>
+<ul><li><a href="./coin.html">버는 법</a></li><li><a href="./rank.html">랭킹</a></li></ul>
 
 ### Linked from
 
