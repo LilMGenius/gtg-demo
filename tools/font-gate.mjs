@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -56,14 +57,14 @@ function coverage(path) {
   return set;
 }
 
+/* 코퍼스는 git이 추적하는 파일이다. 폴더를 걸으면 무시된 증거 폴더(.omo)의 스크립트까지 세어 같은 커밋이
+   작업 트리마다 다른 지문을 냈다(이 기기 ca9daa29, 깨끗한 체크아웃 c6f541b0). 굽는 subset-font.py와 같은 목록이다. */
 function walk(dir, out) {
-  for (const name of readdirSync(dir)) {
-    // 스크래치는 코퍼스가 아니다. 옆 세션이 .omo에 떨군 *.local.* 한 장이 글자 집합을 밀면
-    // 이 게이트가 빨간불을 내고, 그 말대로 다시 깎으면 남의 임시 파일 글자가 서체에 박힌다.
-    if (SKIP.includes(name) || name.includes(".local")) continue;
-    const p = join(dir, name);
-    if (statSync(p).isDirectory()) walk(p, out);
-    else if (/\.(mjs|js|html)$/.test(name)) out.push(p);
+  const names = execFileSync("git", ["ls-files", "-z"], { cwd: dir, encoding: "utf8", maxBuffer: 64 << 20 }).split("\0");
+  for (const rel of names) {
+    const parts = rel.split("/");
+    if (!rel || parts.slice(0, -1).some((p) => SKIP.includes(p)) || rel.includes(".local") || !/\.(mjs|js|html)$/.test(rel)) continue;
+    out.push(join(dir, rel));
   }
   return out;
 }

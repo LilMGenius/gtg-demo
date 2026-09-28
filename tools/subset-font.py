@@ -21,17 +21,18 @@ BASE = "https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/woff2/Pret
 WEIGHTS = [("Regular", 400), ("Bold", 700)]
 # 정본 woff2는 레포에 안 넣는다. 깎은 것만 싣고 원본은 필요할 때 받는다.
 
+# 코퍼스는 git이 추적하는 파일이다. 폴더를 걸으면 무시된 증거 폴더(.omo)의 스크립트까지 세어
+# 같은 커밋이 작업 트리마다 다른 지문을 낸다. 실측으로 이 기기와 깨끗한 체크아웃이 c6f541b0과 ca9daa29로 갈렸다.
 def corpus():
+    import subprocess
     seen = set()
-    for base, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in SKIP and ".local" not in d]
-        for name in files:
-            # 스크래치는 코퍼스가 아니다. 굽는 쪽과 재는 쪽이 같은 목록을 봐야 하므로
-            # tools/font-gate.mjs의 walk과 같은 규칙으로 같이 뺀다.
-            if ".local" in name or not re.search(r"\.(mjs|js|html)$", name):
-                continue
-            with open(os.path.join(base, name), encoding="utf-8", errors="ignore") as fh:
-                seen.update(fh.read())
+    names = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True).stdout.decode("utf-8").split("\0")
+    for rel in names:
+        parts = rel.split("/")
+        if not rel or any(p in SKIP for p in parts[:-1]) or ".local" in rel or not re.search(r"\.(mjs|js|html)$", rel):
+            continue
+        with open(os.path.join(ROOT, rel), encoding="utf-8", errors="ignore") as fh:
+            seen.update(fh.read())
     return seen
 
 def build(name, chars):
