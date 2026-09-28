@@ -38,7 +38,7 @@ try {
 
   const seen = await p.evaluate((words) => {
     const tab = [...document.querySelectorAll("#shop .tab")].find((e) => e.dataset.tab === "pull");
-    const head = document.querySelector("#shop h4");
+    const head = document.querySelector("#shop > .ptitle");
     /* 탭은 아이콘과 글자를 같이 담는다. textContent는 svg의 title까지 이어 붙여
        한 번 적힌 이름을 두 번 적힌 것으로 읽는다. 사람이 보는 글자만 세려면 글자 노드만 본다. */
     // 글자는 아이콘 옆 span이 담는다. 그 자리를 먼저 보고, 없으면 직계 글자 노드로 물러선다.
@@ -61,7 +61,7 @@ try {
   check("instrument:the-draw-shelf-is-on-screen", Boolean(seen.tab && seen.head),
     "tab " + seen.tab + " head " + seen.head);
   check("market:the-shelf-carries-the-new-name",
-    seen.tab === NEW && seen.head === NEW, "tab " + seen.tab + ", head " + seen.head);
+    seen.tab === NEW && seen.head === "상점", "tab " + seen.tab + ", head " + seen.head);
   check("market:nothing-on-screen-still-says-the-old-name",
     seen.hits.length === 0, seen.hits.slice(0, 4).join(", ") || "clear");
 

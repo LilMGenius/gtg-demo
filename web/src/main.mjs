@@ -1396,7 +1396,7 @@ function recordRows() {
   /* 비어 있는 갈래는 제목째 안 선다. 빈 표 위의 제목은 빈 상자 위 라벨이다(빈 칸은 비워 두거나 아이콘, 파운더 판정).
      둘 다 비면 아는 얼굴이 없을 때와 같은 얼굴 실루엣 하나만 선다. 막을 상대가 생겨야 채워질 자리라서다. */
   if (!names.length && !played.length) return '<div class="note dim">' + IC_NOFACE + '</div>';
-  return (names.length ? '<div class="note"><b>상대 전적</b><i>막은 수 - 먹힌 수</i></div>' + table : '')
+  return (names.length ? table : '')
     + (played.length ? '<div class="note"><b>최근</b></div>' + recent : '');
 }
 
@@ -1425,7 +1425,6 @@ const TIER_TOP = rapportTier({ '0:0': 999 }, 0, 0);
 
 function rapportRows() {
   const keys = Object.keys(state.rapport || {});
-  const head = '<div class="note"><b>아는 얼굴</b><i>라포</i></div>';
   /* 빈 칸이 받는 것은 빈 채로 두기와 아이콘 둘뿐이다. 파운더가 세운 규칙이고 열거형이라,
      안내 문장이든 명사구 한 줄이든 글자는 셋째 것이라 여기 안 선다. 둘 중 아이콘을 세운다.
      빈 띠 하나는 화면이 덜 그려진 것으로 읽혔고, 실루엣 하나면 이 자리에 설 것이 사람이라는
@@ -1460,7 +1459,7 @@ function rapportRows() {
         '<u' + (at < tier ? ' class="on"' : '') + '></u>').join('') + '</span>'
       + '<button class="go' + (g.short > 0 ? ' bad-price' : '') + '" data-city="' + city + '" data-passer="' + passer + '"' + (g.open ? '' : ' disabled') + '>' + dateLabel(g) + '</button></div>';
   }).join('');
-  return head + rows;
+  return rows;
 }
 
 /* 내 정보는 성격이 다른 넷을 한 두루마리에 쌓고 있었다. 능력치를 보러 온 사람과 전적을
@@ -1517,7 +1516,7 @@ function renderMe() {
   const big = '<div class="big"><span><b>' + rate + '%</b><i>세이브율</i></span>'
     + '<span><b>' + led.s + '</b><i>막은 수</i></span>'
     + '<span><b>' + led.c + '</b><i>먹힌 수</i></span></div>';
-  box.innerHTML = tabs + '<h4><img class="pfp" alt="' + name + '" src="'
+  box.innerHTML = '<h4 class="ptitle">내 정보</h4>' + tabs + '<h4><img class="pfp" alt="' + name + '" src="'
     + thumbURL('face', k, lookOf(state.gear, state.keeper.name)) + '">' + name
     + '<small><i>Lv ' + k.level + '</i><i>' + k.height + 'cm</i><i>' + k.weight + 'kg</i>'
     + '<i class="cond">' + cond + '</i></small></h4>'
@@ -1939,7 +1938,7 @@ function gearShelf(kind) {
       + '<b>' + g.name + '</b><em>' + cardLines(kind, rank) + '</em>'
       + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-kind="' + kind + '" data-rank="' + rank + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
-  return '<h4>' + s.head + '</h4><div class="rack">' + rows.join('') + '</div>';
+  return '<div class="rack">' + rows.join('') + '</div>';
 }
 
 
@@ -2428,7 +2427,7 @@ function pullBanner(all, kind) {
 function pullShelf(all) {
   /* 보유 이용권은 숫자다. 이용권을 받는 팩이 하나라도 있을 때만 세운다. */
   const bank = PULL_KINDS.some((k) => k.ticketable) ? '<span class="held" title="이용권">' + IC_TICKET + '<b>' + state.tickets + '</b></span>' : '';
-  return '<h4>이적시장</h4><div class="pull-bar"><div class="roles" role="group" aria-label="뽑을 자리">'
+  return '<div class="pull-bar"><div class="roles" role="group" aria-label="뽑을 자리">'
     + ['keeper', 'kicker'].map(role => '<button data-role="' + role + '" aria-pressed="' + (pullRole === role) + '">' + (role === 'keeper' ? '키퍼' : '키커') + '</button>').join('')
     + '</div>' + bank + '</div><div class="banners">' + PULL_KINDS.map((k) => pullBanner(all, k)).join('') + '</div>';
 }// 봇은 소모형이라 SHELVES에 못 넣는다. 등급을 갖는 게 아니라 분을 갖는다.
@@ -2459,7 +2458,7 @@ function botShelf() {
       + '<em>' + cardLines('bot', b.tier, duration) + '</em>'
       + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-bot="' + b.tier + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
-  return '<h4>봇</h4><div class="rack">' + rows.join('') + '</div>';
+  return '<div class="rack">' + rows.join('') + '</div>';
 }
 
 /* 봇과 버프 카드의 그림. 장비와 달리 몸에 걸치는 것이 아니라 등급 하나가 곧 그 그림이라
@@ -2526,7 +2525,7 @@ function buffShelf() {
       + '<em>' + cardLines('buff', b.kind, duration) + '</em>'
       + '<div class="foot"><button class="buy' + (bad ? ' bad-price' : '') + '" data-buff="' + b.kind + '"' + (off ? ' disabled' : '') + '>' + label + '</button></div></div>';
   });
-  return '<h4>버프</h4><div class="rack">' + rows.join('') + '</div>';
+  return '<div class="rack">' + rows.join('') + '</div>';
 }
 
 function bindBuff(box) {
@@ -2564,7 +2563,7 @@ function renderShop() {
   /* 창의 뼈대는 탭 줄, 몸, 닫기 셋이고 선반이 바뀌어도 뼈대는 안 움직인다. 탭 줄이 선반 기둥 안에 있으면
      탈의실이 있는 선반과 없는 선반에서 기둥 폭이 달라 탭이 다르게 접히고, 닫기가 선반 높이를 따라 뛴다.
      탈의실은 입는 선반의 짝이라 뽑기 선반에서는 몸 안에서만 빠진다. */
-  box.innerHTML = tabs + '<div class="shopbody' + (shopTab === 'pull' ? ' pulling' : '') + '">' + (shopTab === 'pull' ? '' : fittingRoom()) + '<div class="goods">' + goods + '</div></div>'
+  box.innerHTML = '<h4 class="ptitle">상점</h4>' + tabs + '<div class="shopbody' + (shopTab === 'pull' ? ' pulling' : '') + '">' + (shopTab === 'pull' ? '' : fittingRoom()) + '<div class="goods">' + goods + '</div></div>'
     + '<button class="close">닫기</button>';
   // 탭을 다시 그려도 선택한 선반이 가로 스크롤 밖으로 사라지지 않게 브라우저가 위치를 맞춘다.
   box.querySelector('.tab[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });

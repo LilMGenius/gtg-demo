@@ -257,6 +257,21 @@ try {
     const same = (list) => new Set(list.map((s) => Number(s.split(' ')[1]))).size === 1;
     const rowTops = await tops();
     check(W + 'x' + H + ':shell:tab-rows-share-one-top-across-panels', same(rowTops), rowTops.join(', '));
+    /* 창 이름. 탭이 있는 창 넷이 머리 띠 가운데 한 자리에 이름을 세우고, 탭 줄 위에 서며, 재화 띠와 닫기를 안 덮는다.
+       탭 이름을 몸 위에 다시 적는 머리(상점의 선반 머리)도 없다. 대조군은 선수단 이름을 흐름으로 되돌린다. */
+    const heads = async () => { const out = []; for (const [id, row] of ROWS) { await cp.evaluate((i) => window['__' + i](true), id); await cp.waitForTimeout(250); out.push(await cp.evaluate(([i, r]) => { const box = (s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom }; }; const cur = document.querySelector('#' + i + ' [aria-current="true"],#' + i + ' [aria-selected="true"]'); const label = cur ? cur.textContent.trim() : ''; const repeat = [...document.querySelectorAll('#' + i + ' h4:not(.ptitle)')].some((h) => label && h.textContent.trim() === label); return { id: i, t: box('#' + i + ' > .ptitle'), row: box('#' + i + ' ' + r), strip: box('#top'), close: box('#' + i + ' .close'), repeat }; }, [id, row])); await cp.evaluate((i) => window['__' + i](false), id); await cp.waitForTimeout(120); } return out; };
+    const apart = (a, c) => !a || !c || a.r <= c.l || c.r <= a.l || a.b <= c.t || c.b <= a.t;
+    const headOk = (h) => h.t && h.row && h.t.b <= h.row.t + 1 && apart(h.t, h.strip) && apart(h.t, h.close) && !h.repeat;
+    const hs = await heads();
+    check(W + 'x' + H + ':shell:every-tabbed-panel-names-itself-above-its-tabs', hs.every(headOk) && Math.max(...hs.map((h) => h.t.t)) - Math.min(...hs.map((h) => h.t.t)) <= 2,
+      hs.map((h) => h.id + ' ' + (h.t ? Math.round(h.t.t) + '-' + Math.round(h.t.b) : 'none') + '/' + (h.row ? Math.round(h.row.t) : '-') + (h.repeat ? ' repeats' : '')).join(', '));
+    if (W === 740) {
+      const plantHead = await cp.addStyleTag({ content: '#roster > .ptitle{position:static;translate:none}' });
+      const ph = await heads();
+      await plantHead.evaluate((n) => n.remove());
+      check(W + 'x' + H + ':control:a-panel-name-back-in-the-flow-is-caught', !(ph.every(headOk) && Math.max(...ph.map((h) => h.t.t)) - Math.min(...ph.map((h) => h.t.t)) <= 2), ph.map((h) => h.id + ' ' + (h.t ? Math.round(h.t.t) : 'none')).join(', '));
+    }
+
     if (W === 740) {
       const plant = await cp.addStyleTag({ content: '#roster > .ptitle{position:static;translate:none;order:1}#roster > .kinds{order:2}#roster > .rosterbody{order:3}' });
       const planted = await tops();

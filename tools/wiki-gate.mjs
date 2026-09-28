@@ -248,7 +248,9 @@ try {
     read += 1;
     tally.push(k + " " + r.tables.length + "t/" + r.nums.length + "n");
     if (r.tables.length < 1) bare.push(k + " " + r.tables.length);
-    if (!r.head.length) headless.push(k);
+    /* 본문 머리는 켜진 분류 이름과 같으면 안 선다(파운더 2026-09-28, 탭이 이미 그 말을 한다). 옛 축은 머리가 있어야 초록이었다. */
+    const cur = await p.evaluate(() => document.querySelector('#wiki .cats [aria-current]')?.textContent.trim());
+    if (r.head && r.head === cur) headless.push(k + ' repeats ' + cur);
     const want = WANT[k];
     if (want) {
       for (const n of want) if (!r.nums.includes(n)) wrong.push(k + " missing " + n);
@@ -261,7 +263,7 @@ try {
     }
   }
   check("wiki:every-category-body-carries-a-table", bare.length === 0, bare.join(", ") || KEYS.length + " bodies, every one tabled");
-  check("wiki:every-category-body-names-itself", headless.length === 0, headless.join(",") || "every body carries a noun head");
+  check("wiki:no-body-repeats-its-tab", headless.length === 0, headless.join(",") || "no body head repeats its tab");
   // 화면 숫자와 코드 상수를 맞댄다. 양쪽으로 묻는다. 빠진 수와 지어낸 수는 다른 결함이다.
   check("wiki:the-tables-carry-the-code-numbers", wrong.length === 0,
     wrong.slice(0, 3).join(", ") || GATED.length + " numeric bodies match the constants");

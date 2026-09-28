@@ -87,7 +87,7 @@ try {
   cpSync(SOURCE, join(temp, 'mutant'), { recursive: true });
   const mutatedFile = join(temp, 'mutant/coin.md');
   const original = readFileSync(mutatedFile, 'utf8');
-  const anchor = original.split('\n---\n')[1].trim().split('\n')[0];
+  const anchor = original.replace(/\r\n/g, '\n').split('\n---\n')[1].trim().split('\n')[0];
   if (!anchor || original.split(anchor).length !== 2) throw Error('Mutation anchor');
   writeFileSync(mutatedFile, original.replace(anchor, anchor + ' Changed sentence.'), 'utf8');
   const mutated = embed(join(temp, 'mutant'), join(temp, 'mutated-output'));
@@ -109,7 +109,7 @@ try {
       const body = document.querySelector('#wiki .body');
       const paragraphs = root => [...root.querySelectorAll('p')].filter(p => !p.closest('table')).map(p => p.textContent);
       return { expected: paragraphs(template.content), actual: paragraphs(body), expectedTitle: title,
-        title: body.querySelector('h4').textContent, visible: !document.querySelector('#wiki').hidden && body.getBoundingClientRect().height > 0,
+        title: body.querySelector('h4')?.textContent ?? document.querySelector('#wiki .cats [aria-current]')?.textContent.trim(), visible: !document.querySelector('#wiki').hidden && body.getBoundingClientRect().height > 0,
         tables: body.querySelectorAll('table').length };
     }, { html: substituted(expected), title: expected.title });
   const matchesBody = r => same(r.actual, r.expected) && r.title === r.expectedTitle && r.visible && r.tables > 0;

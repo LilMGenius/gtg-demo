@@ -123,8 +123,10 @@ check('ctrl:empty-rapport-note-only',
   && ctrl.shot.dim.every((t) => t.trim() === ''),
   'head=' + ctrl.shot.headPresent + ' rows=' + ctrl.shot.rows.length + ' dim=' + ctrl.shot.dim.length
   + ' text=' + JSON.stringify(ctrl.shot.dim.join('')));
-check('view:head-note-present', main.shot.headSeen && main.shot.headSub === SUB,
-  'head=' + JSON.stringify(main.shot.headSub) + ' seen=' + main.shot.headSeen);
+/* 머리 카드(아는 얼굴 / 라포)는 줄이 있어도 안 선다. 켜진 탭이 이미 아는 얼굴이고 카드가 스스로 사람이라,
+   머리는 같은 말을 두 번 한다(파운더 2026-09-28). 옛 축은 머리가 있어야 초록이었다. */
+check('view:no-head-note-over-the-rows', !main.shot.headPresent && main.shot.rows.length > 0,
+  'head=' + main.shot.headPresent + ' rows=' + main.shot.rows.length);
 
 const keys = Object.keys(FIX).sort((x, y) => FIX[y] - FIX[x]);
 check('view:row-count-matches-keys', main.shot.rows.length === keys.length, main.shot.rows.length + '/' + keys.length);

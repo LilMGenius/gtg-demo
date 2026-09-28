@@ -564,10 +564,12 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) #mo
 /* 포지션 색. 축구 UI의 관례(FIFA/EA FC 포메이션 화면과 선수 카드): GK 노랑, DF 파랑, MF 초록, FW 빨강.
    탭 표지와 포메이션 판의 점이 이 네 값 하나를 같이 쓴다. */
 #roster{--pos-gk:#f2c84b;--pos-df:#4a8be8;--pos-mf:#43b86e;--pos-fw:#e5533f}
-/* 창 이름. 탭 줄 위 머리 띠(재화 띠와 같은 높이)의 가운데에 붙박이로 선다. 탭 아래에 두면 창 이름이 탭보다 늦게 읽히고
-   탭 줄이 창마다 다른 자리로 밀린다(--tab-top 규칙). */
-#roster > .ptitle{position:absolute;top:calc(8px + env(safe-area-inset-top));left:50%;translate:-50% 0;
-  height:calc(var(--strip-b) - 19px);display:flex;align-items:center;margin:0;pointer-events:none;white-space:nowrap}
+/* 창 이름. 탭이 있는 창 넷(선수단, 상점, 내 정보, 도움말)이 한 규칙을 쓴다. 탭 줄 위 머리 띠(재화 띠와 같은 높이)의 가운데에
+   붙박이로 선다. 탭 아래에 두면 창 이름이 탭보다 늦게 읽히고, 몸 위에 지금 탭 이름을 다시 적으면 켜진 탭과 같은 말이 두 번 선다. */
+:is(#roster,#shop,#me,#wiki) > .ptitle{position:absolute;top:calc(8px + env(safe-area-inset-top));left:50%;translate:-50% 0;z-index:3;
+  height:calc(var(--strip-b) - 19px);display:flex;align-items:center;margin:0;pointer-events:none;white-space:nowrap;
+  font-family:var(--disp);font-size:var(--fs-title);font-weight:400;color:#ffd83d;-webkit-text-stroke:clamp(3px,.45vw,5px) var(--edge);
+  paint-order:stroke fill;text-shadow:4px 5px 0 var(--edge);transform:rotate(-1.6deg)}
 #roster .kind small{font-size:var(--fs-body);color:var(--dim);font-variant-numeric:tabular-nums;margin-left:2px}
 #roster .kind[aria-selected="true"] small{color:var(--ink)}
 #roster .kind svg{color:var(--pc)}

@@ -92,7 +92,7 @@ export function mountWikiBuild(box) {
 export function wikiHTML(cur) {
   const tabs = WIKI_CATS.map((c) => '<button type="button" data-cat="' + c.key + '"'
     + (c.key === cur ? ' aria-current="true"' : '') + '>' + esc(c.label) + '</button>').join('');
-  return '<div class="sheet"><nav class="cats">' + tabs + '</nav>'
+  return '<h4 class="ptitle">도움말</h4><div class="sheet"><nav class="cats">' + tabs + '</nav>'
     // 본문을 감싸는 칸. 신호는 본문 밖에 서야 본문과 같이 안 굴러간다.
     + '<div class="bodybox"><div class="body"></div>'
     + '<div class="cue up" aria-hidden="true"></div><div class="cue down" aria-hidden="true"></div></div>'
@@ -102,6 +102,8 @@ export function wikiHTML(cur) {
 export function wikiBody(key) {
   const cat = WIKI_CATS.some(c => c.key === key) ? key : WIKI_CATS[0].key;
   const page = pages.find(p => p.id === cat);
-  return '<h4>' + esc(page.title) + '</h4><div class="wiki-prose" data-wiki-id="' + cat + '">' + page.bodyHtml + '</div>'
+  /* 페이지 제목이 켜진 분류 이름과 같으면 세우지 않는다. 탭이 이미 그 말을 한다. 다르면(재화 탭의 버는 법) 세운다. */
+  const label = WIKI_CATS.find(c => c.key === cat)?.label;
+  return (page.title === label ? '' : '<h4>' + esc(page.title) + '</h4>') + '<div class="wiki-prose" data-wiki-id="' + cat + '">' + page.bodyHtml + '</div>'
     + (EXTRA[cat] ? EXTRA[cat]() : '');
 }

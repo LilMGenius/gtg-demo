@@ -114,7 +114,7 @@ try {
   const capPosition = await p.evaluate(() => {
     const e = document.getElementById("caption");
     const cap = e.getBoundingClientRect();
-    const h4 = document.querySelector("#me h4").getBoundingClientRect();
+    const h4 = document.querySelector("#me h4:not(.ptitle)").getBoundingClientRect();
     const originalTop = e.style.top;
     const into = +(Math.min(cap.bottom, h4.bottom) - Math.max(cap.top, h4.top)).toFixed(1);
     e.style.top = (parseFloat(getComputedStyle(e).top) + h4.top - cap.top) + "px";
@@ -123,12 +123,12 @@ try {
   await p.waitForTimeout(90);
   const capSeen = await p.evaluate(() => {
     const cap = document.getElementById("caption").getBoundingClientRect();
-    const h4 = document.querySelector("#me h4").getBoundingClientRect();
+    const h4 = document.querySelector("#me h4:not(.ptitle)").getBoundingClientRect();
     return { text: document.getElementById("caption").textContent.trim(),
       into: +(Math.min(cap.bottom, h4.bottom) - Math.max(cap.top, h4.top)).toFixed(1),
       op: Number(getComputedStyle(document.getElementById("caption")).opacity) };
   });
-  const capClip = inkClip(await inkBox("#me h4"), 1280, 720);
+  const capClip = inkClip(await inkBox("#me h4:not(.ptitle)"), 1280, 720);
   const capOn = await inkShot(capClip);
   const capOn2 = await inkShot(capClip);
   await p.evaluate(() => { document.getElementById("caption").style.visibility = "hidden"; });
@@ -235,7 +235,7 @@ try {
            초상이 0px으로 서 있어도 448을 낸다. 실측으로 21e0f33이 정확히 그 상태였다. */
         face: (() => {
           const im = box.querySelector("h4 img");
-          const h4 = box.querySelector("h4");
+          const h4 = box.querySelector("h4:not(.ptitle)");
           if (!im || !h4) return { w: 0, h: 0, inside: false };
           const r = im.getBoundingClientRect();
           const q = h4.getBoundingClientRect();
@@ -243,10 +243,10 @@ try {
             inside: r.width > 0 && r.height > 0 && r.top >= q.top - 1 && r.bottom <= q.bottom + 1
               && r.left >= q.left - 1 && r.right <= q.right + 1 };
         })(),
-        text: box.querySelector("h4") ? box.querySelector("h4").textContent.trim() : "",
+        text: box.querySelector("h4:not(.ptitle)") ? box.querySelector("h4:not(.ptitle)").textContent.trim() : "",
         cond: box.querySelectorAll("h4 .cond svg").length,
         // 칸이 든 것과 칩이 든 것. 둘을 같이 들고 나와야 옮겨 온 것인지 따로 그린 것인지가 갈린다.
-        mark: (() => { const c = box.querySelector("h4 .cond"); return c ? c.innerHTML : ""; })(),
+        mark: (() => { const c = box.querySelector("h4:not(.ptitle) .cond"); return c ? c.innerHTML : ""; })(),
         chip: (() => { const f = document.getElementById("form"); return f ? f.innerHTML : ""; })()
       },
       // 둘째 단. 큰 수 셋이다.
@@ -287,7 +287,7 @@ try {
         const px = (e) => (e ? Math.round(e.getBoundingClientRect().height) : -1);
         return "card " + px(card) + " pane " + px(pane) + " grid " + px(grid)
           + " wear " + px(box.querySelector(".wear")) + " big " + px(box.querySelector(".big"))
-          + " head " + px(box.querySelector("h4"));
+          + " head " + px(box.querySelector("h4:not(.ptitle)"));
       })(),
       chars: box.textContent.trim().length
     };
@@ -935,7 +935,7 @@ try {
           face: im ? im.naturalWidth : 0,
           name: e.querySelector(".nm") ? e.querySelector(".nm").textContent.trim() : "",
           em: e.querySelector("em") ? e.querySelector("em").textContent.trim() : "",
-          tag: e.querySelector(".tag") ? e.querySelector(".tag").textContent.trim() : "",
+          tag: e.getAttribute("aria-pressed") ?? (e.querySelector(".tag") ? e.querySelector(".tag").textContent.trim() : ""),
           px: e.querySelectorAll(".px").length,
           buy: e.dataset.n !== undefined || e.dataset.buy !== undefined
         };
@@ -1171,7 +1171,7 @@ try {
   await standDown(true);
   await p.waitForTimeout(200);
   const stripTop = await inkBox("#top");
-  const stripHead = await inkBox("#me h4");
+  const stripHead = await inkBox("#me h4:not(.ptitle)");
   const stripClip = inkClip(stripTop, 740, 360);
   const stripOn = await inkShot(stripClip);
   const stripOn2 = await inkShot(stripClip);
