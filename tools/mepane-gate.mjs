@@ -1374,8 +1374,9 @@ try {
     ceilRead === CEIL && !ceilPane.shut && ceilPane.w > 0 && ceilPane.front,
     CEIL_STAT + " wrote " + ceilSeed.wrote + " into " + ceilSeed.key + ", the reopened board reads " + ceilRead
     + ", the profile pane is " + ceilPane.w + "x" + ceilPane.h + " shut=" + ceilPane.shut + " front=" + ceilPane.front);
-  check("mepane:a-capped-growth-slot-shows-the-number",
-    ceilGrid.length === GROWABLE.length && ceilHit.length === 1 && ceilHit[0].text === String(CEIL) && ceilNum.length === 1,
+  /* 10은 이제 상한이 아니라 무릎이다. 그 칸도 다른 칸과 같이 수만 적고 max 표시를 안 단다. 무릎 너머로 계속 오르기 때문이다. */
+  check("mepane:a-slot-at-the-knee-shows-the-number-without-a-max-mark",
+    ceilGrid.length === GROWABLE.length && ceilHit.length === 0 && ceilNum.length === 1,
     ceilHit.length + " of " + ceilGrid.length + " slots carry class max and draw "
     + (ceilHit.map((r) => JSON.stringify(r.text)).join(" ") || "nothing") + ", " + ceilNum.length + " reads "
     + CEIL + ", the rest draw " + ceilGrid.filter((r) => !r.max).map((r) => r.text).join(" "));
