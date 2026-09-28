@@ -1,5 +1,7 @@
 import { chromium } from "playwright";
-import { GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, TATTOOS } from "../web/src/state/gear.mjs";
+import { GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, BEARDS, TATTOOS } from "../web/src/state/gear.mjs";
+import { PULL_KINDS } from "../src/roster.mjs";
+import { UTILS } from "../web/src/state/util.mjs";
 import { BOTS } from "../web/src/state/bot.mjs";
 import { BUFFS } from "../web/src/state/buff.mjs";
 
@@ -14,8 +16,10 @@ t.unref();
 
 // 탭마다 몇 줄이 서야 하는지는 그 선반의 데이터가 정한다. 화면에 적힌 수를 옮겨 적으면
 // 데이터가 늘어난 날 문서와 화면이 같이 틀리고 아무도 모른다.
+/* 뽑기 선반은 카드가 아니라 팩 갈래마다 배너 하나다. 수수께끼 1을 적어 두자 배너로 바뀐 날 0으로 빨개진 채 남았다.
+   수염과 유틸도 데이터가 줄 수를 정한다. */
 const WANT = {
-  pull: 1,
+  pull: PULL_KINDS.length, beard: BEARDS.length, util: UTILS.length,
   glove: GLOVES.length, boot: BOOTS.length, kit: KITS.length, sock: SOCKS.length,
   frame: GOALS.length, city: CITIES.length, hair: HAIRS.length, ink: TATTOOS.length,
   bot: BOTS.length, buff: BUFFS.length
@@ -55,7 +59,7 @@ try {
       const s = document.getElementById("shop");
       // 카드는 이제 .rack 안에 산다. 직계 자식만 세면 격자로 옮긴 날 전부 0이 되고,
       // 그 0은 선반이 비었다는 뜻으로 읽힌다. 상점 안의 카드를 깊이와 무관하게 센다.
-      const rows = s.querySelectorAll(".card").length;
+      const rows = s.querySelectorAll(".card").length + s.querySelectorAll(".banners > *").length;
       const head = s.querySelector("h4");
       return { rows, head: head ? head.textContent.trim().length : 0, marked: s.querySelectorAll('.tab[aria-current="true"]').length };
     });

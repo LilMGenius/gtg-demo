@@ -1,7 +1,8 @@
 // 타이틀. 판을 열기 전에 누구인지부터 묻는다. 게임은 시작 버튼을 눌러야 돌고,
 // 브라우저 자동재생 정책도 그 한 번의 입력으로 같이 풀린다.
 import { VERSION } from '../build.mjs';
-import { signUp, logIn, currentId, setCurrent, nickOf, guestUp } from '../state/account.mjs';
+import { signUp, logIn, currentId, setCurrent, nickOf, guestUp, dropAccount } from '../state/account.mjs';
+import { claimNick } from '../state/rank.mjs';
 import { useAccount, hasLegacy, adoptLegacy } from '../state/save.mjs';
 
 export function mountTitle(onStart) {
@@ -45,7 +46,8 @@ export function mountTitle(onStart) {
       id.hidden = true;
       pw.hidden = true;
       nick.hidden = true;
-      inBtn.textContent = '이름 바꾸기';
+      // 여기서 여는 것은 새 아이디와 새 판이다. 이름만 바꾸는 길은 상점의 닉네임 변경권이다.
+      inBtn.textContent = '새 계정';
       upBtn.textContent = '로그아웃';
       mode = 'ready';
     } else {
@@ -70,13 +72,16 @@ export function mountTitle(onStart) {
      이미 선 상태 위에 다른 사람을 얹으면 앞 사람의 키퍼가 그대로 남는다. */
   const reopen = () => { location.reload(); };
 
-  gate.onsubmit = (e) => {
+  gate.onsubmit = async (e) => {
     e.preventDefault();
     // 이미 들어와 있는 사람이 이름을 바꾸려면 가입 칸을 다시 연다. 새 아이디로 갈아타는 길이다.
     if (mode === 'ready') { who.hidden = true; id.hidden = false; pw.hidden = false; return setMode('up'); }
     if (mode === 'up') {
       const made = signUp(id.value, pw.value, nick.value);
       if (!made.ok) return tell(made.why);
+      // 서버가 있으면 이름을 거기에도 건다. 남이 먼저 쓰고 있으면 방금 만든 계정을 거둔다. 서버가 없으면 이 기기의 확인으로 선다.
+      const held = await claimNick(made.id, nickOf(made.id));
+      if (held && !held.ok) { dropAccount(made.id); return tell(held.why); }
       /* 이름 없던 자리에 판이 남아 있으면 첫 가입이 그것을 물려받는다. 계정이 생기기 전에
          시작한 사람의 판이 가입했다고 사라지면 안 된다. 두 번째 계정부터는 새 판이다. */
       if (hasLegacy()) adoptLegacy(made.id);

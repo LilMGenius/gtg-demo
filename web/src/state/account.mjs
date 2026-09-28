@@ -5,6 +5,8 @@
    비밀번호는 평문으로 안 둔다. 로컬 저장이라 훔칠 사람이 이미 기기 앞에 있지만, 사람들은
    비밀번호를 재사용하므로 여기서 새는 것은 이 게임의 계정만이 아니다. 되돌릴 수 없는 값만 남긴다.
    이 해시는 서버가 쓸 물건이 아니다. 연동 로그인이 서면 이 파일이 통째로 그 뒤로 물러난다. */
+import { nickKey } from './rank.mjs';
+
 const DIR = 'gtg.accounts.v1';
 const NOW = 'gtg.session.v1';
 
@@ -57,8 +59,11 @@ export function signUp(id, pw, nick) {
   if (key.length < 2) return { ok: false, why: '아이디는 두 글자 이상이다' };
   if (String(pw || '').length < 4) return { ok: false, why: '비밀번호는 네 글자 이상이다' };
   if (accountAt(key)) return { ok: false, why: '이미 있는 아이디다' };
+  const name = String(nick || '').trim() || key;
+  const bad = nickProblem(name, key);
+  if (bad) return { ok: false, why: bad };
   const list = readDir();
-  list.push({ id: key, pw: hashPw(key, pw), nick: String(nick || '').trim() || key, at: Date.now() });
+  list.push({ id: key, pw: hashPw(key, pw), nick: name, at: Date.now() });
   writeDir(list);
   return { ok: true, id: key };
 }
@@ -85,6 +90,51 @@ export function setCurrent(id) {
     if (id) localStorage.setItem(NOW, normalId(id));
     else localStorage.removeItem(NOW);
   } catch { /* 위와 같다 */ }
+}
+
+/* 닉네임은 랭킹에 서는 얼굴이라 둘이 같은 이름을 못 쓴다. 이 기기의 계정끼리는 여기서 막고,
+   서버가 있으면 가입 뒤에 서버가 한 번 더 막는다. 손님은 판에 안 서므로 이름을 안 잡는다. */
+export const NICK_MAX = 12;
+export function nickProblem(nick, selfId) {
+  const key = nickKey(nick);
+  if (!key) return '닉네임을 적어 주세요';
+  if (key.length > NICK_MAX) return '닉네임은 ' + NICK_MAX + '글자까지다';
+  const self = normalId(selfId);
+  if (readDir().some((a) => !a.guest && a.id !== self && nickKey(a.nick) === key)) return '이미 쓰는 닉네임이다';
+  return '';
+}
+
+// 이 기기의 이름 있는 계정 전부. 서버가 없을 때 랭킹이 이 목록으로 선다.
+export function namedAccounts() {
+  return readDir().filter((a) => !a.guest).map((a) => ({ id: a.id, nick: a.nick }));
+}
+
+// 이름만 바꾼다. 아이디와 판은 그대로다.
+export function setNick(id, nick) {
+  const key = normalId(id);
+  const name = String(nick || '').trim();
+  const bad = nickProblem(name, key);
+  if (bad) return { ok: false, why: bad };
+  const list = readDir();
+  const acc = list.find((a) => a.id === key);
+  if (!acc) return { ok: false, why: '없는 아이디다' };
+  acc.nick = name;
+  acc.renames = (Number(acc.renames) || 0) + 1;
+  writeDir(list);
+  return { ok: true };
+}
+
+/* 가입을 되돌린다. 서버가 이름을 거절했을 때만 쓴다. 이 기기에서는 통과한 이름이 서버에서 남의 것이면
+   계정이 남의 이름을 든 채 서게 되기 때문이다. */
+export function dropAccount(id) {
+  const key = normalId(id);
+  writeDir(readDir().filter((a) => a.id !== key));
+}
+
+// 이 계정이 이름을 바꾼 횟수. 변경권의 값이 이것을 따라 오른다.
+export function renamesOf(id) {
+  const acc = accountAt(id);
+  return acc ? Number(acc.renames) || 0 : 0;
 }
 
 export function nickOf(id) {

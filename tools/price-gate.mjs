@@ -239,6 +239,9 @@ try {
       await p.waitForTimeout(180);
       await sweepLabels(mark + tab, "#shop .goods");
     }
+    // 시착실은 입을 것이 있는 선반에만 선다. 마지막 탭이 유틸이면 시착실이 없으니 장갑 선반에서 잰다.
+    await p.click('#shop .tab[data-tab="glove"]', { force: true });
+    await p.waitForTimeout(180);
     await sweepLabels(mark + "fitting", "#shop .fitting");
     return list;
   };
@@ -373,7 +376,8 @@ try {
   // 살 수 있는 버튼의 숫자는 같은 선반에서 제 색으로 남아야 한다. 이 대조군이 없으면
   // 모든 숫자를 붉다고 읽는 자도 초록을 낸다.
   const warmSeen = [];
-  const shopTabs = await p.evaluate(() => [...document.querySelectorAll("#shop .tab")].map((e) => e.dataset.tab));
+  /* 두 값 병기를 재는 선반들. 유틸은 캐시 전용이 설계라 골드 표기와 시착실이 없고, 아래에서 따로 잰다. */
+  const shopTabs = (await p.evaluate(() => [...document.querySelectorAll("#shop .tab")].map((e) => e.dataset.tab))).filter((t) => t !== "util");
   for (const tab of shopTabs) {
     await p.click('#shop .tab[data-tab="' + tab + '"]', { force: true });
     await p.waitForTimeout(180);
@@ -436,6 +440,9 @@ try {
       : board.surfaces.length + " surfaces, " + board.runs + " labels");
   await p.evaluate((h) => { window[h](true); }, "__shop");
   await p.waitForTimeout(320);
+  // 골드 값이 서는 선반으로 옮긴다. 선반을 다 돈 뒤 창은 마지막 탭에 머물고, 그 탭이 캐시 전용 유틸이 되자 골드 표기가 0개라 여기서 죽었다.
+  await p.click('#shop .tab[data-tab="buff"]');
+  await p.waitForTimeout(200);
   // 아이콘이 화소로 찍혔는가. DOM에 있는 것으로는 부족하다. 첫 값 표기 하나를 켜고 끄고 잰다.
   // 세는 창은 아이콘 자기 상자다. 표기 전체를 창으로 쓰면 옆의 숫자가 분모를 키워
   // 같은 아이콘이 6%대로 읽힌다. ui-gate의 8%는 아이콘 상자를 재던 수이므로 창을 맞춰야 같은 뜻이 된다.
@@ -642,6 +649,11 @@ try {
   const richCash=await cashRows(8000), poorCash=await cashRows(0);
   check('price:the-cash-token-reads-the-cash-value', richCash.every(s=>s.rows.length>0 && s.rows.every(e=>e.value===e.token && e.value===e.shown)), JSON.stringify(richCash));
   check('price:short-and-rich-show-the-same-cash-number', JSON.stringify(richCash.map(s=>s.rows.map(e=>e.shown)))===JSON.stringify(poorCash.map(s=>s.rows.map(e=>e.shown))), String(poorCash.length));
+  await p.evaluate(() => window.__shop(true));
+  await p.click('#shop .tab[data-tab="util"]', { force: true });
+  await p.waitForTimeout(180);
+  const util = await p.evaluate(() => ({ gold: document.querySelectorAll('#shop .goods .px:not(.cash)').length, cash: document.querySelectorAll('#shop .goods .px.cash').length, or: document.querySelectorAll('#shop .goods .or').length }));
+  check('price:the-util-shelf-shows-cash-alone', util.cash > 0 && util.gold === 0 && util.or === 0, JSON.stringify(util));
   check('instrument:cash-tokens-equal-gold-tokens-on-every-tab', richCash.every(s=>s.gold>0 && s.gold===s.cash), JSON.stringify(richCash.map(({tab,gold,cash})=>({tab,gold,cash}))));
   await p.setViewportSize({width:740,height:360});
   const smallCash=await cashRows(8000);

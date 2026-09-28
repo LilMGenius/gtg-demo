@@ -141,7 +141,11 @@ try {
         await plant.evaluate((n) => n.remove());
         check(tag + ':control:a-panel-that-rolls-whole-moves-the-tab-row', !stays(pb, pa), (pb || []).join(',') + ' -> ' + (pa || []).join(','));
       }
-      check(tag + ':shell:tab-rows-hold-equal-counts', new Set(seen[0].rows).size === 1, seen[0].rows.join('+'));
+      /* 파운더가 짚은 것은 버프 하나가 둘째 줄에 혼자 선 모양이다. 불변식은 줄끼리 한 칸 넘게 차이 나지 않는 것이고,
+         같은 수는 그 한 사례였다. 탭이 열셋(소수)이 되자 같은 수는 한 줄 말고 불가능해져 7+6이 빨개졌다. 12+1은 여전히 빨갛다. */
+      const even = (r) => Math.max(...r) - Math.min(...r) <= 1;
+      check(tag + ':shell:tab-rows-differ-by-at-most-one', even(seen[0].rows), seen[0].rows.join('+'));
+      if (panel.id === 'shop' && W === 1280) check(tag + ':control:a-lone-tab-row-fails', !even([12, 1]) && !even([6, 6, 1]), '12+1 and 6+6+1');
       // 대조군. 몸이 제 높이만큼 자라게 풀면 선반마다 닫기가 뛰어야 계기가 산다. 상점만 몸 높이가 선반마다 크게 다르다.
       if (panel.id === 'shop' && W === 1280) {
         const plant = await p.addStyleTag({ content: '#shop{overflow:auto!important}#shop .shopbody{flex:none!important;overflow:visible!important}#shop > .close{position:static!important;translate:none!important}' });

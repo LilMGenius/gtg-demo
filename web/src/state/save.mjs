@@ -40,6 +40,16 @@ export function adoptLegacy(id) {
   }
 }
 
+/* 다른 계정의 저장. 서버가 없을 때 랭킹이 이 기기의 계정끼리 줄을 세우며 읽는다. 쓰지는 않는다. */
+export function peek(id) {
+  try {
+    const raw = localStorage.getItem(BASE + ':' + id);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function load() {
   try {
     const raw = localStorage.getItem(KEY());

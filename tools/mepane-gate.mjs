@@ -24,7 +24,7 @@ t.unref();
 
 const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + " " + d);
-const TABS = ["stat", "face", "log"];
+const TABS = ["stat", "face", "log", "rank"];
 // 포지션 넷. 화면은 약어로 세우고 계기는 데이터 이름으로 부른다. 둘을 한 곳에서 이어야
 // 약어가 바뀐 날 이 자가 엉뚱한 탭을 누르지 않는다.
 const POS = ["gk"].concat(ROLES);
@@ -300,7 +300,7 @@ try {
     seen[id] = await read();
   }
 
-  check("instrument:the-three-panes-were-found",
+  check("instrument:every-pane-was-found",
     TABS.every((id) => seen[id].open && seen[id].tabs.join(",") === TABS.join(",")),
     seen.stat.tabs.join(", ") + " with the panel open " + TABS.map((id) => seen[id].open).join("/"));
   check("mepane:one-pane-stands-at-a-time", TABS.every((id) => seen[id].current.length === 1 && seen[id].current[0] === id),
@@ -1014,7 +1014,7 @@ try {
   await p.evaluate(() => window.__me(false));
   const floor = kindH.concat(tabH);
   check("layout:every-tab-clears-the-touch-floor-at-740x360",
-    floor.length === 7 && floor.every((v) => v >= TOUCH),
+    floor.length === kindH.length + TABS.length && kindH.length > 0 && floor.every((v) => v >= TOUCH),
     "position tabs " + kindH.join("/") + ", profile tabs " + tabH.join("/") + " against " + TOUCH + "px");
 
   /* 좁고 낮은 화면. 여기서 구르는 것은 칸이 아니라 창이다. 상한을 걷은 자리라 칸은 제 높이를 다 쓰고,
