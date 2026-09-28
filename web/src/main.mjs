@@ -10,11 +10,11 @@ import { mountBgm } from './audio/bgm.mjs';
 import { mountTitle } from './ui/title.mjs';
 import { aimLine } from './ui/callout.mjs';
 import { eventLine, setEndLine, postLine, commentLine, photoLine, selfieLine, dmLine, gazeAct } from './ui/lines.mjs';
-import { load, save, readSquad, offlineGain, readRecord, readSquadKickers, useAccount, saveKey, peek } from './state/save.mjs';
-import { RANK_BOARDS, RANK_MIN_SHOTS, rankLine, sortBoard, rankValue, qualifies, sendRankLine, fetchLines, claimNick, nickKey } from './state/rank.mjs';
+import { load, save, readSquad, offlineGain, readRecord, readSquadKickers, useAccount, saveKey } from './state/save.mjs';
 import { autoTrain, trainStat } from './state/coach.mjs';
-import { currentId, nickOf, isGuest, namedAccounts, nickProblem, setNick, renamesOf } from './state/account.mjs';
-import { UTILS, utilAt, payCash, renamePrice } from './state/util.mjs';
+import { currentId } from './state/account.mjs';
+import { createRankPane } from './ui/rank-pane.mjs';
+import { createUtilShelf } from './ui/util-shelf.mjs';
 import { coinGain, readWallet, cashPrice, pay } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, BEARDS, MAX_BEARD, beardAt, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
@@ -1367,44 +1367,8 @@ function rapportRows() {
 const ME_TABS = [['stat', '능력치'], ['face', '아는 얼굴'], ['log', '전적'], ['rank', '랭킹']];
 let meTab = 'stat';
 
-/* 랭킹 칸. 판 다섯은 칩으로 고르고 고른 판은 창을 닫아도 남는다. 칸과 달리 판은 사람이 다시 찾아오는 자리라서다.
-   줄은 서버가 있으면 서버의 것, 없으면 이 기기의 이름 있는 계정끼리다. 내 줄은 늘 지금 판에서 뽑는다.
-   저장된 줄은 방금 막은 공을 모른다. */
-let rankBoard = 'save';
-let rankNet = null;
-function myRankLine() {
-  return rankLine(nickOf(currentId()) || '', { record: state.record, keeper: state.keeper, fans: state.fans, rapport: state.rapport });
-}
-function rankLines() {
-  const me = currentId();
-  const mine = isGuest(me) ? null : myRankLine();
-  const others = rankNet
-    ? rankNet.filter((l) => l.nick !== (mine && mine.nick))
-    : namedAccounts().filter((a) => a.id !== me).map((a) => rankLine(a.nick, peek(a.id)));
-  return { mine, rows: sortBoard(mine ? others.concat([mine]) : others, rankBoard) };
-}
-function rankRows() {
-  const { mine, rows } = rankLines();
-  const chips = '<div class="boards" role="group" aria-label="랭킹 판">' + RANK_BOARDS.map((b) =>
-    '<button data-board="' + b.id + '"' + (b.id === rankBoard ? ' aria-pressed="true"' : ' aria-pressed="false"') + '>' + b.label + '</button>').join('') + '</div>';
-  const row = (l, me) => '<div class="note rank' + (me ? ' mine' : '') + '"><b class="no">' + (l.rank || '-') + '</b><b class="nick">' + l.nick + '</b>'
-    + '<em>' + rankValue(rankBoard, l[rankBoard]) + '</em></div>';
-  const list = rows.map((l) => row(l, mine && l.nick === mine.nick)).join('');
-  /* 판에 못 선 내 줄. 손님은 이름이 없어 판에 안 서고, 세이브율은 규정 구수 밑이면 안 선다.
-     둘 다 맨 아래 한 줄로 까닭을 수로 보인다. */
-  let tail = '';
-  if (!mine) tail = '<div class="note rank mine out"><b class="no">-</b><b class="nick">손님</b><em>닉네임을 정하면 오른다</em></div>';
-  else if (!qualifies(mine, rankBoard)) tail = '<div class="note rank mine out"><b class="no">-</b><b class="nick">' + mine.nick + '</b><em>' + rankValue(rankBoard, mine[rankBoard]) + ' <small>' + mine.shots + '/' + RANK_MIN_SHOTS + ' 슈팅</small></em></div>';
-  return chips + '<div class="ranks">' + list + tail + '</div>' + (rankNet ? '' : '<small class="src">이 기기 기록</small>');
-}
-// 칸을 열 때 한 번 서버에 내 줄을 올리고 판을 받아 온다. 서버가 없으면 이 기기의 판에 머문다.
-async function syncRank() {
-  const me = currentId();
-  if (me && !isGuest(me)) await sendRankLine(me, myRankLine());
-  const got = await fetchLines();
-  rankNet = got;
-  if (meTab === 'rank' && !el('me').hidden) renderMe();
-}
+/* 랭킹 칸은 제 판과 서버 줄을 스스로 든다. 창은 게임 상태와 다시 그리기만 넘긴다. */
+const rankPane = createRankPane({ state, isOpen: () => meTab === 'rank' && !el('me').hidden, rerender: () => renderMe() });
 // 관찰자 하나. 창 크기가 바뀌면 넘침이 다시 계산되므로, 그릴 때와 굴릴 때만 세면 옛 답이 남는다.
 let meWatch = null;
 
@@ -1435,7 +1399,7 @@ function renderMe() {
     : '';
   const hidden = HIDDEN.map((h) => '<div class="note"><b>' + HIDDEN_LABEL[h] + '</b><i>' + hiddenBand(h, k[h]) + '</i></div>').join('');
   const pane = meTab === 'log' ? recordRows()
-    : meTab === 'rank' ? rankRows()
+    : meTab === 'rank' ? rankPane.html()
     : meTab === 'face' ? rapportRows()
       : '<div class="grid">' + grid + '</div>' + traits + hidden;
   const tabs = '<div class="tabs">' + ME_TABS.map(([id, label]) =>
@@ -1469,8 +1433,8 @@ function renderMe() {
        마지막에 두는 것은 칠하는 차례 때문이다. 앞에 두면 자리를 잡은 칸 상자가 이 겹을 덮는다. */
     + '<div class="cue up" aria-hidden="true"></div><div class="cue down" aria-hidden="true"></div>';
   box.querySelector('.close').onclick = closeMe;
-  for (const b of box.querySelectorAll('.tab')) b.onclick = () => { meTab = b.dataset.tab; renderMe(); if (meTab === 'rank') syncRank(); };
-  for (const b of box.querySelectorAll('[data-board]')) b.onclick = () => { rankBoard = b.dataset.board; renderMe(); };
+  for (const b of box.querySelectorAll('.tab')) b.onclick = () => { meTab = b.dataset.tab; renderMe(); if (meTab === 'rank') rankPane.sync(); };
+  if (meTab === 'rank') rankPane.bind(box);
   for (const b of box.querySelectorAll('.note .go')) b.onclick = () => openDate(Number(b.dataset.city), Number(b.dataset.passer));
   /* 칸이 넘치면 아래끝에 그늘 한 겹이 선다. 위키가 쓰던 그 함수를 그대로 부른다.
      관찰자는 하나만 두고 그릴 때마다 새 칸으로 옮겨 붙인다. 그릴 때마다 새로 만들면
@@ -2487,79 +2451,8 @@ function bindBuff(box) {
   }
 }
 
-/* 유틸 선반. 캐시로만 판다. 값 자리에 골드가 없으니 또는 칸도 없다.
-   닉네임 변경권은 사는 자리에서 새 이름을 받는다. 권을 들고 있다가 다른 창에서 쓰게 하면
-   이름을 바꾸러 온 사람이 문을 하나 더 찾아가야 한다. */
-let utilOpen = null;
-let utilSay = '';
-const CASH_ONLY = (n) => '<span class="price" data-cash="' + n + '" title="캐시"><span class="px cash' + (state.wallet.cash < n ? ' bad-cash' : '')
-  + '" data-cash="' + n + '">' + IC_CASH + '<b>' + n + '</b></span></span>';
-function utilShelf() {
-  const me = currentId();
-  const named = me && !isGuest(me);
-  const rows = UTILS.map((u) => {
-    const cost = u.id === 'rename' ? renamePrice(renamesOf(me)) : u.cash;
-    const off = !named || state.wallet.cash < cost;
-    const form = utilOpen === u.id
-      ? '<form class="rename" data-util="' + u.id + '"><input name="nick" maxlength="12" autocomplete="off" aria-label="새 닉네임" value="' + (nickOf(me) || '') + '">'
-        + '<button class="buy" type="submit">' + CASH_ONLY(cost) + '</button></form>'
-        + (utilSay ? '<small class="say" role="status">' + utilSay + '</small>' : '')
-      : '<button class="buy' + (state.wallet.cash < cost ? ' bad-price' : '') + '" data-util="' + u.id + '"' + (off ? ' disabled' : '') + '>' + CASH_ONLY(cost) + '</button>';
-    return '<div class="card gear util" data-spec="util" data-at="' + u.id + '" data-rare="1">'
-      + '<div class="pic"><div class="shot icon">' + TAB_ICON.util + '</div></div>'
-      + '<b>' + u.name + '</b>'
-      + '<em><span class="ln"><span class="k">' + (named ? nickOf(me) : '닉네임 없음') + '</span></span></em>'
-      + '<div class="foot">' + form + '</div></div>';
-  });
-  return '<div class="rack">' + rows.join('') + '</div>';
-}
-
-function bindUtil(box) {
-  for (const b of box.querySelectorAll('.buy[data-util]')) {
-    b.onclick = () => {
-      if (b.disabled) return;
-      utilOpen = b.dataset.util;
-      utilSay = '';
-      renderShop();
-      const input = el('shop').querySelector('form.rename input');
-      if (input) { input.focus(); input.select(); }
-    };
-  }
-  for (const f of box.querySelectorAll('form.rename')) {
-    f.onsubmit = async (e) => {
-      e.preventDefault();
-      const u = utilAt(f.dataset.util);
-      const me = currentId();
-      const nick = f.querySelector('input').value.trim();
-      if (!u || !me || isGuest(me)) return;
-      // 같은 이름이면 값을 안 받는다. 판 얼굴이 그대로인데 캐시만 빠진다.
-      if (nick === nickOf(me)) { utilSay = '지금 닉네임과 같다'; return renderShop(); }
-      const bad = nickProblem(nick, me);
-      if (bad) { utilSay = bad; return renderShop(); }
-      /* 판이 같은 이름으로 읽는 표기 고침은 값을 안 받는다. 판의 이름이 그대로인데 캐시와 다음 값만 움직이면
-         변경권이 아무것도 안 판 것이 된다(검증자가 1000에서 970을 쟀다). */
-      if (nickKey(nick) === nickKey(nickOf(me))) {
-        setNick(me, nick);
-        await claimNick(me, nick);
-        utilOpen = null;
-        utilSay = '';
-        return renderShop();
-      }
-      const cost = renamePrice(renamesOf(me));
-      if (state.wallet.cash < cost) return renderShop();
-      // 서버가 있으면 이름을 먼저 건다. 서버가 거절하면 캐시를 안 받는다.
-      const held = await claimNick(me, nick);
-      if (held && !held.ok) { utilSay = held.why; return renderShop(); }
-      if (!payCash(state.wallet, cost)) return renderShop();
-      setNick(me, nick);
-      utilOpen = null;
-      utilSay = '';
-      persist();
-      pips();
-      renderShop();
-    };
-  }
-}
+/* 유틸 선반은 열린 폼과 안내를 스스로 든다. 상점은 지갑과 저장과 다시 그리기만 넘긴다. */
+const utilPane = createUtilShelf({ state, persist, pips, rerender: () => renderShop(), root: () => el('shop') });
 
 function renderShop() {
   const box = el('shop');
@@ -2573,7 +2466,7 @@ function renderShop() {
   const tabs = '<div class="tabs" data-now="' + tabName(shopTab) + '">' + SHOP_TABS.map((k) =>
     '<button class="tab" data-tab="' + k + '"' + (shopTab === k ? ' aria-current="true"' : '') + '>'
     + TAB_ICON[k] + '<span>' + tabName(k) + '</span></button>').join('') + '</div>';
-  const goods = SHELVES[shopTab] ? gearShelf(shopTab) : shopTab === 'bot' ? botShelf() : shopTab === 'buff' ? buffShelf() : shopTab === 'util' ? utilShelf() : pullShelf(pool);
+  const goods = SHELVES[shopTab] ? gearShelf(shopTab) : shopTab === 'bot' ? botShelf() : shopTab === 'buff' ? buffShelf() : shopTab === 'util' ? utilPane.html() : pullShelf(pool);
   /* 창의 뼈대는 탭 줄, 몸, 닫기 셋이고 선반이 바뀌어도 뼈대는 안 움직인다. 탭 줄이 선반 기둥 안에 있으면
      탈의실이 있는 선반과 없는 선반에서 기둥 폭이 달라 탭이 다르게 접히고, 닫기가 선반 높이를 따라 뛴다.
      탈의실은 입는 선반의 짝이라 뽑기 선반에서는 몸 안에서만 빠진다. */
@@ -2611,7 +2504,7 @@ function renderShop() {
     renderShop();
   };
   for (const t of box.querySelectorAll('.tab')) {
-    t.onclick = () => { shopTab = t.dataset.tab; utilOpen = null; utilSay = ''; renderShop(); };
+    t.onclick = () => { shopTab = t.dataset.tab; utilPane.close(); renderShop(); };
   }
   bindSpec(box);
   for (const role of box.querySelectorAll('[data-role]')) role.onclick = () => { pullRole = role.dataset.role; renderShop(); };
@@ -2633,7 +2526,7 @@ function renderShop() {
   if (SHELVES[shopTab]) return bindGear(box);
   if (shopTab === 'bot') return bindBot(box);
   if (shopTab === 'buff') return bindBuff(box);
-  if (shopTab === 'util') return bindUtil(box);
+  if (shopTab === 'util') return utilPane.bind(box);
   for (const buy of box.querySelectorAll('.buy[data-want]')) buy.onclick = () => {
     if (buy.disabled) return;
     const want = Number(buy.dataset.want);
@@ -2687,7 +2580,7 @@ function closeShop() {
   stopReveal();
   // 선반도 처음 자리로 돌린다. 닫을 때 보던 탭이 남으면 다음에 연 사람이 이적시장을 못 찾는다.
   shopTab = 'pull';
-  utilOpen = null;
+  utilPane.close();
 }
 
 for (const b of document.querySelectorAll('.move-arrow')) {
