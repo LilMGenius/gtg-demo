@@ -259,14 +259,14 @@ try {
   const botDuration = await p.evaluate(() => [...document.querySelectorAll("#shop .card[data-spec=bot]")].every((card) => {
     const badge = card.querySelector(".buy");
     const body = card.querySelector(".duration");
-    return Boolean(badge && body && !/[분슛]/.test(badge.textContent) && /분/.test(body.textContent));
+    return Boolean(badge && body && !/[분회]/.test(badge.textContent) && /분/.test(body.textContent));
   }));
   await p.click('#shop .tab[data-tab="buff"]', { force: true });
   await p.waitForTimeout(180);
   const buffDuration = await p.evaluate(() => [...document.querySelectorAll("#shop .card[data-spec=buff]")].every((card) => {
     const badge = card.querySelector(".buy");
     const body = card.querySelector(".duration");
-    return Boolean(badge && body && !/[분슛]/.test(badge.textContent) && /슛/.test(body.textContent));
+    return Boolean(badge && body && !/[분회]/.test(badge.textContent) && /회/.test(body.textContent));
   }));
   check("price:duration-sits-outside-the-badge", botDuration && buffDuration,
     botDuration && buffDuration ? "bot and buff cards" : "bot=" + botDuration + ", buff=" + buffDuration);

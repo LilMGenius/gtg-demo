@@ -29,7 +29,7 @@ const tables = {
     { columns: ['종류', '설명'], rows: PULL_KINDS.map((k) => [k.name, k.note]) }],
   gram: [kv([['좋아요', LIKE_BASE], ['동네 한 등급', LIKE_PER_CITY], ['맞팔 한 명', MUTUAL_STEP], ['맞팔 한도', MUTUAL_CAP], ['같이 한 장', SELFIE_BASE]])],
   bot: [{ columns: ['이름', '판단력', '분', '값'], rows: BOTS.map((b) => [b.name, b.judge, b.minutes, b.cost]) }],
-  buff: [{ columns: ['이름', '효과', '슛', '값'], rows: BUFFS.map((b) => [b.name, b.note, b.shots, b.cost]) }],
+  buff: [{ columns: ['이름', '효과', '지속(회)', '값'], rows: BUFFS.map((b) => [b.name, b.note, b.shots, b.cost]) }],
   risk: [
     { columns: ['입력', '무엇'], rows: [[CAUSE_LABEL[INPUT_CAUSES[0]], '고른 자리'], [CAUSE_LABEL[INPUT_CAUSES[1]], '누른 때'], [CAUSE_LABEL[INPUT_CAUSES[2]], '나간 거리']] },
     { columns: ['사고', '깎는 선반'], rows: MISHAP_SHELF }

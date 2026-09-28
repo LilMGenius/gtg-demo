@@ -442,7 +442,7 @@ try {
       durSeen += 1;
       const at = d.name + " " + w + "x" + h;
       if (!d.has) { durMissing.push(at); continue; }
-      if (!/[0-9]/.test(d.txt) || !/[분슛]/.test(d.txt)) durEmpty.push(at + " reads " + JSON.stringify(d.txt));
+      if (!/[0-9]/.test(d.txt) || !/[분회]/.test(d.txt)) durEmpty.push(at + " reads " + JSON.stringify(d.txt));
       if (!d.inside) durOut.push(at + " token x[" + d.rect[0] + "," + d.rect[1] + "] y[" + d.rect[2] + "," + d.rect[3] + "] against card x[" + d.card[0] + "," + d.card[1] + "] y[" + d.card[2] + "," + d.card[3] + "]");
       if (d.effTop !== 0 || d.emTop !== 0) durRolled.push(at + " clamp box at " + d.effTop + ", effect row at " + d.emTop);
       if (!d.shop) { durBlocked.push(at + " " + d.who); continue; }
@@ -454,7 +454,7 @@ try {
   check("rack:every-bot-and-buff-card-carries-its-duration", durSeen > 0 && durMissing.length === 0,
     durMissing.slice(0, 3).join(", ") || durSeen + " card readings over three widths, every one carries a duration span");
   check("rack:the-duration-token-reads-a-number-and-a-unit", durSeen > 0 && durEmpty.length === 0,
-    durEmpty.slice(0, 3).join(", ") || durSeen + " tokens carry a number and 분 or 슛");
+    durEmpty.slice(0, 3).join(", ") || durSeen + " tokens carry a number and 분 or 회");
   check("rack:the-duration-token-sits-inside-its-card", durSeen > 0 && durOut.length === 0,
     durOut.slice(0, 2).join(", ") || durSeen + " tokens inside their card box");
   /* 잘림은 여기서 잡힌다. 말줄임표 뒤로 넘어간 칸은 폭도 높이도 남아 있지만 그 한가운데를 찍으면

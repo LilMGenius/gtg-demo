@@ -1178,6 +1178,7 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) #mo
 /* 봇과 버프의 기간·횟수는 가격 배지 밖의 보조 칸이다. 효과 한 줄 끝에 붙어 한 줄로 읽힌다. */
 #shop .card.gear .duration{flex:0 0 auto;margin-left:var(--gap-2);color:var(--dim);font-size:var(--fs-body);
   font-style:normal;font-weight:700;white-space:nowrap}
+#shop .card.gear .duration svg{width:.8em;height:.8em;margin-right:.15em;vertical-align:-.05em;opacity:.8}
 /* 변형 조각. 한 등급이 여러 모양을 들고 있다는 것을 썸네일 위에서 알린다.
    조각마다 제 누름이 따로 있으므로 누르는 칸은 손가락 바닥 44px이고, 보이는 조각은 그 안의 22x18이다.
    실측 740x360에서 누르는 칸이 조각 그대로 22x18이었다. 칸 사이 틈은 두지 않는다. 틈에 떨어진 손가락은
@@ -1230,13 +1231,15 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) #mo
   /* 변형 조각은 띠의 왼쪽 아래에 선다. 그림을 오른쪽으로 붙여 조각이 상품 위(헤어 얼굴)를 덮지 않게 한다(QA 10th 740x360). */
   /* 이름이 위, 값이 아래, 가운데 줄은 그림과 효과가 나란히 선다. 위아래로만 쌓으면 효과 두세 줄이 그림 몫을 먹어
      740x360에서 그림이 20px 띠로 줄었다(QA 11th 장갑, 동네, 버프). 나란히 두면 효과가 늘수록 그림도 같이 커진다. */
-  #shop .card.gear{display:grid;grid-template-columns:34% minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;
+  #shop .card.gear{display:grid;grid-template-columns:30% minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;
     grid-template-areas:"name name" "pic eff" "foot foot";column-gap:var(--gap-2)}
   #shop .card.gear > b{grid-area:name}
   #shop .card.gear .pic{grid-area:pic;min-height:0}
   #shop .card.gear em{grid-area:eff;min-height:0;align-self:center}
-  #shop .card.gear em:has(.ln){grid-template-columns:minmax(min-content,max-content) max-content max-content;row-gap:2px;column-gap:4px}
-  #shop .card.gear em .ln .duration{margin-left:2px}
+  #shop .card.gear em:has(.ln){grid-template-columns:minmax(min-content,max-content) max-content max-content;row-gap:2px;column-gap:2px}
+  /* 모래시계가 붙은 뒤 740에서 자양강장제의 기간 토큰이 카드 오른쪽 5px 밖으로 나갔다. 줄은 효과 줄에 그대로 두고 틈을 줄인다. */
+  #shop .card.gear em .ln .duration{margin-left:0}
+  #shop .card.gear .duration svg{width:.7em;height:.7em;margin-right:0}
   #shop .card.gear em:has(.ln){overflow:visible}
   #shop .card.gear{padding-right:8px}
   #shop .card.gear .foot{grid-area:foot}

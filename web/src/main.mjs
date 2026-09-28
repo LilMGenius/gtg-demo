@@ -292,6 +292,10 @@ const SW = (n) => '<span class="px" data-coin="' + Number(n) + '">' + IC_GOLD
 // 캐시. 결제로만 들어오는 재화다. 별은 어느 게임에서든 유료 갈래로 읽힌다.
 const IC_CASH = G('캐시', R(10.5, 3, 3, 3) + R(9, 6, 6, 3) + R(0, 9, 24, 3) + R(4.5, 12, 15, 3)
   + R(6, 15, 12, 3) + R(4.5, 18, 6, 3) + R(13.5, 18, 6, 3));
+/* 지속. 봇의 분과 버프의 횟수가 같은 자리에 선다. 숫자만 서면 효과 수치의 꼬리로 읽혀,
+   '10회'가 착용 조건인지 쓸 수 있는 횟수인지를 사는 사람이 되물었다. 모래시계가 기간이라고 먼저 말한다. */
+const IC_TIME = G('지속', R(3, 0, 18, 3) + R(6, 3, 12, 3) + R(9, 6, 6, 3) + R(10.5, 9, 3, 6)
+  + R(9, 15, 6, 3) + R(6, 18, 12, 3) + R(3, 21, 18, 3));
 const affordable = (gold) => state.wallet.coin >= gold || state.wallet.cash >= cashPrice(gold);
 const purchase = (gold) => pay(state.wallet, gold, state.wallet.coin >= gold ? 'coin' : 'cash');
 const PRICE = (n) => '<span class="price" data-coin="' + n + '" data-cash="' + cashPrice(n) + '" title="골드 또는 캐시">'
@@ -446,7 +450,7 @@ function aura() {
   if (state.buff.shots > 0) {
     const spec = buffAt(state.buff.kind);
     rows.push('<span class="tag buff" data-kind="' + state.buff.kind + '">' + buffIcon(state.buff.kind)
-      + '<b>' + state.buff.shots + '</b><i>' + (spec ? spec.name : '') + '</i></span>');
+      + '<b>' + state.buff.shots + '회</b><i>' + (spec ? spec.name : '') + '</i></span>');
   }
   box.innerHTML = rows.join('');
   box.hidden = rows.length === 0;
@@ -1790,7 +1794,7 @@ function specRows(kind, rank) {
     const b = buffAt(rank);
     if (!b) return [];
     // 카드 본문이 이미 든 문장을 여기서 되풀이하면 이 칸이 새 정보를 안 준다. 수로 말한다.
-    const dose = { k: '횟수', v: b.shots + '슛' };
+    const dose = { k: '지속', v: b.shots + '회' };
     if (b.kind === 'tonic') {
       const cut = Math.round((1 - TONIC_FOCUS) * 100);
       return [{ k: '한눈팔기', v: '-' + cut + '%' }, { k: '수다', v: '-' + cut + '%' }, dose];
@@ -1814,8 +1818,8 @@ function specLines(kind, rank) {
 /* 봇과 버프의 기간·횟수는 마지막 효과 줄 끝에 붙는다. 한 문장으로 이어 흘릴 때는 740x360 자양강장제의
    둘째 효과가 수째로 말줄임에 먹혔다('한눈팔기 -50%, 수다...'). */
 function cardLines(kind, rank, tail) {
-  const rows = specRows(kind, rank).filter((r) => r.v && !/[분슛]$/.test(r.v));
-  const end = tail ? '<small class="duration">' + tail + '</small>' : '';
+  const rows = specRows(kind, rank).filter((r) => r.v && !/[분회]$/.test(r.v));
+  const end = tail ? '<small class="duration">' + IC_TIME + tail + '</small>' : '';
   if (!rows.length) return end;
   return rows.map((r, i) => '<span class="ln"><span class="k">' + r.k + '</span> <i class="v">' + r.v + '</i>'
     + (i === rows.length - 1 ? end : '') + '</span>').join('');
@@ -2503,7 +2507,7 @@ function buffShelf() {
   const cur = state.buff;
   const rows = BUFFS.map((b, at) => {
     let label = PRICE(b.cost);
-    let duration = b.shots + '슛';
+    let duration = b.shots + '회';
     let off = false;
     let bad = state.wallet.coin < b.cost;
     if (!affordable(b.cost)) {
@@ -2512,7 +2516,7 @@ function buffShelf() {
       off = !affordable(b.cost);
       bad = true;
     } else if (cur.shots > 0 && cur.kind === b.kind) {
-      duration = '+' + b.shots + '슛';
+      duration = '+' + b.shots + '회';
       // 상한에 닿으면 산 구가 그대로 버려진다. 사기 전에 알아야 한다.
       if (cur.shots >= BUFF_CAP) { label = '한도'; off = true; }
     } else if (cur.shots > 0) {

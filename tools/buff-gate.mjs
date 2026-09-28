@@ -120,7 +120,7 @@ check("spend-empty", spendBuff(drain).kind === "",
 let stack = newBuff();
 for (let i = 0; i < 9; i++) stack = addBuff(stack, "tonic");
 check("cap", stack.shots === BUFF_CAP,
-  "9 x 12 -> " + stack.shots);
+  "9 buys -> " + stack.shots);
 check("read-halfstate", readBuff({ kind: "tonic", shots: 0 }).kind === "",
   "kind without shots dies");
 
