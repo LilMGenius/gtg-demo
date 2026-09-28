@@ -14,7 +14,10 @@ export const X_MAX = GOAL_HALF_W - 0.4;
 // 서서 뻗는 0.45단위는 약 0.75m다(P15 HOTL 가설).
 const STAND = 0.45;
 // 옆걸음은 민첩성 1~10에서 약 1.9~4.0m/s가 된다(P15 HOTL 가설).
-export const moveSpeed = (keeper) => 1.0 + 0.14 * clamp(simStats(keeper).agility, 1, STAT_TOP);
+/* 속도는 실효값 하나에서 나온다. 이미 휜 값을 다시 simStats에 넣으면 곡선이 두 번 걸려 20이 12.5가 아니라 11이 된다.
+   그래서 안쪽은 실효값을 받는 speedOf를 부르고, 바깥에 내는 moveSpeed만 저장값을 받아 한 번 휜다. */
+const speedOf = (agility) => 1.0 + 0.14 * clamp(agility, 1, STAT_TOP);
+export const moveSpeed = (keeper) => speedOf(simStats(keeper).agility);
 
 // 서서 손을 뻗었을 때 닿는 기준선. 수직 반경은 여기서부터 잰다.
 const SHOULDER = 0.90;
@@ -100,11 +103,22 @@ export function statValue(v) {
   return STAT_KNEE + (STAT_TOP - STAT_KNEE) * over / (over + STAT_HALF);
 }
 // 판정에 들어가는 키퍼. 10을 넘는 칸이 없으면 같은 객체를 돌려준다. 판정이 적는 연속 실점과 기복이 원본에 그대로 남는다.
+/* 휜 키퍼는 원래 저장값을 RAW에 든다. 두 가지에 쓴다. 이미 휜 것을 다시 휘지 않는 표지이고,
+   원인 탐침이 한 칸을 더할 때 실효값이 아니라 저장값에 더하게 하는 자리다. */
+const RAW = Symbol('raw');
 function simStats(keeper) {
-  if (!keeper || !GROWABLE.some((k) => keeper[k] > STAT_KNEE)) return keeper;
-  const out = { ...keeper };
+  if (!keeper || keeper[RAW] || !GROWABLE.some((k) => keeper[k] > STAT_KNEE)) return keeper;
+  const out = { ...keeper, [RAW]: keeper };
   for (const k of GROWABLE) out[k] = statValue(keeper[k]);
   return out;
+}
+// 실효값만 든 조각(속도나 다이빙 거리를 한 칸으로 묻는 자리). 표지를 달아 다시 휘지 않게 한다.
+const effective = (o) => Object.assign(o, { [RAW]: o });
+/* 원인 탐침의 한 칸. 저장값에 1을 더한 뒤 휜다. 실효값에 1을 더하면 무릎(10)에서 한 칸이 곡선을 건너뛰어
+   통째로 1이 되고, 무릎 아래는 두 식이 같다. */
+function nextPoint(keeper, k) {
+  const raw = keeper[RAW] || keeper;
+  return statValue((Number(raw[k]) || 0) + 1);
 }
 const pct = (rng, p) => rng() * 100 < p;
 
@@ -154,6 +168,7 @@ export function keeperAtLevel(level, rng) {
   let points = (level - 1) * 3;
   while (points > 0) {
     const offer = [];
+    // 계측 표본의 모집단이다. 10에서 멈추는 것은 제품의 상한이 아니라 게이트들이 딛고 선 표본을 안 옮기려는 것이다.
     const pool = GROWABLE.filter((k) => stats[k] < 10);
     if (!pool.length) break;
     while (offer.length < 3 && pool.length) offer.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
@@ -333,10 +348,10 @@ function bareContactMargin(keeper, shot, input, over) {
   const SCALE_MS = 200;
   // 시간 항은 judgeWindow가 소유한다. 화면의 자가 그리는 그 창이 여기서 그대로 쓰인다.
   // P15 가설: 전속 이동 중 미숙한 자리잡기는 최대 60ms의 준비 시간을 잃는다.
-  const unset = positional ? 60 * Math.min(1, Math.abs(input.vx) / moveSpeed({ agility: s("agility") })) * (10 - offball) / 9 : 0;
+  const unset = positional ? 60 * Math.min(1, Math.abs(input.vx) / speedOf(s("agility"))) * (10 - offball) / 9 : 0;
   // 위치 입력은 마커 이후 예산을 실제 발동 뒤 남은 비행시간으로 바꾼다. 기존 창의 스탯/장비 항은 유지한다.
   const arrival = positional ? (over && "kickerPower" in over ? flight : shot.flight) * 1000 : 0;
-  const remaining = positional ? arrival - input.triggerMs - diveNeed({ diving: s("diving") }, Math.abs(shot.aimX - input.x)) - flight * (1 - 0.72) * 1000 : 0;
+  const remaining = positional ? arrival - input.triggerMs - diveNeed(effective({ diving: s("diving") }), Math.abs(shot.aimX - input.x)) - flight * (1 - 0.72) * 1000 : 0;
   const slack = judgeWindow(keeper, shot, input, over).slackMs + remaining - Math.abs(input.errMs) - unset;
   // 상한을 두지 않는다. 늦으면 늦은 만큼 손이 짧아져야 그 늦음이 원인으로 잡힌다.
   const timing = clamp(slack / SCALE_MS, -1.2, 1.35);
@@ -370,24 +385,24 @@ function attributeContact(keeper, shot, input) {
   const base = contactMargin(keeper, shot, input, null);
   // 코스가 주인을 정한다. 위로 온 공을 수평 반경으로 되짚으면 그 칸이 모든 코스의 원인이 된다.
   const probes = shot.course === "상단"
-    ? [["reflex", { reflex: keeper.reflex + 1 }],
-       ["agility", { agility: keeper.agility + 1 }],
-       ["offball", { offball: keeper.offball + 1 }],
-       ["composure", { composure: keeper.composure + 1 }],
-       ["resilience", { resilience: keeper.resilience + 1 }],
+    ? [["reflex", { reflex: nextPoint(keeper, "reflex") }],
+       ["agility", { agility: nextPoint(keeper, "agility") }],
+       ["offball", { offball: nextPoint(keeper, "offball") }],
+       ["composure", { composure: nextPoint(keeper, "composure") }],
+       ["resilience", { resilience: nextPoint(keeper, "resilience") }],
        ["kickerPower", { kickerPower: shot.kicker.power - 1 }],
        ["kickerCurve", { bendSub: 0.028 }]]
-    : [["diving", { diving: keeper.diving + 1 }],
-       ["reflex", { reflex: keeper.reflex + 1 }],
-       ["agility", { agility: keeper.agility + 1 }],
-       ["offball", { offball: keeper.offball + 1 }],
-       ["composure", { composure: keeper.composure + 1 }],
-       ["resilience", { resilience: keeper.resilience + 1 }],
+    : [["diving", { diving: nextPoint(keeper, "diving") }],
+       ["reflex", { reflex: nextPoint(keeper, "reflex") }],
+       ["agility", { agility: nextPoint(keeper, "agility") }],
+       ["offball", { offball: nextPoint(keeper, "offball") }],
+       ["composure", { composure: nextPoint(keeper, "composure") }],
+       ["resilience", { resilience: nextPoint(keeper, "resilience") }],
        ["kickerPower", { kickerPower: shot.kicker.power - 1 }],
        ["kickerCurve", { bendSub: 0.028 }]];
   let best = probes[0][0];
   // 자동 읽기와 타이밍은 같은 난수로 판단력 한 칸을 재평가한다.
-  if (Array.isArray(input.trace)) probes.push(["judgement", { judgement: keeper.judgement + 1 }]);
+  if (Array.isArray(input.trace)) probes.push(["judgement", { judgement: nextPoint(keeper, "judgement") }]);
   let bestGain = -Infinity;
   let restored = false;
   for (const [cause, over] of probes) {

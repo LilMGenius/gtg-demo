@@ -41,7 +41,8 @@ try {
   const base = impactBase(keeper, city);
   const wantGym = {}, wantMe = {};
   for (const s of GROWABLE) {
-    wantGym[s] = keeper[s] >= 10 ? "" : fmt(statImpact(keeper, s, base, city));
+    // 상한이 없으니 10 이상 칸도 한 칸 올림의 몫을 적는다.
+    wantGym[s] = fmt(statImpact(keeper, s, base, city));
     wantMe[s] = fmt(statHeld(keeper, s, base, city));
   }
   const off = (got, want) => GROWABLE.filter((s) => got[s] !== want[s]).map((s) => s + " " + JSON.stringify(got[s]) + " want " + JSON.stringify(want[s]));

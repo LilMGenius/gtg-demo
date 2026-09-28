@@ -1,4 +1,6 @@
-import { resolve, buildSet, makeRng, newKeeper, statValue, STAT_KNEE, STAT_TOP } from "../src/chain.mjs";
+import { resolve, buildSet, makeRng, newKeeper, statValue, moveSpeed, reactTrace, STAT_KNEE, STAT_TOP } from "../src/chain.mjs";
+import { MOVES, dateOdds } from "../web/src/state/date.mjs";
+import { DM_MOVES, dmOdds } from "../web/src/state/gram.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 import { SAVE_PATH } from "../web/src/state/coach.mjs";
 
@@ -46,6 +48,24 @@ for (const g of GROWABLE) base[g] = 10;
 const rb = rate(base);
 const drops = GROWABLE.map((st) => [st, rate({ ...base, [st]: 20 }) - rb]).filter(([, d]) => d < -0.3);
 check("save:no-single-stat-past-ten-lowers-saves", drops.length === 0, drops.map(([s, d]) => s + " " + d.toFixed(2)).join(", ") || GROWABLE.length + " stats, none below -0.3");
+
+// 곡선은 한 번만 걸린다. 저장 민첩 20은 실효 12.5이고, 판정 안에서 이미 휜 키퍼를 도는 길(reactTrace)도 바깥 속도와 같아야 한다.
+// 두 번 걸리면 11로 읽혀 걸음이 느려진다(검증자가 2.75 대 2.54로 쟀다). 대조군은 두 번 휜 값이다.
+const fast = { ...newKeeper(), agility: 20 };
+const direct = moveSpeed(fast);
+const shotAt = { flight: 1.0, aimX: 2.0, aimY: 0.5, course: "중단", kicker: { power: 5 } };
+const tr = reactTrace(fast, shotAt, [{ ms: -1000, x: 0 }, { ms: 0, x: 0 }], 200);
+const moved = tr.filter((p) => p.ms > 200 && p.ms <= 600).map((p) => Math.abs(p.x) / ((p.ms - 200) / 1000)).filter((v) => v > 0);
+const traced = moved.length ? Math.max(...moved) : direct;
+const twice = 1.0 + 0.14 * statValue(statValue(20));
+check("curve:applied-once-on-every-path", Math.abs(direct - (1.0 + 0.14 * statValue(20))) < 1e-9 && Math.abs(traced - direct) < 1e-6, "direct " + direct.toFixed(4) + " traced " + traced.toFixed(4));
+check("control:a-double-curve-is-slower", twice < direct - 0.1, "twice " + twice.toFixed(4));
+
+// 무릎 너머의 훈련은 판 밖의 확률(만남과 쪽지)도 산다. 10에서 자르면 20이 10과 같은 확률을 낸다.
+const past = (fn, moves) => moves.every((m) => fn({ [m.stat]: 20 }, m.id) >= fn({ [m.stat]: 10 }, m.id)) && moves.some((m) => fn({ [m.stat]: 20 }, m.id) > fn({ [m.stat]: 10 }, m.id));
+check("odds:dates-and-messages-keep-rising-past-ten", past(dateOdds, MOVES) && past(dmOdds, DM_MOVES), MOVES.map((m) => m.stat + " " + dateOdds({ [m.stat]: 10 }, m.id) + "->" + dateOdds({ [m.stat]: 20 }, m.id)).join(", "));
+const clipped = (k, id) => dateOdds({ [MOVES[0].stat]: Math.min(10, k[MOVES[0].stat]) }, id);
+check("control:a-ten-clamp-fails-the-odds-axis", !past(clipped, [MOVES[0]]), "clamped " + clipped({ [MOVES[0].stat]: 20 }, MOVES[0].id));
 
 for (const n of notes) console.log("  ok   " + n);
 for (const f of fails) console.log("  FAIL " + f);

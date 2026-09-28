@@ -2,6 +2,7 @@
 // 좋아요와 댓글은 그 구가 만들고, 팔로우는 사람이 건다. 셋 다 판정식 밖이고 팔로워 축에만 붙는다.
 
 import { FACES_V_SOCIAL, FACES_V_POSTS, movedFace, remapFaceKeys } from './passer.mjs';
+import { statValue } from '../../../src/chain.mjs';
 
 // 한 글에 붙는 좋아요. 화제가 클수록, 사람이 많은 동네일수록 많이 붙는다.
 // 팔로워 증가분만 쓰면 초반 한 자리 수에서 0이 되어, 아무도 안 본 글이 계정을 채운다.
@@ -184,7 +185,8 @@ export function dmMoveAt(id) {
 export function dmOdds(keeper, moveId) {
   const m = dmMoveAt(moveId);
   if (!m || !keeper) return 0;
-  const v = Math.max(1, Math.min(10, Number(keeper[m.stat]) || 1));
+  // 만남과 같은 곡선이다. 10에서 자르면 무릎 너머의 훈련이 대화에서 아무것도 안 산다.
+  const v = Math.max(1, statValue(Number(keeper[m.stat]) || 1));
   return Math.max(5, Math.min(92, Math.round(m.base + m.step * v)));
 }
 

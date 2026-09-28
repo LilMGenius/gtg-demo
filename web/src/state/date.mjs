@@ -3,6 +3,7 @@
 // 판정식은 건드리지 않는다. 라포 숫자와 지갑과 팔로워만 움직인다.
 
 import { cashPrice } from './wallet.mjs';
+import { statValue } from '../../../src/chain.mjs';
 import { RAPPORT_CAP, RAPPORT_STEPS, rapportKey, rapportTier } from "./rapport.mjs";
 
 // 만남이 열리는 단계. RAPPORT_STEPS의 마지막 문턱이라 열다섯 번 말을 섞어야 닿는다.
@@ -39,7 +40,8 @@ export function moveAt(id) {
 export function dateOdds(keeper, moveId) {
   const m = moveAt(moveId);
   if (!m || !keeper) return 0;
-  const v = Math.max(1, Math.min(10, Number(keeper[m.stat]) || 1));
+  // 능력치에 상한이 없으니 10에서 자르지 않고 판정과 같은 곡선을 지난다. 확률 상한 92가 확실한 성공을 막는다.
+  const v = Math.max(1, statValue(Number(keeper[m.stat]) || 1));
   return Math.max(5, Math.min(92, Math.round(m.base + m.step * v)));
 }
 
