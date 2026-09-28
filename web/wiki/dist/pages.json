@@ -3,7 +3,7 @@
     "backlinks": [
       "gram"
     ],
-    "bodyHtml": "<p>봇이 대신 막은 슛에는 팔로워가 안 붙는다</p>\n<p>판단력만 봇 값으로 바뀐다</p>\n<p>크레딧은 여섯 시간까지만 쌓인다</p>\n<p>크레딧은 봇의 손을 빌리는 값이고, 다 써도 코치는 계속 번 훈련 포인트로 능력을 올린다.</p>\n<p>봇은 판마다 얻는 훈련 두 회와 오프라인 적립으로 핸들링을 먼저 끝까지 올린 뒤 세이브 능력을 고르게 훈련하며, 가장 낮은 능력보다 한 칸 넘게 앞선 능력은 더 올리지 않는다.</p>\n<table><thead><tr><th>이름</th><th>판단력</th><th>분</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">중고 훈련용 더미</th><td>3</td><td>20</td><td>150</td></tr><tr><th scope=\"row\">동네 공업사 클론</th><td>6</td><td>45</td><td>390</td></tr><tr><th scope=\"row\">연구소 유출 피지컬 AI</th><td>9</td><td>90</td><td>840</td></tr></tbody></table>",
+    "bodyHtml": "<p>봇이 대신 막은 슛에는 팔로워가 안 붙는다</p>\n<p>판단력만 봇 값으로 바뀐다</p>\n<p>크레딧은 여섯 시간까지만 쌓인다</p>\n<p>크레딧은 봇의 손을 빌리는 값이고, 다 써도 코치는 계속 번 훈련 포인트로 능력을 올린다.</p>\n<p>봇은 판마다 얻는 훈련 기회 두 번과 오프라인 적립으로 핸들링을 먼저 끝까지 올린 뒤 세이브 능력을 고르게 훈련하며, 가장 낮은 능력보다 한 칸 넘게 앞선 능력은 더 올리지 않는다.</p>\n<table><thead><tr><th>이름</th><th>판단력</th><th>분</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">중고 훈련용 더미</th><td>3</td><td>20</td><td>150</td></tr><tr><th scope=\"row\">동네 공업사 클론</th><td>6</td><td>45</td><td>390</td></tr><tr><th scope=\"row\">연구소 유출 피지컬 AI</th><td>9</td><td>90</td><td>840</td></tr></tbody></table>",
     "categories": [
       "bot"
     ],
@@ -47,7 +47,7 @@
       "coin-save",
       "hand"
     ],
-    "bodyHtml": "<p>골드는 슛을 막아서 번다. 캐시는 골드 대신 쓸 수 있고, 캐시 값은 <a class=\"internal new\" href=\"./cash-rate.html\">환산 비율</a>을 따른다.</p>\n<p>유명한 키커일수록 막았을 때 더 붙는다</p>\n<p>세이브 다섯 칸은 이번 판의 슛 결과다: 초록은 세이브, 빨강은 실점, 노랑은 진행 중이다</p>\n<table><thead><tr><th>자리</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">막으면</th><td>12</td></tr><tr><th scope=\"row\">최상급</th><td>30</td></tr><tr><th scope=\"row\">먹혀도</th><td>4</td></tr><tr><th scope=\"row\">훈련 대신</th><td>12</td></tr><tr><th scope=\"row\">캐시 한 단위</th><td>10</td></tr></tbody></table>",
+    "bodyHtml": "<p>골드는 슛을 막아서 번다. 캐시는 골드 대신 쓸 수 있고, 캐시 값은 <a class=\"internal new\" href=\"./cash-rate.html\">환산 비율</a>을 따른다.</p>\n<p>유명한 키커일수록 막았을 때 더 붙는다</p>\n<p>세이브 다섯 칸은 이번 판의 슛 결과다: 초록은 세이브, 빨강은 실점, 노랑은 진행 중이다</p>\n<table><thead><tr><th>항목</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">막으면</th><td>12</td></tr><tr><th scope=\"row\">최상급</th><td>30</td></tr><tr><th scope=\"row\">먹혀도</th><td>4</td></tr><tr><th scope=\"row\">훈련 대신</th><td>12</td></tr><tr><th scope=\"row\">캐시 한 단위</th><td>10</td></tr></tbody></table>",
     "categories": [
       "coin"
     ],
@@ -89,7 +89,7 @@
       "coin",
       "drill"
     ],
-    "bodyHtml": "<p>판이 끝나면 훈련 두 회가 쌓인다</p>\n<p><a class=\"internal new\" href=\"./drill.html\">훈련</a>은 능력 한 칸을 올린다</p>\n<p>올릴 칸이 없으면 훈련 한 회가 12 골드로 바뀐다</p>\n<table><thead><tr><th>자리</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">훈련 대신</th><td>12</td></tr></tbody></table>",
+    "bodyHtml": "<p>판이 끝나면 훈련 기회가 두 번 쌓인다</p>\n<p><a class=\"internal new\" href=\"./drill.html\">훈련</a>은 능력 한 칸을 올린다</p>\n<p>올릴 칸이 없으면 훈련 한 회가 12 골드로 바뀐다</p>\n<table><thead><tr><th>항목</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">훈련 대신</th><td>12</td></tr></tbody></table>",
     "categories": [
       "drill"
     ],
@@ -135,7 +135,7 @@
       "pull",
       "selfie-base"
     ],
-    "bodyHtml": "<p>막은 슛이 소문이 되어 팔로워가 붙는다</p>\n<p>맞팔은 소문을 조금씩 넓힌다</p>\n<p>동네 등급이 오르면 같은 슛에 더 붙는다</p>\n<table><thead><tr><th>자리</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">좋아요</th><td>3</td></tr><tr><th scope=\"row\">동네 한 등급</th><td>4</td></tr><tr><th scope=\"row\">맞팔 한 명</th><td>0.03</td></tr><tr><th scope=\"row\">맞팔 한도</th><td>1.3</td></tr><tr><th scope=\"row\">같이 한 장</th><td>120</td></tr></tbody></table>",
+    "bodyHtml": "<p>막은 슛이 소문이 되어 팔로워가 붙는다</p>\n<p>맞팔은 소문을 조금씩 넓힌다</p>\n<p>동네 등급이 오르면 같은 슛에 더 붙는다</p>\n<table><thead><tr><th>항목</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">좋아요</th><td>3</td></tr><tr><th scope=\"row\">동네 한 등급</th><td>4</td></tr><tr><th scope=\"row\">맞팔 한 명</th><td>0.03</td></tr><tr><th scope=\"row\">맞팔 한도</th><td>1.3</td></tr><tr><th scope=\"row\">같이 한 장</th><td>120</td></tr></tbody></table>",
     "categories": [
       "gram"
     ],
@@ -218,7 +218,7 @@
       "pull-cost",
       "ticket-cap"
     ],
-    "bodyHtml": "<p>이용권은 완봉으로 쌓인다</p>\n<p>보유한 키퍼는 제외하므로 현재 확률은 상점의 확률 표를 따른다.</p>\n<table><thead><tr><th>자리</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">한 장</th><td>380</td></tr><tr><th scope=\"row\">묶음</th><td>10</td></tr><tr><th scope=\"row\">묶음 보상</th><td>1</td></tr><tr><th scope=\"row\">이용권 한도</th><td>40</td></tr></tbody></table>\n<table><thead><tr><th>종류</th><th>설명</th></tr></thead><tbody><tr><th scope=\"row\">동네 이적시장</th><td>아직 없는 키퍼 중 한 장이 나온다</td></tr><tr><th scope=\"row\">전설 이적시장</th><td>명성 9 이상만 나온다. 이용권은 안 받는다</td></tr></tbody></table>",
+    "bodyHtml": "<p>이용권은 완봉으로 쌓인다</p>\n<p>보유한 키퍼는 제외하므로 현재 확률은 상점의 확률 표를 따른다.</p>\n<table><thead><tr><th>항목</th><th>값</th></tr></thead><tbody><tr><th scope=\"row\">한 장</th><td>380</td></tr><tr><th scope=\"row\">묶음</th><td>10</td></tr><tr><th scope=\"row\">묶음 보상</th><td>1</td></tr><tr><th scope=\"row\">이용권 한도</th><td>40</td></tr></tbody></table>\n<table><thead><tr><th>종류</th><th>설명</th></tr></thead><tbody><tr><th scope=\"row\">동네 이적시장</th><td>아직 없는 키퍼 중 한 장이 나온다</td></tr><tr><th scope=\"row\">전설 이적시장</th><td>명성 9 이상만 나온다. 이용권은 안 받는다</td></tr></tbody></table>",
     "categories": [
       "pull"
     ],

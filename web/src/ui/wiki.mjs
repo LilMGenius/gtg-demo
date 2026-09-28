@@ -44,7 +44,7 @@ export const wikiReady = typeof window === 'undefined' ? Promise.resolve() : fet
 
 // 화면에서만 참인 것만 여기 남는다. 표는 빌드가 pages.json에 넣어 사이트와 같은 바이트다.
 const EXTRA = {
-  game: () => table(['자리', '값'], [['버전', 'v' + VERSION], ['빌드', 'v' + VERSION + '+…']])
+  game: () => table(['항목', '값'], [['버전', 'v' + VERSION], ['빌드', 'v' + VERSION + '+…']])
     + '<button class="copy" type="button">복사</button> <a class="site" href="' + SITE_URL + '" target="_blank" rel="noopener">브라우저에서 위키 열기</a>',
   hand: () => (typeof document !== 'undefined' && !document.fullscreenEnabled && !document.documentElement.webkitRequestFullscreen) ? '<p>iPhone에서는 공유 메뉴에서 홈 화면에 추가한 뒤 실행하면 전체 화면으로 플레이할 수 있다.</p>' : ''
 };

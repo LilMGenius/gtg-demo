@@ -1391,7 +1391,7 @@ function recordRows() {
       + '</em></td><td><i>' + r.conceded + '</i></td></tr>';
   }).join('');
   const table = names.length
-    ? '<table><thead><tr><th></th><th>이름</th><th>막은</th><th>먹힌</th></tr></thead><tbody>'
+    ? '<table><thead><tr><th></th><th>이름</th><th>세이브</th><th>실점</th></tr></thead><tbody>'
       + rows + '</tbody></table>'
     : '<div class="note dim"><span></span></div>';
   /* 표가 먼저 선다. 이 칸을 여는 이유가 누구한테 약한지라, 그 답이 굴리기 전에 서야 한다. 실측
@@ -1521,8 +1521,8 @@ function renderMe() {
   }, { s: 0, c: 0 });
   const rate = led.s + led.c > 0 ? Math.round((led.s / (led.s + led.c)) * 100) : 0;
   const big = '<div class="big"><span><b>' + rate + '%</b><i>세이브율</i></span>'
-    + '<span><b>' + led.s + '</b><i>막은 수</i></span>'
-    + '<span><b>' + led.c + '</b><i>먹힌 수</i></span></div>';
+    + '<span><b>' + led.s + '</b><i>세이브</i></span>'
+    + '<span><b>' + led.c + '</b><i>실점</i></span></div>';
   box.innerHTML = '<h4 class="ptitle">내 정보</h4>' + tabs + '<h4><img class="pfp" alt="' + name + '" src="'
     + thumbURL('face', k, lookOf(state.gear, state.keeper.name)) + '">' + name
     + '<small><i>Lv ' + k.level + '</i><i>' + k.height + 'cm</i><i>' + k.weight + 'kg</i>'
@@ -1746,8 +1746,8 @@ const SHELVES = {
   boot: { head: '축구화', list: BOOTS, field: 'studs', worn: '착용', past: '보유', top: MAX_STUD, at: bootAt },
   kit: { head: '유니폼', list: KITS, field: 'pads', worn: '착용', past: '보유', top: MAX_KIT, at: kitAt },
   sock: { head: '양말', list: SOCKS, field: 'socks', worn: '착용', past: '보유', top: MAX_SOCK, at: sockAt },
-  frame: { head: '골대', list: GOALS, field: 'frame', worn: '착용', past: '보유', top: MAX_FRAME, at: frameAt },
-  city: { head: '동네', list: CITIES, field: 'city', worn: '착용', past: '보유', top: MAX_CITY, at: cityAt },
+  frame: { head: '골대', list: GOALS, field: 'frame', worn: '설치', past: '보유', top: MAX_FRAME, at: frameAt },
+  city: { head: '동네', list: CITIES, field: 'city', worn: '이용', past: '보유', top: MAX_CITY, at: cityAt },
   hair: { head: '헤어', list: HAIRS, field: 'hair', worn: '착용', past: '보유', top: MAX_HAIR, at: hairAt },
   beard: { head: '수염', list: BEARDS, field: 'beard', worn: '착용', past: '보유', top: MAX_BEARD, at: beardAt },
   ink: { head: '타투', list: TATTOOS, field: 'ink', worn: '착용', past: '보유', top: MAX_INK, at: inkAt }

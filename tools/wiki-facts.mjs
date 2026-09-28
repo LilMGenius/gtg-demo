@@ -16,7 +16,7 @@ const values = {
   'pull-cost': PULL_COST, 'pull-bulk': PULL_BULK, 'pull-bonus': PULL_BONUS, 'ticket-cap': TICKET_CAP,
   'like-base': LIKE_BASE, 'like-per-city': LIKE_PER_CITY, 'mutual-step': MUTUAL_STEP, 'mutual-cap': MUTUAL_CAP, 'selfie-base': SELFIE_BASE
 };
-const kv = (rows) => ({ columns: ['자리', '값'], rows });
+const kv = (rows) => ({ columns: ['항목', '값'], rows });
 const tables = {
   hand: [
     { columns: ['키', '하는 일'], rows: KEY_MAP.map(({ label, note }) => [label, note]) },

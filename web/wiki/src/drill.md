@@ -9,7 +9,7 @@ relations:
   relatedTo: [gear]
 valueFrom: 'wallet.COIN_DRILL'
 ---
-판이 끝나면 훈련 두 회가 쌓인다
+판이 끝나면 훈련 기회가 두 번 쌓인다
 
 [[drill|훈련]]은 능력 한 칸을 올린다
 

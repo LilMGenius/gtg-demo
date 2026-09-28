@@ -28,7 +28,9 @@ const SHELVES = [
 ];
 // 지금 낀 등급과 지나온 등급의 이름표. 선반마다 달랐던 여덟 쌍이 이 두 낱말로 모였으므로
 // 선반 표에 여덟 번 적지 않는다. 여덟 줄에 같은 값을 적으면 한 줄만 어긋나도 계기가 조용하다.
-const WORN = '착용';
+// 몸에 안 거는 두 선반은 제 동사를 쓴다. 골대를 착용하고 경기장을 착용한다는 말은 한국어가 아니다.
+const WORN_AT = { frame: '설치', city: '이용' };
+const wornOf = (tab) => WORN_AT[tab] || '착용';
 const PAST = '보유';
 // 잉여 훈련 환전으로 들어오는 돈. MAXED_POINTS 5 × COIN_DRILL 12다.
 // 지갑이 0이면 모자란 값과 정가가 같은 수라, 버튼이 어느 쪽을 적었는지 화면으로 못 가른다.
@@ -83,7 +85,8 @@ try {
       return s.display !== "none" && s.visibility !== "hidden";
     };
     return {
-      head: box.querySelector("h4").textContent,
+      // 선반 머리는 따로 서지 않는다. 켜진 탭이 그 말을 하고, 탭 줄이 그 이름을 data-now로 든다.
+      head: (box.querySelector(".tabs") || { dataset: {} }).dataset.now || "",
       // 값을 그린 자리 수. 다 산 선반은 살 게 없다는 말을 값의 부재로 한다.
       prices: [...box.querySelectorAll('.rack .px[data-coin]')].filter(lit).length,
       // 값은 버튼이 들고 있는 데이터에서 읽는다. 그려진 글자에는 쉼표와 아이콘 이름이 섞인다.
@@ -210,13 +213,13 @@ try {
     await p.waitForTimeout(120);
     const post = await shelf(s.tab);
     const bought = post.rows.find((r) => r.rank === TOP);
-    if (bought && bought.off && bought.lit && bought.text === WORN) worn += 1;
+    if (bought && bought.off && bought.lit && bought.text === wornOf(s.tab)) worn += 1;
     const lower = post.rows.filter((r) => r.rank < TOP);
     if (lower.length === RANKS - 1 && lower.every((r) => r.off && r.lit && r.text === PAST)) past += 1;
     /* 다 산 선반은 살 게 없다는 말을 값의 부재로 한다. 랙 안에 값이 하나도 없고,
        네 줄이 전부 죽은 채 보이고, 최상급만 착용이고 나머지는 지나온 등급이다. */
     if (post.prices === 0 && post.rows.length === RANKS && post.rows.every((r) => r.off && r.lit)
-      && bought && bought.text === WORN && lower.every((r) => r.text === PAST)) done += 1;
+      && bought && bought.text === wornOf(s.tab) && lower.every((r) => r.text === PAST)) done += 1;
   }
   const coin1 = await p.evaluate(() => window.__wallet().coin);
   const gear = await p.evaluate(() => window.__gear());
