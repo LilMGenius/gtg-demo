@@ -55,11 +55,12 @@ const top = tagged.sort((a, b) => rank(b) - rank(a))[0];
 // 배포된 바이트가 말하는 버전은 마지막 태그와 같아야 한다. 매니페스트는 태그가 붙는 커밋에서 오른다.
 if (top && rank(head) !== rank(top)) fails.push('manifest ' + head + ' is not the highest tag v' + top);
 
-// 버전 범프는 그 시점 gamewiki 최신 릴리스로 다시 지은 위키를 싣는다. 출력의 gamewiki.json이 자기를 쓴 릴리스를 적으므로
-// 범프 커밋의 트리만 읽으면 된다. 기준은 범프 커밋 시각에 나와 있던 가장 높은 gamewiki 태그라 뒤에 gamewiki가 올라도 옛 릴리스는 빨개지지 않는다.
-// 도장이 생기기 전의 릴리스(0.8.1까지)는 대조할 값이 없다.
-const STAMPED_FROM = '0.9.0';
+// 위키를 싣는 모든 릴리스는 그 위키를 지은 gamewiki 릴리스를 dist와 site의 gamewiki.json에 같은 값으로 적는다.
+// 도장은 그 커밋 시각에 이미 태그로 나와 있던 gamewiki 릴리스여야 한다. 위키가 생기기 전의 릴리스는 대조할 출력이 없다.
+// 범프가 그 시각의 최신 gamewiki로 다시 지어야 한다는 규칙은 0.9.0부터다. 그 전 릴리스는 당시 쓰던 판을 적고, 최신과의 차이는 기록만 한다.
+const LATEST_FROM = '0.9.0';
 const GAMEWIKI = process.env.GAMEWIKI_DIR || new URL('../../gamewiki', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const hasWiki = (ref) => git('ls-tree', '--name-only', ref, 'web/wiki/').length > 0;
 const stampAt = (ref, dir) => {
   try {
     return JSON.parse(git('show', ref + ':web/wiki/' + dir + '/gamewiki.json')).version ?? null;
@@ -67,10 +68,6 @@ const stampAt = (ref, dir) => {
     return null;
   }
 };
-const dist = stampAt('HEAD', 'dist');
-const site = stampAt('HEAD', 'site');
-if (dist && dist === site) console.log('  ok version:the-wiki-names-its-gamewiki ' + dist);
-else if (rank(head) >= rank(STAMPED_FROM)) fails.push('version:the-wiki-names-its-gamewiki dist=' + dist + ' site=' + site);
 
 let releases = null;
 try {
@@ -80,20 +77,23 @@ try {
 } catch {
   releases = null;
 }
-const latestAt = (at) => releases.filter((r) => r.at <= at).map((r) => r.version).sort((a, b) => rank(b) - rank(a))[0] ?? null;
-// 범프 커밋은 매니페스트 버전이 부모와 달라지는 커밋이다. 가장 높은 태그의 커밋과, 아직 태그가 없는 HEAD의 범프를 잰다.
-const bumps = new Set();
-if (top && rank(top) >= rank(STAMPED_FROM)) bumps.add(git('rev-list', '-n', '1', 'v' + top));
-if (rank(head) >= rank(STAMPED_FROM) && manifestVersionAt('HEAD') !== manifestVersionAt('HEAD^')) bumps.add(git('rev-parse', 'HEAD'));
-for (const commit of bumps) {
-  if (!releases) {
-    fails.push('version:a-bump-ships-the-latest-gamewiki cannot read gamewiki tags at ' + GAMEWIKI);
-    continue;
-  }
-  const want = latestAt(Number(git('show', '-s', '--format=%ct', commit)));
-  const got = stampAt(commit, 'site');
-  if (got !== want) fails.push('version:a-bump-ships-the-latest-gamewiki ' + commit.slice(0, 7) + ' wiki=' + got + ' latest=' + want);
-  else console.log('  ok version:a-bump-ships-the-latest-gamewiki ' + commit.slice(0, 7) + ' ' + got);
+const releasedBy = (at) => releases.filter((r) => r.at <= at).map((r) => r.version).sort((a, b) => rank(b) - rank(a));
+
+// 태그가 붙은 커밋과, 아직 태그가 없는 HEAD의 범프를 잰다. 범프는 매니페스트 버전이 부모와 달라지는 커밋이다.
+const releaseCommits = tags.filter((t) => !NO_MANIFEST.has(t)).map((t) => ({ version: t.slice(1), commit: git('rev-list', '-n', '1', t) }));
+if (manifestVersionAt('HEAD') !== manifestVersionAt('HEAD^') && !tags.includes('v' + head)) releaseCommits.push({ version: head, commit: git('rev-parse', 'HEAD') });
+if (!releases) fails.push('version:the-wiki-names-its-gamewiki cannot read gamewiki tags at ' + GAMEWIKI);
+for (const { version, commit } of releases ? releaseCommits : []) {
+  if (!hasWiki(commit)) continue;
+  const at = Number(git('show', '-s', '--format=%at', commit));
+  const dist = stampAt(commit, 'dist');
+  const site = stampAt(commit, 'site');
+  const out = releasedBy(at);
+  const label = 'v' + version + ' ' + commit.slice(0, 7);
+  if (!dist || (site !== null && site !== dist)) fails.push('version:the-wiki-names-its-gamewiki ' + label + ' dist=' + dist + ' site=' + site);
+  else if (!out.includes(dist)) fails.push('version:the-wiki-names-its-gamewiki ' + label + ' names ' + dist + ', not a gamewiki release out by then');
+  else if (rank(version) >= rank(LATEST_FROM) && dist !== out[0]) fails.push('version:a-bump-ships-the-latest-gamewiki ' + label + ' wiki=' + dist + ' latest=' + out[0]);
+  else console.log('  ok version:the-wiki-names-its-gamewiki ' + label + ' gamewiki ' + dist + (dist === out[0] ? '' : ' (latest then ' + out[0] + ', before the rebuild rule)'));
 }
 
 for (const row of rows) console.log('  ' + row);
@@ -105,3 +105,4 @@ if (fails.length) {
   process.exit(1);
 }
 console.log('PASS version ' + tags.length + ' tags');
+
