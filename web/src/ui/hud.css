@@ -454,6 +454,8 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) #mo
 #gym .row button .who,#me .grid .who{display:flex;align-items:center;gap:6px;min-width:0}
 #gym .row button .who svg,#me .grid .who svg{width:18px;height:18px;flex:none;color:var(--dim)}
 /* 상한에 닿았거나 남은 훈련이 없는 칸. 눌러도 아무 일이 없다는 것이 먼저 보여야 한다. */
+#gym .row button .fx{display:block;margin-top:2px;font-size:.86em;line-height:1.25;color:var(--dim)}
+#gym .row button .fx span{display:block;white-space:nowrap}
 #gym .row button:disabled{color:#f6efdc5c;background:#141a12;cursor:default}
 #gym .row button:disabled em{color:#f6efdc44}
 #gym .row button:not(:disabled):hover{background:#25301f;transform:translateY(-4px) rotate(0);

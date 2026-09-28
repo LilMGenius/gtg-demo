@@ -18,6 +18,7 @@ import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, BEARDS, MAX_BEARD, beardAt, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { AXIS_WORD, AXIS_UNIT, SHELF_NOTES_FOR_WIKI } from './state/shelf.mjs';
 export { SHELF_NOTES_FOR_WIKI };
+import { impactBase, statImpact } from './state/impact.mjs';
 import { BUFFS, BUFF_CAP, newBuff, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
 import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds, photoOdds, selfieFans,
   DM_MOVES, dmOdds, dmOutcome, dmClock, dmWaiting, applyDm } from './state/gram.mjs';
@@ -801,6 +802,54 @@ function trainKeeper(stat) {
   renderGym();
 }
 
+/* 한 칸 올림의 몫. 숫자만 오르는 훈련은 무엇을 산 것인지가 안 읽혀, 올린 능력치가 성능 어디에 붙는지를
+   위키에서만 알 수 있었다. 봇 입력으로 같은 시드를 짝지어 잰 값을 칸 아래에 세운다. 키퍼와 레벨과 동네가
+   같으면 같은 값이라 한 번 잰 것을 들고 있다. 창을 먼저 그리고 칸마다 한 박자씩 쉬어 가며 채운다. */
+let impactKey = '', impactBaseline = null;
+const impactMemo = {};
+function impactStateKey() {
+  const k = state.keeper;
+  return GROWABLE.map((s) => k[s]).join(',') + '|' + k.level + '|' + state.gear.city;
+}
+function fxText(stat) {
+  const r = impactKey === impactStateKey() ? impactMemo[stat] : undefined;
+  if (r === undefined) return '<span>…</span>';
+  if (!r) return '';
+  const parts = [];
+  if (r.save) parts.push('세이브 ' + (r.save > 0 ? '+' : '') + r.save.toFixed(1) + '%p');
+  if (r.fans) parts.push('팔로워 ' + (r.fans > 0 ? '+' : '') + Math.round(r.fans) + '%');
+  return parts.length ? parts.map((x) => '<span>' + x + '</span>').join('') : '<span>변화 없음</span>';
+}
+let impactTimer = 0;
+function fillImpact() {
+  clearTimeout(impactTimer);
+  const key = impactStateKey();
+  if (impactKey !== key) {
+    impactKey = key;
+    impactBaseline = null;
+    for (const s of Object.keys(impactMemo)) delete impactMemo[s];
+  }
+  const todo = GROWABLE.filter((s) => !(s in impactMemo));
+  if (!todo.length) return;
+  const step = () => {
+    const box = el('gym');
+    if (!box || box.hidden || impactKey !== impactStateKey()) return;
+    const city = state.gear.city;
+    if (!impactBaseline) impactBaseline = impactBase(state.keeper, city);
+    else {
+      const stat = todo.shift();
+      impactMemo[stat] = statImpact(state.keeper, stat, impactBaseline, city);
+      const slot = box.querySelector('[data-fx="' + stat + '"]');
+      if (slot && state.keeper[stat] < 10) slot.innerHTML = fxText(stat);
+      // 칸이 한 줄씩 자라면 창이 접힘 아래로 넘친다. 굴러간다는 자국을 다시 잰다.
+      scrollCue(box, box);
+    }
+    if (todo.length) impactTimer = setTimeout(step, 0);
+  };
+  impactTimer = setTimeout(step, 30);
+}
+
+
 // 훈련장. 열고 닫는 것은 손이고, 열려 있는 동안에도 판은 돈다.
 // 포인트가 0이어도 열린다. 그때는 내 스탯을 보는 창이다.
 function renderGym() {
@@ -823,7 +872,7 @@ function renderGym() {
     // 값 자리에는 값만 적는다. 상한에 닿은 것은 못 누르는 버튼이 말한다.
     const tail = v >= 10 ? String(v) : v + ' → ' + (v + 1);
     return '<button data-k="' + k + '"' + (off ? ' disabled' : '') + '><span class="who">' + STAT_ICON[k]
-      + CAUSE_LABEL[k] + '</span><em>' + tail + '</em></button>';
+      + CAUSE_LABEL[k] + '</span><em>' + tail + '</em><small class="fx" data-fx="' + k + '">' + (v >= 10 ? '' : fxText(k)) + '</small></button>';
   }).join('') + '</div>' + swap + '<button class="close">닫기</button>'
     /* 굴러간다는 자국. 내 정보가 쓰는 그 겹을 같은 클래스로 둔다. 마지막에 두는 것은 칠하는 차례
        때문이다. 앞에 두면 자리를 잡은 칸들이 이 겹을 덮는다. */
@@ -849,6 +898,7 @@ function renderGym() {
      내 정보가 쓰던 그 신호를 그대로 부른다. 구르는 것이 칸이 아니라 창이라 굴러가는 상자를 밖에서
      넘긴다. 안 넘기면 첫 자식인 제목 줄을 재게 되어 넘침이 늘 0이고 신호가 영영 안 켜진다. */
   box.onscroll = () => scrollCue(box, box);
+  fillImpact();
   /* 화면이 줄면 기둥은 그대로인데 접힘이 올라와 안 구르던 창이 구르기 시작한다. 그릴 때와 굴릴 때만
      세면 그 사이에 아무도 다시 안 세어, 자국이 꺼진 채로 닫기가 접힘 아래에 남는다. 실측 1280x720에서
      열어 두고 740x360으로 줄이면 넘침이 54인데 자국은 꺼진 채였고, 닫기는 402.45에 서서 화면 밖에
