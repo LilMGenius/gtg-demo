@@ -40,3 +40,11 @@ export function statImpact(keeper, stat, base, city = 0, sets = IMPACT_SETS, cap
   const fans = base.fans > 0 ? (after.fans / base.fans - 1) * 100 : 0;
   return { save: Math.abs(save) < IMPACT_FLOOR ? 0 : save, fans: Math.abs(fans) < IMPACT_FLOOR * 10 ? 0 : fans };
 }
+// 지금 값이 훈련 안 한 1에 비해 벌어 주는 몫. 내 정보가 칸마다 적는다. 한 칸 올림(훈련장)과 다른 물음이라 함수도 다르다.
+export function statHeld(keeper, stat, base, city = 0, sets = IMPACT_SETS) {
+  if (!GROWABLE.includes(stat) || keeper[stat] <= 1) return { save: 0, fans: 0 };
+  const bare = sample({ ...keeper, [stat]: 1 }, Math.max(1, keeper.level || 1), city, sets);
+  const save = base.save - bare.save;
+  const fans = bare.fans > 0 ? (base.fans / bare.fans - 1) * 100 : 0;
+  return { save: Math.abs(save) < IMPACT_FLOOR ? 0 : save, fans: Math.abs(fans) < IMPACT_FLOOR * 10 ? 0 : fans };
+}

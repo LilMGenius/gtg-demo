@@ -886,6 +886,8 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) #mo
 #me .grid span b{color:#ffd83d;font-weight:400}
 /* 만렙 칸. 더 줄 곳이 없다는 것이 수치보다 먼저 보여야 한다. */
 #me .grid span.max b{color:var(--good)}
+#me .grid > span .fx{font-size:.86em;line-height:1.25;color:var(--dim);text-align:center}
+#me .grid > span .fx span{display:block;white-space:nowrap}
 /* 지금 걸친 것. 왼쪽은 그 차림 그대로 구운 그림이고 오른쪽은 무엇을 걸쳤는지의 목록이다.
    116px. 능력치가 한 화면에 들어가도록 이 블록에서 70px을 내주었다.
    여기가 답하는 것은 무엇을 걸쳤는가 하나뿐이라, 능력치 여섯 칸과 바꿀 자리가 아니다. */

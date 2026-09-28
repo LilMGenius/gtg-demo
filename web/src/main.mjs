@@ -18,7 +18,7 @@ import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
 import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, BEARDS, MAX_BEARD, beardAt, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
 import { AXIS_WORD, AXIS_UNIT, SHELF_NOTES_FOR_WIKI } from './state/shelf.mjs';
 export { SHELF_NOTES_FOR_WIKI };
-import { impactBase, statImpact } from './state/impact.mjs';
+import { impactBase, statImpact, statHeld } from './state/impact.mjs';
 import { BUFFS, BUFF_CAP, newBuff, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
 import { readSocial, whoKey, isFollowing, isMutual, follow, mutualCount, mutualBoost, likesFor, commentOdds, photoOdds, selfieFans,
   DM_MOVES, dmOdds, dmOutcome, dmClock, dmWaiting, applyDm } from './state/gram.mjs';
@@ -806,13 +806,14 @@ function trainKeeper(stat) {
    위키에서만 알 수 있었다. 봇 입력으로 같은 시드를 짝지어 잰 값을 칸 아래에 세운다. 키퍼와 레벨과 동네가
    같으면 같은 값이라 한 번 잰 것을 들고 있다. 창을 먼저 그리고 칸마다 한 박자씩 쉬어 가며 채운다. */
 let impactKey = '', impactBaseline = null;
-const impactMemo = {};
+// 두 물음의 답을 따로 든다. next는 한 칸 올림(훈련장), held는 지금 값이 1에 비해 버는 몫(내 정보)이다.
+const impactMemo = { next: {}, held: {} };
 function impactStateKey() {
   const k = state.keeper;
   return GROWABLE.map((s) => k[s]).join(',') + '|' + k.level + '|' + state.gear.city;
 }
-function fxText(stat) {
-  const r = impactKey === impactStateKey() ? impactMemo[stat] : undefined;
+function fxText(stat, kind = 'next') {
+  const r = impactKey === impactStateKey() ? impactMemo[kind][stat] : undefined;
   if (r === undefined) return '<span>…</span>';
   if (!r) return '';
   const parts = [];
@@ -821,28 +822,31 @@ function fxText(stat) {
   return parts.length ? parts.map((x) => '<span>' + x + '</span>').join('') : '<span>변화 없음</span>';
 }
 let impactTimer = 0;
-function fillImpact() {
+function fillImpact(kind = 'next', boxId = 'gym', after = null) {
   clearTimeout(impactTimer);
   const key = impactStateKey();
   if (impactKey !== key) {
     impactKey = key;
     impactBaseline = null;
-    for (const s of Object.keys(impactMemo)) delete impactMemo[s];
+    impactMemo.next = {};
+    impactMemo.held = {};
   }
-  const todo = GROWABLE.filter((s) => !(s in impactMemo));
+  const memo = impactMemo[kind];
+  const todo = GROWABLE.filter((s) => !(s in memo));
   if (!todo.length) return;
   const step = () => {
-    const box = el('gym');
-    if (!box || box.hidden || impactKey !== impactStateKey()) return;
+    const box = el(boxId);
+    if (!box || box.hidden || impactKey !== impactStateKey() || !box.querySelector('[data-fx]')) return;
     const city = state.gear.city;
     if (!impactBaseline) impactBaseline = impactBase(state.keeper, city);
     else {
       const stat = todo.shift();
-      impactMemo[stat] = statImpact(state.keeper, stat, impactBaseline, city);
+      memo[stat] = kind === 'held' ? statHeld(state.keeper, stat, impactBaseline, city)
+        : statImpact(state.keeper, stat, impactBaseline, city);
       const slot = box.querySelector('[data-fx="' + stat + '"]');
-      if (slot && state.keeper[stat] < 10) slot.innerHTML = fxText(stat);
+      if (slot && (kind === 'held' || state.keeper[stat] < 10)) slot.innerHTML = fxText(stat, kind);
       // 칸이 한 줄씩 자라면 창이 접힘 아래로 넘친다. 굴러간다는 자국을 다시 잰다.
-      scrollCue(box, box);
+      if (after) after(box);
     }
     if (todo.length) impactTimer = setTimeout(step, 0);
   };
@@ -898,7 +902,7 @@ function renderGym() {
      내 정보가 쓰던 그 신호를 그대로 부른다. 구르는 것이 칸이 아니라 창이라 굴러가는 상자를 밖에서
      넘긴다. 안 넘기면 첫 자식인 제목 줄을 재게 되어 넘침이 늘 0이고 신호가 영영 안 켜진다. */
   box.onscroll = () => scrollCue(box, box);
-  fillImpact();
+  fillImpact('next', 'gym', (b) => scrollCue(b, b));
   /* 화면이 줄면 기둥은 그대로인데 접힘이 올라와 안 구르던 창이 구르기 시작한다. 그릴 때와 굴릴 때만
      세면 그 사이에 아무도 다시 안 세어, 자국이 꺼진 채로 닫기가 접힘 아래에 남는다. 실측 1280x720에서
      열어 두고 740x360으로 줄이면 넘침이 54인데 자국은 꺼진 채였고, 닫기는 402.45에 서서 화면 밖에
@@ -1547,8 +1551,8 @@ function renderMe() {
     const v = k[s];
     // 10은 성장 상한이다. 훈련장과 같은 기준이어야 두 창이 어긋나지 않는다.
     // 값 자리에는 값만 적는다. 상한에 닿은 것은 max 칸이 말한다.
-    return '<span class="' + (v >= 10 ? 'max' : '') + '"><span class="who">' + STAT_ICON[s] + CAUSE_LABEL[s]
-      + '</span><b>' + v + '</b></span>';
+    return '<span class="' + (v >= 10 ? 'max' : '') + '" title="훈련 전(1)에 비해 지금 이 능력치가 버는 몫"><span class="who">' + STAT_ICON[s] + CAUSE_LABEL[s]
+      + '</span><b>' + v + '</b><small class="fx" data-fx="' + s + '">' + fxText(s, 'held') + '</small></span>';
   }).join('');
   const traits = (k.traits && k.traits.length)
     ? k.traits.map((t) => '<div class="note"><b>' + t + '</b><i>' + (TRAITS[t] ? TRAITS[t].note : '') + '</i></div>').join('')
@@ -1605,6 +1609,7 @@ function renderMe() {
   /* 창도 같이 본다. 화면이 바뀌면 상한이 걷히거나 붙어 구르는 상자가 칸에서 창으로 넘어가는데,
      칸만 보면 그 순간 창의 넘침을 아무도 다시 안 센다. 관찰자는 그대로 하나다. */
   meWatch.observe(box);
+  if (meTab === 'stat') fillImpact('held', 'me', () => meCues());
   meCues();
 }
 
