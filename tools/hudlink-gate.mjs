@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, mkdirSync } from 'node:fs';
+import { serveRetired } from './retired.mjs';
 import { fileURLToPath } from 'node:url';
 import { HUD_LINKS } from '../web/src/ui/links.mjs';
 
@@ -38,10 +39,15 @@ try {
     p.setDefaultTimeout(8000);
     p.on('pageerror', (e) => errors.push(e.message));
     if (mode) {
-      const paths = mode === 'baseline' ? ['web/index.html', 'web/src/main.mjs', 'web/src/ui/hud.css'] : ['web/src/main.mjs'];
+      // 얼린 부모가 지금 모듈에서 지워진 이름을 읽으면 import에서 죽는다. 퇴역 줄을 덧붙여 띄운다.
+      await serveRetired(p);
+      // 부모의 main만 띄우면 그 main이 찾는 옛 단추가 지금 HTML에 없어 시작에서 죽는다. 부모는 셋을 한 벌로 띄운다.
+      const paths = ['web/index.html', 'web/src/main.mjs', 'web/src/ui/hud.css'];
       for (const path of paths) {
         // The 24px target floor owns geometry; the older routing failure remains the behavior control.
-        const body = parent(path, mode === 'baseline' ? 'e373e2f' : '1e46fcd');
+        /* 바탕은 칩 모양을 마지막으로 일부러 바꾼 커밋이다. 링크를 단 것이 칩을 옮기지 않았는가를 묻는 축이라, 그 뒤에 손가락 바닥(17c46ce, 4d2e357)이
+           칩을 44px로 일부러 넓힌 것을 옛 바탕과 견주면 링크가 아니라 바닥 랩을 결함으로 읽는다. 칩 모양을 일부러 바꾸는 랩은 이 바탕을 그 커밋으로 옮긴다. */
+        const body = parent(path, mode === 'baseline' ? '4d2e357' : '1e46fcd');
         await p.route('**/' + path + (path.endsWith('.html') ? '*': ''), (route) => route.fulfill({
           contentType: path.endsWith('.html') ? 'text/html' : path.endsWith('.css') ? 'text/css' : 'text/javascript', body
         }));

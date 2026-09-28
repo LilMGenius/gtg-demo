@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { CAUSE_LABEL } from "../src/ledger.mjs";
 import { pinClock } from "./clock.mjs";
+import { serveRetired } from "./retired.mjs";
 
 // Reuse sfx-gate's frame-stamped sound log and clock.mjs clock. Reuse walkback-gate's
 // page.route control so the historical module never replaces a tracked file.
@@ -43,6 +44,7 @@ async function sample(browser, body, tag, { scene, error = false } = {}) {
     page.setDefaultTimeout(60000);
     page.on("pageerror", (e) => errors.push(String(e)));
     page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+    if (body !== null) await serveRetired(page);
     if (body !== null) await page.route("**/web/src/main.mjs", (r) => r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body }));
     if (scene) await page.route("**/web/src/render/scene.mjs", (r) => r.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", body: scene }));
     if (error) await ctx.addInitScript(() => {

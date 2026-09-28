@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { pinClock } from './clock.mjs';
+import { serveRetired } from './retired.mjs';
 // Reuse the project's browser, clock and served-parent control mechanism.
 const BASE = 'http://127.0.0.1:10310/web/index.html';
 const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
@@ -18,6 +19,7 @@ try {
   await pinClock(ctx);
   if (unsupported) await ctx.addInitScript(() => { Object.defineProperty(Document.prototype,'fullscreenEnabled',{get:()=>false,configurable:true}); Object.defineProperty(Element.prototype,'webkitRequestFullscreen',{value:undefined,configurable:true}); });
   const p = await ctx.newPage();
+  if(control) await serveRetired(p);
   if(control) for(const file of ['index.html','src/main.mjs']) {
    const body=execFileSync('git',['show','4eb39f9:web/'+file],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:1024*1024});
    await p.route('**/web/'+file+'*',r=>r.fulfill({status:200,contentType:file.endsWith('html')?'text/html':'text/javascript',body}));

@@ -5,6 +5,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as wallet from '../web/src/state/wallet.mjs';
+import { serveRetired } from './retired.mjs';
 import * as roster from '../src/roster.mjs';
 import * as gram from '../web/src/state/gram.mjs';
 
@@ -142,9 +143,7 @@ try {
   const parentPage = await context.newPage();
   await parentPage.route('**/src/ui/wiki.mjs', r => r.fulfill({ contentType: 'text/javascript', body: parent }));
   // 부모 모듈이 읽던 COIN_DRILL은 능력치 상한과 함께 지갑에서 사라졌다. wiki 게이트와 같이 지금 지갑에 부모 값 한 줄을 덧붙인다.
-  const parentDrill = execFileSync('git', ['show', '9566a7e:web/src/state/wallet.mjs'], { cwd: ROOT, encoding: 'utf8' }).match(/export const COIN_DRILL = \d+;/)[0];
-  const parentWallet = readFileSync(join(ROOT, 'web/src/state/wallet.mjs'), 'utf8') + '\n' + parentDrill + '\n';
-  await parentPage.route('**/src/state/wallet.mjs', r => r.fulfill({ contentType: 'text/javascript', body: parentWallet }));
+  await serveRetired(parentPage);
   await parentPage.goto(BASE);
   await parentPage.click('#go', { force: true });
   await parentPage.click('#wikiBtn', { force: true });

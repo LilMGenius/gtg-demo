@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { serveRetired } from './retired.mjs';
 // 화면 값은 구현의 상수가 아니라 배포 매니페스트와 맞댄다.
 const RELEASE = JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version;
 import { COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP, CASH_RATE } from "../web/src/state/wallet.mjs";
@@ -230,9 +231,7 @@ try {
   await parentPage.route('**/src/ui/wiki.mjs', route => route.fulfill({ contentType: 'text/javascript', body: parentSource }));
   // 부모 모듈이 읽던 상수가 뒤에 지워질 수 있다(COIN_DRILL은 능력치 상한과 함께 사라졌다). 지갑은 지금 판에 부모가 읽던 그 한 줄을 부모 값으로 덧붙여 준다.
   // 지갑 전체를 부모 판으로 바꾸면 지금 main이 읽는 cashPrice가 사라져 페이지가 통째로 안 뜬다.
-  const parentDrill = execFileSync('git', ['show', '9566a7e:web/src/state/wallet.mjs'], { encoding: 'utf8' }).match(/export const COIN_DRILL = \d+;/)[0];
-  const parentWallet = readFileSync(new URL('../web/src/state/wallet.mjs', import.meta.url), 'utf8') + '\n' + parentDrill + '\n';
-  await parentPage.route('**/src/state/wallet.mjs', route => route.fulfill({ contentType: 'text/javascript', body: parentWallet }));
+  await serveRetired(parentPage);
   await parentPage.goto(BASE);
   await parentPage.click('#go', { force: true });
   await parentPage.click('#wikiBtn', { force: true });
