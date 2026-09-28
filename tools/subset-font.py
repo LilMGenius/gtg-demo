@@ -59,6 +59,23 @@ def build(name, chars):
     font.save(out)
     return os.path.getsize(out)
 
+# 제목 서체. 정본 ttf는 979KB이고 font-display:block이라 받는 동안 타이틀 글자가 안 선다.
+# 같은 코퍼스로 깎아 woff2로 싣는다. 정본 ttf는 font-gate가 글자 덮임을 재는 원본이라 레포에 남고 화면은 안 받는다.
+# OFL 1.1이고 예약 서체 이름이 없어 깎은 판도 같은 이름으로 싣는다.
+def build_display(chars):
+    src = os.path.join(ROOT, "web", "assets", "fonts", "black-han-sans.ttf")
+    out = os.path.join(ROOT, "web", "assets", "fonts", "black-han-sans.subset.woff2")
+    opts = subset.Options()
+    opts.flavor = "woff2"
+    opts.layout_features = ["*"]
+    font = TTFont(src, recalcTimestamp=False)
+    sub = subset.Subsetter(options=opts)
+    sub.populate(text="".join(sorted(chars)))
+    sub.subset(font)
+    font.flavor = "woff2"
+    font.save(out)
+    return os.path.getsize(out)
+
 def main():
     chars = corpus()
     # 아스키 인쇄 가능 문자는 전부 넣는다. 숫자와 문장부호는 소스에 없어도 런타임에 조립된다.
@@ -68,6 +85,7 @@ def main():
     for name, weight in WEIGHTS:
         size = build(name, chars)
         print("%s(%d)  chars %d  out %d bytes" % (name, weight, len(chars), size))
+    print("BlackHanSans  chars %d  out %d bytes" % (len(chars), build_display(chars)))
     # 코퍼스 지문을 같이 남긴다. 소스에 새 글자가 들어오면 이 값이 달라지고 font-gate가 빨간불을 낸다.
     # 지문이 없으면 이름 하나를 추가한 날 그 글자만 다른 서체로 떨어지는 것을 아무도 모른다.
     text = "".join(sorted(chars))

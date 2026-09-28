@@ -30,6 +30,12 @@
     "form": "ttf"
   },
   {
+    "path": "fonts/black-han-sans.subset.woff2",
+    "origin": "fonts/black-han-sans.ttf subset to the source corpus by tools/subset-font.py",
+    "rights": "OFL-1.1",
+    "form": "woff2"
+  },
+  {
     "path": "fonts/pretendard-bold.subset.woff2",
     "origin": "orioncactus/pretendard 1.3.9",
     "rights": "OFL-1.1",
