@@ -273,16 +273,21 @@ body:has(#hud > :is(#gym,#roster,#gram,#me,#shop,#wiki,#date):not([hidden])) #mo
    같은 규칙을 판의 창과 컨디션 칩이 같이 쓴다. 자리마다 따로 두면 한쪽만 고쳐지고 둘이 어긋난다. */
 .say{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;
   overflow:hidden;clip-path:inset(50%);white-space:nowrap;pointer-events:none}
-/* 64px 판은 요구한 48px 터치 바닥보다 크고 양 엄지가 닿는 아래 모서리에 선다. */
+/* 좌우 이동 판. 모바일 액션 게임의 가상 버튼 크기(엄지 하나가 다 덮는 150px 안팎)로, 옛 64px의 세 배인 192px이 기준이다(파운더 2026-09-28).
+   화면이 짧으면 세로 42퍼센트와 가로 24퍼센트에서 멈춘다. 배경 없이 테두리와 화살표만 그려 뒤의 경기장이 비친다. */
 #movement{position:absolute;inset:0;pointer-events:none}
 .move-arrow{position:absolute;bottom:calc(var(--gap-3) + env(safe-area-inset-bottom));
-  width:64px;height:64px;min-width:48px;min-height:48px;pointer-events:auto;touch-action:none;
-  border:var(--line) solid var(--edge);background:var(--panel);color:var(--ink);
-  box-shadow:var(--lift) var(--lift) 0 var(--edge),var(--bevel);font-size:var(--fs-title);font-weight:bold}
+  width:min(192px,42vh,24vw);height:min(192px,42vh,24vw);min-width:48px;min-height:48px;pointer-events:auto;touch-action:none;
+  border:var(--line) solid #f6efdc8c;border-radius:50%;background:transparent;color:#f6efdcd9;
+  box-shadow:0 0 0 2px #0d110c66,inset 0 0 0 2px #0d110c66;font-size:min(72px,16vh,9vw);font-weight:bold;line-height:1;display:grid;place-items:center;padding:0;
+  text-shadow:0 2px 0 #0d110c99}
 .move-arrow[data-move="-1"]{left:var(--pad-l)}
 .move-arrow[data-move="1"]{right:var(--pad-r)}
-.move-arrow[aria-pressed="true"]{background:#ffd83d;color:#0d110c;box-shadow:var(--bevel)}
-.move-arrow:not(.live){color:var(--dim)}
+.move-arrow[aria-pressed="true"]{background:#ffd83d40;border-color:#ffd83d;color:#ffd83d}
+.move-arrow:not(.live){color:#f6efdc59;border-color:#f6efdc40}
+/* 짧은 화면은 오른쪽 기둥(창 버튼 넷)이 아래까지 내려와 판이 그 밑에 설 자리가 없다. 두 판을 같은 폭만큼 안으로 들여 기둥을 비킨다.
+   판은 테두리뿐이라 안으로 들어와도 경기장을 가리지 않는다. */
+@media (max-height:520px){.move-arrow[data-move="-1"]{left:calc(var(--pad-l) + var(--col-w,76px))}.move-arrow[data-move="1"]{right:calc(var(--pad-r) + var(--col-w,76px))}}
 /* 첫 준비에만 나오는 한 줄은 엄지와 키퍼 사이의 빈 하단을 쓴다. */
 #moveHint{position:absolute;bottom:var(--gap-3);left:50%;transform:translateX(-50%);
   color:var(--ink);background:var(--panel);padding:var(--gap-1) var(--gap-2);white-space:nowrap;pointer-events:none}
