@@ -977,7 +977,7 @@ function renderRoster() {
      다른 자리의 보유는 탭을 눌러야 보였다. 지금 어느 자리를 보는지는 aria-selected가 소유한다. */
   const tabs = '<div class="kinds" role="tablist">' + ['gk'].concat(ROLES)
     .map((id) => { const [have, all] = ownedOf(id); return '<button class="kind pos-' + POS_ABBR[id].toLowerCase() + '" role="tab" data-pos="' + id + '" aria-selected="'
-      + (squadTab === id) + '" aria-label="' + POS_ABBR[id] + ' 보유 ' + have + ' / ' + all + '">' + POS_ICON[id] + '<span>' + POS_ABBR[id] + '</span><small>' + have + '/' + all + '</small></button>'; }).join('') + '</div>';
+      + (squadTab === id) + '">' + POS_ICON[id] + '<span>' + POS_ABBR[id] + '</span><small>보유 ' + have + '/' + all + '</small></button>'; }).join('') + '</div>';
   const pane = squadTab === 'gk'
     ? '<div class="row mine">' + mine + '</div>'
       + (hire ? '<h5>영입</h5><div class="row hire">' + hire + '</div>' : '')
@@ -1031,7 +1031,7 @@ function formationBoard() {
     for (let i = names.length; i > 0; i -= LINE_MAX) lines.push('<div class="line">' + names.slice(Math.max(0, i - LINE_MAX), i).map((n) => dot(cls, n)).join('') + '</div>');
   }
   lines.push('<div class="line">' + dot('gk', state.keeper.name) + '</div>');
-  return '<div class="pitch" role="img" aria-label="선발 ' + (state.eleven.length + 1) + '명">' + lines.join('') + '</div>';
+  return '<div class="pitch" role="img" aria-label="포메이션">' + lines.join('') + '</div>';
 }
 
 // 선수단 창에서 보고 있는 포지션. 창 수명만 사는 값이라 저장에 안 싣는다.

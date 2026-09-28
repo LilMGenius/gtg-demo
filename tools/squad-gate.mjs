@@ -90,7 +90,7 @@ try {
   // 탭마다 그 자리의 보유 수를 전체 풀과 함께 단다.
   const counts = await p.evaluate(() => [...document.querySelectorAll("#roster .kind small")].map((e) => e.textContent));
   const want = ["gk"].concat(ROLES).map((id) => id === "gk" ? null : KICKERS.filter((k) => k.role === id).length);
-  check("squad:every-position-tab-shows-owned-over-pool", counts.length === 4 && counts.every((c, i) => /^\d+\/\d+$/.test(c) && (want[i] === null || Number(c.split("/")[1]) === want[i])), counts.join(", "));
+  check("squad:every-position-tab-shows-owned-over-pool", counts.length === 4 && counts.every((c, i) => /^보유 \d+\/\d+$/.test(c) && (want[i] === null || Number(c.split("/")[1]) === want[i])), counts.join(", "));
   // 상태 글자와 중복 머리가 없다. 밝은 카드와 판의 점이 그 말을 한다.
   const WORDS = /선발|해제|출전|교체|가진 사람|주전 \d/;
   const words = async () => p.evaluate((src) => { const re = new RegExp(src); return [...document.querySelectorAll("#roster *")].filter((e) => !e.children.length && re.test(e.textContent)).map((e) => e.textContent.trim()); }, WORDS.source);
