@@ -1,6 +1,7 @@
 // 선반 어휘. 상점 화면과 위키 둘 다 이 표를 읽는다. 화면 파일에 두면 위키를 짓는 node가 못 읽고,
 // 위키 파일에 두면 상점이 위키를 import한다. DOM을 모르는 이 자리가 둘의 공통 조상이다.
-import { GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, BEARDS, TATTOOS } from './gear.mjs';
+import { GLOVES, BOOTS, KITS, SOCKS, GOALS, CITIES, HAIRS, BEARDS, TATTOOS, MAX_GRIP, MAX_STUD, MAX_KIT, MAX_SOCK, MAX_FRAME, MAX_CITY, MAX_HAIR, MAX_BEARD, MAX_INK,
+  gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, beardAt, inkAt } from './gear.mjs';
 import { GEAR_STEP } from '../../../src/chain.mjs';
 
 // 장비 칸 둘의 규칙이 같으므로 선반도 하나로 둔다. 선반을 칸마다 복제하면
@@ -56,3 +57,19 @@ export const SHELF_NOTES_FOR_WIKI = Object.keys(SHELF_WORDS).map((k) => ({
   rows: SHELF_WORDS[k].list.map((g) => ({ name: g.name, note: g.note }))
 }));
 
+// 장비 칸 둘의 규칙이 같으므로 선반도 하나로 둔다. 선반을 칸마다 복제하면
+// 버튼 글자 규칙이 한쪽에서만 바뀌어 같은 상점 안에서 말이 갈린다.
+// 장갑은 손이라 판정식의 gloveP와 spillP로, 축구화는 발이라 출발 지연으로 들어간다.
+// 라벨은 명사구다. 여기에 한 줄 더: 타투와 버프와 봇처럼 굳은 외래어와 EXP 같은 게임 용어는
+// 우리말로 안 옮긴다. 옮긴 말이 더 낯설고, '머리'는 선반 이름이 아니라 몸의 부위로 읽혔다.
+export const SHELVES = {
+  glove: { head: '장갑', list: GLOVES, field: 'grip', worn: '착용', past: '보유', top: MAX_GRIP, at: gloveAt },
+  boot: { head: '축구화', list: BOOTS, field: 'studs', worn: '착용', past: '보유', top: MAX_STUD, at: bootAt },
+  kit: { head: '유니폼', list: KITS, field: 'pads', worn: '착용', past: '보유', top: MAX_KIT, at: kitAt },
+  sock: { head: '양말', list: SOCKS, field: 'socks', worn: '착용', past: '보유', top: MAX_SOCK, at: sockAt },
+  frame: { head: '골대', list: GOALS, field: 'frame', worn: '설치', past: '보유', top: MAX_FRAME, at: frameAt },
+  city: { head: '동네', list: CITIES, field: 'city', worn: '이용', past: '보유', top: MAX_CITY, at: cityAt },
+  hair: { head: '헤어', list: HAIRS, field: 'hair', worn: '착용', past: '보유', top: MAX_HAIR, at: hairAt },
+  beard: { head: '수염', list: BEARDS, field: 'beard', worn: '착용', past: '보유', top: MAX_BEARD, at: beardAt },
+  ink: { head: '타투', list: TATTOOS, field: 'ink', worn: '착용', past: '보유', top: MAX_INK, at: inkAt }
+};

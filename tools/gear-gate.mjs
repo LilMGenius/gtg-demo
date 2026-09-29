@@ -15,7 +15,7 @@ const RANKS = 4;
 const TOP = 3;
 // 여덟 선반 최상급 총액. RICH_COIN 8000이 이걸 덮어야 한 판에 다 살 수 있다.
 const TOP_TOTAL = 6810;
-// 선반 정의. main.mjs의 SHELVES와 같은 순서, 같은 머리글이어야 한다.
+// 선반 정의. web/src/state/shelf.mjs의 SHELVES와 같은 순서, 같은 머리글이어야 한다(수염은 판정 밖이라 여기 안 선다).
 const SHELVES = [
   { tab: 'glove', head: '장갑', field: 'grip' },
   { tab: 'boot', head: '축구화', field: 'studs' },

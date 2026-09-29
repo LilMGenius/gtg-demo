@@ -17,10 +17,10 @@ import { createRankPane } from './ui/rank-pane.mjs';
 import { createUtilShelf } from './ui/util-shelf.mjs';
 import { coinGain, readWallet, cashPrice, pay } from './state/wallet.mjs';
 import { BOTS, BOT_CAP, readBot, botAt, botKeeper } from './state/bot.mjs';
-import { GLOVES, MAX_GRIP, BOOTS, MAX_STUD, KITS, MAX_KIT, SOCKS, MAX_SOCK, GOALS, MAX_FRAME, CITIES, MAX_CITY, HAIRS, MAX_HAIR, BEARDS, MAX_BEARD, beardAt, TATTOOS, MAX_INK, WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, gloveAt, bootAt, kitAt, sockAt, frameAt, cityAt, hairAt, skinsAt, inkAt, lookOf, lookBoost } from './state/gear.mjs';
-import { AXIS_WORD, AXIS_UNIT, SHELF_NOTES_FOR_WIKI } from './state/shelf.mjs';
+import { WORN_FIELDS, PLACE_FIELDS, isWorn, readGear, cityAt, skinsAt, lookOf, lookBoost } from './state/gear.mjs';
+import { AXIS_WORD, AXIS_UNIT, SHELF_NOTES_FOR_WIKI, SHELVES } from './state/shelf.mjs';
 export { SHELF_NOTES_FOR_WIKI };
-import { BUFFS, BUFF_CAP, newBuff, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
+import { BUFFS, BUFF_CAP, TONIC_FOCUS, HYPE_BOOST, newBuff, readBuff, buffAt, addBuff, spendBuff } from './state/buff.mjs';
 import { readSocial, mutualBoost, likesFor, commentOdds, photoOdds } from './state/gram.mjs';
 import { readRapport, addRapport, rapportCount, rapportTier, rapportGazeAid, rapportBoost, RAPPORT_STEPS } from './state/rapport.mjs';
 import { passerName } from './state/passer.mjs';
@@ -1150,32 +1150,11 @@ function shopOdds(pool) {
   return '<span class="head"><i>등급</i><b>확률</b><u>남은 수</u></span>' + rows;
 }
 
-// 장비 칸 둘의 규칙이 같으므로 선반도 하나로 둔다. 선반을 칸마다 복제하면
-// 버튼 글자 규칙이 한쪽에서만 바뀌어 같은 상점 안에서 말이 갈린다.
-// 장갑은 손이라 판정식의 gloveP와 spillP로, 축구화는 발이라 출발 지연으로 들어간다.
-// 라벨은 명사구다. 여기에 한 줄 더: 타투와 버프와 봇처럼 굳은 외래어와 EXP 같은 게임 용어는
-// 우리말로 안 옮긴다. 옮긴 말이 더 낯설고, '머리'는 선반 이름이 아니라 몸의 부위로 읽혔다.
-const SHELVES = {
-  glove: { head: '장갑', list: GLOVES, field: 'grip', worn: '착용', past: '보유', top: MAX_GRIP, at: gloveAt },
-  boot: { head: '축구화', list: BOOTS, field: 'studs', worn: '착용', past: '보유', top: MAX_STUD, at: bootAt },
-  kit: { head: '유니폼', list: KITS, field: 'pads', worn: '착용', past: '보유', top: MAX_KIT, at: kitAt },
-  sock: { head: '양말', list: SOCKS, field: 'socks', worn: '착용', past: '보유', top: MAX_SOCK, at: sockAt },
-  frame: { head: '골대', list: GOALS, field: 'frame', worn: '설치', past: '보유', top: MAX_FRAME, at: frameAt },
-  city: { head: '동네', list: CITIES, field: 'city', worn: '이용', past: '보유', top: MAX_CITY, at: cityAt },
-  hair: { head: '헤어', list: HAIRS, field: 'hair', worn: '착용', past: '보유', top: MAX_HAIR, at: hairAt },
-  beard: { head: '수염', list: BEARDS, field: 'beard', worn: '착용', past: '보유', top: MAX_BEARD, at: beardAt },
-  ink: { head: '타투', list: TATTOOS, field: 'ink', worn: '착용', past: '보유', top: MAX_INK, at: inkAt }
-};
 
 
 /* 카드 하나가 파는 것을 문장으로 만든다. 수는 판정과 선반 데이터에서 꺼내고 문구만 여기서 짓는다.
    카드 본문에 다 적으면 격자가 다시 글자 벽이 되므로, 이 문장들은 왼쪽 기둥의 별도 칸이 받는다. */
 
-// 자양강장제가 한눈팔기와 수다에 곱하는 값. 절반이라 두 사고가 같이 반으로 준다.
-// 화면이 이 수를 옮겨 적으면 버프를 손본 날 선반 문구가 거짓말을 한다.
-const TONIC_FOCUS = 0.5;
-// 바이럴 떡밥이 소문에 곱하는 값. 판정 밖 축이라 팔로워에만 붙는다.
-const HYPE_BOOST = 1.5;
 
 
 

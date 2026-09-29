@@ -48,3 +48,9 @@ export function spendBuff(buff) {
   const left = buff.shots - 1;
   return left > 0 ? { kind: buff.kind, shots: left } : newBuff();
 }
+
+// 자양강장제가 한눈팔기와 수다에 곱하는 값. 절반이라 두 사고가 같이 반으로 준다.
+// 화면이 이 수를 옮겨 적으면 버프를 손본 날 선반 문구가 거짓말을 한다.
+export const TONIC_FOCUS = 0.5;
+// 바이럴 떡밥이 소문에 곱하는 값. 판정 밖 축이라 팔로워에만 붙는다.
+export const HYPE_BOOST = 1.5;
