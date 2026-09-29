@@ -15,6 +15,13 @@ const GLOBALS = new Set(Object.getOwnPropertyNames(globalThis).concat(["window",
   "HTMLElement", "HTMLCanvasElement", "OffscreenCanvas", "Node", "Event", "CustomEvent", "KeyboardEvent", "PointerEvent", "FontFace", "Blob", "FileReader",
   "createImageBitmap", "ImageData", "WebGL2RenderingContext", "caches", "indexedDB"]));
 
+// import했지만 한 번도 안 읽는 이름. 떼어 낸 뒤 쓰는 쪽이 옮겨 간 import가 남으면 모듈이 무엇에 기대는지가 거짓말을 한다.
+function unusedImports(src, name) {
+  const out = [];
+  traverse(babelParse(src, name, true), { ImportDeclaration(p) { for (const s of p.node.specifiers) { const b = p.scope.getBinding(s.local.name); if (b && !b.referenced) out.push(s.local.name); } } });
+  return out;
+}
+
 function freeNames(src, name) {
   const free = new Set();
   const ast = babelParse(src, name, true);
@@ -32,6 +39,10 @@ const files = readdirSync(ROOT, { recursive: true }).map(String).filter((p) => p
 const bad = [];
 for (const f of files) { const free = freeNames(readFileSync(new URL(f, ROOT), "utf8"), f); if (free.length) bad.push(f + ": " + free.join(",")); }
 check("every-name-resolves-in-its-module", bad.length === 0, bad.join(" | ") || files.length + " modules");
+const idle = [];
+for (const f of files) { const u = unusedImports(readFileSync(new URL(f, ROOT), "utf8"), f); if (u.length) idle.push(f + ": " + u.join(",")); }
+check("every-import-is-read", idle.length === 0, idle.join(" | ") || files.length + " modules");
+check("control:a-planted-unused-import-is-caught", unusedImports("import { a, b } from './x.mjs';\nconsole.log(a);\n", "planted.mjs").join() === "b", "b");
 check("instrument:the-extracted-panels-are-scanned", ["ui/gram-panel.mjs", "ui/roster-panel.mjs", "main.mjs"].every((f) => files.includes(f)), files.length + " modules");
 const planted = readFileSync(new URL("ui/roster-panel.mjs", ROOT), "utf8").replace("export function createRosterPanel", "function plantedLeak() { fitting = {}; }\nexport function createRosterPanel");
 check("control:a-planted-outer-assignment-is-caught", freeNames(planted, "planted.mjs").includes("fitting"), "fitting");

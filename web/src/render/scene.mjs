@@ -7,7 +7,7 @@ import { mountSfx } from '../audio/sfx.mjs';
 import { createBallProbe, opaqueBlocker } from '../diagnostics/ball-probe.mjs';
 import { createStageProbe, goalFraming, footY, faceToCamera } from '../diagnostics/stage-probe.mjs';
 import {
-  flat, flatVertex, BALL_R, VIEW_X, KICKER_OFF, BALL_PAST, REST_Z, REST_Y,
+  flatVertex, BALL_R, VIEW_X, KICKER_OFF, REST_Z, REST_Y,
   R_HALF_W, R_H, SX, SY, MOUTH_X, lerp, ease
 } from './units.mjs';
 import { pupilMat, buildKeeper, buildKicker, POSES, JOINTS, lerpPose, pushPose, setPose, poseDist, KICK_WIND, beatOf } from './objects/actors.mjs';
