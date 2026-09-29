@@ -733,7 +733,7 @@ function renderGym() {
 // 손잡이로만 열리는 창이고 그때 첫 진입 개봉이 조용히 걷힌다. 처음 오는 사람이 자기가 무엇을
 // 들고 시작하는지를 못 보고 지나가는 자리이고, 계기가 사람이 못 가는 상태를 재게 되는 자리다.
 /* 상점과 개봉. 선반, 시착실, 뽑기 배너, 개봉 연출, 첫 진입 개봉을 한 창이 든다. 게임 상태와 지갑과 무대는 부르는 쪽이 넘긴다. */
-const { openShop, closeShop, stopReveal, revealAll, onboardStep, revealState, clearFitting } = createShopPanel({ state, el, affordable, PRICE, purchase, persist, pips, stage, recruit, roll, shutOthers });
+const { openShop, closeShop, stopReveal, revealAll, onboardStep, revealState, clearFitting, setRevealPace } = createShopPanel({ state, el, affordable, PRICE, purchase, persist, pips, stage, recruit, roll, shutOthers });
 /* 선수단 창. 보는 포지션과 포메이션 판을 스스로 들고, 영입과 교체는 게임 상태와 지갑과 무대를 받아 한다. */
 const { openRoster, closeRoster } = createRosterPanel({ state, el, affordable, PRICE, purchase, recruit, persist, pips, stage, shutOthers, clearFitting: () => clearFitting() });
 /* 아웃문그램과 만남 창. 쪽지와 만남의 열린 자리를 스스로 들고, 게임 상태와 저장과 창 전환만 받는다. 창 닫기 표가 닫는 함수를 읽으므로 그 표보다 먼저 선다. */
@@ -1195,6 +1195,8 @@ window.__persist = () => { persist(); return true; };
 window.__saveKey = () => saveKey();
 window.__kickers = () => state.kickers.slice();
 // 뒤집힌 카드 수와 뽑은 카드 수와 지금 선 단. 연출이 도는 동안 계기가 이 셋을 읽어 한 번에 안 열리는 것을 본다.
+// 개봉 단 길이의 배수. 화면을 찍는 계기만 부른다.
+window.__revealPace = (k) => setRevealPace(k);
 window.__reveal = () => { const r = revealState(); return { shown: r.shown, drawn: r.drawn, stage: r.stage, long: r.long }; };
 // 누가 무엇을 걸쳤는가. 계기가 교체 전후로 이 둘을 읽어 착용이 사람을 따라가는지 본다.
 window.__worn = () => ({ pick: state.pick, name: state.keeper.name,

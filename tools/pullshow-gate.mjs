@@ -370,6 +370,9 @@ try {
   /* 낱장 한 회차. 사서 봉인과 실루엣과 열린 단을 한 장씩 찍고 닫는다.
      닫아야 다음 회차를 산다. 개봉 화면이 선반을 통째로 덮기 때문이다. */
   const solo = async (kind) => {
+    /* 낱장 회차는 화소만 받는 자리다. 봉인 단은 0.3초라 바쁜 기계에서 창을 놓쳐 계기 축이 흔들렸다(같은 바이트에서 초록과 빨강).
+       단 길이를 세 배로 넓혀 찍고 되돌린다. 순서와 등급 비율 축은 묶음 회차가 제 속도로 잰다. */
+    await p.evaluate(() => window.__revealPace && window.__revealPace(3));
     await arm();
     await p.click('#shop .kind[data-kind="' + kind + '"]', { force: true });
     await p.waitForTimeout(160);
@@ -387,6 +390,7 @@ try {
        그 건너뜀이 제품이 단을 빠뜨린 것으로 기록에 남는다. */
     fold(await drain());
     await dismiss();
+    await p.evaluate(() => window.__revealPace && window.__revealPace(1));
   };
 
   await p.goto(BASE, { waitUntil: "load" });

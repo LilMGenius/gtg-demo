@@ -431,6 +431,9 @@ const STAGE_LAST = STAGE_MS.length - 1;
    있으면 남은 것이 그 자리에서 전부 열린다. 0.45초는 넘기려고 스쳐 누르는 손가락보다 한참 길고
    답답해서 붙들고 있는 손가락보다는 짧아서, 둘 중 어느 쪽도 상대의 뜻으로 안 읽힌다. */
 const LONG_MS = 450;
+/* 단의 길이에 곱하는 배수. 사람 손에는 늘 1이다. 화면을 찍는 계기가 봉인 단처럼 0.3초짜리 창을 바쁜 기계에서
+   놓치지 않게 넓힐 때만 바뀐다. 순서와 비율은 그대로라 등급 단이 더 오래 서는 것도 그대로다. */
+let revealPace = 1;
 // 지금 카드가 선 단. 화면은 이 수 하나를 읽어 어느 층까지 보여 줄지 정한다.
 let pullStage = 0;
 /* 길게 누름의 예약과, 그 예약이 이미 제 일을 했는지. 전부 열리면 판을 다시 그리느라 버튼이 새 것으로
@@ -463,7 +466,7 @@ function holdStage() {
       return;
     }
     revealNext();
-  }, STAGE_MS[pullStage] + (rare && pullStage === BEAM_STAGE ? RARE_HOLD_MS : 0));
+  }, (STAGE_MS[pullStage] + (rare && pullStage === BEAM_STAGE ? RARE_HOLD_MS : 0)) * revealPace);
 }
 
 /* 단만 바꾼다. 판을 다시 그리면 그림이 단마다 다시 디코딩되고 카드가 놓이는 동작이 처음부터 돈다.
@@ -996,6 +999,10 @@ function closeShop() {
 }
 
 // 개봉 연출의 지금 자리. 키보드와 계기가 읽는다. 값을 바꾸는 쪽은 이 창뿐이다.
+function setRevealPace(k) {
+  revealPace = Number(k) > 0 ? Number(k) : 1;
+}
+
 function revealState() {
   return { shown, drawn: lastPull.length, stage: pullStage, long: LONG_MS, done: shown >= lastPull.length && pullStage === STAGE_LAST };
 }
@@ -1004,5 +1011,5 @@ function revealState() {
 function clearFitting() {
   fitting = {};
 }
-  return { openShop, closeShop, stopReveal, revealAll, onboardStep, revealState, clearFitting };
+  return { openShop, closeShop, stopReveal, revealAll, onboardStep, revealState, clearFitting, setRevealPace };
 }
