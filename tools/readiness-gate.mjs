@@ -21,7 +21,9 @@ const pending = (name, owner, detail, layer = 'HOOTL') => row(name, layer, '대�
 const walk = folder => readdirSync(resolve(ROOT, folder), { withFileTypes: true }).flatMap(e => e.name.includes('.local') ? [] : e.isDirectory() ? walk(join(folder, e.name)) : [join(folder, e.name)]);
 const html = read('web/index.html'), css = read('web/src/ui/hud.css').replace(/\/\*[\s\S]*?\*\//g, '');
 const manifest = JSON.parse(read('web/manifest.webmanifest'));
-const main = read('web/src/main.mjs');
+/* 제품 화면 코드 전부. main 하나만 읽으면 창을 컴포넌트로 떼어 낸 날 그 창의 선언이 이 자 밖으로 나가
+   아무 것도 안 바뀐 축이 빨개진다(첫 진입 개봉 id가 상점 모듈로 옮겨 간 날 ftue 축). */
+const main = ['web/src/main.mjs', ...readdirSync(resolve(ROOT, 'web/src/ui')).filter((n) => n.endsWith('.mjs')).sort().map((n) => 'web/src/ui/' + n)].map(read).join('\n');
 const source = p => read(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 let largest;
 

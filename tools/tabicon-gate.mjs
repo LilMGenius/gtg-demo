@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 import { readFileSync as readTabs } from "node:fs";
 // 탭 수는 제품의 SHOP_TABS가 소유한다. 여기 수를 적으면 탭이 는 날 계기가 먼저 빨개진다(11에 박힌 채 열둘을 두 번 지났다).
-const SHOP_TAB_COUNT = (readTabs(new URL("../web/src/main.mjs", import.meta.url), "utf8").match(/const SHOP_TABS = \[([^\]]*)\]/)[1].match(/'[a-z]+'/g) || []).length;
+const SHOP_TAB_COUNT = (readTabs(new URL("../web/src/ui/shop-panel.mjs", import.meta.url), "utf8").match(/const SHOP_TABS = \[([^\]]*)\]/)[1].match(/'[a-z]+'/g) || []).length;
 
 // 상점 탭 아이콘의 자. 열한 칸이 글자로만 서 있으면 어느 칸이 무엇을 파는지 매번 읽어야 한다.
 //
