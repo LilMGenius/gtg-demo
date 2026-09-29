@@ -170,11 +170,14 @@ try {
      안 움직이면 이 자는 화면이 아니라 제 안의 상수를 읽는 것이고, 표가 사라진 날에도 초록을 낸다.
      7은 등급 셋 중 어느 칸의 값과도 안 겹치게 고른 폭이다. 읽은 뒤 원래 글자를 돌려놓는다. */
   const planted = await p.evaluate(() => {
-    const u = document.querySelector("#shop details.odds em span:not(.head) u");
+    /* 읽는 표는 위의 readOdds가 읽은 그 표 하나다. 팩 갈래마다 배너가 제 확률 표를 들게 된 뒤로 문서 전체의 u를 더하면
+       옆 팩의 표까지 더해 68을 읽었다(보이는 표는 45). 같은 첫 표에서 심고 같은 표에서 더한다. */
+    const em = document.querySelector("#shop details.odds em");
+    const u = em && em.querySelector("span:not(.head) u");
     if (!u) return -1;
     const was = u.textContent;
     u.textContent = String(Number(was) + 7);
-    const now = [...document.querySelectorAll("#shop details.odds em span:not(.head) u")]
+    const now = [...em.querySelectorAll("span:not(.head) u")]
       .reduce((a, e) => a + Number(e.textContent), 0);
     u.textContent = was;
     return now;
