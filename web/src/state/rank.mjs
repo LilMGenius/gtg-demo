@@ -2,6 +2,7 @@
    값은 판정이 이미 가진 장부에서 그 자리에서 뽑고 따로 세지 않는다. 화면이 제 수를 세면 장부가
    움직인 날 둘이 갈린다.
    판은 파운더가 부른 순서다. 세이브율, 팔로워, 꼬신 행인, 레벨, 능력치. */
+export { nickKey } from '../../../server/rank-shared.mjs';
 import { GROWABLE } from '../../../src/ledger.mjs';
 import { RAPPORT_CAP } from './rapport.mjs';
 
@@ -71,18 +72,21 @@ export function rankValue(board, v) {
   return Math.floor(n).toLocaleString('ko-KR');
 }
 
-/* 닉네임 비교 자리. 사람이 같은 이름으로 읽는 둘은 같은 이름이다.
-   앞뒤 공백과 대소문자와 조합형 한글의 차이는 이름이 아니다. */
-export function nickKey(nick) {
-  return String(nick || '').normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase();
-}
+const API = (typeof document === 'undefined' ? '' : document.querySelector('meta[name="gtg-api"]')?.content.trim())?.replace(/[/]+$/, '') || 'api';
 
-/* 서버. 배포 자리가 정적 호스팅이면 /api가 없다. 그때 판은 이 기기의 계정만으로 선다.
-   호스팅과 과금은 사람이 정할 일이라 여기서는 같은 출처의 /api만 찾는다. */
-const API = 'api';
+// 사람이 적는 로그인 ID는 비밀이 아니다. 계정별 비밀값은 한 번만 만들어 기기에 보관한다.
+function rankId(id) {
+  const key = 'gtg.rank.secret.v1:' + String(id).trim().toLowerCase();
+  let secret = localStorage.getItem(key);
+  if (!secret) {
+    secret = crypto.randomUUID();
+    localStorage.setItem(key, secret);
+  }
+  return secret;
+}
 async function call(path, body) {
   const ctl = typeof AbortController === 'function' ? new AbortController() : null;
-  const stop = ctl ? setTimeout(() => ctl.abort(), 1500) : 0;
+  const stop = ctl ? setTimeout(() => ctl.abort(), API === 'api' ? 1500 : 10000) : 0;
   try {
     const res = await fetch(API + path, body
       ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctl && ctl.signal }
@@ -99,13 +103,14 @@ async function call(path, body) {
 
 // 이름을 서버에 건다. 서버가 없으면 null, 남이 쓰면 { ok: false }.
 export async function claimNick(id, nick) {
-  const r = await call('/nick', { id, nick });
-  if (!r) return null;
+  const r = await call('/nick', { id: rankId(id), nick });
+  if (!r) return API === 'api' ? null : { ok: false, why: '랭킹 서버에 연결할 수 없다' };
+  if (r.status !== 200 && r.status !== 409) return { ok: false, why: '랭킹 서버에 연결할 수 없다' };
   return r.status === 200 ? { ok: true } : { ok: false, why: '이미 쓰는 닉네임이다' };
 }
 
 export async function sendRankLine(id, line) {
-  const r = await call('/line', { id, line });
+  const r = await call('/line', { id: rankId(id), line });
   return Boolean(r && r.status === 200);
 }
 

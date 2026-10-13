@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS rank_players (
+  id TEXT PRIMARY KEY NOT NULL,
+  nick_key TEXT NOT NULL UNIQUE,
+  nick TEXT NOT NULL,
+  line JSONB
+);

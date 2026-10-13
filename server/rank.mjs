@@ -1,14 +1,9 @@
-/* 랭킹 서버. 이름 하나에 계정 하나를 묶고 계정마다 마지막 줄 하나를 든다.
-   이것은 모의 서버다. 호스팅과 과금은 사람이 정할 일이고, 그 앞까지 클라이언트와 약속과 게이트가
-   이 모양으로 선다. 실제 서버가 서면 같은 세 길(/nick, /line, /lines)을 받으면 된다.
-   저장은 파일 하나다. 경로를 안 주면 메모리에만 산다(게이트가 그렇게 쓴다). */
+/* Local ranking adapter for tools/serve.mjs. Optional file persistence; otherwise in memory. */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { nickKey } from '../web/src/state/rank.mjs';
-
-const NICK_MAX = 12;
+import { nickKey, NICK_MAX, sanitizeLine } from './rank-shared.mjs';
 
 export function createRankStore(file) {
-  let db = { nicks: {}, lines: {} };
+  let db = { nicks: Object.create(null), lines: Object.create(null) };
   if (file) {
     try { db = Object.assign(db, JSON.parse(readFileSync(file, 'utf8'))); } catch { /* 첫 실행 */ }
   }
@@ -18,10 +13,10 @@ export function createRankStore(file) {
     claim(id, nick) {
       const key = nickKey(nick);
       if (!id || !key || key.length > NICK_MAX) return 400;
-      const owner = db.nicks[key];
+      const owner = Object.hasOwn(db.nicks, key) ? db.nicks[key] : null;
       if (owner && owner !== id) return 409;
       for (const k of Object.keys(db.nicks)) if (db.nicks[k] === id && k !== key) delete db.nicks[k];
-      db.nicks[key] = id;
+      Object.defineProperty(db.nicks, key, { value: id, writable: true, enumerable: true, configurable: true });
       flush();
       return 200;
     },
@@ -29,9 +24,7 @@ export function createRankStore(file) {
     post(id, line) {
       const nick = Object.keys(db.nicks).find((k) => db.nicks[k] === id);
       if (!nick || !line || typeof line !== 'object') return 403;
-      const pick = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-      db.lines[id] = { nick: String(line.nick || nick).slice(0, NICK_MAX), shots: pick(line.shots), save: Math.min(1, Math.max(0, pick(line.save))),
-        fans: pick(line.fans), charm: pick(line.charm), level: pick(line.level), stat: pick(line.stat) };
+      db.lines[id] = sanitizeLine(line, nickKey(line.nick) === nick ? line.nick : nick);
       flush();
       return 200;
     },

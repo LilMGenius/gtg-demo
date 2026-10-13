@@ -18,18 +18,23 @@ export function createRankPane({ state, isOpen, rerender }) {
       : namedAccounts().filter((a) => a.id !== me).map((a) => rankLine(a.nick, peek(a.id)));
     return { mine, rows: sortBoard(mine ? others.concat([mine]) : others, board) };
   };
+  function nickText(value) {
+    const node = document.createElement('span');
+    node.textContent = value;
+    return node.innerHTML;
+  }
   function html() {
     const { mine, rows } = lines();
     const chips = '<div class="boards" role="group" aria-label="랭킹 판">' + RANK_BOARDS.map((b) =>
       '<button data-board="' + b.id + '"' + (b.id === board ? ' aria-pressed="true"' : ' aria-pressed="false"') + '>' + b.label + '</button>').join('') + '</div>';
-    const row = (l, me) => '<div class="note rank' + (me ? ' mine' : '') + '"><b class="no">' + (l.rank || '-') + '</b><b class="nick">' + l.nick + '</b>'
+    const row = (l, me) => '<div class="note rank' + (me ? ' mine' : '') + '"><b class="no">' + (l.rank || '-') + '</b><b class="nick">' + nickText(l.nick) + '</b>'
       + '<em>' + rankValue(board, l[board]) + '</em></div>';
     const list = rows.map((l) => row(l, mine && l.nick === mine.nick)).join('');
     /* 판에 못 선 내 줄. 손님은 이름이 없어 판에 안 서고, 세이브율은 규정 구수 밑이면 안 선다.
        둘 다 맨 아래 한 줄로 까닭을 수로 보인다. */
     let tail = '';
     if (!mine) tail = '<div class="note rank mine out"><b class="no">-</b><b class="nick">손님</b><em>닉네임을 정하면 오른다</em></div>';
-    else if (!qualifies(mine, board)) tail = '<div class="note rank mine out"><b class="no">-</b><b class="nick">' + mine.nick + '</b><em>' + rankValue(board, mine[board]) + ' <small>' + mine.shots + '/' + RANK_MIN_SHOTS + ' 슈팅</small></em></div>';
+    else if (!qualifies(mine, board)) tail = '<div class="note rank mine out"><b class="no">-</b><b class="nick">' + nickText(mine.nick) + '</b><em>' + rankValue(board, mine[board]) + ' <small>' + mine.shots + '/' + RANK_MIN_SHOTS + ' 슈팅</small></em></div>';
     return chips + '<div class="ranks">' + list + tail + '</div>' + (net ? '' : '<small class="src">이 기기 기록</small>');
   }
   function bind(box) {
