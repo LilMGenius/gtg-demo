@@ -1,6 +1,6 @@
 // Setup: npm ci --prefix server; npm --prefix server exec -- playwright install chromium
 // Local: node tools/rank-live-gate.mjs [--no-unique]
-// Preview: RANK_API=https://<preview>/api node tools/rank-live-gate.mjs --preview
+// Preview: node tools/rank-live-gate.mjs --api https://<preview>
 // Protected Preview: supply VERCEL_OIDC_TOKEN from vercel env pull; never disable protection.
 // PGlite (Apache-2.0) runs real PostgreSQL locally: https://pglite.dev/docs/
 // The same adapter and migration run here; local PASS does not claim a Neon deployment.
@@ -17,7 +17,14 @@ import { createPostgresRankStore } from '../server/postgres-rank.mjs';
 
 const serverRequire = createRequire(new URL('../server/package.json', import.meta.url));
 const { chromium } = serverRequire('playwright');
-const local = !process.argv.includes('--preview');
+const apiIndex = process.argv.indexOf('--api');
+if (apiIndex !== -1) {
+  const url = new URL(process.argv[apiIndex + 1]);
+  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('--api requires an HTTP(S) URL');
+  if (url.pathname === '/') url.pathname = '/api';
+  process.env.RANK_API = url.href;
+}
+const local = apiIndex === -1 && !process.argv.includes('--preview');
 const control = process.argv.includes('--no-unique');
 const out = resolve(process.env.RANK_EVIDENCE_DIR || '.omo/evidence/rank-worker', (control ? 'postgres-control-' : local ? 'postgres-local-' : 'preview-') + Date.now());
 mkdirSync(out, { recursive: true });
@@ -93,7 +100,7 @@ try {
     api = 'http://127.0.0.1:' + apiServer.address().port + '/api';
   }
   const base = 'http://127.0.0.1:' + gamePort + '/web/index.html?seed=20&lang=en';
-  writeFileSync(out + '/invocation.json', JSON.stringify({ command: 'node tools/rank-live-gate.mjs', local, control, api, base }, null, 2));
+  writeFileSync(out + '/invocation.json', JSON.stringify({ command: [process.execPath, ...process.execArgv, ...process.argv.slice(1)], local, control, api, base }, null, 2));
   staticServer = start(process.execPath, ['tools/serve.mjs', String(gamePort)], 'game');
   await ready(api + '/lines');
   await ready(base);
