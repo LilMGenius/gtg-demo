@@ -66,7 +66,12 @@ axis('initial-byte-budget', () => {
   assert(total <= 20_000_000, `${total} bytes > 20000000`);
   return `${total} bytes / 20000000; ${ordered.length} resources; largest ${ordered[0].path} ${ordered[0].bytes} bytes`;
 });
-axis('largest-single-asset', () => { assert(largest && largest.bytes > 0); return `${largest.path} ${largest.bytes} bytes (reported, no universal per-file cap)`; });
+// 이 줄은 initial-byte-budget가 만든 목록의 맨 위를 읽을 뿐이라, 그쪽 순회가 던지면 목록이 없다. 말 없는 거짓 대신 까닭을 이름으로 적는다.
+axis('largest-single-asset', () => {
+  assert(largest, 'no bootstrap inventory: initial-byte-budget threw before listing assets, fix that row first');
+  assert(largest.bytes > 0, largest.path + ' is the largest bootstrap resource and it is empty');
+  return `${largest.path} ${largest.bytes} bytes (reported, no universal per-file cap)`;
+});
 
 for (const field of ['name', 'short_name', 'start_url', 'display']) axis('manifest:' + field, () => {
   assert.equal(typeof manifest[field], 'string'); assert(manifest[field].trim());
