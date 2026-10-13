@@ -11,11 +11,11 @@ const ATTRS = ['aria-label', 'title', 'placeholder', 'alt'];
 
 export const LANGS = ['ko', 'en'];
 
-export function pickLang(search = location.search, stored = localStorage.getItem(KEY), nav = navigator.language) {
+export function pickLang(search = location.search, stored = localStorage.getItem(KEY)) {
   const q = new URLSearchParams(search).get('lang');
   if (LANGS.includes(q)) return q;
   if (LANGS.includes(stored)) return stored;
-  return String(nav || '').toLowerCase().startsWith('ko') ? 'ko' : 'en';
+  return 'en';
 }
 
 // Key of a painted string: whitespace collapsed, each number run replaced by its position.
