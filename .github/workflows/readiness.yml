@@ -1,0 +1,18 @@
+name: readiness
+# The readiness gate ran on no runner: it sat outside the workflows and the fast local sweep is non-blocking
+# beside many other red gates, so its deterministic RED rows went unnoticed from 31e8b6d (RED=3) to RED=4.
+# This job runs it on every push and pull request; a deterministic RED exits 1 and fails the push.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tools/readiness-gate.mjs
