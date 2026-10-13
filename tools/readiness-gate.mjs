@@ -184,11 +184,15 @@ axis('currency-placeholder', () => {
 });
 axis('payment-sdk-scan', () => {
   const files = [...walk('web/src'), ...walk('src'), 'web/index.html', 'package.json'].filter(p => /\.(mjs|js|html|json)$/.test(p));
-  const sdk = /['"`][^'"`\n]*(?:stripe|toss|iamport|play[ -]?billing)/i;
+  /* 결제 SDK는 패키지 이름이나 도메인으로만 들어온다. 낱말 stripe가 아니라 js.stripe.com, @stripe/, stripe-js,
+     from 'stripe'로 잡는 까닭은 영어 사전의 "Striped socks"와 "stripes"가 낱말 stripe를 품어 SDK로 읽히기 때문이다. */
+  const sdk = /['"`][^'"`\n]*(?:\bjs\.stripe\.com|@stripe\/|\bstripe-js\b|tosspayments|\btoss\.im\b|iamport|portone|play[ -]?billing|billingclient)|(?:\bfrom|require\(|import\()\s*['"`](?:stripe|tosspayments)\b/i;
   const hits = files.filter(p => sdk.test(source(p)) || /\b(?:Stripe|TossPayments|Iamport)\s*\(/.test(source(p)));
   const raw = files.filter(p => /stripe|toss|iamport|play[ -]?billing/i.test(read(p)));
-  lines.push('PAYMENT_RAW_MATCHES ' + JSON.stringify(raw) + '; pitch.mjs stripe is the local field-marking geometry helper, not an SDK');
+  lines.push('PAYMENT_RAW_MATCHES ' + JSON.stringify(raw) + '; pitch.mjs stripe is the local field-marking geometry helper and i18n-en.json holds the English words Striped/stripes, neither is an SDK');
   assert(sdk.test("import Stripe from 'stripe'")); assert(sdk.test("load('https://js.tosspayments.com/v2')"));
+  // 영어 낱말은 SDK가 아니라는 음성 대조군. 위 두 양성 대조군과 짝으로 서야 범위를 좁힌 정규식이 아무것도 못 잡는 식이 되지 않는다.
+  assert(!sdk.test('"Striped socks"') && !sdk.test('"Two white stripes"') && !sdk.test('"A white stripe"'));
   assert.equal(hits.length, 0, hits.join(', '));
   assert(/이 빌드에는 결제 경로가 없다/.test(read('web/src/state/inject.mjs')));
   return `${files.length} product files; payment SDK matches=0; cash is injected only, no real-money sale path at this HEAD`;
