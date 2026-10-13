@@ -1,1 +1,5 @@
+# Generated wiki output is written with LF by gamewiki and wiki-facts, and release-wiki compares it byte for byte.
+# Checking it out as CRLF made every regeneration show a content-free diff, so it is stored and checked out as-is.
 web/wiki/dist/* text eol=lf
+web/wiki/facts.json -text
+web/wiki/site/** -text
