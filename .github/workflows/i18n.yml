@@ -1,0 +1,20 @@
+name: i18n
+# English ships as a dictionary over the Korean screens. This holds it on every push: no Korean left in a
+# value, no number slot dropped, no fixed label in index.html without an entry, and the planted control red.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  dictionary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tools/i18n-gate.mjs --selftest
+      - run: node tools/i18n-gate.mjs
+

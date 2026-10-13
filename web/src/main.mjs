@@ -27,6 +27,7 @@ import { DATE_COST, dateGate } from './state/date.mjs';
 import { applyPreset, ONBOARD_DONE } from './state/inject.mjs';
 import { thumbURL } from './render/thumb.mjs';
 import * as wikiUI from './ui/wiki.mjs';
+import { pickLang, setLang, getLang } from './ui/i18n.mjs';
 import { createImpact } from './ui/impact-view.mjs';
 import { createGramPanel } from './ui/gram-panel.mjs';
 import { createRosterPanel } from './ui/roster-panel.mjs';
@@ -1263,6 +1264,11 @@ const startFullscreen = () => {
 };
 // A touch pointerdown need not grant activation; click does, before title startup.
 el('go').addEventListener('click', startFullscreen, { capture: true, once: true });
+setLang(pickLang());
+el('lang').onpointerdown = (e) => {
+  e.stopPropagation();
+  setLang(getLang() === 'en' ? 'ko' : 'en');
+};
 const muteBtn = el('mute');
 function setMuted(on) {
   bgm.muted = on;

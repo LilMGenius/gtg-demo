@@ -1,6 +1,7 @@
 // 임팩트. 사건이 일어난 자리에 한 번 터지고 사라진다.
 // 파티클 시스템은 없다. 도형 몇 개를 키우고 지우는 것이 전부다.
 import * as THREE from '../../../vendor/three.module.min.js';
+import { t as tr, getLang } from '../../ui/i18n.mjs';
 
 // 한 번의 충돌은 수명 하나가 아니다. 순간 플래시, 본체, 남아 떠 있는 잔막 셋이 겹쳐야 한 발로 읽힌다.
 // 수명이 하나면 사건 직후 프레임에 아무것도 없다. 별과 흙은 시간이 지나야 커지기 때문이다.
@@ -183,6 +184,7 @@ const TONE_DEFAULT = { c: 0xfffdf0, ring: 0xffffff, spokes: 8, shape: 'spike' };
 // 사건이 뭐였는지를 그림만으로 읽히게 하는 가장 싸고 확실한 방법이 이것이다.
 // 외곽선을 안 그리면 흙 배경에서 글자가 사라진다. 검은 테두리를 먼저 칠한다.
 function wordTex(word) {
+  word = tr(word);
   const cv = document.createElement('canvas');
   cv.width = 256; cv.height = 128;
   const c = cv.getContext('2d');
@@ -416,8 +418,8 @@ export function createImpact(scene) {
     follow = word2;
     stage = 0;
     if (word) {
-      if (!texCache.has(word)) texCache.set(word, wordTex(word));
-      wordMat.map = texCache.get(word);
+      if (!texCache.has(getLang() + word)) texCache.set(getLang() + word, wordTex(word));
+      wordMat.map = texCache.get(getLang() + word);
       wordMat.needsUpdate = true;
       // 같은 각도로 매번 뜨면 도장찍기로 읽힌다. 매번 달리 기울인다.
       wordSpin = (Math.random() - 0.5) * 0.52;
@@ -547,8 +549,8 @@ export function createImpact(scene) {
       // 뒤따르는 소리로 갈아 끼운다. 반대쪽으로 밀고 반대로 기울여야 잔상이 아니라 다음 소리로 읽힌다.
       if (stage === 0 && follow && t >= D_WORD2) {
         stage = 1;
-        if (!texCache.has(follow)) texCache.set(follow, wordTex(follow));
-        wordMat.map = texCache.get(follow);
+        if (!texCache.has(getLang() + follow)) texCache.set(getLang() + follow, wordTex(follow));
+        wordMat.map = texCache.get(getLang() + follow);
         wordMat.needsUpdate = true;
         wordSpin = -wordSpin * 0.8 + 0.18;
         // 반대쪽으로 넘어가되 밀어내는 양은 줄이지 않는다. 줄이면 두 번째 소리가 몸 위로 돌아온다.
