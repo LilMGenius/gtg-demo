@@ -246,6 +246,29 @@ export function pullWeight(k) {
   return Math.pow(11 - f, 2);
 }
 
+/* 확률은 명단이 아니라 지금 남은 풀에서 다시 센다. 뽑을수록 남은 풀이 바뀌므로
+   고정 문구를 걸면 뒤로 갈수록 화면이 거짓말을 한다.
+   등급은 셋으로 가르고 서로 안 겹치게 둔다. 겹치면 남은 수를 세로로 더했을 때 풀보다 커져,
+   표를 읽는 사람이 같은 카드를 두 번 센다. 상점 배너와 위키 표가 이 한 곳에서 읽는다. */
+export const ODDS_BANDS = [
+  { name: '명성 10', at: (f) => f >= 10 },
+  { name: '명성 9', at: (f) => f === 9 },
+  { name: '명성 8 이하', at: (f) => f <= 8 }
+];
+
+// 등급 한 줄에 확률(소수 한 자리 백분율)과 풀에 남은 수. 한 자리인 까닭은 화면 표가 처음부터 한 자리로 인쇄해 온 표기를 지키기 위해서다.
+export function poolOdds(pool) {
+  let total = 0;
+  for (const k of pool) total += pullWeight(k);
+  if (!total) return [];
+  return ODDS_BANDS.map((band) => {
+    const list = pool.filter((k) => band.at(Number(k.fame) || 0));
+    let w = 0;
+    for (const k of list) w += pullWeight(k);
+    return { name: band.name, pct: (w / total * 100).toFixed(1) + '%', count: list.length };
+  });
+}
+
 // 미보유 풀에서 한 장. 풀이 비면 null을 돌려주고, 부르는 쪽이 값을 깎기 전에 그것을 본다.
 // 값만 깎고 아무것도 주지 않는 경로는 만렙 훈련 데드락과 같은 결함이다.
 export function pullFrom(pool, rand) {

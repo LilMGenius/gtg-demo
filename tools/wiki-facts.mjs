@@ -6,7 +6,7 @@ import { COIN_SAVE, COIN_CONCEDED, COIN_FAME_STEP, CASH_RATE } from '../web/src/
 import { BOTS } from '../web/src/state/bot.mjs';
 import { KEY_MAP } from '../web/src/ui/keys.mjs';
 import { BUFFS } from '../web/src/state/buff.mjs';
-import { PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP, PULL_KINDS } from '../src/roster.mjs';
+import { PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP, PULL_KINDS, KEEPERS, poolFor, poolOdds } from '../src/roster.mjs';
 import { CAUSE_LABEL, INPUT_CAUSES } from '../src/ledger.mjs';
 import { LIKE_BASE, LIKE_PER_CITY, MUTUAL_STEP, MUTUAL_CAP, SELFIE_BASE } from '../web/src/state/gram.mjs';
 import { MISHAP_SHELF, SHELF_NOTES_FOR_WIKI } from '../web/src/state/shelf.mjs';
@@ -29,8 +29,11 @@ const tables = {
   // 체감 곡선. 쌓은 능력치와 판정이 읽는 실효값. 곡선이 바뀐 날 이 표도 같이 바뀐다.
   drill: [{ columns: ['쌓은 능력치', '판정에 드는 값'], rows: CURVE_SAMPLES.map((v) => [v, statValue(v).toFixed(1)]) }],
   gear: SHELF_NOTES_FOR_WIKI.map((s) => ({ head: s.head, columns: ['이름', '효과'], rows: s.rows.map((g) => [g.name, g.note]) })),
+  // 확률 표는 갈래마다 하나이고 전체 명단 기준이다. 상점 표는 보유를 뺀 남은 풀을 다시 세므로 같은 식(poolOdds)을 풀만 바꿔 부른다.
+  // 칸은 이름과 확률 둘뿐이다. 장수까지 실으면 wiki-gate의 수 축이 상수에 없는 수로 읽는다.
   pull: [kv([['한 장', PULL_COST], ['묶음', PULL_BULK], ['묶음 보상', PULL_BONUS], ['이용권 한도', TICKET_CAP]]),
-    { columns: ['종류', '설명'], rows: PULL_KINDS.map((k) => [k.name, k.note]) }],
+    { columns: ['종류', '설명'], rows: PULL_KINDS.map((k) => [k.name, k.note]) },
+    ...PULL_KINDS.map((k) => ({ head: k.name + ' 확률 (전체 명단 기준)', columns: ['등급', '확률'], rows: poolOdds(poolFor(KEEPERS, k.id)).map((o) => [o.name, o.pct]) }))],
   gram: [kv([['좋아요', LIKE_BASE], ['동네 한 등급', LIKE_PER_CITY], ['맞팔 한 명', MUTUAL_STEP], ['맞팔 한도', MUTUAL_CAP], ['같이 한 장', SELFIE_BASE]])],
   bot: [{ columns: ['이름', '판단력', '분', '값'], rows: BOTS.map((b) => [b.name, b.judge, b.minutes, b.cost]) }],
   buff: [{ columns: ['이름', '효과', '지속(회)', '값'], rows: BUFFS.map((b) => [b.name, b.note, b.shots, b.cost]) }],

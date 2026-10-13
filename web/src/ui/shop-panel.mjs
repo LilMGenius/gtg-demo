@@ -1,5 +1,5 @@
 import { lookOf, skinsAt, isWorn } from '../state/gear.mjs';
-import { pullWeight, pullKindOf, KEEPERS, KICKERS, pullYield, PULL_BULK, pullFrom, PULL_KINDS, poolFor, pullCostOf, pullBill, PULL_BONUS } from '../../../src/roster.mjs';
+import { pullKindOf, KEEPERS, KICKERS, pullYield, PULL_BULK, pullFrom, PULL_KINDS, poolFor, pullCostOf, pullBill, PULL_BONUS, poolOdds } from '../../../src/roster.mjs';
 import { SHELVES, AXIS_UNIT, AXIS_WORD } from '../state/shelf.mjs';
 import { GEAR_STEP } from '../../../src/chain.mjs';
 import { botAt, BOTS, BOT_CAP } from '../state/bot.mjs';
@@ -33,28 +33,11 @@ function fittedLook() {
   return lookOf(Object.assign({}, state.gear, fitting), state.keeper.name);
 }
 
-/* 확률은 명단이 아니라 지금 남은 풀에서 다시 센다. 뽑을수록 남은 풀이 바뀌므로
-   고정 문구를 걸면 뒤로 갈수록 화면이 거짓말을 한다.
-   등급은 셋으로 가르고 서로 안 겹치게 둔다. 겹치면 남은 수를 세로로 더했을 때 풀보다 커져,
-   표를 읽는 사람이 같은 카드를 두 번 센다. */
-const ODDS_BANDS = [
-  { name: '명성 10', at: (f) => f >= 10 },
-  { name: '명성 9', at: (f) => f === 9 },
-  { name: '명성 8 이하', at: (f) => f <= 8 }
-];
-
 // 등급 한 줄에 확률과 남은 수. 세 칸이 한 줄에 서므로 문장으로 잇지 않는다.
 function shopOdds(pool) {
-  let total = 0;
-  for (const k of pool) total += pullWeight(k);
-  if (!total) return '';
-  const rows = ODDS_BANDS.map((band) => {
-    const list = pool.filter((k) => band.at(Number(k.fame) || 0));
-    let w = 0;
-    for (const k of list) w += pullWeight(k);
-    return '<span><i>' + band.name + '</i><b>' + (w / total * 100).toFixed(1)
-      + '%</b><u>' + list.length + '</u></span>';
-  }).join('');
+  const odds = poolOdds(pool);
+  if (!odds.length) return '';
+  const rows = odds.map((o) => '<span><i>' + o.name + '</i><b>' + o.pct + '</b><u>' + o.count + '</u></span>').join('');
   return '<span class="head"><i>등급</i><b>확률</b><u>남은 수</u></span>' + rows;
 }
 

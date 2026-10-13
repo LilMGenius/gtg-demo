@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { crc32, inflateSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import { runInNewContext } from 'node:vm';
-import { KEEPERS, pullWeight } from '../src/roster.mjs';
+import { KEEPERS, pullWeight, PULL_KINDS, poolFor, poolOdds } from '../src/roster.mjs';
 
 // Repository gate shape; WCAG formula: https://www.w3.org/TR/WCAG22/#dfn-relative-luminance
 // Node fs/URL/zlib own traversal, resolution, PNG CRC and decompression; no dependencies.
@@ -168,15 +168,22 @@ axis('ftue-ordered-ids', () => {
 axis('wiki-searchable-odds', () => {
   const pages = JSON.parse(read('web/wiki/dist/pages.json'));
   const page = pages.find(p => p.id === 'pull' && p.categories.includes('pull'));
-  assert(page && !/[0-9]/.test(page.bodyHtml.replace(/<[^>]*>/g, ' ')));
+  assert(page, 'wiki has no pull page');
+  /* 손으로 쓴 원본과 표 밖 글에는 숫자도 백분율도 없다. 풀이 줄면 거짓이 되는 베낀 확률이 서는 자리이기 때문이다.
+     표의 수는 wiki-facts가 코드에서 뽑으므로 표만 수를 든다. "본문 전체에 숫자 없음"은 그 상수 표까지 거짓 빨강으로 읽었다. */
+  const source = read('web/wiki/src/pull.md').replace(/^---[\s\S]*?\n---/, '');
+  const prose = page.bodyHtml.replace(/<table\b[\s\S]*?<\/table>/gi, ' ').replace(/<[^>]*>/g, ' ');
+  for (const [where, body] of [['pull.md', source], ['built pull prose', prose]]) assert(!/[0-9%％]/.test(body), where + ' copies a number by hand: ' + (body.match(/.{0,12}[0-9%％].{0,12}/) || [''])[0].trim());
+  assert(/확률/.test(prose) && /상점/.test(prose), 'wiki pull page no longer points searchable text at the live shop odds');
   // Execute the product's pure HTML formatter with Node vm; browser visibility remains pull-gate's axis.
-  const bands = [...main.matchAll(/const ODDS_BANDS = \[[\s\S]*?\n\];/g)];
   const formatters = [...main.matchAll(/function shopOdds\(pool\) \{[\s\S]*?\n\}/g)];
-  assert.equal(bands.length, 1); assert.equal(formatters.length, 1);
+  assert.equal(formatters.length, 1);
   assert(main.includes("+ shopOdds(pool) + '</em></details>'"));
+  const render = pool => runInNewContext(formatters[0][0] + '\nshopOdds(pool)', { pool, poolOdds }, { timeout: 1000 });
+  const parse = rendered => [...rendered.matchAll(/<span><i>([^<]+)<\/i><b>([\d.]+%)<\/b><u>(\d+)<\/u><\/span>/g)].map(m => [m[1], m[2], Number(m[3])]);
   for (const pool of [KEEPERS, KEEPERS.slice(1)]) {
-    const rendered = runInNewContext(bands[0][0] + '\n' + formatters[0][0] + '\nshopOdds(pool)', { pool, pullWeight }, { timeout: 1000 });
-    const parsed = [...rendered.matchAll(/<span><i>([^<]+)<\/i><b>([\d.]+%)<\/b><u>(\d+)<\/u><\/span>/g)].map(m => [m[2], Number(m[3])]);
+    const rendered = render(pool);
+    const parsed = parse(rendered).map(([, pct, n]) => [pct, n]);
     const total = pool.reduce((n, k) => n + pullWeight(k), 0);
     const expected = [k => k.fame >= 10, k => k.fame === 9, k => k.fame <= 8].map(f => {
       const group = pool.filter(f);
@@ -185,7 +192,18 @@ axis('wiki-searchable-odds', () => {
     assert.deepEqual(parsed, expected); assert(!/<canvas\b/i.test(rendered));
     lines.push('POOL_ODDS ' + JSON.stringify({ population: pool.length, totalWeight: total, odds: parsed, text: rendered.replace(/<[^>]*>/g, ' ') }));
   }
-  return 'actual shopOdds HTML text matches full and reduced pools; wiki has prose only; browser visibility owned by pull gate';
+  // 위키는 갈래마다 전체 명단 기준 확률 표를 글자로 든다. 상점이 인쇄하는 그 식을 같은 명단에 돌린 줄과 한 줄도 다르면 안 된다.
+  const tables = [...page.bodyHtml.matchAll(/<table\b[\s\S]*?<\/table>/gi)].map(t => [...t[0].matchAll(/<tr\b[\s\S]*?<\/tr>/gi)]
+    .map(r => [...r[0].matchAll(/<t[hd]\b[^>]*>([\s\S]*?)<\/t[hd]>/gi)].map(c => c[1].replace(/<[^>]*>/g, '').trim())));
+  const wiki = [];
+  for (const kind of PULL_KINDS) {
+    const want = parse(render(poolFor(KEEPERS, kind.id))).map(([name, pct]) => [name, pct]);
+    assert.equal(want.length, 3, kind.name + ' has no printed odds');
+    const found = tables.find(rows => JSON.stringify(rows[0]) === '["등급","확률"]' && JSON.stringify(rows.slice(1)) === JSON.stringify(want));
+    assert(found, 'wiki pull page lacks the searchable full-roster odds table of ' + kind.name + ': ' + JSON.stringify(want));
+    wiki.push(kind.name + ' ' + want.map(r => r.join(' ')).join(', '));
+  }
+  return 'actual shopOdds HTML text matches full and reduced pools; wiki pull tables carry the same full-roster odds as text (' + wiki.join('; ') + '); wiki prose copies no number; browser visibility owned by pull gate';
 });
 axis('currency-placeholder', () => {
   assert(read('web/wiki/src/cash-rate.md').includes('[[coin]]'));
