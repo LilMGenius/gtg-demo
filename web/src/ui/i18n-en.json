@@ -383,6 +383,8 @@
  "보라 빨판": "Purple suction",
  "보라 저지": "Purple jersey",
  "보유": "Owned",
+ "보유 {0}": "Owned {0}",
+ "보유 {0}/{1}": "Owned {0}/{1}",
  "보유한 키퍼는 제외하므로 현재 확률은 상점의 확률 표를 따른다.": "Owned keepers are excluded, so current odds follow the Shop's odds table.",
  "보통": "Normal",
  "복사": "Copy",
