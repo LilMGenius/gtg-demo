@@ -49,7 +49,14 @@ axis('initial-byte-budget', () => {
     if (/\.(?:mjs|js)$/.test(file)) {
       assert(!/\bimport\s*\(/.test(text), 'Dynamic import needs an explicit budget owner: ' + relative(ROOT, file));
       for (const m of text.matchAll(/\b(?:import|export)\s+(?:[^;"']*?\sfrom\s*)?["']([^"']+)["']/g)) add(m[1], file);
-      for (const m of text.matchAll(/new URL\(\s*['"]([^'"]+)['"]\s*,\s*import\.meta\.url\s*\)/g)) add(m[1], file);
+      /* wiki.mjs의 SITE_URL은 눌러야 새 탭으로 여는 링크라 첫 판 전에 받는 바이트가 아니다. 이걸 자원으로 세면
+         사이트 html이 절대 경로 /gtg-demo/web/wiki/site/...(Pages 배포 기준)를 달고 있어 파일 URL이 드라이브 뿌리로
+         풀리며 저장소 밖으로 샌다. 사이트의 본문 바이트는 wikisite 게이트가 잰다. 다른 new URL은 그대로 센다. */
+      for (const m of text.matchAll(/new URL\(\s*['"]([^'"]+)['"]\s*,\s*import\.meta\.url\s*\)/g)) {
+        if (!/(?:^|\/)wiki\/site\//.test(m[1])) { add(m[1], file); continue; }
+        // 제외는 이 주소가 링크로만 쓰일 때 선다. 받아 오는 쪽으로 바뀌면 첫 판 바이트라 이 줄이 빨개진다.
+        assert(/href="'\s*\+\s*SITE_URL\b/.test(text) && !/fetch\([^)]*SITE_URL/.test(text), 'wiki/site must stay an opened link, not a bootstrap fetch: ' + relative(ROOT, file));
+      }
       for (const m of text.matchAll(/loadDecor\(\s*\w+\s*,\s*['"]([^'"]+)['"]/g)) add('assets/models/' + m[1] + '.glb', resolve(ROOT, 'web/index.html'));
     }
     if (/\.(?:html|css)$/.test(file)) for (const m of text.matchAll(/url\(\s*['"]?([^)'"\s]+)['"]?\s*\)/g)) add(m[1], file);
