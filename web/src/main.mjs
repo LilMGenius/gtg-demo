@@ -29,6 +29,7 @@ import { thumbURL } from './render/thumb.mjs';
 import * as wikiUI from './ui/wiki.mjs';
 import { pickLang, setLang, getLang } from './ui/i18n.mjs';
 import { createImpact } from './ui/impact-view.mjs';
+import { createStatTip } from './ui/stat-tip.mjs';
 import { createGramPanel } from './ui/gram-panel.mjs';
 import { createRosterPanel } from './ui/roster-panel.mjs';
 import { createShopPanel } from './ui/shop-panel.mjs';
@@ -662,7 +663,11 @@ let gymWatch = null;
 let lastAutoTraining = '';
 let shotBuff = newBuff();
 // 능력치 효과 표시. 훈련장과 내 정보가 같은 기억을 나눈다.
-const { fxText, fillImpact } = createImpact({ state, el });
+const { fxText, fillImpact, effects } = createImpact({ state, el });
+/* 능력치 효과 팝업. 훈련장 칸과 내 정보 칸이 같은 부품 하나를 쓴다. 칸은 둘 다 data-k에 능력치 이름을 든다. */
+const statTip = createStatTip({ state, el, effects, label: (k) => CAUSE_LABEL[k], icon: (k) => STAT_ICON[k] });
+statTip.bind('gym', '.row button[data-k]');
+statTip.bind('me', '.grid > span[data-k]', true);
 
 // 손과 자동은 같은 성장 굴림과 저장, 외형 갱신을 쓴다. 예산은 쌓인 훈련 포인트뿐이다.
 function trainKeeper(stat) {
@@ -1024,7 +1029,7 @@ function renderMe() {
     const v = k[s];
     // 10은 성장 상한이다. 훈련장과 같은 기준이어야 두 창이 어긋나지 않는다.
     // 값 자리에는 값만 적는다. 상한에 닿은 것은 max 칸이 말한다.
-    return '<span title="훈련 전(1)에 비해 지금 이 능력치가 버는 몫"><span class="who">' + STAT_ICON[s] + CAUSE_LABEL[s]
+    return '<span data-k="' + s + '" tabindex="0"><span class="who">' + STAT_ICON[s] + CAUSE_LABEL[s]
       + '</span><b>' + v + '</b><small class="fx" data-fx="' + s + '">' + fxText(s, 'held') + '</small></span>';
   }).join('');
   const traits = (k.traits && k.traits.length)
