@@ -16,7 +16,11 @@ const artifact = resolve(ROOT, '.omo/evidence/readiness-' + head.slice(0, 7) + '
 const lines = [`HEAD ${head}`, `BINARY ${process.execPath} ${process.version}; package.json has no Node engine pin`, 'INVOCATION node tools/readiness-gate.mjs', `ARTIFACT ${artifact}`];
 const rows = [];
 const row = (name, layer, status, owner, detail) => { rows.push([name, layer, status, owner]); lines.push(`${status} ${name}: ${detail}`); };
-const axis = (name, test) => { try { row(name, '결정론', 'GREEN', 'readiness gate', test()); } catch (e) { row(name, '결정론', 'RED', 'readiness gate', e.message); } };
+/* 메시지 없는 assert가 새로 들어오면 "The expression evaluated to a falsy value"만 남아 원인을 못 읽는다. 그 문구는 실패한 줄을 붙여 적고,
+   아래 self-check가 그 경로를 빨강 대신 원인 있는 빨강으로 두는지 매번 잰다. */
+const BARE = /^The expression evaluated to a falsy value/;
+const cause = (e) => BARE.test(e.message) ? 'assert without a message at ' + ((String(e.stack).match(/readiness-gate\.mjs:(\d+)/) || [])[1] ? 'tools/readiness-gate.mjs line ' + String(e.stack).match(/readiness-gate\.mjs:(\d+)/)[1] : 'unknown line') + '; ' + e.message.split('\n')[1]?.trim() : e.message;
+const axis = (name, test) => { try { row(name, '결정론', 'GREEN', 'readiness gate', test()); } catch (e) { row(name, '결정론', 'RED', 'readiness gate', cause(e)); } };
 const pending = (name, owner, detail, layer = 'HOOTL') => row(name, layer, '대기', owner, detail);
 const walk = folder => readdirSync(resolve(ROOT, folder), { withFileTypes: true }).flatMap(e => e.name.includes('.local') ? [] : e.isDirectory() ? walk(join(folder, e.name)) : [join(folder, e.name)]);
 const html = read('web/index.html'), css = read('web/src/ui/hud.css').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -68,7 +72,7 @@ axis('initial-byte-budget', () => {
   lines.push(`LARGEST_ASSET ${ordered[0].path} ${ordered[0].bytes} bytes`);
   lines.push('BUDGET_SCOPE raw on-disk bytes, deduplicated; includes bootstrap modules, CSS/font URLs, JSON fetches and loadDecor GLBs; conservative pre-gesture upper bound, not measured transfer bytes');
   const bgm = source('web/src/audio/bgm.mjs');
-  assert(/el\.preload\s*=\s*'none'/.test(bgm) && /const kick = [\s\S]*?el\.src = src/.test(bgm), 'Deferred audio assumption changed');
+  assert(/el\.preload\s*=\s*'none'/.test(bgm) && /const kick = [\s\S]*?el\.src = src/.test(bgm), 'bgm.mjs no longer defers audio (preload none, src set in kick), so the budget must count the codecs');
   lines.push('DEFERRED BGM codecs are excluded: preload=none and src assigned by gesture kick; procedural textures/portraits have no file payload');
   assert(total <= 20_000_000, `${total} bytes > 20000000`);
   return `${total} bytes / 20000000; ${ordered.length} resources; largest ${ordered[0].path} ${ordered[0].bytes} bytes`;
@@ -81,34 +85,34 @@ axis('largest-single-asset', () => {
 });
 
 for (const field of ['name', 'short_name', 'start_url', 'display']) axis('manifest:' + field, () => {
-  assert.equal(typeof manifest[field], 'string'); assert(manifest[field].trim());
-  if (field === 'start_url') assert(statSync(resolve(ROOT, 'web', manifest[field])).isFile());
-  if (field === 'display') assert(['fullscreen', 'standalone', 'minimal-ui'].includes(manifest[field]));
+  assert.equal(typeof manifest[field], 'string', 'manifest.' + field + ' is not a string'); assert(manifest[field].trim(), 'manifest.' + field + ' is empty');
+  if (field === 'start_url') assert(statSync(resolve(ROOT, 'web', manifest[field])).isFile(), 'manifest start_url ' + manifest[field] + ' is not a file under web/');
+  if (field === 'display') assert(['fullscreen', 'standalone', 'minimal-ui'].includes(manifest[field]), 'manifest display ' + manifest[field] + ' is not fullscreen, standalone or minimal-ui');
   return manifest[field];
 });
 for (const size of [192, 512]) axis('manifest:icon-' + size, () => {
   const icon = manifest.icons.find(i => i.sizes === `${size}x${size}` && i.type === 'image/png');
   assert(icon, 'Missing ' + size + 'x' + size + ' PNG');
   const png = readFileSync(resolve(ROOT, 'web', icon.src));
-  assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
-  assert.equal(png.readUInt32BE(16), size); assert.equal(png.readUInt32BE(20), size);
+  assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', icon.src + ' lacks the PNG signature');
+  assert.equal(png.readUInt32BE(16), size, icon.src + ' width is not ' + size); assert.equal(png.readUInt32BE(20), size, icon.src + ' height is not ' + size);
   const data = []; let ended = false;
   for (let offset = 8; offset < png.length;) {
     const n = png.readUInt32BE(offset), type = png.toString('ascii', offset + 4, offset + 8);
-    assert.equal(crc32(png.subarray(offset + 4, offset + 8 + n)), png.readUInt32BE(offset + 8 + n));
+    assert.equal(crc32(png.subarray(offset + 4, offset + 8 + n)), png.readUInt32BE(offset + 8 + n), icon.src + ' has a bad chunk CRC at byte ' + offset);
     if (type === 'IDAT') data.push(png.subarray(offset + 8, offset + 8 + n));
     if (type === 'IEND') ended = true;
     offset += n + 12;
   }
-  assert(ended && inflateSync(Buffer.concat(data)).length > size * size);
+  assert(ended, icon.src + ' has no IEND chunk'); assert(inflateSync(Buffer.concat(data)).length > size * size, icon.src + ' pixel data is smaller than ' + size + 'x' + size);
   return `${icon.src} ${size}x${size}, ${png.length} bytes, CRC and decompression valid`;
 });
-axis('apple-touch-icon', () => { assert(/<link\b[^>]*rel="apple-touch-icon"[^>]*href="assets\/icon-192.png"/.test(html)); return '192px link'; });
-axis('orientation', () => { assert.equal(manifest.orientation, 'landscape'); return manifest.orientation; });
+axis('apple-touch-icon', () => { assert(/<link\b[^>]*rel="apple-touch-icon"[^>]*href="assets\/icon-192.png"/.test(html), 'web/index.html has no apple-touch-icon link to assets/icon-192.png'); return '192px link'; });
+axis('orientation', () => { assert.equal(manifest.orientation, 'landscape', 'manifest orientation is ' + manifest.orientation + ', not landscape'); return manifest.orientation; });
 axis('refresh-independent-judgement', () => {
   const scene = source('web/src/render/scene.mjs');
-  assert(/let dt = Math\.min\(0\.05, Math\.max\(0, real - realLast\)\)/.test(scene));
-  assert(/if \(fixedDt > 0\) dt = fixedDt/.test(scene));
+  assert(/let dt = Math\.min\(0\.05, Math\.max\(0, real - realLast\)\)/.test(scene), 'scene.mjs no longer clamps the render dt to 0.05s');
+  assert(/if \(fixedDt > 0\) dt = fixedDt/.test(scene), 'scene.mjs lost the fixedDt override');
   const judges = walk('src').filter(p => /\.mjs$/.test(p));
   const touched = judges.filter(p => /\bdt\b/.test(source(p)));
   const control = [...scene.matchAll(/\bdt\b/g)].length;
@@ -126,9 +130,9 @@ function storageScenario() {
 }
 axis('audio-resume-hooks-source-only', () => {
   const bgm = source('web/src/audio/bgm.mjs');
-  assert(/visibilitychange[\s\S]*?resume\(\)/.test(bgm));
-  assert(/const kick[\s\S]*?resume\(\)/.test(bgm));
-  assert(/\['pointerdown', 'keydown', 'touchstart'\]\) document.addEventListener\(ev, kick\)/.test(bgm));
+  assert(/visibilitychange[\s\S]*?resume\(\)/.test(bgm), 'bgm.mjs does not resume audio on visibilitychange');
+  assert(/const kick[\s\S]*?resume\(\)/.test(bgm), 'bgm.mjs kick does not resume audio');
+  assert(/\['pointerdown', 'keydown', 'touchstart'\]\) document.addEventListener\(ev, kick\)/.test(bgm), 'bgm.mjs does not register kick on pointerdown, keydown and touchstart');
   return 'visibilitychange + pointerdown/keydown/touchstart; source registration only, iOS recovery awaits device test';
 });
 
@@ -146,23 +150,23 @@ axis('hud-touch-minimum', () => {
   const measured = selectors.map(s => ({ selector: s, px: minimum(s) }));
   lines.push('TOUCH_DECLARATIONS ' + JSON.stringify(measured));
   assert(measured.every(m => m.px.every(v => v >= 24)), 'Missing >=24px declarations: ' + JSON.stringify(measured.filter(m => m.px.some(v => v < 24))));
-  assert.equal([...html.matchAll(/data-move="-?1"/g)].length, 2);
+  assert.equal([...html.matchAll(/data-move="-?1"/g)].length, 2, 'web/index.html must hold exactly two data-move arrows');
   return 'HUD minimum >=24 CSS px; movement arrows 48x48; declaration audit, rendered bounds owned by mobile gate';
 });
 const tokens = Object.fromEntries([...css.match(/:root\s*\{([^}]+)\}/)[1].matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})\b/gi)].map(m => [m[1], m[2]]));
 const luminance = hex => hex.slice(1).match(/../g).map(v => parseInt(v, 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4).reduce((n, v, i) => n + v * [0.2126, 0.7152, 0.0722][i], 0);
 const contrast = (a, b) => { const x = luminance(a), y = luminance(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
-axis('contrast-instrument-control', () => { assert.equal(contrast('#000000', '#ffffff'), 21); assert.equal(contrast('#161c14', '#161c14'), 1); return 'black/white=21, identical=1 (rejects 4.5 and 3)'; });
+axis('contrast-instrument-control', () => { assert.equal(contrast('#000000', '#ffffff'), 21, 'contrast() no longer gives 21 for black on white'); assert.equal(contrast('#161c14', '#161c14'), 1, 'contrast() no longer gives 1 for identical colors'); return 'black/white=21, identical=1 (rejects 4.5 and 3)'; });
 for (const fg of ['ink', 'dim', 'bad', 'good']) for (const bg of ['panel', 'edge']) axis(`contrast:${fg}/${bg}`, () => {
   const bar = ['ink', 'dim'].includes(fg) ? 4.5 : 3;
-  assert(tokens[fg] && tokens[bg]); const value = contrast(tokens[fg], tokens[bg]);
+  assert(tokens[fg] && tokens[bg], 'hud.css :root lacks the --' + (tokens[fg] ? bg : fg) + ' color token'); const value = contrast(tokens[fg], tokens[bg]);
   assert(value >= bar, `${value.toFixed(3)} < ${bar}`); return `${tokens[fg]}/${tokens[bg]}=${value.toFixed(3)}:1 >= ${bar}:1; opaque root tokens, not composited pixels`;
 });
-axis('reduced-motion', () => { assert(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?transition-duration:\s*(?:0|0?\.01)ms/.test(css)); return 'reduce query shortens panel transitions to <=0.01ms'; });
+axis('reduced-motion', () => { assert(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?transition-duration:\s*(?:0|0?\.01)ms/.test(css), 'hud.css has no prefers-reduced-motion block that cuts transition-duration to 0.01ms or less'); return 'reduce query shortens panel transitions to <=0.01ms'; });
 axis('ftue-ordered-ids', () => {
   const ids = [...source('web/src/state/inject.mjs').matchAll(/export const (ONBOARD_\w+) = (\d+);/g)].map(m => [m[1], Number(m[2])]);
-  assert.deepEqual(ids, [['ONBOARD_KEEPER', 0], ['ONBOARD_KICKERS', 1], ['ONBOARD_DONE', 2]]);
-  assert(ids.every(([id]) => main.includes(id))); assert(/onboard:\s*Number\(onboard\)/.test(source('web/src/state/save.mjs')));
+  assert.deepEqual(ids, [['ONBOARD_KEEPER', 0], ['ONBOARD_KICKERS', 1], ['ONBOARD_DONE', 2]], 'inject.mjs ONBOARD ids changed order or value');
+  assert(ids.every(([id]) => main.includes(id)), 'an ONBOARD id is no longer used by the screen code: ' + ids.filter(([id]) => !main.includes(id)).map(x => x[0]).join(', ')); assert(/onboard:\s*Number\(onboard\)/.test(source('web/src/state/save.mjs')), 'save.mjs no longer persists onboard as a number');
   return JSON.stringify(ids) + '; ordered declarations in inject.mjs, persisted denominator; not a measured funnel';
 });
 axis('wiki-searchable-odds', () => {
@@ -177,8 +181,8 @@ axis('wiki-searchable-odds', () => {
   assert(/확률/.test(prose) && /상점/.test(prose), 'wiki pull page no longer points searchable text at the live shop odds');
   // Execute the product's pure HTML formatter with Node vm; browser visibility remains pull-gate's axis.
   const formatters = [...main.matchAll(/function shopOdds\(pool\) \{[\s\S]*?\n\}/g)];
-  assert.equal(formatters.length, 1);
-  assert(main.includes("+ shopOdds(pool) + '</em></details>'"));
+  assert.equal(formatters.length, 1, 'expected exactly one function shopOdds(pool) in the product UI code, found ' + formatters.length);
+  assert(main.includes("+ shopOdds(pool) + '</em></details>'"), 'the shop banner no longer renders shopOdds(pool) inside details.odds');
   const render = pool => runInNewContext(formatters[0][0] + '\nshopOdds(pool)', { pool, poolOdds }, { timeout: 1000 });
   const parse = rendered => [...rendered.matchAll(/<span><i>([^<]+)<\/i><b>([\d.]+%)<\/b><u>(\d+)<\/u><\/span>/g)].map(m => [m[1], m[2], Number(m[3])]);
   for (const pool of [KEEPERS, KEEPERS.slice(1)]) {
@@ -189,7 +193,7 @@ axis('wiki-searchable-odds', () => {
       const group = pool.filter(f);
       return [(group.reduce((n, k) => n + pullWeight(k), 0) / total * 100).toFixed(1) + '%', group.length];
     });
-    assert.deepEqual(parsed, expected); assert(!/<canvas\b/i.test(rendered));
+    assert.deepEqual(parsed, expected, 'shopOdds prints odds that differ from the pool math for a pool of ' + pool.length); assert(!/<canvas\b/i.test(rendered), 'shopOdds renders a canvas, so the odds are not searchable text');
     lines.push('POOL_ODDS ' + JSON.stringify({ population: pool.length, totalWeight: total, odds: parsed, text: rendered.replace(/<[^>]*>/g, ' ') }));
   }
   // 위키는 갈래마다 전체 명단 기준 확률 표를 글자로 든다. 상점이 인쇄하는 그 식을 같은 명단에 돌린 줄과 한 줄도 다르면 안 된다.
@@ -206,11 +210,11 @@ axis('wiki-searchable-odds', () => {
   return 'actual shopOdds HTML text matches full and reduced pools; wiki pull tables carry the same full-roster odds as text (' + wiki.join('; ') + '); wiki prose copies no number; browser visibility owned by pull gate';
 });
 axis('currency-placeholder', () => {
-  assert(read('web/wiki/src/cash-rate.md').includes('[[coin]]'));
+  assert(read('web/wiki/src/cash-rate.md').includes('[[coin]]'), 'cash-rate.md no longer links [[coin]]');
   const sentence = '골드와 캐시는 나중에 바꿀 수 있는 임시 일반 재화 이름이다.';
   // 임시 이름이라는 기록은 재화를 정의하는 코드 곁에 선다. 플레이어 도움말에 두면 개발 메모가 게임 화면에 뜬다.
-  assert(read('web/src/state/wallet.mjs').includes(sentence));
-  assert(!JSON.parse(read('web/wiki/dist/pages.json')).find(p => p.id === 'coin').bodyHtml.includes('임시')); return 'cash-rate -> coin; placeholder record sits beside the currency code and stays out of the player wiki';
+  assert(read('web/src/state/wallet.mjs').includes(sentence), 'wallet.mjs no longer records that the currency names are placeholders');
+  assert(!JSON.parse(read('web/wiki/dist/pages.json')).find(p => p.id === 'coin').bodyHtml.includes('임시'), 'the player wiki coin page shows the development note about placeholder names'); return 'cash-rate -> coin; placeholder record sits beside the currency code and stays out of the player wiki';
 });
 axis('payment-sdk-scan', () => {
   const files = [...walk('web/src'), ...walk('src'), 'web/index.html', 'package.json'].filter(p => /\.(mjs|js|html|json)$/.test(p));
@@ -220,14 +224,14 @@ axis('payment-sdk-scan', () => {
   const hits = files.filter(p => sdk.test(source(p)) || /\b(?:Stripe|TossPayments|Iamport)\s*\(/.test(source(p)));
   const raw = files.filter(p => /stripe|toss|iamport|play[ -]?billing/i.test(read(p)));
   lines.push('PAYMENT_RAW_MATCHES ' + JSON.stringify(raw) + '; pitch.mjs stripe is the local field-marking geometry helper and i18n-en.json holds the English words Striped/stripes, neither is an SDK');
-  assert(sdk.test("import Stripe from 'stripe'")); assert(sdk.test("load('https://js.tosspayments.com/v2')"));
+  assert(sdk.test("import Stripe from 'stripe'"), 'scan control: import Stripe is no longer detected'); assert(sdk.test("load('https://js.tosspayments.com/v2')"), 'scan control: the tosspayments script is no longer detected');
   // 영어 낱말은 SDK가 아니라는 음성 대조군. 위 두 양성 대조군과 짝으로 서야 범위를 좁힌 정규식이 아무것도 못 잡는 식이 되지 않는다.
-  assert(!sdk.test('"Striped socks"') && !sdk.test('"Two white stripes"') && !sdk.test('"A white stripe"'));
+  assert(!sdk.test('"Striped socks"') && !sdk.test('"Two white stripes"') && !sdk.test('"A white stripe"'), 'scan control: an English stripe word is detected as a payment SDK');
   assert.equal(hits.length, 0, hits.join(', '));
-  assert(/이 빌드에는 결제 경로가 없다/.test(read('web/src/state/inject.mjs')));
+  assert(/이 빌드에는 결제 경로가 없다/.test(read('web/src/state/inject.mjs')), 'inject.mjs lost the statement that this build has no payment path');
   return `${files.length} product files; payment SDK matches=0; cash is injected only, no real-money sale path at this HEAD`;
 });
-axis('hosting-declaration', () => { const url = read('tools/live-gate.mjs').match(/const LIVE = "([^"]+)"/)[1]; assert(new URL(url).hostname.endsWith('.github.io')); return url + '; live gate target, not a deployment verification; R25 sale trigger absent'; });
+axis('hosting-declaration', () => { const url = read('tools/live-gate.mjs').match(/const LIVE = "([^"]+)"/)[1]; assert(new URL(url).hostname.endsWith('.github.io'), 'live gate target ' + url + ' is not on github.io, so the hosting declaration and R25 need review'); return url + '; live gate target, not a deployment verification; R25 sale trigger absent'; });
 
 // Existing browser owners are references, never recycled PASS reports.
 for (const [name, owner, marker] of [
@@ -238,7 +242,7 @@ for (const [name, owner, marker] of [
   ['fullscreen optional and unsupported hidden', 'fullscreen', 'unsupported:hidden-and-home-screen-help'],
   ['in-game odds match current pool', 'pull', 'pull:printed-odds-match-the-pool']
 ]) {
-  axis('owner-registration:' + owner + ':' + name, () => { assert(read(`tools/${owner}-gate.mjs`).includes(marker)); return `node tools/${owner}-gate.mjs -> ${marker}; not rerun by readiness gate`; });
+  axis('owner-registration:' + owner + ':' + name, () => { assert(read(`tools/${owner}-gate.mjs`).includes(marker), 'tools/' + owner + '-gate.mjs no longer holds the axis marker ' + marker); return `node tools/${owner}-gate.mjs -> ${marker}; not rerun by readiness gate`; });
   pending(name, owner + ' gate lap', 'Existing axis referenced; no prior runtime PASS claimed');
 }
 for (const name of ['frame p50/p95/p99 and draw calls', 'field p75 LCP<2.5s INP<200ms CLS<0.1 (mobile/desktop)', 'Lighthouse >=90', 'minimum device 30FPS', '30min soak / 20 scene changes without OOM or context loss']) pending(name, 'perf gate lap', 'Browser/device measurement required');
