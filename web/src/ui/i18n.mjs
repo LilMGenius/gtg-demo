@@ -25,18 +25,64 @@ export function keyOf(text) {
   return { key, nums };
 }
 
-export function translate(text, dict = EN) {
-  if (!text || !HANGUL.test(text)) return text;
+// Keys written with {n} hold a slot the game fills with anything (a name, a count); they match as patterns.
+const escRe = (s) => s.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
+const patterns = new Map();
+function patternsOf(dict) {
+  if (!patterns.has(dict)) {
+    const list = [];
+    for (const [k, v] of Object.entries(dict)) {
+      if (!/\{(n|\d+)\}/.test(k) || !HANGUL.test(k)) continue;
+      const slots = [];
+      const src = k.split(/(\{(?:n|\d+)\})/).map((p, i) => (i % 2 ? (slots.push(p), '(.+?)') : escRe(p))).join('');
+      list.push({ re: new RegExp('^' + src + '$'), slots, v, weight: k.replace(/\{(?:n|\d+)\}/g, '').length });
+    }
+    list.sort((a, b) => b.weight - a.weight);
+    patterns.set(dict, list);
+  }
+  return patterns.get(dict);
+}
+
+function fill(v, slots, caps, dict, depth) {
+  let out = v;
+  slots.forEach((s, i) => { out = out.split(s).join(translate(caps[i], dict, depth + 1)); });
+  return out;
+}
+
+export function translate(text, dict = EN, depth = 0) {
+  if (!text || !HANGUL.test(text) || depth > 6) return text;
   const lead = text.match(/^\s*/)[0];
   const tail = text.match(/\s*$/)[0];
-  const { key, nums } = keyOf(text);
+  const core = text.slice(lead.length, text.length - tail.length).replace(/\s+/g, ' ');
+  const { key, nums } = keyOf(core);
   const hit = dict[key];
   if (hit !== undefined) return lead + hit.replace(/\{(\d+)\}/g, (_, i) => nums[i] ?? '') + tail;
+  if (dict[core] !== undefined) return lead + dict[core] + tail;
+  for (const p of patternsOf(dict)) {
+    const m = core.match(p.re);
+    if (m) return lead + fill(p.v, p.slots, m.slice(1), dict, depth) + tail;
+  }
   // A line built from parts (a name, a colon, a stock phrase) has no whole entry; translate the parts.
-  const parts = text.split(/(\s*[,:·|/()]\s*|\s+-\s+)/);
+  const parts = core.split(/(\s*[,:·|/()\[\]<>!?]\s*|\.\s+|\s+-\s+)/);
   if (parts.length > 1) {
-    const joined = parts.map((s, i) => (i % 2 ? s : translate(s, dict))).join('');
-    if (joined !== text) return joined;
+    const joined = parts.map((s, i) => (i % 2 ? s : translate(s, dict, depth + 1))).join('');
+    if (!HANGUL.test(joined)) return lead + joined + tail;
+  }
+  // A name in front of or behind a stock phrase: the longest known word-run wins, the rest is translated alone.
+  const words = core.split(' ');
+  for (let n = words.length - 1; n >= 1; n--) {
+    const head = words.slice(0, n).join(' ');
+    const rest = words.slice(n).join(' ');
+    for (const [a, b, nameFirst] of [[head, rest, false], [rest, head, true]]) {
+      const ka = keyOf(a);
+      if (dict[ka.key] === undefined || !HANGUL.test(a)) continue;
+      const va = dict[ka.key].replace(/\{(\d+)\}/g, (_, i) => ka.nums[i] ?? '');
+      const vb = translate(b, dict, depth + 1);
+      if (HANGUL.test(vb)) continue;
+      const low = (s) => (/^[A-Z][a-z]+ [a-z]/.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s);
+      const out = nameFirst ? vb + ' ' + low(va) : va + ' ' + low(vb);
+      return lead + out.trim() + tail;
+    }
   }
   return text;
 }
@@ -100,7 +146,7 @@ function restore(root) {
   }
 }
 
-const HEAD = {
+const HEAD = typeof document === 'undefined' ? {} : {
   ko: { title: document.title, desc: document.querySelector('meta[name=description]')?.content },
   en: { title: 'Grow The Goalkeeper 3D', desc: 'Not a football game. A goalkeeper game. Every shot flips its outcome several times before it lands. A low-poly slapstick goalkeeper idle RPG on a dirt neighbourhood pitch.' }
 };

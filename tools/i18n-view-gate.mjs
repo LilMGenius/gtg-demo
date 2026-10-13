@@ -48,6 +48,16 @@ try {
   };
   const en = await walk('en');
   check('i18n:english-screens-carry-no-korean', en.seen.length === 0, { count: en.seen.length, first: en.seen.slice(0, 25) });
+  // Captions, toasts and cause labels only exist mid-play, and their names are filled in at run time.
+  // Let the bot play in English and collect every painted line the dictionary could not turn.
+  await en.p.evaluate(() => document.getElementById('auto').click());
+  const heard = new Set();
+  for (let i = 0; i < 60; i++) {
+    await en.p.waitForTimeout(1000);
+    for (const s of await en.p.evaluate(() => window.__i18nMisses())) heard.add(s);
+    for (const s of await visibleHangul(en.p)) heard.add('live: ' + s);
+  }
+  check('i18n:sixty-seconds-of-english-play-paint-no-korean', heard.size === 0, { count: heard.size, first: [...heard].slice(0, 25) });
   const lang = await en.p.evaluate(() => [document.documentElement.lang, document.getElementById('lang').getAttribute('aria-pressed')]);
   check('i18n:english-is-declared', lang[0] === 'en' && lang[1] === 'true', lang);
   await en.p.click('#lang');

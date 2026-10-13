@@ -17,4 +17,5 @@ jobs:
           node-version: 22
       - run: node tools/i18n-gate.mjs --selftest
       - run: node tools/i18n-gate.mjs
-
+      - run: node tools/i18n-source-gate.mjs --selftest
+      - run: node tools/i18n-source-gate.mjs
