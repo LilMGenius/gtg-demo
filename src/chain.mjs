@@ -158,7 +158,7 @@ export function rollForm(keeper, rng) {
 
 // 레벨은 성장 포인트의 총량만 정한다. 어디에 붙는지는 성장 선택지가 정하므로 여기서는 무작위 배분이다.
 // 배분을 고정하면 모든 레벨의 키퍼가 같은 약점을 갖고, 실점 원인 분포가 한 칸으로 쏠린다.
-// 이 표본은 N칸 중 셋 제시와 레벨당 3포인트로, 제품의 열다섯 스탯 화면과 세트당 2포인트와 다르다(daedal-games docs/gamedev/judgement.md 계측 모집단).
+// 이 표본은 N칸 중 셋 제시와 레벨당 3포인트로, 제품의 열다섯 스탯 화면과 세트당 2포인트와 다르다(계측 모집단).
 export function keeperAtLevel(level, rng) {
   const stats = {};
   for (const k of GROWABLE) stats[k] = 3;
@@ -308,7 +308,6 @@ export function judgeWindow(keeper, shot, input, over) {
 
 // 1단 접촉의 여유. 양수면 닿는다.
 // 각 항의 주인은 STATS 15절이 정한다. 여기서 계수를 발명하지 않는다.
-// https://github.com/DaedalGames/daedal-games/blob/main/docs/gamedev/modifiers.md
 // GTG 계약의 가산 위 유계 승산을 접촉 여유와 손 성공률에 적용해 만렙에서도 산다.
 // 가설: rho 0.07, K 2는 강도가 무한대여도 손 이득 5.68%p 미만으로 남은 실패 6%p를 보존한다.
 export function boughtGain(trained, untrained, strength) {
