@@ -63,7 +63,7 @@
 
 HUD와 패널은 DOM이고 캔버스는 경기장만 그린다는 규칙은 [DOM 오버레이](https://github.com/DaedalGames/daedal-games/blob/main/docs/gamedev/ui/frameworks.md#dom-오버레이) 절이 갖는다. 패널이 열려 있는 동안에도 판은 계속 돈다.
 
-화면에 없는 시스템은 만들지 않는다. 빈 탭도 만들지 않는다. 못 누르는 버튼은 사유를 자기 글자로 말한다.
+화면에 없는 시스템은 만들지 않는다. 빈 탭 금지는 [빈 탭 금지](https://github.com/DaedalGames/daedal-games/blob/main/docs/gamedev/ui/types.md#빈-탭-금지) 절이 갖는다. 못 누르는 버튼은 사유를 자기 글자로 말한다.
 
 패널 스타일 규칙은 아이디 스코프라 상속되지 않는다. 새 패널을 세우면 닫기와 배경을 그 패널 이름으로 다시 적는다. 안 적으면 브라우저 기본 버튼이 뜬다.
 
@@ -71,15 +71,15 @@ HUD와 패널은 DOM이고 캔버스는 경기장만 그린다는 규칙은 [DOM
 
 진입점이 장르 표준을 따른다는 규칙은 [인벤토리와 상점 창](https://github.com/DaedalGames/daedal-games/blob/main/docs/gamedev/ui/types.md#인벤토리와-상점-창) 절이 갖는다.
 
-폰트는 용도별로 두셋을 전역 스타일에 정의하고 그것만 쓴다. 제목용과 본문용과 수치용이다. 굵은 하나로 다 쓰면 강조가 사라지고 장문이 먼저 읽기를 잃는다.
+폰트 용도 규칙은 [글꼴 용도](https://github.com/DaedalGames/daedal-games/blob/main/docs/gamedev/ui/onboarding.md#글꼴-용도) 절이 갖는다.
 
-상품 선반은 글자가 아니라 그림이 채운다. 썸네일과 시착용이 없으면 그것은 상점이 아니라 목록이다. 나열은 한 열이 아니라 뷰포트 폭을 쓰는 격자다.
+상품 선반이 그림이 채우는 격자여야 한다는 규칙은 [그림이 채우는 선반 격자](https://github.com/DaedalGames/daedal-games/blob/main/docs/gamedev/ui/types.md#그림이-채우는-선반-격자) 절이 갖는다.
 
 판을 세는 단위로 구를 쓰지 않는다. 직역이라 한국어로 안 읽힌다.
 
 ## 소리
 
-공 차기와 골대 튕김과 드리블과 공 놓기와 발소리를 현실적으로 낸다. 현실적이게 못 하겠으면 넣지 않는다. 어설픈 소리는 없는 것보다 나쁘다.
+공 차기와 골대 튕김과 드리블과 공 놓기와 발소리가 GTG의 효과음이다. 실물처럼 들리는 소리만 둔다는 규칙은 [실물처럼 들리는 효과음만](https://github.com/DaedalGames/daedal-games/blob/main/docs/gamedev/audio/sfx.md#실물처럼-들리는-효과음만) 절이 갖는다.
 
 ## 위키
 
