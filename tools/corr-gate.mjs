@@ -85,7 +85,7 @@ modifierContract({ gate: "corr", fields: ["studs"], engine: { makeRng, buildSet,
 
 // The opening table's scope remains level one; this separate axis reads offers.
 // Reuse corr's one-point probe at the frozen research seeds (12,000 shots per cell).
-// Bars are lap hypotheses, not player preference: DaedalGames/daedal-games docs/gamedev/judgement.md.
+// Bars are lap hypotheses, not player preference.
 // This population includes untested shots; the original level-one table keeps its own seeds and size.
 // Positivity is asserted on perfect input only. Auto input layers finger misjudgement on the stat
 // effect (see the header), so its signed gains are printed and only its share cap is a bar.

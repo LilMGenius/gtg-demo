@@ -1,7 +1,7 @@
 #!/bin/sh
 # type(scope): problem, at most 72 ASCII characters; body lines are "- " bullets.
-# re0-git's commit-economy owns the form. Adapted from DaedalGames/coggs-ai hooks/commit-msg.
-# Measured 2026-10-18: three repositories enforced different subsets; 35/200 daedal-games
+# re0-git's commit-economy owns the form. Adapted from an earlier private commit hook.
+# Measured 2026-10-18: three repositories enforced different subsets; 35/200 knowledge-base
 # subjects and 113/200 on feat/gtg exceeded 72 characters. One floor copy prevents drift.
 msg=$1
 # git commit -v appends the diff under a scissors line; nothing below it is the message.
