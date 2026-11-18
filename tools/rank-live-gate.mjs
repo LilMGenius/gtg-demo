@@ -104,11 +104,11 @@ try {
   staticServer = start(process.execPath, ['tools/serve.mjs', String(gamePort)], 'game');
   await ready(api + '/lines');
   await ready(base);
-  const post = (path, body, origin = 'https://lilmgenius.github.io') => fetch(api + path, {
+  const post = (path, body, origin = 'https://gtg-demo-play.vercel.app') => fetch(api + path, {
     method: 'POST', headers: { 'content-type': 'application/json', origin }, body: JSON.stringify(body)
   });
-  const preflight = await fetch(api + '/nick', { method: 'OPTIONS', headers: { origin: 'https://lilmgenius.github.io', 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type' } });
-  check('pages-cors', preflight.status === 200 && preflight.headers.get('access-control-allow-origin') === 'https://lilmgenius.github.io' && preflight.headers.get('access-control-allow-headers') === 'Content-Type', { status: preflight.status, headers: Object.fromEntries(preflight.headers) });
+  const preflight = await fetch(api + '/nick', { method: 'OPTIONS', headers: { origin: 'https://gtg-demo-play.vercel.app', 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type' } });
+  check('site-cors', preflight.status === 200 && preflight.headers.get('access-control-allow-origin') === 'https://gtg-demo-play.vercel.app' && preflight.headers.get('access-control-allow-headers') === 'Content-Type', { status: preflight.status, headers: Object.fromEntries(preflight.headers) });
   const denied = await post('/nick', { id: 'outside', nick: 'Outside' }, 'https://example.org');
   check('foreign-origin-refused', denied.status === 403 && !denied.headers.has('access-control-allow-origin'), denied.status);
   const cases = [

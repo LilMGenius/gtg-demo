@@ -1,8 +1,7 @@
-// In server/: npm ci && npx vercel link --project gtg-rank --scope <team>
-// npx vercel integration add neon --plan free_v3 -m region=pdx1 -m auth=false
+// Served by the Vercel project gtg-demo-api on team devfiance (root directory server/), built from main.
+// In server/: npm ci && npx vercel link --project gtg-demo-api --scope devfiance
 // npx vercel env pull .env.local --environment=production && npm run migrate
-// After commercial-plan upgrade: npx vercel deploy --prod
-// Set web/index.html gtg-api content to https://<deployment>/api; leave empty before cutover.
+// The game calls its own origin's web/api/; the root vercel.json rewrites that path to https://gtg-demo-api.vercel.app/api.
 import { neon } from '@neondatabase/serverless';
 import { createPostgresRankStore } from './postgres-rank.mjs';
 import { handleRankFetch } from './rank-http.mjs';

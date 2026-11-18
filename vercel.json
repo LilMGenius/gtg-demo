@@ -3,5 +3,8 @@
   "framework": null,
   "installCommand": "echo the site is static files and installs nothing",
   "buildCommand": "node tools/build-identity.mjs",
-  "outputDirectory": "."
+  "outputDirectory": ".",
+  "rewrites": [
+    { "source": "/web/api/:path*", "destination": "https://gtg-demo-api.vercel.app/api/:path*" }
+  ]
 }

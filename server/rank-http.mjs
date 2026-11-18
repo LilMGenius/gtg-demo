@@ -1,5 +1,5 @@
 function allowed(origin) {
-  if (origin === 'https://lilmgenius.github.io') return true;
+  if (origin === 'https://gtg-demo-play.vercel.app') return true;
   try {
     const url = new URL(origin);
     return ['http:', 'https:'].includes(url.protocol) && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
