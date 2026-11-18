@@ -7,14 +7,14 @@ import { fileURLToPath } from 'node:url';
 // gamewiki (MIT), https://github.com/DaedalGames/gamewiki: the site output of the same source that
 // wikisrc-gate proves for the embed output. One source has two outputs, and a lap that rebuilds one
 // and forgets the other ships half a wiki; this gate reddens when the tracked site drifts from a fresh
-// build, or when the site stops carrying the sub-path base the Pages deploy serves it under.
+// build, or when the site stops carrying the base path the deployed site serves it under.
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const CLI = join(ROOT, 'node_modules/gamewiki/dist/cli.js');
 const SOURCE = join(ROOT, 'web/wiki/src');
 const SITE = join(ROOT, 'web/wiki/site');
 const DIST = join(ROOT, 'web/wiki/dist');
 const FACTS = join(ROOT, 'web/wiki/facts.json');
-const BASE = '/gtg-demo/web/wiki/site';
+const BASE = '/web/wiki/site';
 const fails = [];
 const check = (name, ok, detail) => { console.log((ok ? 'GREEN ' : 'RED ') + name + ' ' + JSON.stringify(detail)); if (!ok) fails.push(name); };
 const files = dir => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? files(join(dir, e.name)) : [join(dir, e.name)]).sort();

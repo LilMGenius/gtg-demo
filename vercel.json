@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "echo the site is static files and installs nothing",
+  "buildCommand": "node tools/build-identity.mjs",
+  "outputDirectory": "."
+}

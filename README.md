@@ -2,9 +2,9 @@
 
 축구를 하는 게임이 아니라 골키퍼가 되는 게임. 슛 하나가 끝날 때까지 결과가 몇 번이나 뒤집힌다. 흙바닥 동네 운동장에서 시작해 훈련하고, 장비를 사고, 팔로워를 모은다.
 
-플레이: https://lilmgenius.github.io/gtg-demo/
+플레이: https://gtg-demo-play.vercel.app/
 
-위키: https://lilmgenius.github.io/gtg-demo/web/wiki/site/ (게임 안 위키 패널과 같은 글이다)
+위키: https://gtg-demo-play.vercel.app/web/wiki/site/index.html (게임 안 위키 패널과 같은 글이다)
 
 ## 로컬에서 돌리기
 

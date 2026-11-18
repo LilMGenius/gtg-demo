@@ -10,8 +10,8 @@ import { SET_END } from "../web/src/ui/lines.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const OUT = join(ROOT, ".omo", "evidence");
-const LIVE = "https://lilmgenius.github.io/gtg-demo/web/index.html";
-const WRONG = "https://lilmgenius.github.io/gtg-demo/web/nope.html";
+const LIVE = "https://gtg-demo-play.vercel.app/web/index.html";
+const WRONG = "https://gtg-demo-play.vercel.app/web/nope.html";
 const FILES = ["web/index.html", "web/src/main.mjs", "web/src/render/scene.mjs",
   "web/src/ui/wiki.mjs", "web/wiki/dist/pages.json"];
 const AXES = ["live:the-deployed-bytes-are-the-gated-bytes",
@@ -40,7 +40,7 @@ const watchdog = setTimeout(() => {
 watchdog.unref();
 
 async function deployedIdentity() {
-  // 배포의 메타데이터를 기준으로 읽어 Pages 지연을 제품 결함과 구분한다.
+  // 배포의 메타데이터를 기준으로 읽어 배포 지연을 제품 결함과 구분한다.
   const response = await api.get(new URL('build.json', LIVE).href, { headers: { 'Cache-Control': 'no-cache' } });
   if (response.status() === 404) {
     console.log('build.json not deployed yet');
@@ -54,7 +54,7 @@ async function deployedIdentity() {
     || !/^[0-9a-f]{7}$/.test(metadata.short) || metadata.short !== metadata.commit.slice(0, 7)) {
     check(AXES[5], false, 'malformed build.json'); return;
   }
-  console.log('INFO deployed short=' + metadata.short + ' HEAD=' + head.slice(0, 7) + ' equal=' + (metadata.short === head.slice(0, 7)) + ' (Pages lag is informational)');
+  console.log('INFO deployed short=' + metadata.short + ' HEAD=' + head.slice(0, 7) + ' equal=' + (metadata.short === head.slice(0, 7)) + ' (deploy lag is informational)');
   // 새 컨텍스트라 이미 열린 세션의 모듈 캐시가 배포 표본을 바꾸지 않는다.
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   try {
@@ -98,7 +98,7 @@ async function deployedBytes() {
       }
     }));
     if (pairs.every(Boolean)) return true;
-    console.log("Pages lags a push by minutes; hashes identify bytes, not an unexposed deployed commit.");
+    console.log("A deploy lags a push by minutes; hashes identify bytes, not an unexposed deployed commit.");
     if (attempt < 3) {
       console.log(`hash retry ${attempt + 1}/3 in 60s`);
       await new Promise((resolve) => setTimeout(resolve, 60000));

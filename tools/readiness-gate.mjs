@@ -54,7 +54,7 @@ axis('initial-byte-budget', () => {
       assert(!/\bimport\s*\(/.test(text), 'Dynamic import needs an explicit budget owner: ' + relative(ROOT, file));
       for (const m of text.matchAll(/\b(?:import|export)\s+(?:[^;"']*?\sfrom\s*)?["']([^"']+)["']/g)) add(m[1], file);
       /* wiki.mjs의 SITE_URL은 눌러야 새 탭으로 여는 링크라 첫 판 전에 받는 바이트가 아니다. 이걸 자원으로 세면
-         사이트 html이 절대 경로 /gtg-demo/web/wiki/site/...(Pages 배포 기준)를 달고 있어 파일 URL이 드라이브 뿌리로
+         사이트 html이 절대 경로 /web/wiki/site/...(배포 기준)를 달고 있어 파일 URL이 드라이브 뿌리로
          풀리며 저장소 밖으로 샌다. 사이트의 본문 바이트는 wikisite 게이트가 잰다. 다른 new URL은 그대로 센다. */
       for (const m of text.matchAll(/new URL\(\s*['"]([^'"]+)['"]\s*,\s*import\.meta\.url\s*\)/g)) {
         if (!/(?:^|\/)wiki\/site\//.test(m[1])) { add(m[1], file); continue; }
@@ -231,7 +231,7 @@ axis('payment-sdk-scan', () => {
   assert(/이 빌드에는 결제 경로가 없다/.test(read('web/src/state/inject.mjs')), 'inject.mjs lost the statement that this build has no payment path');
   return `${files.length} product files; payment SDK matches=0; cash is injected only, no real-money sale path at this HEAD`;
 });
-axis('hosting-declaration', () => { const url = read('tools/live-gate.mjs').match(/const LIVE = "([^"]+)"/)[1]; assert(new URL(url).hostname.endsWith('.github.io'), 'live gate target ' + url + ' is not on github.io, so the hosting declaration and R25 need review'); return url + '; live gate target, not a deployment verification; R25 sale trigger absent'; });
+axis('hosting-declaration', () => { const url = read('tools/live-gate.mjs').match(/const LIVE = "([^"]+)"/)[1]; assert(new URL(url).hostname.endsWith('.vercel.app'), 'live gate target ' + url + ' is not on the Vercel project, so the hosting declaration and R25 need review'); return url + '; live gate target on the devfiance Vercel Pro team, off GitHub Pages and its commerce ban (R25); not a deployment verification'; });
 
 // Existing browser owners are references, never recycled PASS reports.
 for (const [name, owner, marker] of [

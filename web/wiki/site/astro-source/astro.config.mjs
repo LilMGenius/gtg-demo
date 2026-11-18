@@ -1,6 +1,6 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
-export default defineConfig({ base: "/gtg-demo/web/wiki/site", build: { format: 'file' }, trailingSlash: 'never', integrations: [starlight({
+export default defineConfig({ base: "/web/wiki/site", build: { format: 'file' }, trailingSlash: 'never', integrations: [starlight({
   "disable404Route": true,
   "lastUpdated": false,
   "pagination": false,
