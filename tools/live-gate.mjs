@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { clearDraw } from "./draw.mjs";
 import { SET_END } from "../web/src/ui/lines.mjs";
+import { LANGS, translate } from "../web/src/ui/i18n.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const OUT = join(ROOT, ".omo", "evidence");
@@ -22,6 +23,13 @@ const STEP_MS = 26000;
 const started = Date.now();
 const verdicts = new Map();
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
+// The live page picks its own language, so every string this gate waits for is the Korean source run
+// through the page's own dictionary for the language the page reports. A Korean-only literal reads a
+// translated page as a missing panel.
+const said = (lang, text) => (lang === "en" ? translate(text) : text);
+const exact = (text) => new RegExp("^" + text.replace(/[.*+?^$()|[\]\\{}]/g, "\\$&") + "$");
+const CAPTIONS = Object.fromEntries(LANGS.map((lang) => [lang, Object.fromEntries([0, 1, 2, 3, 4, 5]
+  .map((saved) => [saved, SET_END.map((line) => said(lang, line.replace("{n}", String(saved))))]))]));
 const git = (...args) => execFileSync("git", args, { cwd: ROOT, timeout: 10000 });
 const head = git("rev-parse", "HEAD").toString().trim();
 mkdirSync(OUT, { recursive: true });
@@ -68,11 +76,13 @@ async function deployedIdentity() {
     // 구현의 값 대신 서버가 제공한 좌표와 실제 셀을 맞댄다.
     const expected = 'v' + metadata.version + '+g' + metadata.short;
     // 행 이름은 화면에 보이는 빌드 셀을 특정한다.
-    const cell = page.locator('#wiki tbody tr').filter({ has: page.locator('th', { hasText: /^빌드$/ }) }).locator('td');
+    const lang = await page.evaluate(() => document.documentElement.lang);
+    const label = said(lang, '빌드');
+    const cell = page.locator('#wiki tbody tr').filter({ has: page.locator('th', { hasText: exact(label) }) }).locator('td');
     // 현재 표시와 새로 읽은 메타데이터를 함께 남겨 배포 전후를 재현한다.
     const actual = await cell.innerText();
-    check(AXES[5], await cell.isVisible() && actual === expected, 'screen=' + actual + ' metadata=' + expected);
-    writeFileSync(join(OUT, 'bc-live-build.json'), JSON.stringify({ metadata, actual, expected, head }, null, 2));
+    check(AXES[5], await cell.isVisible() && actual === expected, 'lang=' + lang + ' label=' + label + ' screen=' + actual + ' metadata=' + expected);
+    writeFileSync(join(OUT, 'bc-live-build.json'), JSON.stringify({ metadata, lang, label, actual, expected, head }, null, 2));
   } finally { await context.close(); }
 }
 
@@ -283,13 +293,13 @@ async function phoneRound(url, control = false, requiredLogin = false) {
       result.balls = await page.locator("#pips i.gone, #pips i.save").count();
       console.log(`phone ${control ? "control" : "live"} ball=${result.balls}/5 wallMs=${Date.now() - t0}`);
     }
-    await page.waitForFunction((templates) => {
+    await page.waitForFunction((captions) => {
       const saved = document.querySelectorAll("#pips i.save").length;
       const caption = document.querySelector("#caption");
       return document.querySelectorAll("#pips i.gone, #pips i.save").length === 5
         && document.querySelector("#lv")?.textContent === "Lv 2"
-        && caption && templates.some((text) => text.replace("{n}", String(saved)) === caption.innerText);
-    }, SET_END, { timeout: STEP_MS });
+        && caption && (captions[document.documentElement.lang]?.[saved] ?? []).includes(caption.innerText);
+    }, CAPTIONS, { timeout: STEP_MS });
     result.surface = await page.locator("#caption").isVisible();
     result.caption = await page.locator("#caption").innerText();
     if (!control && !requiredLogin) {
