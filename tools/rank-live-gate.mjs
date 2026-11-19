@@ -22,6 +22,8 @@ if (apiIndex !== -1) {
   const url = new URL(process.argv[apiIndex + 1]);
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('--api requires an HTTP(S) URL');
   if (url.pathname === '/') url.pathname = '/api';
+  // Production keeps its own database and every scenario below writes players, so this mode runs on a preview only.
+  if (['gtg-demo-api.vercel.app', 'gtg-demo-play.vercel.app'].includes(url.hostname)) throw new Error('--api must name a preview deployment; production players stay real');
   process.env.RANK_API = url.href;
 }
 const local = apiIndex === -1 && !process.argv.includes('--preview');
