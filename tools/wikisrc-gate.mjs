@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import { gameUrl } from './game-url.mjs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -12,9 +13,7 @@ import * as gram from '../web/src/state/gram.mjs';
 // gamewiki (MIT), https://github.com/DaedalGames/gamewiki: use its compiled CLI
 // for both clean and mutated builds. Browser setup follows this repo's wiki-gate.
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
-// The panel axes compare the painted body with the Korean source in pages.json, so lang=ko pins the
-// source language; a first visit opens in English and the dictionary layer would rewrite every paragraph.
-const BASE = 'http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran&lang=ko';
+const BASE = gameUrl('seed=20&preset=veteran');
 const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
 const CLI = join(ROOT, 'node_modules/gamewiki/dist/cli.js');
 const SOURCE = join(ROOT, 'web/wiki/src');

@@ -1,10 +1,10 @@
 import { chromium } from 'playwright';
+import { gameUrl } from './game-url.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { KEY_MAP } from '../web/src/ui/keys.mjs';
 
 // Reuses the repo's wiki-gate browser and preset mechanism; this measures keyboard input.
-const BASE = 'http://127.0.0.1:10310/web/index.html';
 const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
 const ROOT = new URL('../', import.meta.url);
 const evidence = new URL('.omo/evidence/', ROOT);
@@ -31,7 +31,7 @@ try {
     const p = await context.newPage();
     p.on('pageerror', (e) => errors.push(e.message));
     if (control) await p.route('**/web/src/main.mjs', (route) => route.fulfill({ contentType: 'text/javascript', body: parent }));
-    await p.goto(BASE + '?seed=20&preset=' + preset);
+    await p.goto(gameUrl('seed=20&preset=' + preset));
     await p.waitForSelector('#go');
     // Start by navigating native tab order, never assigning focus or clicking.
     for (let i = 0; i < 30 && !(await p.locator('#go').evaluate((b) => b === document.activeElement)); i++) await p.keyboard.press('Tab');
@@ -118,7 +118,7 @@ try {
   const firstTab = async (leak) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const q = await ctx.newPage();
-    await q.goto(BASE + '?seed=20'); await q.waitForSelector('#go');
+    await q.goto(gameUrl('seed=20')); await q.waitForSelector('#go');
     if (leak) await q.evaluate(() => { const h = document.getElementById('hud'); new MutationObserver(() => { if (h.inert) h.inert = false; }).observe(h, { attributes: true }); h.inert = false; });
     await q.keyboard.press('Tab');
     const id = await q.evaluate(() => document.activeElement.id || document.activeElement.tagName);

@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import { gameUrl } from './game-url.mjs';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PULL_KINDS, PULL_BULK, KEEPERS, KICKERS, poolFor } from '../src/roster.mjs';
@@ -17,7 +18,7 @@ const t = setTimeout(() => { console.log('WATCHDOG'); process.exit(1); }, 240000
 const shots = fileURLToPath(new URL('../.omo/evidence/s2/', import.meta.url));
 mkdirSync(shots, { recursive: true });
 const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
-const BASE = 'http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran';
+const BASE = gameUrl('seed=20&preset=rich,veteran');
 const fails = [], notes = [];
 const check = (n, ok, d) => (ok ? notes : fails).push(n + ' ' + (typeof d === 'string' ? d : JSON.stringify(d)));
 const top = Math.max(...PULL_KINDS.map((k) => k.floor));

@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { gameUrl } from "./game-url.mjs";
 import { readCloseFloor, closeFloorSaid } from "./close-floor.mjs";
 import { KICKERS, ROLES } from "../src/roster.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
@@ -12,7 +13,7 @@ import { GROWABLE } from "../src/ledger.mjs";
 // 대조군으로 칸을 옮겨 다니며 같은 것을 다시 잰다. 한 칸만 재면 나머지 둘은 아무도 안 본다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 // famous는 라포 줄을, seed 20은 전적 줄을, rich는 영입 카드의 값을 살아 있게 만든다.
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=famous,rich,veteran";
+const BASE = gameUrl("seed=20&preset=famous,rich,veteran");
 // 새 계정 판. 프리셋은 개봉을 건너뛰는 것 하나만 남긴다. 빈 아는 얼굴 칸은 라포가 없는 사람의
 // 화면이라, 라포를 심어 둔 이 판에서는 구조적으로 안 나온다.
 const NEW = BASE.replace(/preset=[^&]*/, "preset=veteran");

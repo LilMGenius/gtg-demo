@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { gameUrl } from "./game-url.mjs";
 import { PULL_BULK, PULL_BONUS, pullYield, ROLES, ROLE_SLOTS, kickerByName } from "../src/roster.mjs";
 import { TEAM_RULE } from "../src/reality.mjs";
 import { STAGE_LAST, pressOpen, tapClose } from "./draw.mjs";
@@ -10,7 +11,7 @@ import { STAGE_LAST, pressOpen, tapClose } from "./draw.mjs";
 // 첫 키퍼가 못 박혀 있는가, 이어서 키커 열한 장이 오는가, 그 열한 장이 실제로 주전에 서는가.
 // 대조군은 이미 하던 사람이다. 그 사람에게 이 화면이 다시 열리면 판이 뒤집힌다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20";
+const BASE = gameUrl("seed=20");
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 180000);
 t.unref();

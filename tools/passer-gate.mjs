@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { gameUrl } from "./game-url.mjs";
 import { makeRng, buildSet } from "../src/chain.mjs";
 import { passerAt, passerName, passerCountAt } from "../web/src/state/passer.mjs";
 
@@ -7,7 +8,7 @@ import { passerAt, passerName, passerCountAt } from "../web/src/state/passer.mjs
 
 // 표본 범위: 키퍼 스탯을 안 쓴다. 행인 이름표는 도시와 번호와 라포 단계만 읽으므로 어떤 키퍼로 재도 같은 결과가 나온다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?preset=veteran";
+const BASE = gameUrl("preset=veteran");
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 120000);
 t.unref();
 

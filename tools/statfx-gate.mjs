@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { gameUrl } from "./game-url.mjs";
 import { impactBase, statImpact, statHeld } from "../web/src/state/impact.mjs";
 import { GROWABLE } from "../src/ledger.mjs";
 
@@ -6,7 +7,7 @@ import { GROWABLE } from "../src/ledger.mjs";
 // 묻는 것은 셋이다. 화면의 수가 같은 키퍼로 노드에서 잰 수와 같은가, 열다섯 칸이 전부 채워지는가,
 // 1인 칸의 몫이 0인가. 대조군은 한 칸을 올린 키퍼로 잰 수가 화면과 갈리는지다. 안 갈리면 이 자는 키퍼를 안 본다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const URL = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
+const URL = gameUrl("seed=20&preset=rich,veteran");
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 170000);
 t.unref();
 const fails = [], notes = [];

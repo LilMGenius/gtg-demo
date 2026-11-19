@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { gameUrl } from "./game-url.mjs";
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { serveRetired } from './retired.mjs';
@@ -22,7 +23,7 @@ import { PULL_COST, PULL_BULK, PULL_BONUS, TICKET_CAP } from "../src/roster.mjs"
 // 최상급은 wiki.mjs가 COIN_SAVE + COIN_FAME_STEP * 9로 굽고 여기서도 같은 식을 따로 적으므로,
 // 한쪽의 9만 바뀌면 빨개진다. 상수 자체가 틀린 것은 그 모듈의 몫이지 이 자의 몫이 아니다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=veteran";
+const BASE = gameUrl("seed=20&preset=veteran");
 const LINE = String.fromCharCode(10);
 // 카테고리 아홉. 키는 ASCII다. 화면 라벨로 찾으면 라벨을 다듬은 날 자가 같이 죽는다.
 const KEYS = ["game", "hand", "coin", "drill", "gear", "pull", "gram", "bot", "buff", "risk", "rank"];

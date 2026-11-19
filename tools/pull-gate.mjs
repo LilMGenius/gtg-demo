@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { gameUrl } from "./game-url.mjs";
 import { KEEPERS, keeperCost, PULL_COST, pullWeight, pullFrom } from "../src/roster.mjs";
 
 // 이적시장은 상점에서 유일하게 값을 알고 이름을 모르는 축인데 아무도 재지 않았다.
@@ -19,7 +20,7 @@ const mul32 = (a) => () => {
 };
 
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?preset=rich,veteran";
+const BASE = gameUrl("preset=rich,veteran");
 const LINE = String.fromCharCode(10);
 const t = setTimeout(() => { console.log("WATCHDOG"); process.exit(1); }, 90000);
 t.unref();

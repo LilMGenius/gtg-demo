@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { gameUrl } from "./game-url.mjs";
 
 // 값 표기의 자. 상단 잔고는 아이콘인데 상점 버튼은 '140 골드'처럼 글자였다.
 // 같은 재화가 두 표기로 갈리면 어느 재화로 사는지가 글자를 읽어야 아는 정보가 된다.
@@ -8,7 +9,7 @@ import { chromium } from "playwright";
 // 앞의 둘은 대조군을 달고 온다. 판에 '골드' 글자를 심어서 자가 그것을 잡는지 먼저 본다.
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
 // maxed는 훈련장의 잉여 훈련 환전 줄을 열고, rich는 상점 값이 전부 모자람 문구로 덮이는 것을 막는다.
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=maxed,rich,veteran";
+const BASE = gameUrl("seed=20&preset=maxed,rich,veteran");
 const LINE = String.fromCharCode(10);
 // 재화 이름은 화면과 같은 글자로 대조한다.
 // 값은 아래 대조군이 검증한다.

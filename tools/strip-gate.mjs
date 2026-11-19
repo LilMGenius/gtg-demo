@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { gameUrl } from "./game-url.mjs";
 
 // 시착용을 무르는 자의 자. 걸친 것을 벗는 길이 카드를 다시 찾아 누르는 것뿐이면,
 // 무엇을 걸쳤는지 아는 자리와 그것을 무르는 자리가 갈려 있다.
@@ -27,7 +28,7 @@ try {
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
   p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
-  await p.goto("http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran", { waitUntil: "load" });
+  await p.goto(gameUrl("seed=20&preset=rich,veteran"), { waitUntil: "load" });
   await p.waitForSelector("#go", { timeout: 15000 });
   await p.click("#go", { force: true });
   await p.waitForTimeout(1300);

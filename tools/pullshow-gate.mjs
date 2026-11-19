@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { gameUrl } from "./game-url.mjs";
 import { pressOpen, tapClose } from "./draw.mjs";
 
 /* 개봉 연출의 자. 뽑은 열 장이 상점 카드 안 58x34 칩으로 1.3초에 스쳐 지나갔고, 그 다음 판은
@@ -29,7 +30,7 @@ import { pressOpen, tapClose } from "./draw.mjs";
    나오는 장이 반드시 희귀하다. 동네 열한 장은 명성 9가 무게로 8.5%뿐이라 한 장도 안 나오는
    회차가 셋에 하나꼴이고, 그 회차에서는 등급 축 둘이 표본 없이 죽는다. */
 const EXE = process.env.LOCALAPPDATA + "/ms-playwright/chromium-1228/chrome-win64/chrome.exe";
-const BASE = "http://127.0.0.1:10310/web/index.html?seed=20&preset=rich,veteran";
+const BASE = gameUrl("seed=20&preset=rich,veteran");
 const LINE = String.fromCharCode(10);
 // 다섯 단. 0 봉인, 1 등급 신호, 2 실루엣, 3 이름과 초상, 4 스탯 다섯 줄이다.
 const STAGES = 5;
