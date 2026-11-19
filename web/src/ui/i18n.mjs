@@ -5,7 +5,7 @@
 import EN from './i18n-en.json' with { type: 'json' };
 
 const KEY = 'gtg.lang';
-const HANGUL = /[\uac00-\ud7a3]/;
+const HANGUL = /[가-힣]/;
 const NUM = /\d+(?:[.,]\d+)*/g;
 const ATTRS = ['aria-label', 'title', 'placeholder', 'alt'];
 

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 // invents a number slot, or a fixed label in index.html with no entry would each ship Korean or a broken
 // number to an English player, so all three fail here without a browser. --selftest plants one of each.
 const ROOT = new URL('../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const HANGUL = /[\uac00-\ud7a3]/;
+const HANGUL = /[가-힣]/;
 const NUM = /\d+(?:[.,]\d+)*/g;
 const keyOf = (s) => { let i = 0; return s.replace(/\s+/g, ' ').trim().replace(NUM, () => '{' + i++ + '}'); };
 const slots = (s) => (s.match(/\{\d+\}/g) || []).sort().join(',');

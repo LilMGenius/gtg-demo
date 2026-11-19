@@ -8,7 +8,7 @@ import { translate } from '../web/src/ui/i18n.mjs';
 // A run that only plays a minute misses captions behind rare branches; source does not.
 // --selftest plants an untranslatable line in a copy of the corpus and requires it to turn the gate red.
 const ROOT = new URL('../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const HANGUL = /[\uac00-\ud7a3]/;
+const HANGUL = /[가-힣]/;
 const files = [];
 const walk = (d) => { for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) walk(p); else if (f.endsWith('.mjs') && !f.startsWith('i18n')) files.push(p); } };
 walk(join(ROOT, 'web/src'));

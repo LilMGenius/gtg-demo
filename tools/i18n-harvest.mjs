@@ -11,7 +11,7 @@ const STATIC_ONLY = process.argv.includes('--static-only');
 // lang=ko pins the source language; headless Chrome reports an English locale and would otherwise translate.
 const BASE = 'http://127.0.0.1:' + PORT + '/web/index.html?seed=20&preset=rich,famous,veteran&lang=ko';
 const EXE = process.env.LOCALAPPDATA + '/ms-playwright/chromium-1228/chrome-win64/chrome.exe';
-const HANGUL = /[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7A3]/;
+const HANGUL = /[ᄀ-ᇿ㄰-㆏가-힣]/;
 const OUT = join(ROOTP, '.omo', 'i18n-harvest.local.json');
 
 // ---- static scan -------------------------------------------------------------------------
@@ -125,7 +125,7 @@ export function toKey(raw) {
 
 // ---- browser drive -----------------------------------------------------------------------
 const INIT = () => {
-  const H = /[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7A3]/;
+  const H = /[ᄀ-ᇿ㄰-㆏가-힣]/;
   const seen = (window.__hv = window.__hv || { text: new Set(), attr: new Set() });
   const ATTRS = ['aria-label', 'title', 'placeholder', 'alt'];
   const take = (node) => {

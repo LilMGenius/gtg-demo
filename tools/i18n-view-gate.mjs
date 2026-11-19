@@ -14,7 +14,7 @@ const visibleHangul = (p) => p.evaluate(() => {
   const w = document.createTreeWalker(document.getElementById('hud'), NodeFilter.SHOW_TEXT);
   for (let n = w.nextNode(); n; n = w.nextNode()) {
     const e = n.parentElement;
-    if (!/[\uac00-\ud7a3]/.test(n.nodeValue) || e.closest('[hidden],[data-i18n-skip]')) continue;
+    if (!/[가-힣]/.test(n.nodeValue) || e.closest('[hidden],[data-i18n-skip]')) continue;
     const r = e.getBoundingClientRect();
     if (r.width && r.height && getComputedStyle(e).visibility !== 'hidden') out.add(n.nodeValue.trim());
   }
@@ -62,7 +62,7 @@ try {
   check('i18n:english-is-declared', lang[0] === 'en' && lang[1] === 'true', lang);
   await en.p.click('#lang');
   const back = await en.p.evaluate(() => [document.documentElement.lang, localStorage.getItem('gtg.lang'), document.getElementById('lang').getAttribute('aria-label')]);
-  check('i18n:button-flips-to-korean', back[0] === 'ko' && back[1] === 'ko' && /[\uac00-\ud7a3]/.test(back[2]), back);
+  check('i18n:button-flips-to-korean', back[0] === 'ko' && back[1] === 'ko' && /[가-힣]/.test(back[2]), back);
   await en.p.click('#lang');
   await en.p.goto(BASE + '?seed=20');
   await en.p.waitForSelector('#go');
